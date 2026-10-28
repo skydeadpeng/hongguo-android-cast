@@ -28,7 +28,7 @@ SRC="$ROOT/app/src/main/java/io/github/jackotom/hongguo/android"
  "$TMP/android/content/Context.java" "$TMP/android/content/SharedPreferences.java" "$TMP/android/media/PlaybackParams.java" "$TMP/android/media/MediaPlayer.java" "$SRC/PlayerOptions.java" "$ROOT/tests/PlayerOptionsTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.PlayerOptionsTest
 cat > "$TMP/io/github/jackotom/hongguo/android/BuildConfig.java" <<'STUB'
-package io.github.jackotom.hongguo.android;public final class BuildConfig {public static final boolean IS_TV=false,DEBUG=true;public static final String VERSION_NAME="0.4.0";}
+package io.github.jackotom.hongguo.android;public final class BuildConfig {public static final boolean IS_TV=false,NATIVE_UI=false,DEBUG=true;public static final String VERSION_NAME="0.4.0";}
 STUB
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -source 17 -target 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d "$TMP/sdk35" "$TMP/io/github/jackotom/hongguo/android/BuildConfig.java" "$SRC/"*.java
 echo 'PASS PlayerOptions SDK35 allProductionCompile=true deviceUntouched=true'

@@ -29,8 +29,17 @@ android {
     }
     flavorDimensions 'device'
     productFlavors {
-        phone { dimension 'device'; buildConfigField 'boolean', 'IS_TV', 'false' }
-        tv { dimension 'device'; applicationIdSuffix '.tv'; buildConfigField 'boolean', 'IS_TV', 'true' }
+        phone { dimension 'device'; buildConfigField 'boolean', 'IS_TV', 'false'; buildConfigField 'boolean', 'NATIVE_UI', 'false' }
+        tv { dimension 'device'; applicationIdSuffix '.tv'; buildConfigField 'boolean', 'IS_TV', 'true'; buildConfigField 'boolean', 'NATIVE_UI', 'false' }
+        // Independent WebView-free TV line: own applicationId and version series.
+        tvNative {
+            dimension 'device'
+            applicationIdSuffix '.tvnative'
+            versionCode 3
+            versionName '0.1.2'
+            buildConfigField 'boolean', 'IS_TV', 'true'
+            buildConfigField 'boolean', 'NATIVE_UI', 'true'
+        }
     }
     buildFeatures { buildConfig true }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }

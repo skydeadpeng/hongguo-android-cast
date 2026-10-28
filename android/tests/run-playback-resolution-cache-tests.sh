@@ -23,5 +23,5 @@ cat > "$TMP/android/content/Context.java" <<'JAVA'
 package android.content;public class Context{private final java.io.File root;public Context(java.io.File root){this.root=root;}public Context getApplicationContext(){return this;}public java.io.File getCacheDir(){return root;}}
 JAVA
 SRC="$ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
-"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/android/content/Context.java" "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" "$SRC/PlaybackCache.java" "$OWN/android/tests/PlaybackResolutionCacheTest.java"
+"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/android/content/Context.java" "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" "$SRC/PlaybackCache.java" "$OWN/android/tests/PlaybackResolutionCacheTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.PlaybackResolutionCacheTest

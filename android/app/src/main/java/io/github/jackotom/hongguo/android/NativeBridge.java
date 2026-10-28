@@ -342,18 +342,7 @@ final class NativeBridge {
         activity.runOnUiThread(() -> {
             try (UpdateOperationGate.Lease held = launchLease) {
                 if (closed || activity.isFinishing() || activity.isDestroyed()) return;
-                JSONObject defaults = PlayerOptions.read(activity);
-                String quality = MediaQuality.normalize(params.optString("quality", defaults.getString("quality")));
-                double speed = params.optDouble("speed", defaults.getDouble("speed"));
-                PlayerOptions.validateSpeed(speed);
-                Intent intent = new Intent(activity, PlayerActivity.class).putExtra("series", series.toString()).putExtra("episode", episode.toString())
-                    .putExtra("episodes", episodes.toString()).putExtra("url", url).putExtra("download", local)
-                    .putExtra("quality", quality).putExtra("speed", speed)
-                    .putExtra("autoplay", params.optBoolean("autoplay", true)).putExtra("cleanupPlaybackCache", params.optBoolean("cleanupPlaybackCache", true))
-                    .putExtra("keepPreviousEpisodes", 1).putExtra("playInfo", params.optJSONObject("playInfo") == null ? "" : params.getJSONObject("playInfo").toString());
-                // The compact descriptor crosses Binder once. Decorated per-episode owners
-                // exist only inside the player/services, never duplicated in Intent extras.
-                if (!local && params.optJSONObject("playlist") != null) intent.putExtra("playlist", params.getJSONObject("playlist").toString());
+                Intent intent = PlayLauncher.build(activity, series, episode, episodes, url, local, params);
                 UpdateInstallCheckpoint.playerLaunching();
                 activity.startActivity(intent); respond(id, new JSONObject().put("started", true), null);
             } catch (Exception error) { respond(id, null, "播放器启动未成功"); }

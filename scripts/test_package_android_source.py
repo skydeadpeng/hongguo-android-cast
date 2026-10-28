@@ -217,6 +217,86 @@ class SourcePackageTests(unittest.TestCase):
         with self.assertRaises(packager.PackageError):
             packager.validate_archive(wrong_version)
 
+    def multi_flavor_gradle(self):
+        return """// versionName '9.9.9' and braces { } in a comment are inert.
+android {
+    namespace 'example.versionName'
+    defaultConfig { versionCode 41; versionName '0.12.18' }
+    productFlavors {
+        phone { dimension 'device' }
+        tv { dimension 'device' }
+        tvNative {
+            dimension 'device'
+            applicationIdSuffix '.tvnative'
+            versionCode 3
+            versionName '0.1.2'
+        }
+    }
+}
+"""
+
+    def test_native_multiflavor_package_selects_its_own_version(self):
+        self.put("android/app/build.gradle", self.multi_flavor_gradle())
+        result = packager.package_source(self.source, self.git, self.output, device="tvnative")
+        self.assertEqual((result["versionName"], result["versionCode"]), ("0.1.2", 3))
+        manifest = packager.validate_archive(self.output)
+        self.assertEqual(manifest["device"], "tvnative")
+        self.assertEqual((manifest["versionName"], manifest["versionCode"]), ("0.1.2", 3))
+        self.assertEqual(packager.version_from(self.multi_flavor_gradle(), "phone"), ("0.12.18", 41))
+        self.assertEqual(packager.version_from(self.multi_flavor_gradle(), "tv"), ("0.12.18", 41))
+
+    def rewrite_manifest(self, source, output, change):
+        with zipfile.ZipFile(source) as old, zipfile.ZipFile(output, "w") as new:
+            for info in old.infolist():
+                data = old.read(info)
+                if info.filename == packager.MANIFEST:
+                    value = json.loads(data)
+                    change(value)
+                    data = json.dumps(value).encode("utf-8")
+                new.writestr(info, data)
+
+    def test_native_archive_wrong_version_or_flavor_is_rejected(self):
+        self.put("android/app/build.gradle", self.multi_flavor_gradle())
+        packager.package_source(self.source, self.git, self.output, device="tvnative")
+        for key, value in [("device", "phone"), ("device", "TVNative"), ("versionCode", 41), ("versionName", "0.12.18")]:
+            output = self.base / ("changed-" + key + str(value) + ".zip")
+            self.rewrite_manifest(self.output, output, lambda m, k=key, v=value: m.update({k: v}))
+            with self.subTest(key=key, value=value), self.assertRaises(packager.PackageError):
+                packager.validate_archive(output)
+
+    def test_legacy_manifest_without_device_defaults_to_phone(self):
+        self.package()
+        legacy = self.base / "legacy.zip"
+        self.rewrite_manifest(self.output, legacy, lambda m: m.pop("device", None))
+        self.assertEqual(packager.validate_archive(legacy)["versionName"], "0.12.12")
+
+    def test_version_parser_skips_comments_strings_and_other_scopes(self):
+        replacement = "namespace \"a { versionName '8.8.8' }\"\n    /* defaultConfig { versionCode 999; versionName '9.9.9' } */"
+        source = self.multi_flavor_gradle().replace("namespace 'example.versionName'", replacement)
+        self.assertEqual(packager.version_from(source, "tvnative"), ("0.1.2", 3))
+        self.assertEqual(packager.version_from("versionCode 7; versionName '1.2.3'"), ("1.2.3", 7))
+
+    def test_ambiguous_dynamic_or_missing_native_versions_are_rejected(self):
+        fixtures = [
+            self.multi_flavor_gradle().replace("versionCode 3", "versionCode 3; versionCode 4"),
+            self.multi_flavor_gradle().replace("versionName '0.1.2'", "versionName nativeVersion"),
+            self.multi_flavor_gradle().replace("versionName '0.1.2'", "versionName '0.1.2' + suffix"),
+            self.multi_flavor_gradle().replace("versionCode 3", "if (enabled) { versionCode 3 }"),
+            self.multi_flavor_gradle().replace("tvNative {", "other {"),
+            self.multi_flavor_gradle() + "android { defaultConfig { versionCode 3; versionName '0.1.2' } }",
+        ]
+        for source in fixtures:
+            with self.subTest(source=source), self.assertRaises(packager.PackageError):
+                packager.version_from(source, "tvnative")
+        with self.assertRaises(packager.PackageError):
+            packager.version_from(self.multi_flavor_gradle(), "TVNative")
+
+    def test_cli_device_argument_creates_native_metadata(self):
+        self.put("android/app/build.gradle", self.multi_flavor_gradle())
+        result = subprocess.run([sys.executable, str(HERE / "package-android-source.py"), "--root", str(self.source), "--git-root", str(self.git), "--output", str(self.output), "--device", "tvnative"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["device"], "tvnative")
+
     def test_changed_source_during_packaging_cannot_publish_a_stale_snapshot(self):
         original = packager.source_files
         def changed(*args, **kwargs):

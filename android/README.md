@@ -1,9 +1,10 @@
 # Android 原生宿主
 
-同一套移动界面打包为两种独立安装包：
+项目提供三种可独立安装的 flavor：
 
 - `phone`：手机启动入口，包名 `io.github.jackotom.hongguo.android`。
 - `tv`：横屏、Leanback 启动入口、遥控器导航，包名后缀 `.tv`，可与手机版共存。
+- `tvNative`：无 WebView 的独立原生 TV 版（面向系统 WebView 过旧的设备），包名后缀 `.tvnative`、独立版本线 0.1.x（当前 0.1.2 / code3）、原生界面 + Java 取源，与上两者共存。本机数据与下载不跨包自动迁移；支持自己的自动更新渠道。详见根目录 README 的「原生 TV 独立版」与 `ANDROID.md`。
 
 Android 8.0 / API 26 起；编译 / target API 35；Java 17；AGP 8.7.2。无第三方 Android 运行库。正式发布前请配置自己的 release 签名；debug APK 仅使用本机 Android debug keystore。
 

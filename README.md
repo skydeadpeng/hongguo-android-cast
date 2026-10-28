@@ -17,17 +17,18 @@
 
 ## 下载与安装
 
-Android 版本：**0.12.14 / code37**。手机、TV 安装包及对应源码在 [v0.12.14 Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.14) 分发；本地构建输出位于 `dist/android/`。
+手机 / TV WebView 当前版本：**0.12.18 / code41**，见 [v0.12.18 Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.18)。独立原生 TV 当前版本：**0.1.2 / code3**，见 [v0.1.2 Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.2)。本地构建输出位于 `dist/android/`。
 
 | 版本 | 文件名 | 用途 |
 | --- | --- | --- |
-| 手机 | `Hongguo-0.12.14-phone-release-compatible.apk` | 手机触控、本机播放、DLNA / 浏览器投屏 |
-| TV / 盒子 | `Hongguo-0.12.14-tv-release-compatible.apk` | 电视独立播放、遥控操作、本机记录与弹幕 |
+| 手机 WebView | `Hongguo-0.12.18-phone-release-compatible.apk` | 手机触控、本机播放、DLNA / 浏览器投屏 |
+| TV WebView | `Hongguo-0.12.18-tv-release-compatible.apk` | 系统 WebView 界面，电视遥控与原生播放 |
+| 独立原生 TV | `HongguoNative-0.1.2-tvNative-release-compatible.apk` | 全原生电视界面与 Java 取源，不依赖系统 WebView |
 
-- Android **8.0+**（API 26），使用设备系统 WebView 与原生视频解码器。
+- 三种安装包均要求 Android **8.0+**（API 26），使用原生视频解码器；只有手机 / TV WebView 版的界面依赖系统 WebView。
 - 手机与 TV 使用不同应用 ID。TV 版是独立播放器，安装 TV APK 不会自动把电视变成 DLNA 接收器。
 - `release-compatible` 为非调试 release 构建，但沿用既有安装证书，方便旧用户覆盖安装保留记录；不是独立生产签名。自行构建时，只有使用同一证书才能覆盖原包。
-- [桌面版原说明](README.desktop.md)与 Electron 桌面源码仍保留，当前基线为 2.3.0；Android 独立版本号为 0.12.14，只按需借鉴上游改进，未整体升级为桌面 3.8。
+- [桌面版原说明](README.desktop.md)与 Electron 桌面源码仍保留，当前基线为 2.3.0；Android 手机 / TV WebView 版本号为 0.12.18，原生 TV 使用独立的 0.1.x 版本线，只按需借鉴上游改进，未整体升级为桌面 3.8。
 - 0.12.12 接入官方短信登录/MFA、官方云同步、官方系列剧目录及完整账号隔离。游客记录仅显式确认后导入；较大账号库采用有界UI投影和原生单剧进度点查。
 - 0.12.11 移除自建同步账号功能，新增本机只读时间轴弹幕与应用内更新器；首个更新器版本需手动安装，稳定更新清单需随自己的 Release 发布。官方短信登录尚未接入。
 - 0.12.10 对 App 取源的 HTTP 200 空数据增加一次同集、同画质的有界重签恢复，区分空响应与无效格式；不把空响应当作高清缺失，不自动跳集。
@@ -36,6 +37,35 @@ Android 版本：**0.12.14 / code37**。手机、TV 安装包及对应源码在 
 0.12.13 补齐游客收藏导入、播放中进度 checkpoint、不确定发码输入和MFA边界；修复会话刷新丢失、同步状态卡住及旧剧详情刷新。0.12.12历史资产保持不变；安装0.12.11及后续版本的用户可在「关于 → 版本更新」检查升级。
 
 0.12.14 修复应用覆盖升级后缓存恢复的状态误报：缓存包必须完整验证通过才显示“可继续安装”；同版已安装、损坏、签名不匹配等缓存会清理，不把删除后的包当作可安装。
+
+## 原生 TV 独立版
+
+**给电视或盒子直接安装使用的原生客户端，不是手机版，也不是手机投屏接收器。** 适合系统 WebView 老旧、网页版界面兼容性欠佳的设备；电视端用于本机播放，手机端保留 DLNA / 浏览器投屏控制。
+
+| 项目 | 说明 |
+| --- | --- |
+| 当前版本 | **0.1.2 / code3**，独立维护，不与 WebView 版 0.12.x 比较版本号 |
+| 构建 flavor | `tvNative` |
+| 包名 | `io.github.jackotom.hongguo.android.tvnative` |
+| 运行方式 | Java 原生界面、原生取源与共享播放器，横屏 / 遥控器操作 |
+| 安装包 | [HongguoNative-0.1.2-tvNative-release-compatible.apk](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.2/HongguoNative-0.1.2-tvNative-release-compatible.apk) |
+| 对应源码 | [0.1.2 源码与校验和](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.2)；此仓库同时保留整个红果项目源码 |
+
+- **界面与观看**：海报分类、搜索与搜索历史管理、收藏、观看历史与续播、详情选集和分季；支持清晰度、倍速、自动连播、弹幕和本机下载 / 离线播放 / 确认删除。
+- **遥控器**：方向键移动，确认键进入或播放，返回键返回；白色边框表示当前焦点，红色状态表示当前栏目或分类。
+- **账号与数据**：可接入红果官方手机号登录及收藏 / 历史 / 进度同步。三种安装包可共存，但各自的本机记录、下载文件与设置独立；不会自动读取另一包的数据。游客记录只在确认后导入当前账号。
+- **自动升级**：设置内「自动检查更新」默认开启，启动、返回前台与前台周期检查；成功检查间隔 24 小时，失败按 15 分钟间隔重试。发现新版后确认下载，校验大小、SHA-256、包名、版本和签名后，再由系统确认安装；播放中不弹出升级提示。关闭自动后仍可手动检查。
+- **安装选择**：TV WebView 版和原生 TV 版可同时保留；只在同包名、同签名的原生版本之间覆盖升级。原生渠道使用 `android/update-tvnative.json`，不会替换手机 / TV WebView 稳定清单。
+
+```sh
+# 独立原生 TV：使用现有兼容证书的 release 构建
+bash scripts/build-android.sh --tvnative-release-compatible
+
+# 仅编译原生 TV debug，适合已准备好 Android SDK 的开发环境
+gradle -p android :app:assembleTvNativeDebug
+```
+
+界面与下载播放已在 Android 模拟器验证；具体电视遥控、厂商系统和解码兼容性仍以设备表现为准。更新流程与源码发布步骤见 [应用内更新](docs/ANDROID-UPDATES.md)。
 
 ## 三步开始 DLNA 投屏
 
@@ -77,12 +107,13 @@ Android 版本：**0.12.14 / code37**。手机、TV 安装包及对应源码在 
 ```sh
 npm ci
 
-# 手机与 TV debug 包
+# 手机 / TV WebView / 原生 TV debug 包
 npm run build:android
 
 # 非调试 release 构建，使用本机兼容证书
 npm run build:android:phone:release-compatible
 npm run build:android:tv:release-compatible
+bash scripts/build-android.sh --tvnative-release-compatible
 ```
 
 结果写入 `dist/android/`。兼容证书默认读取 `~/.android/debug.keystore`，也可通过 `HONGGUO_COMPAT_KEYSTORE` 指定；新证书与发布包证书不一致时，需要卸载后安装，卸载前请保存所需数据。
@@ -100,7 +131,8 @@ npm run build:android:tv:release
 
 | 路径 | 内容 |
 | --- | --- |
-| `src/android/` | 手机 / TV 界面、桥接与数据源解析 |
+| `src/android/` | 手机 / TV WebView 界面、桥接与数据源解析 |
+| `android/app/src/tvNative/` | 独立原生 TV 启动配置；界面由 Java `Tv*` 类实现 |
 | `android/` | 原生播放器、DLNA、浏览器接收、缓存与本机记录 |
 | `server/login/` | 历史自建服务源码（Android 0.12.11 起不再连接） |
 | `src/native/` | 与桌面版共享的部分取源实现 |

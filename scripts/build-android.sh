@@ -9,9 +9,9 @@ if [[ "$#" -gt 1 ]]; then
   exit 2
 fi
 case "$MODE" in
-  --debug) ;;
-  --tv-release-compatible|--phone-release-compatible) ;;
-  --tv-release|--phone-release)
+--debug) ;;
+--tv-release-compatible|--phone-release-compatible|--tvnative-release-compatible) ;;
+--tv-release|--phone-release|--tvnative-release)
     for name in HONGGUO_RELEASE_KEYSTORE HONGGUO_RELEASE_STORE_PASSWORD HONGGUO_RELEASE_KEY_ALIAS; do
       [[ -n "${!name:-}" ]] || { printf 'Missing %s for external release signing.\n' "$name" >&2; exit 2; }
     done
@@ -25,6 +25,8 @@ Usage: bash scripts/build-android.sh [mode]
   --tv-release              Build TV release using external HONGGUO_RELEASE_* signing credentials.
   --phone-release-compatible Build phone release using the existing debug install certificate.
   --phone-release           Build phone release using external signing credentials.
+  --tvnative-release-compatible Build the WebView-free native TV release with the debug install certificate.
+  --tvnative-release        Build the WebView-free native TV release using external signing credentials.
 
 External signing environment: HONGGUO_RELEASE_KEYSTORE,
 HONGGUO_RELEASE_STORE_PASSWORD, HONGGUO_RELEASE_KEY_ALIAS,
@@ -58,7 +60,7 @@ export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/s
 [[ -d node_modules ]] || { echo '请先运行 npm ci。' >&2; exit 1; }
 
 npm run build:android:ui
-GRADLE_ARGS=(--no-daemon assemblePhoneDebug assembleTvDebug)
+GRADLE_ARGS=(--no-daemon assemblePhoneDebug assembleTvDebug assembleTvNativeDebug)
 if [[ "$MODE" == --tv-release-compatible ]]; then
   GRADLE_ARGS=(--no-daemon assembleTvRelease -PhongguoReleaseSigning=compatible)
 elif [[ "$MODE" == --tv-release ]]; then
@@ -67,6 +69,10 @@ elif [[ "$MODE" == --phone-release-compatible ]]; then
   GRADLE_ARGS=(--no-daemon assemblePhoneRelease -PhongguoReleaseSigning=compatible)
 elif [[ "$MODE" == --phone-release ]]; then
   GRADLE_ARGS=(--no-daemon assemblePhoneRelease -PhongguoReleaseSigning=external)
+elif [[ "$MODE" == --tvnative-release-compatible ]]; then
+  GRADLE_ARGS=(--no-daemon assembleTvNativeRelease -PhongguoReleaseSigning=compatible)
+elif [[ "$MODE" == --tvnative-release ]]; then
+  GRADLE_ARGS=(--no-daemon assembleTvNativeRelease -PhongguoReleaseSigning=external)
 fi
 if [[ "${GRADLE_OFFLINE:-0}" == 1 ]]; then GRADLE_ARGS=(--offline "${GRADLE_ARGS[@]}"); fi
 if command -v gradle >/dev/null 2>&1; then
@@ -85,11 +91,29 @@ if [[ "$MODE" == --debug ]]; then
   for flavor in phone tv; do
     cp "android/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk" "dist/android/Hongguo-$VERSION-$flavor-debug.apk"
   done
-  shasum -a 256 dist/android/Hongguo-"$VERSION"-*-debug.apk > dist/android/SHA256SUMS.txt
+  # tvNative is an independent version line; name it with its own versionName.
+  NATIVE_VERSION="$(sed -n '/tvNative {/,/^        }/s/.*versionName '\''\([^'\'']*\)'\''.*/\1/p' android/app/build.gradle | head -1)"
+  cp "android/app/build/outputs/apk/tvNative/debug/app-tvNative-debug.apk" \
+     "dist/android/HongguoNative-${NATIVE_VERSION:-dev}-tvNative-debug.apk"
+  shasum -a 256 dist/android/Hongguo-*-*-debug.apk > dist/android/SHA256SUMS.txt
   SUMS=dist/android/SHA256SUMS.txt
 else
   DEVICE=tv
   [[ "$MODE" != --phone-release && "$MODE" != --phone-release-compatible ]] || DEVICE=phone
+  if [[ "$MODE" == --tvnative-release || "$MODE" == --tvnative-release-compatible ]]; then
+    # tvNative is an independent version line; the shared release checker only
+    # knows the phone/tv WebView flavors, so it is not run for this APK yet.
+    NATIVE_VERSION="$(sed -n '/tvNative {/,/^        }/s/.*versionName '\''\([^'\'']*\)'\''.*/\1/p' android/app/build.gradle | head -1)"
+    SUFFIX="tvNative-release"
+    [[ "$MODE" != *-release-compatible ]] || SUFFIX="tvNative-release-compatible"
+    OUTPUT="dist/android/HongguoNative-${NATIVE_VERSION:-dev}-$SUFFIX.apk"
+    cp "android/app/build/outputs/apk/tvNative/release/app-tvNative-release.apk" "$OUTPUT"
+    SUMS="dist/android/SHA256SUMS-native-$SUFFIX.txt"
+    shasum -a 256 "$OUTPUT" > "$SUMS"
+    printf '\nAPK_OUTPUT=%s/dist/android\n' "$ROOT"
+    cat "$SUMS"
+    exit 0
+  fi
   SUFFIX="$DEVICE-release"
   [[ "$MODE" != *-release-compatible ]] || SUFFIX="$DEVICE-release-compatible"
   OUTPUT="dist/android/Hongguo-$VERSION-$SUFFIX.apk"

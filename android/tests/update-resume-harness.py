@@ -47,6 +47,7 @@ public final class UpdateResumeHarness {
   static void check(boolean value, String reason) { checks++; if (!value) throw new AssertionError(reason); }
   void publish() { publishes++; }
   void maybePrompt() { }
+  void automaticCheck() { }
   void start() { starts++; }
   void submit(long operation, Runnable task) { task.run(); }
   void live(long operation) throws IOException { if (destroyed || epoch != operation) throw new IOException("cancelled"); }

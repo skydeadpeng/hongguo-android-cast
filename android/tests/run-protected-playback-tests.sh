@@ -9,6 +9,6 @@ JSON_JAR="${JSON_JAR:-$HOME/.m2/repository/com/vaadin/external/google/android-js
 TMP="$(mktemp -d -t hongguo-protected-playback.XXXXXX)"; trap 'rm -rf "$TMP"' EXIT
 SRC="$SOURCE_ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
- "$SRC/EpisodeResolver.java" "$SRC/PlaybackSources.java" "$SRC/MediaQuality.java" \
+ "$SRC/EpisodeResolver.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/MediaQuality.java" \
  "$TEST_ROOT/ProtectedPlaybackDoubles.java" "$TEST_ROOT/ProtectedPlaybackTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.ProtectedPlaybackTest

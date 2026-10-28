@@ -8,22 +8,27 @@
 
 0.12.17/code40 的更新器新增固定加速线路，保留 0.12.16 的播放自动取源/低分辨率恢复、0.12.15 的下载删除，以及既有账号、收藏、进度和更新缓存恢复修复。更新通道及兼容证书不变，历史 Release 资产不替换。0.12.16/code39 及更早更新器不会使用新线路；如果旧版直连下载失败，先手动覆盖安装加速版一次，随后由新版更新器自动切换线路。
 
-手机包`io.github.jackotom.hongguo.android`、TV包`io.github.jackotom.hongguo.android.tv`分开，不能互换。更新保留现有安装证书；更换证书会破坏覆盖更新链，不通过卸载清数据处理。
+手机包`io.github.jackotom.hongguo.android`、TV包`io.github.jackotom.hongguo.android.tv`、原生TV包`io.github.jackotom.hongguo.android.tvnative`分开，不能互换。原生TV是独立版本线（0.1.x），清单只与自身版本比较，不会提示安装手机/TV 网页版。更新保留现有安装证书；更换证书会破坏覆盖更新链，不通过卸载清数据处理。
+
+原生 TV 0.1.2 / code3：滚动设置页提供默认开启的「自动检查更新」开关、最近成功检查时间和手动检查。启动、返回前台以及前台周期调度统一判断到期；成功检查间隔 24 小时，失败 15 分钟后自动重试，关闭自动后仍可手动检查。选择「稍后」不会反复提示相同版本，但到期仍会查询更高版本。发现新版或下载就绪时，主导航旁显示更新入口；播放期间不弹提示，返回主界面再处理。下载、验证和系统安装保留分别确认，不进行静默安装。
 
 ## 固定渠道
 
 - 手机：https://raw.githubusercontent.com/skydeadpeng/hongguo-android-cast/main/android/update-phone.json
 - 电视：https://raw.githubusercontent.com/skydeadpeng/hongguo-android-cast/main/android/update-tv.json
+- 原生电视：https://raw.githubusercontent.com/skydeadpeng/hongguo-android-cast/main/android/update-tvnative.json
 
-只接受自有仓库不可变`releases/download/v<version>/Hongguo-<version>-<phone|tv>-release-compatible.apk`或`-release.apk`。不读取aston项目或桌面上游清单，不允许任意用户输入更新地址。
+只接受自有仓库不可变`releases/download/v<version>/Hongguo-<version>-<phone|tv>-release-compatible.apk`或`-release.apk`；原生电视为`HongguoNative-<version>-tvNative-release-compatible.apk`或`-release.apk`。不读取aston项目或桌面上游清单，不允许任意用户输入更新地址。
 
 ## 本地构建与生成清单
 
 ```sh
 bash scripts/build-android.sh --phone-release-compatible
 bash scripts/build-android.sh --tv-release-compatible
+bash scripts/build-android.sh --tvnative-release-compatible
 node scripts/generate-android-update.mjs --apk dist/android/Hongguo-0.12.17-phone-release-compatible.apk --device phone --output dist/android/update-phone.json
 node scripts/generate-android-update.mjs --apk dist/android/Hongguo-0.12.17-tv-release-compatible.apk --device tv --output dist/android/update-tv.json
+node scripts/generate-android-update.mjs --apk dist/android/HongguoNative-0.1.2-tvNative-release-compatible.apk --device tvnative --output dist/android/update-tvnative.json
 ```
 
 版本随实际发布调整，生成器从已签名APK读取字段，拒绝错包、debug包、错签名和非规范文件名，重新打开生成清单确认SHA256。使用SDK Build Tools 35.0.0的aapt与apksigner。不包含上传动作。
@@ -35,7 +40,7 @@ node scripts/generate-android-update.mjs --apk dist/android/Hongguo-0.12.17-tv-r
 1. 先完成回归、手机/TV签名构建并核验与旧安装证书一致。
 2. 从最终APK生成清单和校验和，保管现有私钥，不提交私钥或凭据。
 3. 上传不可变版本Release资产；同一versionCode不替换不同内容。
-4. 确认资产下载及散列正确后，最后更新`android/update-phone.json`、`update-tv.json`稳定清单。稳定清单不应先于可用APK发布。
+4. 确认资产下载及散列正确后，最后更新`android/update-phone.json`、`update-tv.json`、`update-tvnative.json`稳定清单。稳定清单不应先于可用 APK 发布。原生 TV 清单必须使用本次最终签名 APK 的真实 size/SHA256；不发布占位散列。原生 TV Release 保持 `--latest=false`，不覆盖手机/TV WebView 版的 Latest 标记。
 5. 真实手机及TV分别从旧版走应用内安装，检查未知来源权限返回、取消/重试及数据保留；ADB覆盖安装不替代这条业务验收。
 
 ## 安装与数据

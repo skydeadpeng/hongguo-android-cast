@@ -1,13 +1,20 @@
 # 红果 Android 移植版
 
-本仓库保留原有 Electron / Mac 版，另提供独立运行的手机和电视 Android 应用。Android 版不依赖 Mac 服务，不是把桌面安装包改扩展名。
+本仓库保留原有 Electron / Mac 版，另提供独立运行的手机、TV WebView 与原生 TV Android 应用。Android 版不依赖 Mac 服务，不是把桌面安装包改扩展名。
 
-## 安装包
+## 安装包与版本选择
 
-- 手机：`dist/android/Hongguo-0.12.14-phone-release-compatible.apk`
-- 电视 / 盒子：`dist/android/Hongguo-0.12.14-tv-release-compatible.apk`
-- 系统：Android 8.0（API 26）或更新版本；使用设备系统 WebView 和原生视频解码器。
-- 两个 flavor 使用不同应用 ID，可以同时安装。手机与 TV 更新为 `0.12.14`/code37 release-compatible 包（当前桌面源码基线为 `2.3.0`；保留 0.12.5 已移植的上游 2.4 取源兼容修复，不整体升级桌面版）。两者均为真正的 release 构建，`debuggable=false`，不是 debug 包改名；`release-compatible` 使用与各自原 debug 包相同的本机签名证书，应用 ID 不变，便于覆盖安装保留记录。这不是独立生产签名。
+| 版本 | 当前发行 | 应用 ID | 界面 |
+| --- | --- | --- | --- |
+| 手机 | 0.12.18 / code41 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.18 / code41 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.2 / code3 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+
+三个包均支持 Android 8.0（API26）及以上，可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。
+
+原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
+
+下载：[手机 / TV WebView 0.12.18](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.18) · [原生 TV 0.1.2](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.2)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
 
 ## 0.12.14 更新缓存状态修复
 
@@ -656,3 +663,14 @@ HONGGUO_DEVICE=emulator-5582 ADB_PORT=5038 node scripts/check-android-jingye-dev
 - 用户首选仍为自动、720p及以上、1080p及以上，正常健康播放和手动下载维持最低短边语义；自动降档只改变播放会话，不写入首选。内部低档不接受为手动下载偏好，离线和手动文件不转网络恢复、不自动删文件。
 - 准备与持续缓冲有有界看门狗；回调同时绑定当前 generation、VideoView 与定时任务身份，成功、切集、切档、暂停、投屏和退出清理旧任务。自动恢复保留同集位置、暂停及已确认倍速。
 - 本节取代历史章节中的 1080p→720p→auto 回跳策略；实际可用低档取决于片源模型，不保证每集都存在全部档位。所有重取/档位/传输沿用有界次数，不自动跳集或跨季。
+
+## tvNative 0.1.0：独立原生 TV 版本（无 WebView）
+
+面向系统 WebView 过旧且不可更新的电视/盒子。第三个 flavor `tvNative`：包名后缀 `.tvnative`、独立版本线（versionCode 1 / versionName 0.1.0）、Leanback 启动入口、应用名「红果原生版」，可与手机版、TV 网页版共存安装；现有 phone / tv 源码与行为不变。
+
+- 界面全部为原生 android.widget（零第三方运行库）：首页分类网格（真人剧/漫剧/AI剧）、收藏、下载列表、设置；详情页分集选集、续播、收藏、季切换；搜索页（App 分页搜索，官网网页首屏兜底）。焦点导航复用 TV 遥控器习惯。
+- 取源不经过 WebView：`RegisteredPlaybackModel`（匿名登记设备）取回 video_model，`SpadeDecoder` 完成 spade_a 内容密钥推导与 base64 片源地址解码，`AppMediaSource` 按 H.264/HEVC 编码与真实短边排序产出与网页版完全相同的 playInfo 契约；`PlaybackSources` 新增原生查找钩子（`attachNative/detachNative`），手机/TV 网页版仍走页面路径。播放、连播、自动降档恢复、播放缓存、弹幕、投屏全部复用既有实现。
+- 目录/详情/搜索数据：`SiteCatalog` 复用 `EpisodeResolver` 的 `_ROUTER_DATA` 与公网 URL 校验；`AppSearchPage` 为官方分页搜索的 Java 投影（字符串 ID 精度保护、游标推进校验、单页 40 条上限）。
+- 应用内自动更新与手机/TV 网页版同机制：独立清单渠道 `android/update-tvnative.json`（GitHub 固定仓库 + 四条加速线路），资产命名 `HongguoNative-<版本>-tvNative-release(-compatible).apk`；清单按 tvNative 自身版本线比较，绝不提示安装手机/TV 网页版，包名/签名/尺寸/SHA 校验相同。无网页关于页，改为设置对话框「检查更新」+ 原生「发现新版本 / 更新已就绪」对话框引导下载与安装。发布流程见 docs/ANDROID-UPDATES.md（`--device tvnative` 生成清单）。
+- v1 已知边界：无账号登录界面（收藏/进度按本机 guest 归属）；下载仅列表与离线播放，删除与管理仍在网页版；release 发布检查器（check-android-release）尚未适配 tvNative 的独立版本号，`--tvnative-release*` 模式直接出包并生成 SHA-256。
+- 离线测试：`android/tests/run-app-media-source-tests.sh`（Spade/AppMediaSource 向量）、`run-site-catalog-tests.sh`（目录/详情/搜索解析）、`run-native-media-contract-tests.sh`（含 PlaybackSources 原生钩子）。

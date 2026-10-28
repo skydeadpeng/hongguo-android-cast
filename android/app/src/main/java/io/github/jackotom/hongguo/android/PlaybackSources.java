@@ -54,6 +54,11 @@ final class PlaybackSources {
         QualityUnavailableException(String message) { super(message); }
     }
     static synchronized void attach(MainActivity value) { activity = new WeakReference<>(value); }
+    /** Native-UI lookup used when no WebView page owns resolution; phone/tv keep the page path. */
+    interface NativeLookup { JSONObject lookup(String sid, String vid, String requestedQuality, int ceiling, long timeoutMs) throws Exception; }
+    private static volatile NativeLookup nativeLookup;
+    static void attachNative(NativeLookup lookup) { nativeLookup = lookup; }
+    static void detachNative(NativeLookup lookup) { if (nativeLookup == lookup) nativeLookup = null; }
     static synchronized void detach(MainActivity value) {
         if (activity.get() != value) return;
         activity.clear();
@@ -289,6 +294,19 @@ final class PlaybackSources {
     }
     private static JSONObject resolveAppAttempt(String sid,String vid,String requestedQuality,long timeoutMs,int ceiling) throws Exception {
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
+        NativeLookup lookup = nativeLookup;
+        if (lookup != null) {
+            if (pending.size()>=8) throw new IOException("分集正在准备，请稍后重试");
+            JSONObject info;
+            try { info = lookup.lookup(sid, vid, requestedQuality, ceiling, timeoutMs); }
+            catch (AppMediaSource.AppSourceException error) { throw new AppLookupException(error.getMessage()==null?"App片源暂未取得":error.getMessage(), error.code); }
+            catch (java.net.SocketTimeoutException error) { throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT"); }
+            catch (InterruptedIOException error) { throw error; }
+            catch (Exception error) { throw new AppLookupException(error.getMessage()==null?"App片源暂未取得":error.getMessage(), ""); }
+            if (!requestedQuality.equals(info.optString("requestedQuality", requestedQuality))) throw new IOException("片源清晰度结果不匹配");
+            if (ceiling>0 && info.optInt("playbackCeiling",-1)!=ceiling) throw new IOException("播放清晰度边界结果不匹配");
+            return info;
+        }
         MainActivity host;
         synchronized(PlaybackSources.class) { host=activity.get(); }
         if (host==null || host.isFinishing() || host.isDestroyed()) throw new IOException("App片源服务尚未准备");

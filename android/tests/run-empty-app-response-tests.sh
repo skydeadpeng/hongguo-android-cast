@@ -19,5 +19,5 @@ Path(sys.argv[2]).write_text(text[start:end]+'\n')
 PY
 SRC="$ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
 "$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
- "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/PlaybackSources.java" "$SRC/AdaptiveQuality.java" "$OWN/android/tests/EmptyAppResponseTest.java"
+ "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/AdaptiveQuality.java" "$OWN/android/tests/EmptyAppResponseTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.EmptyAppResponseTest

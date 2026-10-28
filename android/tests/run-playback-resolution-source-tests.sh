@@ -12,8 +12,8 @@ import sys
 s=Path(sys.argv[1]).read_text();m='cat > "$TMP/OfflineMediaStubs.java" <<\'STUB\'\n';i=s.index(m)+len(m);Path(sys.argv[2]).write_text(s[i:s.index('\nSTUB',i)]+'\n')
 PY
 SRC="$ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
-"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/PlaybackSources.java" "$OWN/android/tests/PlaybackResolutionSourceTest.java"
+"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$OWN/android/tests/PlaybackResolutionSourceTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.PlaybackResolutionSourceTest
 SDK="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platforms/android-35/android.jar"
-"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$SDK" -d "$TMP/sdk35" "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/PlaybackSources.java"
+"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$SDK" -d "$TMP/sdk35" "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java"
 echo 'PASS PLAYBACK_RESOLUTION_SDK35 productionSourceClasses=2 androidJsonContract=true transportBoundary=stubs'

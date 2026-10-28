@@ -108,7 +108,7 @@ final class EpisodeResolver {
         if (value instanceof Number) return ((Number) value).doubleValue() != 0;
         return true;
     }
-    private static JSONObject extractRouterData(String html) throws Exception {
+    static JSONObject extractRouterData(String html) throws Exception {
         if (html == null || html.trim().isEmpty() || html.length() > MAX_HTML) throw error("SOURCE_INVALID", "来源页面为空或超过大小限制");
         Matcher marker = ROUTER.matcher(html);
         if (!marker.find()) throw error("SOURCE_INVALID", "来源页面未返回目录数据");
@@ -152,7 +152,7 @@ final class EpisodeResolver {
         } catch (Exception ignored) { return false; }
     }
     /** Keep every signed query byte; decode keys only to remove Range (case-insensitively). */
-    private static String publicHttpsUrl(String value) {
+    static String publicHttpsUrl(String value) {
         if (value == null || value.length() > 16_384 || hasUrlWhitespaceOrBackslash(value)) return "";
         try {
             URI uri = new URI(value);

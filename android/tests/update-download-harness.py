@@ -30,7 +30,7 @@ def blocks(pattern):
     if depth==0:out.append(source[start:i+1].replace('private ',''));break
    i+=1
  return out
-names=['check','fetchManifest','download','transfer','open','verify','signerHashes','hex','live','finish','failed','stateWasReady','userError','cancel','destroy']
+names=['automaticChecksEnabled','check','fetchManifest','download','transfer','open','verify','signerHashes','hex','live','finish','failed','stateWasReady','userError','cancel','destroy']
 if manifestModern:names+=['finishManifest','readManifest','nextManifestNonce']
 if modern:names+=['finishDownload','remainingTimeout','disconnect','liveDownload','transferSource','interruptedDownload']
 else:names+=['hashFile']
@@ -58,10 +58,10 @@ public final class UpdateDownloadHarness implements AutoCloseable {
  static void check(boolean ok,String reason){checks++;if(!ok)throw new AssertionError(reason);}interface Case{void run()throws Exception;}static void group(String name,Case body)throws Exception{body.run();groups++;System.out.println("PASS "+name);}
  static String proxy(int i){return "https://"+HOSTS[i]+"/"+ORIGIN;}
  final class Host {final PackageManager pm=new PackageManager();final Deque<Runnable>ui=new ArrayDeque<>();void runOnUiThread(Runnable r){ui.addLast(r);}void flush(){while(!ui.isEmpty())ui.removeFirst().run();}PackageManager getPackageManager(){return pm;}String getPackageName(){return PKG;}}
- static final class Prefs{final Map<String,String>data=new HashMap<>();boolean writable=true,failCleanup;Runnable onCommit;Prefs edit(){return this;}Prefs putString(String k,String v){data.put(k,v);return this;}Prefs putLong(String k,long v){data.put(k,Long.toString(v));return this;}void apply(){}Prefs remove(String k){data.remove(k);return this;}String getString(String k,String fallback){if(failCleanup)throw new IllegalStateException("fixture cleanup prefs unavailable");return data.getOrDefault(k,fallback);}boolean commit(){if(onCommit!=null){Runnable action=onCommit;onCommit=null;action.run();}return writable;}}
+ static final class Prefs{final Map<String,String>data=new HashMap<>();boolean writable=true,failCleanup;Runnable onCommit;Prefs edit(){return this;}Prefs putString(String k,String v){data.put(k,v);return this;}Prefs putLong(String k,long v){data.put(k,Long.toString(v));return this;}void apply(){}Prefs remove(String k){data.remove(k);return this;}boolean getBoolean(String k,boolean fallback){String v=data.get(k);return v==null?fallback:Boolean.parseBoolean(v);}String getString(String k,String fallback){if(failCleanup)throw new IllegalStateException("fixture cleanup prefs unavailable");return data.getOrDefault(k,fallback);}boolean commit(){if(onCommit!=null){Runnable action=onCommit;onCommit=null;action.run();}return writable;}}
  static final class Worker{void purge(){}void shutdownNow(){}}
  static final class Build{static final class VERSION{static int SDK_INT=35;}}
- static final class BuildConfig{static final boolean IS_TV=false;static final String VERSION_NAME="fixture";}
+ static final class BuildConfig{static final boolean IS_TV=false;static final boolean NATIVE_UI=false;static final String VERSION_NAME="fixture";}
  static final class UpdateInstallCheckpoint{static void release(Object owner){}}
  static final class Signature{final byte[]data;Signature(int value){data=new byte[]{(byte)value};}byte[]toByteArray(){return data;}}
  static final class SigningInfo{Signature[]signatures={new Signature(7)};Signature[]getApkContentsSigners(){return signatures;}}
@@ -135,7 +135,7 @@ manifest=r'''
   System.out.println("UPDATE_MANIFEST_PROXY_OK groups="+groups+" checks="+checks+" actualCheckOpenReadParse=true fixedSources=5 boundedBytes=131072 nonceBound=true noNetworkSockets=true");
  }
 '''
-manifestpolicy='group("manifest policy only constructs the matching fixed phone or TV path",()->{for(boolean tv:new boolean[]{false,true}){List<UpdatePolicy.ManifestSource>routes=UpdatePolicy.manifestSources(tv,123);check(routes.size()==5,"fixed manifest routes");for(UpdatePolicy.ManifestSource route:routes){check(route.allows(route.url),"constructed source accepted");check(!route.allows(route.url.replace("check=123","check=124")),"nonce changed rejected");check(!route.allows(route.url.replace("main/android/","other/android/")),"branch change rejected");check(!route.allows(ORIGIN),"APK endpoint not a manifest");}}try{UpdatePolicy.manifestSources(false,0);throw new AssertionError();}catch(IllegalArgumentException expected){checks++;}});'
+manifestpolicy='group("manifest policy only constructs the matching fixed phone or TV path",()->{for(String flavor:new String[]{"phone","tv","tvnative"}){List<UpdatePolicy.ManifestSource>routes=UpdatePolicy.manifestSources(flavor,123);check(routes.size()==5,"fixed manifest routes");for(UpdatePolicy.ManifestSource route:routes){check(route.allows(route.url),"constructed source accepted");check(!route.allows(route.url.replace("check=123","check=124")),"nonce changed rejected");check(!route.allows(route.url.replace("main/android/","other/android/")),"branch change rejected");check(!route.allows(ORIGIN),"APK endpoint not a manifest");}}try{UpdatePolicy.manifestSources("phone",0);throw new AssertionError();}catch(IllegalArgumentException expected){checks++;}});'
 text=text.replace('MANIFEST_TESTS',manifest.replace('MANIFEST_POLICY_TESTS',manifestpolicy if manifestModern else ''))
 text=text.replace('NESTED','\n'.join(nested)).replace('METHODS','\n'.join(methods)).replace('POLICY_TESTS',policy if modern else '')
 Path(sys.argv[2]).write_text(text)

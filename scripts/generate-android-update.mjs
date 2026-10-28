@@ -9,9 +9,9 @@ import { pathToFileURL } from 'node:url';
 const REPO = 'skydeadpeng/hongguo-android-cast';
 const COMPAT_SIGNER = '3a883cc41a4ce34b462a8c12c0d289e6c985d3e2c0d6ecf2b516b5cc75e353ab';
 export function createUpdateManifest({ device, badging, signature, bytes, sha256, filename, notes = '' }) {
-  if (!['phone', 'tv'].includes(device)) throw new Error('device must be phone or tv');
+  if (!['phone', 'tv', 'tvnative'].includes(device)) throw new Error('device must be phone, tv or tvnative');
   const identity = /package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'/.exec(badging);
-  const expected = 'io.github.jackotom.hongguo.android' + (device === 'tv' ? '.tv' : '');
+  const expected = 'io.github.jackotom.hongguo.android' + (device === 'tv' ? '.tv' : device === 'tvnative' ? '.tvnative' : '');
   if (!identity || identity[1] !== expected || !Number.isSafeInteger(Number(identity[2])) || Number(identity[2]) <= 0 || !/^\d+\.\d+\.\d+$/.test(identity[3])) throw new Error('APK identity or version is invalid');
   if (/application-debuggable/.test(badging)) throw new Error('debug APK cannot be published as an update');
   const min = Number(/sdkVersion:'(\d+)'/.exec(badging)?.[1]);
@@ -20,7 +20,8 @@ export function createUpdateManifest({ device, badging, signature, bytes, sha256
   if (signers.length !== 1 || signers[0] !== COMPAT_SIGNER) throw new Error('APK is not signed by the existing compatible certificate');
   if (!Number.isSafeInteger(bytes) || bytes <= 0 || bytes > 100 * 1024 * 1024 || !/^[a-f\d]{64}$/.test(sha256)) throw new Error('invalid APK size or SHA256');
   const name = identity[3];
-  if (![ `Hongguo-${name}-${device}-release-compatible.apk`, `Hongguo-${name}-${device}-release.apk` ].includes(filename)) throw new Error('APK filename does not match its immutable release identity');
+  const assetPrefix = device === 'tvnative' ? `HongguoNative-${name}-tvNative-release` : `Hongguo-${name}-${device}-release`;
+  if (![ `${assetPrefix}-compatible.apk`, `${assetPrefix}.apk` ].includes(filename)) throw new Error('APK filename does not match its immutable release identity');
   if (typeof notes !== 'string' || notes.length > 8000) throw new Error('release notes are too long');
   return { schemaVersion: 1, channel: 'android-compatible', flavor: device, packageName: expected,
     versionCode: Number(identity[2]), versionName: name, minSdk: min,
@@ -35,7 +36,7 @@ function tool(executable, args) {
 export function main(args = process.argv.slice(2)) {
   const opts = {};
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--help') { console.log('Usage: node scripts/generate-android-update.mjs --apk PATH --device phone|tv --output PATH [--notes-file PATH]'); return; }
+    if (args[i] === '--help') { console.log('Usage: node scripts/generate-android-update.mjs --apk PATH --device phone|tv|tvnative --output PATH [--notes-file PATH]'); return; }
     if (!['--apk', '--device', '--output', '--notes-file'].includes(args[i]) || !args[i + 1] || args[i + 1].startsWith('--')) throw new Error('invalid arguments; use --help');
     if (opts[args[i]]) throw new Error('duplicate argument');
     opts[args[i]] = args[++i];

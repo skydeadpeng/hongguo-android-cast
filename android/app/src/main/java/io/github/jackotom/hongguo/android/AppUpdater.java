@@ -1,5 +1,6 @@
 package io.github.jackotom.hongguo.android;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.*;
 import android.content.pm.*;
@@ -19,7 +20,9 @@ import org.json.*;
 
 /** A user-confirmed updater for this Android application, independent of media transport/cache. */
 final class AppUpdater {
-    private final MainActivity host;
+    private final Activity host;
+    /** Null in the WebView-free native UI: publishing and trust then rely on the activity itself. */
+    private final MainActivity page;
     private final SharedPreferences prefs;
     private final File directory, apk, partial;
     private final int installedCode;
@@ -44,20 +47,52 @@ final class AppUpdater {
     }
     private Future<?> task;
     private boolean started, pageReady, manualPrompt;
-    private int promptedCode;
+    private int promptedCode, readyPromptedCode;
     private String state = "idle", message = "尚未检查更新";
     private Candidate candidate, verifiedCandidate;
     private long downloaded;
     private AlertDialog prompt;
 
-    AppUpdater(MainActivity host) {
-        this.host = host;
+    AppUpdater(MainActivity host) { this(host, host); }
+    AppUpdater(Activity activity, MainActivity page) {
+        this.host = activity;
+        this.page = page;
         int currentCode = 0; String currentName = BuildConfig.VERSION_NAME;
         try { PackageInfo installed = host.getPackageManager().getPackageInfo(host.getPackageName(), 0); currentCode = installed.versionCode; currentName = installed.versionName; } catch (PackageManager.NameNotFoundException ignored) { }
         installedCode = currentCode; installedName = currentName;
         prefs = host.getSharedPreferences("hongguo_android_updates_v1", Context.MODE_PRIVATE);
         directory = new File(host.getFilesDir(), "updates"); apk = new File(directory, "verified.apk"); partial = new File(directory, "download.part");
     }
+    private boolean pageAlive() { return page != null ? page.trusted() : !host.isFinishing() && !host.isDestroyed(); }
+    private void pageScript(String source) { if (page != null) page.script(source); }
+    /** Native-UI entry points mirroring the page bridge actions; guards stay inside check/download/install/cancel. */
+    void manualCheck() { host.runOnUiThread(() -> { if (!destroyed) check(true); }); }
+    void manualDownload() { host.runOnUiThread(() -> { if (!destroyed) download(); }); }
+    void manualInstall() { host.runOnUiThread(() -> { if (!destroyed) install(); }); }
+    void manualCancel() { host.runOnUiThread(() -> { if (!destroyed) cancel(); }); }
+    JSONObject snapshotJson() { try { return snapshot(); } catch (JSONException invalid) { return null; } }
+    boolean automaticChecksEnabled() {
+        try { return prefs.getBoolean("automatic_check", true); }
+        catch (ClassCastException invalid) { return true; }
+    }
+    /** Save off the UI thread. A failed disk commit restores the prior in-memory behavior too. */
+    void setAutomaticChecks(boolean enabled) throws IOException {
+        boolean previous = automaticChecksEnabled();
+        if (!prefs.edit().putBoolean("automatic_check", enabled).commit()) {
+            prefs.edit().putBoolean("automatic_check", previous).commit();
+            throw new IOException("自动检查设置保存未完成，请重试");
+        }
+        host.runOnUiThread(() -> { if (!destroyed) { publish(); if (enabled) automaticCheck(); } });
+    }
+    /** Called on the UI thread at resume and by the native foreground heartbeat. */
+    void automaticCheck() {
+        if (destroyed || !started || !foreground || !pageReady || !pageAlive() || busy
+                || state.equals("unsupported") || state.equals("installing") || state.equals("waiting_permission")
+                || candidate != null && !state.equals("available") && !state.equals("error")
+                || !automaticChecksEnabled()) return;
+        if (UpdatePolicy.automaticCheckDue(System.currentTimeMillis(), prefs.getLong("last_auto_attempt", 0), prefs.getLong("last_checked", 0))) check(false);
+    }
+
     public final class Bridge {
         @JavascriptInterface public void postMessage(String source) {
             if (source == null || source.length() > 4096) return;
@@ -65,7 +100,7 @@ final class AppUpdater {
                 JSONObject request = new JSONObject(source); Object id = request.opt("id"); String method = request.getString("method");
                 if (!(id instanceof String) || ((String) id).length() > 128 || !Arrays.asList("status", "check", "download", "cancel", "install", "later").contains(method)) return;
                 host.runOnUiThread(() -> {
-                    if (destroyed || !host.trusted()) return;
+                    if (destroyed || !pageAlive()) return;
                     try {
                         if (method.equals("check")) check(true);
                         else if (method.equals("download")) download();
@@ -84,14 +119,14 @@ final class AppUpdater {
     }
     private void respond(String id, String error) {
         if (destroyed) return;
-        try { host.script("window.__androidUpdatesResponse && window.__androidUpdatesResponse(" + new JSONObject().put("id", id).put("result", snapshot()).put("error", error == null ? JSONObject.NULL : error) + ")"); }
+        try { pageScript("window.__androidUpdatesResponse && window.__androidUpdatesResponse(" + new JSONObject().put("id", id).put("result", snapshot()).put("error", error == null ? JSONObject.NULL : error) + ")"); }
         catch (JSONException ignored) { }
     }
     private JSONObject snapshot() throws JSONException {
         JSONObject value = new JSONObject().put("state", state).put("message", message).put("busy", busy)
             .put("installedVersion", installedName).put("installedCode", installedCode)
-            .put("flavor", BuildConfig.IS_TV ? "tv" : "phone").put("downloaded", downloaded)
-            .put("lastCheckedAt", prefs.getLong("last_checked", 0))
+            .put("flavor", BuildConfig.NATIVE_UI?"tvnative":BuildConfig.IS_TV?"tv":"phone").put("downloaded", downloaded)
+            .put("lastCheckedAt", prefs.getLong("last_checked", 0)).put("automaticChecks", automaticChecksEnabled())
             .put("downloadSource", downloadSource).put("downloadRouteIndex", downloadRouteIndex).put("downloadRouteCount", downloadRouteCount)
             .put("checkSource", checkSource).put("checkRouteIndex", checkRouteIndex).put("checkRouteCount", checkRouteCount);
         if (candidate != null) value.put("versionName", candidate.name).put("versionCode", candidate.code).put("size", candidate.bytes).put("notes", candidate.notes);
@@ -99,9 +134,9 @@ final class AppUpdater {
     }
     private void publish() {
         if (destroyed) return;
-        try { host.script("window.__androidUpdatesChanged && window.__androidUpdatesChanged(" + snapshot() + ")"); } catch (JSONException ignored) { }
+        try { pageScript("window.__androidUpdatesChanged && window.__androidUpdatesChanged(" + snapshot() + ")"); } catch (JSONException ignored) { }
     }
-    void pageReady() { pageReady = true; maybePrompt(); }
+    void pageReady() { pageReady = true; maybePrompt(); automaticCheck(); }
     void pageUnavailable() { pageReady = false; dismissPrompt(); }
     void resume() {
         foreground = true;
@@ -114,7 +149,7 @@ final class AppUpdater {
         } else if (!busy && state.equals("installing")) {
             state = "ready"; message = "安装尚未完成，已保留验证过的更新包"; publish();
         }
-        maybePrompt();
+        maybePrompt(); automaticCheck();
     }
     void pause() { foreground = false; dismissPrompt(); }
     private void start() {
@@ -137,13 +172,14 @@ final class AppUpdater {
                 busy = false; candidate = result; verifiedCandidate = result;
                 if (result != null) { state = "ready"; downloaded = result.bytes; message = "更新包已验证，可继续安装"; }
                 else { prefs.edit().remove("manifest").remove("waiting_permission").apply(); downloaded = 0; state = "idle"; message = "尚未检查更新"; }
-                publish();
+                publish(); maybePrompt();
                 if (prefs.getBoolean("waiting_permission", false) && foreground) resume();
-                else if (result == null && UpdatePolicy.automaticCheckDue(System.currentTimeMillis(), prefs.getLong("last_auto_attempt", 0))) check(false);
+                else if (result == null) automaticCheck();
             });
         });
     }
     private void check(boolean manual) {
+        if (!manual && !automaticChecksEnabled()) return;
         if (destroyed || busy || state.equals("installing") || state.equals("unsupported")) return;
         if (!manual) prefs.edit().putLong("last_auto_attempt", System.currentTimeMillis()).apply();
         busy = true; manualPrompt = manual; state = "checking"; checkSource="";checkRouteIndex=checkRouteCount=0;message = "正在检查更新…"; publish();
@@ -188,7 +224,7 @@ final class AppUpdater {
                 live(operation);Files.move(partial.toPath(), apk.toPath(), StandardCopyOption.REPLACE_EXISTING);moved=true;live(operation);
                 if (!prefs.edit().putString("manifest", target.json.toString()).commit()) throw new IOException("更新状态保存失败，请重新下载");
                 live(operation);
-                finish(operation, () -> { completingDownload=false; verifiedCandidate = target; state = "ready"; downloaded = target.bytes; message = "校验通过，确认后安装 " + target.name; busy = false; publish(); });
+                finish(operation, () -> { completingDownload=false; verifiedCandidate = target; state = "ready"; downloaded = target.bytes; message = "校验通过，确认后安装 " + target.name; busy = false; publish(); maybePrompt(); });
             } catch (Exception error) {
                 partial.delete();
                 // Before move(), an existing verified archive belongs to the old operation and is left untouched.
@@ -248,14 +284,24 @@ final class AppUpdater {
         catch (ActivityNotFoundException missing) { throw new IOException("这台设备没有可用的APK安装器，更新包已保留"); }
     }
     private void maybePrompt() {
-        if (destroyed || !foreground || !pageReady || !host.trusted() || busy || !state.equals("available") || candidate == null || prompt != null) return;
-        if (!manualPrompt && (prefs.getInt("skipped_code", 0) == candidate.code || promptedCode == candidate.code)) return;
-        manualPrompt = false; promptedCode = candidate.code;
-        Candidate target = candidate;
-        prompt = new AlertDialog.Builder(host).setTitle("发现新版本 " + target.name)
-            .setMessage(target.notes.isEmpty() ? "下载校验后，由系统确认安装；观看记录会保留。" : target.notes)
-            .setNegativeButton("稍后", (d, w) -> prefs.edit().putInt("skipped_code", target.code).apply())
-            .setPositiveButton("下载更新", (d, w) -> download()).create();
+        if (destroyed || !foreground || !pageReady || !pageAlive() || busy || candidate == null || prompt != null) return;
+        if (state.equals("available")) {
+            if (!manualPrompt && !automaticChecksEnabled()) return;
+            if (!manualPrompt && (prefs.getInt("skipped_code", 0) == candidate.code || promptedCode == candidate.code)) return;
+            manualPrompt = false; promptedCode = candidate.code;
+            Candidate target = candidate;
+            prompt = new AlertDialog.Builder(host).setTitle("发现新版本 " + target.name)
+                .setMessage(target.notes.isEmpty() ? "下载校验后，由系统确认安装；观看记录会保留。" : target.notes)
+                .setNegativeButton("稍后", (d, w) -> prefs.edit().putInt("skipped_code", target.code).apply())
+                .setPositiveButton("下载更新", (d, w) -> download()).create();
+        } else if (page == null && state.equals("ready") && verifiedCandidate != null && apk.isFile() && readyPromptedCode != candidate.code) {
+            // Without a page panel, a verified package still needs its own install confirmation.
+            readyPromptedCode = candidate.code;
+            prompt = new AlertDialog.Builder(host).setTitle("更新已就绪 " + candidate.name)
+                .setMessage("更新包已下载并完成校验，可立即安装；观看记录会保留。")
+                .setNegativeButton("稍后", null)
+                .setPositiveButton("立即安装", (d, w) -> install()).create();
+        } else return;
         prompt.setOnDismissListener(d -> prompt = null); prompt.show();
         prompt.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus();
     }
@@ -327,7 +373,7 @@ final class AppUpdater {
     private static long nextManifestNonce(){return manifestNonces.updateAndGet(previous->Math.max(System.currentTimeMillis(),previous+1));}
     private Candidate fetchManifest(long operation) throws Exception {
         long deadline=SystemClock.elapsedRealtime()+60000;
-        List<UpdatePolicy.ManifestSource> sources=UpdatePolicy.manifestSources(BuildConfig.IS_TV,nextManifestNonce());
+        List<UpdatePolicy.ManifestSource> sources=UpdatePolicy.manifestSources(BuildConfig.NATIVE_UI?"tvnative":BuildConfig.IS_TV?"tv":"phone",nextManifestNonce());
         Candidate current=null;Exception last=null;int attempted=0;
         for(int index=0;index<sources.size();index++){
             live(operation);
@@ -449,7 +495,7 @@ final class AppUpdater {
         static Candidate parse(JSONObject value, int installedCode, String installedName) throws Exception {
             int schema = (int) integer(value, "schemaVersion"), code = (int) integer(value, "versionCode"), min = (int) integer(value, "minSdk"); long bytes = integer(value, "size");
             String flavor = value.getString("flavor"), pkg = value.getString("packageName"), name = value.getString("versionName"), hash = value.getString("sha256").toLowerCase(Locale.ROOT), url = value.getString("apkUrl");
-            UpdatePolicy.validate(schema, value.getString("channel"), flavor, pkg, code, name, min, bytes, hash, url, BuildConfig.IS_TV ? "io.github.jackotom.hongguo.android.tv" : "io.github.jackotom.hongguo.android", installedCode, installedName, Build.VERSION.SDK_INT);
+            UpdatePolicy.validate(schema, value.getString("channel"), flavor, pkg, code, name, min, bytes, hash, url, BuildConfig.NATIVE_UI ? "io.github.jackotom.hongguo.android.tvnative" : BuildConfig.IS_TV ? "io.github.jackotom.hongguo.android.tv" : "io.github.jackotom.hongguo.android", installedCode, installedName, Build.VERSION.SDK_INT);
             String notes = value.optString("notes", ""); if (notes.length() > 4000) notes = notes.substring(0, 4000);
             return new Candidate(new JSONObject(value.toString()), code, name, min, bytes, url, hash, notes);
         }

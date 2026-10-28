@@ -28,22 +28,22 @@ def method(signature):
    if depth==0:return source[start:i+1]
   i+=1
  raise AssertionError('Unclosed production method '+signature)
-methods='\n'.join(method(s) for s in ['private void start()','void resume()','private void finish(long operation, Runnable action)'])
+methods='\n'.join(method(s) for s in ['private void start()','void resume()','boolean automaticChecksEnabled()','void automaticCheck()','private void finish(long operation, Runnable action)'])
 template=r'''
 import java.io.*;import java.nio.file.*;import java.util.*;import org.json.*;
 public final class UpdateRestoreHarness implements AutoCloseable {
  static int groups,checks;
  static void check(boolean ok,String message){checks++;if(!ok)throw new AssertionError(message);}
  static final class BuildConfig{static boolean DEBUG=false;}
- static final class UpdatePolicy{static final long CHECK_INTERVAL=86400000;static boolean automaticCheckDue(long now,long attempted){return attempted<=0||attempted>now||now-attempted>=CHECK_INTERVAL;}}
+ static final class UpdatePolicy{static final long CHECK_INTERVAL=86400000;static boolean automaticCheckDue(long now,long attempted){return attempted<=0||attempted>now||now-attempted>=CHECK_INTERVAL;}static boolean automaticCheckDue(long now,long attempted,long succeeded){long stamp=Math.max(attempted,succeeded);long interval=succeeded>0&&succeeded>=attempted?CHECK_INTERVAL:900000;return stamp<=0||stamp>now||now-stamp>=interval;}}
  final File directory,apk,partial;final FakePrefs prefs=new FakePrefs();final Host host=new Host();
  final Deque<Runnable> worker=new ArrayDeque<>(),ui=new ArrayDeque<>();
- int installedCode=36;String installedName="0.12.13";boolean started,busy,destroyed,foreground;
+ int installedCode=36;String installedName="0.12.13";boolean started,busy,destroyed,foreground,pageReady=true;
  long epoch,downloaded=98765;String state="idle",message="";Candidate candidate,verifiedCandidate;int verifies,publishes,autoChecks,installs;
  UpdateRestoreHarness()throws Exception{directory=Files.createTempDirectory("hongguo-restore-fixture-").toFile();apk=new File(directory,"verified.apk");partial=new File(directory,"download.part");prefs.values.put("last_auto_attempt",System.currentTimeMillis());}
  public void close()throws Exception{try(java.util.stream.Stream<Path> files=Files.walk(directory.toPath())){files.sorted(Comparator.reverseOrder()).forEach(p->{try{Files.deleteIfExists(p);}catch(IOException ex){throw new UncheckedIOException(ex);}});}}
  void cache(int code,String failure)throws Exception{Files.write(apk.toPath(),new byte[]{1,2,3});apk.setLastModified(System.currentTimeMillis());prefs.values.put("manifest",new JSONObject().put("code",code).put("bytes",3).put("failure",failure).toString());prefs.values.put("waiting_permission",true);Files.write(partial.toPath(),new byte[]{0});}
- void publish(){publishes++;}void maybePrompt(){}void submit(long op,Runnable job){worker.addLast(job);}
+ boolean pageAlive(){return true;}void publish(){publishes++;}void maybePrompt(){}void submit(long op,Runnable job){worker.addLast(job);}
  void pump(){while(!worker.isEmpty())worker.removeFirst().run();while(!ui.isEmpty())ui.removeFirst().run();}
  void check(boolean manual){check(!manual,"automatic restore check is not manual");autoChecks++;state="checking";}
  void install(){check(candidate!=null&&verifiedCandidate==candidate&&apk.isFile(),"permission return only uses verified future APK");installs++;state="installing";}
@@ -66,7 +66,7 @@ public final class UpdateRestoreHarness implements AutoCloseable {
   try(UpdateRestoreHarness h=new UpdateRestoreHarness()){h.cache(h.installedCode+1,"");h.start();h.pump();check(h.state.equals("ready")&&h.candidate==h.verifiedCandidate&&h.candidate!=null,"verified newer archive remains ready");check(h.apk.isFile()&&!h.partial.exists()&&h.downloaded==3,"valid cached bytes retained and partial cleared");check(h.prefs.values.containsKey("manifest")&&h.prefs.getBoolean("waiting_permission",false),"background restore preserves marker for real foreground");check(h.verifies==1&&h.autoChecks==0,"valid restore does not issue duplicate checks");groups++;}
   try(UpdateRestoreHarness h=new UpdateRestoreHarness()){h.cache(h.installedCode+1,"");h.foreground=true;h.start();h.pump();check(h.state.equals("installing")&&h.installs==1,"valid cold permission return continues once");check(!h.prefs.getBoolean("waiting_permission",true),"real resume method consumes marker");groups++;}
   try(UpdateRestoreHarness h=new UpdateRestoreHarness()){h.cache(h.installedCode+1,"");h.foreground=true;h.host.pm.permission=false;h.start();h.pump();check(h.state.equals("ready")&&h.installs==0&&h.message.contains("权限尚未开启"),"permission denial keeps verified future APK retryable");groups++;}
-  try(UpdateRestoreHarness h=new UpdateRestoreHarness()){h.prefs.values.put("last_auto_attempt",0L);h.start();h.pump();check(h.autoChecks==1&&h.state.equals("checking")&&h.candidate==null,"due auto-check runs once after genuine empty restore");groups++;}
+  try(UpdateRestoreHarness h=new UpdateRestoreHarness()){h.prefs.values.put("last_auto_attempt",0L);h.foreground=true;h.start();h.pump();check(h.autoChecks==1&&h.state.equals("checking")&&h.candidate==null,"due auto-check runs once after genuine empty restore");groups++;}
   try(UpdateRestoreHarness h=new UpdateRestoreHarness()){h.cache(h.installedCode+1,"");h.start();h.worker.removeFirst().run();h.epoch++;h.state="newer-operation";h.pump();check(h.state.equals("newer-operation")&&h.candidate==null&&h.publishes==1,"late restore UI completion cannot replace newer epoch");groups++;}
   try(UpdateRestoreHarness h=new UpdateRestoreHarness()){h.cache(h.installedCode+1,"");h.start();h.destroyed=true;h.state="destroyed";h.pump();check(h.state.equals("destroyed")&&h.candidate==null&&h.publishes==1,"destroyed activity gets no late restored ready");groups++;}
   try(UpdateRestoreHarness h=new UpdateRestoreHarness()){BuildConfig.DEBUG=true;h.start();h.pump();check(h.state.equals("unsupported")&&h.worker.isEmpty(),"debug build does not restore/install");BuildConfig.DEBUG=false;groups++;}

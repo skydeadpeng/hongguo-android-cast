@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a deterministic corresponding-source ZIP without reading keys or following links.
 
-Usage: python3 scripts/package-android-source.py --root SOURCE --git-root PROJECT --output ZIP
+Usage: python3 scripts/package-android-source.py --root SOURCE --git-root PROJECT --output ZIP [--device phone|tv|tvnative]
 Only local source files are read. No build, downloaded reference program, upload, or signing runs.
 """
 from __future__ import annotations
@@ -200,12 +200,96 @@ def source_files(root: Path, git_root: Path, generated: set[Path]) -> list[dict]
     return entries
 
 
-def version_from(data: str) -> tuple[str, int]:
-    name = re.findall(r"\bversionName\s+['\"]([0-9]+\.[0-9]+\.[0-9]+)['\"]", data)
-    code = re.findall(r"\bversionCode\s+([1-9][0-9]*)", data)
-    if len(name) != 1 or len(code) != 1:
+def version_from(data: str, device: str = "phone") -> tuple[str, int]:
+    """Read literal version fields from their Gradle DSL scopes, never execute Gradle.
+
+    String/comment contents cannot invent scopes. Dynamic or conditional version
+    assignments fail closed; the signed APK remains the release identity check.
+    """
+    if device not in ("phone", "tv", "tvnative"):
+        raise PackageError("Unknown Android source device")
+    pattern = re.compile(r"(?P<skip>\s+|//[^\n]*|/\*[\s\S]*?\*/)|(?P<string>'(?:\\[\s\S]|[^'\\])*'|\"(?:\\[\s\S]|[^\"\\])*\")|(?P<word>[A-Za-z_$][A-Za-z0-9_$]*|[0-9]+)|(?P<symbol>[\s\S])")
+    tokens = [(m.group(), m.lastgroup, m.start(), m.end()) for m in pattern.finditer(data) if m.lastgroup != "skip"]
+    depth = 0
+    for text, kind, _, _ in tokens:
+        if kind == "symbol" and text in ("'", '"'):
+            raise PackageError("Unterminated Android Gradle string")
+        if kind == "symbol":
+            depth += (text == "{") - (text == "}")
+            if depth < 0:
+                raise PackageError("Unbalanced Android Gradle scope")
+    if depth:
+        raise PackageError("Unbalanced Android Gradle scope")
+
+    def blocks(scope, name):
+        found, depth, index = [], 0, 0
+        while index < len(scope):
+            text = scope[index][0]
+            if depth == 0 and text == name and index + 1 < len(scope) and scope[index + 1][0] == "{":
+                end, nesting = index + 2, 1
+                while nesting:
+                    nesting += (scope[end][0] == "{") - (scope[end][0] == "}")
+                    end += 1
+                found.append(scope[index + 2:end - 1])
+                index = end
+            else:
+                depth += (text == "{") - (text == "}")
+                index += 1
+        if len(found) > 1:
+            raise PackageError("Android Gradle scope is ambiguous: " + name)
+        return found[0] if found else None
+
+    def fields(scope):
+        values, depth = {}, 0
+        for index, (text, _, _, _) in enumerate(scope):
+            depth += (text == "{") - (text == "}")
+            if text not in ("versionName", "versionCode"):
+                continue
+            if depth or text in values:
+                raise PackageError("Conditional or duplicate Android version field")
+            value_index = index + 1
+            if value_index < len(scope) and scope[value_index][0] == "=":
+                value_index += 1
+            if value_index >= len(scope):
+                raise PackageError("Android version field has no literal value")
+            value, kind, _, end = scope[value_index]
+            if text == "versionName":
+                if kind != "string" or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", value[1:-1]):
+                    raise PackageError("Android versionName must be a literal semantic version")
+                value = value[1:-1]
+            else:
+                if kind != "word" or not re.fullmatch(r"[1-9][0-9]*", value):
+                    raise PackageError("Android versionCode must be a positive integer literal")
+                value = int(value)
+            if value_index + 1 < len(scope):
+                next_token = scope[value_index + 1]
+                gap = re.sub(r"/\*[\s\S]*?\*/|//[^\n]*", "", data[end:next_token[2]])
+                if next_token[0] != ";" and "\n" not in gap and "\r" not in gap:
+                    raise PackageError("Android version expressions are not supported")
+            values[text] = value
+        return values
+
+    android = blocks(tokens, "android")
+    if android is None:
+        # Preserve older single-version inputs without a wrapper, but never
+        # invent the native flavor when the project does not declare it.
+        if device == "tvnative":
+            raise PackageError("Native TV source flavor is missing")
+        values = fields(tokens)
+    else:
+        default = blocks(android, "defaultConfig")
+        if default is None:
+            raise PackageError("Android defaultConfig is missing")
+        values = fields(default)
+        flavors = blocks(android, "productFlavors")
+        selected = blocks(flavors, "tvNative" if device == "tvnative" else device) if flavors is not None else None
+        if device == "tvnative" and selected is None:
+            raise PackageError("Native TV source flavor is missing")
+        if selected is not None:
+            values.update(fields(selected))
+    if "versionName" not in values or "versionCode" not in values:
         raise PackageError("Android versionName/versionCode could not be identified unambiguously")
-    return name[0], int(code[0])
+    return values["versionName"], values["versionCode"]
 
 
 def snapshot_digest(entries: list[dict]) -> str:
@@ -260,7 +344,7 @@ def validate_archive(path: Path, expected: dict | None = None) -> dict:
                         digest.update(chunk)
                 if digest.hexdigest() != entry["sha256"]:
                     raise PackageError("Archive source hash differs from the manifest")
-            version, code = version_from(archive.read("android/app/build.gradle").decode("utf-8"))
+            version, code = version_from(archive.read("android/app/build.gradle").decode("utf-8"), manifest.get("device", "phone"))
             if manifest.get("versionName") != version or manifest.get("versionCode") != code:
                 raise PackageError("Archived Android version differs from the manifest")
             return manifest
@@ -278,7 +362,7 @@ def zip_info(name: str, mode: int) -> zipfile.ZipInfo:
     return info
 
 
-def package_source(root: Path, git_root: Path, output: Path, force: bool = False) -> dict:
+def package_source(root: Path, git_root: Path, output: Path, force: bool = False, device: str = "phone") -> dict:
     if root.is_symlink():
         raise PackageError("Source root cannot be a symlink")
     root, git_root = root.resolve(), git_root.resolve()
@@ -296,8 +380,8 @@ def package_source(root: Path, git_root: Path, output: Path, force: bool = False
         raise PackageError("Output sidecars cannot be symlinks")
     identity = git_identity(git_root)
     entries = source_files(root, git_root, {output, sidecar, checksum})
-    version, code = version_from((root / "android/app/build.gradle").read_text(encoding="utf-8"))
-    manifest = {"schema": 1, "kind": "android-corresponding-source", "versionName": version, "versionCode": code,
+    version, code = version_from((root / "android/app/build.gradle").read_text(encoding="utf-8"), device)
+    manifest = {"schema": 1, "kind": "android-corresponding-source", "device": device, "versionName": version, "versionCode": code,
                 "gitReference": identity, "snapshotSha256": snapshot_digest(entries), "files": entries}
     raw_manifest = (json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
     if len(raw_manifest) > MAX_MANIFEST_BYTES:
@@ -335,7 +419,7 @@ def package_source(root: Path, git_root: Path, output: Path, force: bool = False
         if json.loads(sidecar.read_text(encoding="utf-8")) != manifest or hashlib.sha256(output.read_bytes()).hexdigest() != checksum.read_text(encoding="utf-8").split()[0]:
             raise PackageError("Final ZIP/manifest/checksum did not reopen consistently")
         return {"zip": str(output), "sha256": archive_sha, "bytes": output.stat().st_size, "files": len(entries),
-                "versionName": version, "versionCode": code, "snapshotSha256": manifest["snapshotSha256"],
+                "device": device, "versionName": version, "versionCode": code, "snapshotSha256": manifest["snapshotSha256"],
                 "manifest": str(sidecar), "checksum": str(checksum), "crc": "PASS", "entrySafety": "PASS", "symlinks": 0}
     finally:
         if temporary is not None:
@@ -347,10 +431,11 @@ def main(argv=None) -> int:
     parser.add_argument("--root", type=Path, required=True, help="Frozen corresponding source directory (may be an ignored verification copy)")
     parser.add_argument("--git-root", type=Path, required=True, help="Original project Git top-level used only for reference and ignore rules")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--device", choices=("phone", "tv", "tvnative"), default="phone", help="Android variant identity (default: phone)")
     parser.add_argument("--force", action="store_true", help="Explicitly replace an existing package and its sidecars")
     args = parser.parse_args(argv)
     try:
-        print(json.dumps(package_source(args.root, args.git_root, args.output, args.force), ensure_ascii=False, sort_keys=True))
+        print(json.dumps(package_source(args.root, args.git_root, args.output, args.force, args.device), ensure_ascii=False, sort_keys=True))
         return 0
     except PackageError as error:
         print("SOURCE_PACKAGE_ERROR: " + str(error), file=sys.stderr)

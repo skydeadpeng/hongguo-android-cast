@@ -164,7 +164,11 @@ public final class PlayerActivity extends Activity {
                 castBound = bindService(new Intent(this, DlnaCastService.class), castConnection, BIND_AUTO_CREATE);
                 browserCastBound = bindService(new Intent(this, BrowserCastService.class), browserCastConnection, BIND_AUTO_CREATE);
             }
-        } catch (Exception error) { Toast.makeText(this, "播放信息无效：" + error.getMessage(), Toast.LENGTH_LONG).show(); finish(); }
+        } catch (Exception error) {
+            android.util.Log.e("HongguoPlayer", "播放信息无效", error);
+            Toast.makeText(this, "播放信息无效：" + error.getMessage(), Toast.LENGTH_LONG).show();
+            finish();
+        }
     }
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     private Button button(String text, Runnable action) {
