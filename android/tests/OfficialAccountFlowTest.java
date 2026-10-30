@@ -16,9 +16,9 @@ public final class OfficialAccountFlowTest {
     static JSONObject login(String uid)throws JSONException{return ok(new JSONObject().put("user_id_str",uid).put("user_id",uid).put("name","合成账号"));}
     static JSONObject mfa()throws JSONException{return new JSONObject().put("message","error").put("data",new JSONObject().put("error_code",2002).put("encrypt_uid","PRIVATE_ENCRYPT_UID").put("sms_code_key","PRIVATE_CODE_KEY").put("event_params",new JSONObject().put("log_id","PRIVATE_LOG")).put("verify_ways",new JSONArray().put(new JSONObject().put("verify_way","upsms").put("channel_mobile","106900000001").put("sms_content","SYNTHETIC MESSAGE"))));}
     static final class Memory implements OfficialAccountFlow.Store {
-        JSONObject disk;int saves;boolean failProfile,failLoad;
+        JSONObject disk;int saves;boolean failProfile,failLoad,failAll;
         public JSONObject load()throws Exception{if(failLoad)throw new IOException("corrupt");return disk==null?null:copyJSON(disk);}
-        public void save(JSONObject value)throws Exception{if(failProfile&&value.has("profile"))throw new IOException("synthetic disk full");disk=copyJSON(value);saves++;}
+        public void save(JSONObject value)throws Exception{if(failAll)throw new IOException("synthetic keystore unavailable");if(failProfile&&value.has("profile"))throw new IOException("synthetic disk full");disk=copyJSON(value);saves++;}
     }
     static final class Clock implements OfficialAccountFlow.Clock {long now=100000,nanos=1_000_000_000L;public long now(){return now;}public long nanos(){return nanos;}}
     static final class Factory implements OfficialAccountFlow.Clients {
@@ -31,7 +31,7 @@ public final class OfficialAccountFlowTest {
             JSONObject state=copyJSON(input);boolean closed;
             public void registerDevice()throws Exception{if(!state.optBoolean("registered")){registrations++;if(failRegister)throw new IOException("synthetic register failure");state.put("registered",true).put("device_id","7000000000000000001").put("install_id","7000000000000000002");}}
             public JSONObject session()throws Exception{return copyJSON(state);}
-            public JSONObject sendCode(String phone)throws Exception{sends++;check(store.disk!=null&&store.disk.getJSONObject("session").getBoolean("registered"),"registration persisted before SMS");if(entered!=null){entered.countDown();long stop=System.nanoTime()+2_000_000_000L;while(release.getCount()>0&&System.nanoTime()<stop)try{release.await(20,TimeUnit.MILLISECONDS);}catch(InterruptedException ignored){} }return(JSONObject)next(send,ok(new JSONObject()));}
+            public JSONObject sendCode(String phone)throws Exception{sends++;if(!store.failAll)check(store.disk!=null&&store.disk.getJSONObject("session").getBoolean("registered"),"registration persisted before SMS");if(entered!=null){entered.countDown();long stop=System.nanoTime()+2_000_000_000L;while(release.getCount()>0&&System.nanoTime()<stop)try{release.await(20,TimeUnit.MILLISECONDS);}catch(InterruptedException ignored){} }return(JSONObject)next(send,ok(new JSONObject()));}
             public JSONObject smsLogin(String phone,String code,String ticket)throws Exception{logins++;tickets.add(ticket);JSONObject value=(JSONObject)next(login,OfficialAccountFlowTest.login("7123456789012345678"));if(forceCredentials||OfficialAccountFlow.success(value)&&value.getJSONObject("data").has("user_id_str")&&!noCredentials)state.put("token","PRIVATE_SESSION_TOKEN");return value;}
             public JSONObject verifyMfa(JSONObject challenge,String phone)throws Exception{verifications++;if(onVerify!=null)onVerify.run();return(JSONObject)next(verify,new JSONObject().put("message","error").put("data",new JSONObject().put("error_code",1045)));}
             public void close(){if(!closed){closes++;closed=true;}}
@@ -46,6 +46,21 @@ public final class OfficialAccountFlowTest {
     public static void main(String[]args)throws Exception {
         group("user-only registration persistence, masking and cooldown survive a new flow",()->{
             Env e=new Env();check(e.factory.sends==0&&e.store.saves==0,"startup sends/writes nothing");JSONObject status=e.flow.sendCode("+86 13800000000");check(status.getString("phase").equals("code")&&status.getString("smsState").equals("sent"),"explicit send confirmed");check(status.getString("maskedPhone").equals("138****0000")&&!status.toString().contains("13800000000"),"full phone not projected");check(e.factory.registrations==1&&e.factory.sends==1,"one device registration and one SMS");rejects(()->e.flow.sendCode("13800000000"),"cooldown blocks repeated sends");check(e.factory.sends==1,"no second SMS");new OfficialAccountFlow(e.store,e.factory,e.clock,ms->e.clock.now+=ms);check(e.factory.sends==1&&e.factory.registrations==1,"restart only loads registered state");check(!e.store.disk.toString().contains("13800000000"),"phone not persisted");
+        });
+        group("a keystore failure never swallows an accepted code",()->{
+            Env e=new Env();e.store.failAll=true;JSONObject s=e.flow.sendCode("13800000000");
+            check(e.factory.sends==1,"the code request still reached the server");
+            check(s.getString("phase").equals("code")&&s.getString("smsState").equals("sent"),"a delivered code is not reported as a failure");
+            check(s.getString("diagnostic").isEmpty(),"a delivered code carries no failure diagnostic");
+            check(e.store.saves==0,"nothing was persisted while the keystore was unavailable");
+        });
+        group("failure diagnostics stay stable and carry no credential",()->{
+            Env limited=new Env();limited.factory.send.add(new OfficialApiClient.HTTPError(429,60));check(limited.flow.sendCode("13800000000").getString("diagnostic").equals("send_limited"),"rate limit carries a stable diagnostic");
+            Env rejected=new Env();rejected.factory.send.add(new JSONObject().put("message","error").put("data",new JSONObject().put("error_code",1009)));check(rejected.flow.sendCode("13800000000").getString("diagnostic").equals("send_rejected"),"business rejection carries a stable diagnostic");
+            Env challenged=new Env();challenged.factory.login.add(mfa());check(challenged.flow.loginSMS("13800000000","123456").getString("diagnostic").equals("mfa_required"),"an upstream MFA challenge carries a stable diagnostic");
+            Env wrong=new Env();wrong.factory.login.add(new JSONObject().put("message","error").put("data",new JSONObject().put("error_code",1009).put("description","验证码错误")));JSONObject s=wrong.flow.loginSMS("13800000000","012345");
+            check(s.getString("diagnostic").equals("login_rejected"),"a rejected OTP carries a stable diagnostic");
+            check(!s.toString().contains("012345"),"the diagnostic never carries the OTP");
         });
         group("registration failure, rejection, rate limit and uncertain delivery differ",()->{
             Env reg=new Env();reg.factory.failRegister=true;JSONObject s=reg.flow.sendCode("13800000000");check(reg.factory.sends==0&&s.getString("smsState").equals("rejected")&&s.getInt("retryAfter")==0,"registration failure prevents SMS");

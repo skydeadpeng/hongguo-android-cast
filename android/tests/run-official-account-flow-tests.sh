@@ -11,7 +11,7 @@ package io.github.jackotom.hongguo.android;
 final class OfficialApiClient { static final class HTTPError extends java.io.IOException { final int status,retryAfter; HTTPError(int status,int retry){this.status=status;this.retryAfter=retry;} } }
 STUB
 SOURCE="$ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
-"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/io/github/jackotom/hongguo/android/OfficialApiClient.java" "$SOURCE/OfficialAccountFlow.java" "$ROOT/android/tests/OfficialAccountFlowTest.java"
+"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/io/github/jackotom/hongguo/android/OfficialApiClient.java" "$SOURCE/AccountLog.java" "$SOURCE/OfficialAccountFlow.java" "$ROOT/android/tests/OfficialAccountFlowTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.OfficialAccountFlowTest
 
 SDK="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platforms/android-35/android.jar"

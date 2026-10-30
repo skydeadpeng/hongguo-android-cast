@@ -5,6 +5,7 @@ import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
+import java.security.UnrecoverableKeyException;
 import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
 
@@ -13,7 +14,14 @@ final class OfficialAccountVault implements OfficialSessionStore.Vault {
     private static final String ALIAS="hongguo_official_session_v1";
     private static final byte[] AAD="hongguo:official-account:session:v1".getBytes(StandardCharsets.UTF_8);
     private SecretKey key()throws Exception {
-        KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);if(store.containsAlias(ALIAS))return(SecretKey)store.getKey(ALIAS,null);
+        KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);
+        if(store.containsAlias(ALIAS)){
+            // A key invalidated by a screen-lock or biometric change is permanently unrecoverable; without this
+            // branch every later login would fail until the user wiped the app data.
+            try{SecretKey existing=(SecretKey)store.getKey(ALIAS,null);if(existing!=null)return existing;AccountLog.warn("official_account_keystore_key_missing");}
+            catch(UnrecoverableKeyException broken){AccountLog.warn("official_account_keystore_key_unrecoverable");}
+            try{store.deleteEntry(ALIAS);}catch(Exception ignored){}
+        }
         KeyGenerator generator=KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,"AndroidKeyStore");generator.init(new KeyGenParameterSpec.Builder(ALIAS,KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());return generator.generateKey();
     }
     public String seal(String value)throws Exception {Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,key());cipher.updateAAD(AAD);return Base64.encodeToString(cipher.getIV(),Base64.NO_WRAP)+":"+Base64.encodeToString(cipher.doFinal(value.getBytes(StandardCharsets.UTF_8)),Base64.NO_WRAP);}

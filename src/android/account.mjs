@@ -12,6 +12,8 @@ export function accountView(value) {
     maskedPhone: masked(value.maskedPhone), retryAfter: Math.min(3600, count(value.retryAfter)),
     smsState: ['sent', 'limited', 'rejected', 'uncertain'].includes(value.smsState) ? value.smsState : '',
     error: text(value.error), loginRequired: value.loginRequired === true,
+    // Stable failure code for support: no URL, no credential, no phone fragment.
+    diagnostic: /^[a-z_]{1,40}$/.test(value.diagnostic || '') ? value.diagnostic : '',
     user: value.authenticated && value.user && typeof value.user === 'object' ? { name: text(value.user.name, 80) || '红果用户', maskedPhone: masked(value.user.maskedPhone), idSuffix: /^尾号 \d{1,4}$/.test(value.user.idSuffix || '') ? value.user.idSuffix : '' } : null,
     smsNumber: /^\+?\d{5,20}$/.test(value.smsNumber || '') ? value.smsNumber : '',
     smsContent: text(value.smsContent, 256), mfaExpiresAt: count(value.mfaExpiresAt),

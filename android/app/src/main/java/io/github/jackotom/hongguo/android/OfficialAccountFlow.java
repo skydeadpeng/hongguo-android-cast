@@ -27,7 +27,7 @@ final class OfficialAccountFlow {
     private final Sleeper sleeper;
     private final AtomicLong generation=new AtomicLong();
     private JSONObject disk,challenge;
-    private String phone="",otp="",phase="phone",smsState="",error="";
+    private String phone="",otp="",phase="phone",smsState="",error="",diagnostic="";
     private long retryAt,mfaExpires,mfaExpiresNanos;
     private boolean busy,loginRequired;
     private volatile Client active;
@@ -40,7 +40,7 @@ final class OfficialAccountFlow {
             JSONObject loaded=store.load();
             disk=loaded==null?empty(clients.fresh()):validateDisk(loaded);
             phase=profile()!=null?"logged_in":"phone";
-        }catch(Exception failure){disk=empty(clients.fresh());error="账号凭据读取未完成，请重新登录；原本机记录保留";loginRequired=true;}
+        }catch(Exception failure){disk=empty(clients.fresh());error="账号凭据读取未完成，请重新登录；原本机记录保留";loginRequired=true;diagnostic="session_invalid";AccountLog.error("official_account_session_load_failed:"+failure.getClass().getSimpleName());}
     }
     void setListener(Runnable value){changed=value;}
     private void notifyChanged(){Runnable value=changed;if(value!=null)try{value.run();}catch(RuntimeException ignored){}}
@@ -61,7 +61,7 @@ final class OfficialAccountFlow {
         synchronized(lock){if(!current(epoch,uid))return;JSONObject next=copy(disk).put("session",copy(session));store.save(next);if(current(epoch,uid))disk=next;}
     }
     JSONObject status()throws JSONException {
-        synchronized(lock){expireLocked();JSONObject p=profile();JSONObject result=new JSONObject().put("provider","hongguo").put("revision",generation.get()).put("officialLoginAvailable",true).put("authenticated",p!=null).put("phase",phase).put("busy",busy).put("maskedPhone",mask(phone)).put("retryAfter",Math.max(0,(retryAt-clock.now()+999)/1000)).put("smsState",smsState).put("error",error).put("loginRequired",loginRequired).put("selfHostedRemoved",true).put("legacyRecordsPreserved",true);
+        synchronized(lock){expireLocked();JSONObject p=profile();JSONObject result=new JSONObject().put("provider","hongguo").put("revision",generation.get()).put("officialLoginAvailable",true).put("authenticated",p!=null).put("phase",phase).put("busy",busy).put("maskedPhone",mask(phone)).put("retryAfter",Math.max(0,(retryAt-clock.now()+999)/1000)).put("smsState",smsState).put("error",error).put("diagnostic",diagnostic).put("loginRequired",loginRequired).put("selfHostedRemoved",true).put("legacyRecordsPreserved",true);
             if(p!=null)result.put("user",new JSONObject().put("name",p.optString("name","红果用户")).put("maskedPhone",p.optString("maskedPhone","")).put("idSuffix",suffix(p.optString("uid"))));
             if(challenge!=null){JSONObject safe=mfaDisplay(challenge);result.put("smsNumber",safe.optString("number")).put("smsContent",safe.optString("content")).put("mfaExpiresAt",mfaExpires);}
             return result;
@@ -113,33 +113,42 @@ final class OfficialAccountFlow {
     private Operation begin(String number,boolean sending)throws Exception {
         synchronized(lock){expireLocked();if(profile()!=null)throw new IOException("请先退出当前红果账号");if(busy)throw new IOException("账号操作处理中，请稍候");if(sending&&clock.now()<retryAt)throw new IOException("请等待倒计时结束后再获取验证码");
             if(!sending&&!phone.isEmpty()&&!phone.equals(number))throw new IOException("手机号已改变，请重新获取验证码");
-            long epoch=generation.incrementAndGet();Client client=clients.create(copy(disk.getJSONObject("session")));active=client;activeThread=Thread.currentThread();busy=true;phone=number;phase=sending?"sending":"submitting";error="";challenge=null;mfaExpires=0;mfaExpiresNanos=0;otp="";return new Operation(epoch,client);}
+            long epoch=generation.incrementAndGet();Client client=clients.create(copy(disk.getJSONObject("session")));active=client;activeThread=Thread.currentThread();busy=true;phone=number;phase=sending?"sending":"submitting";error="";diagnostic="";challenge=null;mfaExpires=0;mfaExpiresNanos=0;otp="";return new Operation(epoch,client);}
     }
     private void live(Operation op)throws IOException {if(generation.get()!=op.epoch||active!=op.client||Thread.currentThread().isInterrupted())throw new InterruptedIOException("登录已取消");}
     private void saveAnonymous(Operation op)throws Exception {synchronized(lock){live(op);JSONObject next=copy(disk).put("session",op.client.session());store.save(next);live(op);disk=next;}}
+    /**
+     * The anonymous device profile is a convenience copy, never the credential that decides the outcome.
+     * A keystore failure here must not swallow a code the server already accepted.
+     */
+    private void persist(Operation op)throws Exception{
+        try{saveAnonymous(op);}
+        catch(InterruptedIOException cancelled){throw cancelled;}
+        catch(Exception failure){AccountLog.error("official_account_session_persist_failed:"+failure.getClass().getSimpleName());}
+    }
     private void end(Operation op){synchronized(lock){if(active==op.client){active=null;activeThread=null;busy=false;}}op.client.close();notifyChanged();}
     JSONObject sendCode(String candidate)throws Exception {
         String number=canonicalPhone(candidate);Operation op=begin(number,true);boolean deliveryPossible=false;notifyChanged();
-        try {op.client.registerDevice();saveAnonymous(op);synchronized(lock){live(op);retryAt=clock.now()+60000;smsState="uncertain";deliveryPossible=true;}JSONObject response=op.client.sendCode(number);live(op);saveAnonymous(op);
+        try {op.client.registerDevice();persist(op);synchronized(lock){live(op);retryAt=clock.now()+60000;smsState="uncertain";deliveryPossible=true;}JSONObject response=op.client.sendCode(number);live(op);persist(op);
             synchronized(lock){live(op);JSONObject data=response.optJSONObject("data");long retry=data==null?0:data.optLong("retry_time",0);if(retry>0&&retry<=3600)retryAt=clock.now()+retry*1000;
-                if(success(response)){smsState="sent";phase="code";}else{String business=businessCode(response);boolean explicit=!business.isEmpty()&&!business.equals("0")&&!business.equals("invalid");smsState=explicit?(business.equals("429")?"limited":"rejected"):"uncertain";if(explicit&&!(retry>0&&retry<=3600))retryAt=business.equals("429")?clock.now()+60000:0;phase="phone";error=reason(rejected(response));}}
+                if(success(response)){smsState="sent";phase="code";diagnostic="";}else{String business=businessCode(response);boolean explicit=!business.isEmpty()&&!business.equals("0")&&!business.equals("invalid");smsState=explicit?(business.equals("429")?"limited":"rejected"):"uncertain";diagnostic=business.equals("429")?"send_limited":explicit?"send_rejected":"send_uncertain";if(explicit&&!(retry>0&&retry<=3600))retryAt=business.equals("429")?clock.now()+60000:0;phase="phone";error=reason(rejected(response));AccountLog.warn("official_account_send_rejected:"+business);}}
         }catch(Exception failure){synchronized(lock){if(generation.get()==op.epoch){int status=failure instanceof OfficialApiClient.HTTPError?((OfficialApiClient.HTTPError)failure).status:0;long retry=failure instanceof OfficialApiClient.HTTPError?((OfficialApiClient.HTTPError)failure).retryAfter:0;
-                    if(status==429){smsState="limited";retryAt=clock.now()+Math.max(1,Math.min(3600,retry>0?retry:60))*1000;}else if(status>=400&&status<500&&status!=408){smsState="rejected";retryAt=retry>0?clock.now()+Math.min(3600,retry)*1000:0;}else if(!deliveryPossible){smsState="rejected";retryAt=0;}else smsState="uncertain";
-                    phase="phone";error=reason(failure);}}}
+                    if(status==429){smsState="limited";diagnostic="send_limited";retryAt=clock.now()+Math.max(1,Math.min(3600,retry>0?retry:60))*1000;}else if(status>=400&&status<500&&status!=408){smsState="rejected";diagnostic="send_rejected";retryAt=retry>0?clock.now()+Math.min(3600,retry)*1000:0;}else if(!deliveryPossible){smsState="rejected";diagnostic="send_transport";retryAt=0;}else smsState="uncertain";
+                    phase="phone";error=reason(failure);AccountLog.warn("official_account_send_failed:"+failure.getClass().getSimpleName());}}}
         finally{end(op);}return status();
     }
     JSONObject loginSMS(String candidate,String code)throws Exception {
         String number=canonicalPhone(candidate);if(code==null||!code.matches("[0-9]{4,8}"))throw new IOException("请输入4至8位短信验证码");Operation op=begin(number,false);notifyChanged();
-        try {op.client.registerDevice();saveAnonymous(op);JSONObject response=op.client.smsLogin(number,code,"");live(op);
-            if(success(response))finish(op,response);else if(isMfa(response)){saveAnonymous(op);synchronized(lock){live(op);challenge=copy(response.getJSONObject("data"));otp=code;mfaExpires=clock.now()+600000;mfaExpiresNanos=clock.nanos()+java.util.concurrent.TimeUnit.MINUTES.toNanos(10);phase="mfa";}}
-            else throw rejected(response);
-        }catch(Exception failure){synchronized(lock){if(generation.get()==op.epoch){error=reason(failure);phase="code";clearChallenge();}}}
+        try {op.client.registerDevice();persist(op);JSONObject response=op.client.smsLogin(number,code,"");live(op);
+            if(success(response))finish(op,response);else if(isMfa(response)){persist(op);synchronized(lock){live(op);challenge=copy(response.getJSONObject("data"));otp=code;mfaExpires=clock.now()+600000;mfaExpiresNanos=clock.nanos()+java.util.concurrent.TimeUnit.MINUTES.toNanos(10);phase="mfa";diagnostic="mfa_required";AccountLog.warn("official_account_mfa_required");}}
+            else{synchronized(lock){live(op);diagnostic="login_rejected";}throw rejected(response);}
+        }catch(Exception failure){synchronized(lock){if(generation.get()==op.epoch){error=reason(failure);phase="code";clearChallenge();if(diagnostic.isEmpty())diagnostic="login_transport";AccountLog.warn("official_account_login_failed:"+failure.getClass().getSimpleName());}}}
         finally{end(op);}return status();
     }
     JSONObject verifyMfa()throws Exception {
         final Operation op;final JSONObject selected;final String number,code;final long expires,expiresNanos;
         synchronized(lock){expireLocked();if(busy)throw new IOException("账号操作处理中，请稍候");if(challenge==null||otp.isEmpty())throw new IOException("短信验证已结束，请重新登录");
-            long epoch=generation.incrementAndGet();Client client=clients.create(copy(disk.getJSONObject("session")));active=client;activeThread=Thread.currentThread();busy=true;phase="mfa_waiting";error="";selected=copy(challenge);number=phone;code=otp;expires=mfaExpires;expiresNanos=mfaExpiresNanos;op=new Operation(epoch,client);}
+            long epoch=generation.incrementAndGet();Client client=clients.create(copy(disk.getJSONObject("session")));active=client;activeThread=Thread.currentThread();busy=true;phase="mfa_waiting";error="";diagnostic="mfa_waiting";selected=copy(challenge);number=phone;code=otp;expires=mfaExpires;expiresNanos=mfaExpiresNanos;op=new Operation(epoch,client);}
         notifyChanged();long stop=Math.min(expires,clock.now()+90000);
         final long stopNanos=Math.min(expiresNanos,clock.nanos()+java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0,Math.min(90000,stop-clock.now()))));
         op.client.deadlineNanos(stopNanos);boolean complete=false;
@@ -149,14 +158,14 @@ final class OfficialAccountFlow {
                 if("1045".equals(businessCode(response))){long wait=Math.min(3000,Math.min(stop-clock.now(),java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(stopNanos-clock.nanos())));if(wait<=0)break;sleeper.sleep(wait);continue;}
                 if(!success(response))throw mfaFailure(response);JSONObject data=response.getJSONObject("data");String ticket=data.optString("ticket","");if(ticket.isEmpty())ticket=data.optString("verify_ticket","");if(ticket.isEmpty())throw new IOException("短信验证没有返回登录票据，请重新登录");
                 response=op.client.smsLogin(number,code,ticket);live(op);if(clock.nanos()>=stopNanos)break;if(!success(response))throw mfaFailure(response);finish(op,response);complete=true;break;}
-            if(!complete)synchronized(lock){live(op);if(clock.now()>=expires||clock.nanos()>=expiresNanos){clearChallenge();phase="phone";error="短信验证等待已过期，请重新获取验证码";}else{phase="mfa";error="本轮短信验证等待已结束，可重试或取消";}}
-        }catch(Exception failure){synchronized(lock){if(generation.get()==op.epoch){error=reason(failure);if(failure instanceof ExpiredMfa||clock.now()>=expires||clock.nanos()>=expiresNanos){clearChallenge();phase="phone";}else phase="mfa";}}}
+            if(!complete)synchronized(lock){live(op);if(clock.now()>=expires||clock.nanos()>=expiresNanos){clearChallenge();phase="phone";diagnostic="mfa_expired";error="短信验证等待已过期，请重新获取验证码";}else{phase="mfa";diagnostic="mfa_round_ended";error="本轮短信验证等待已结束，可重试或取消";}}
+        }catch(Exception failure){synchronized(lock){if(generation.get()==op.epoch){error=reason(failure);if(failure instanceof ExpiredMfa||clock.now()>=expires||clock.nanos()>=expiresNanos){clearChallenge();phase="phone";diagnostic="mfa_expired";}else{phase="mfa";diagnostic="mfa_transport";}AccountLog.warn("official_account_mfa_failed:"+failure.getClass().getSimpleName());}}}
         finally{end(op);}return status();
     }
     private void finish(Operation op,JSONObject response)throws Exception {
         String uid=loginUID(response);JSONObject session=op.client.session();if(!credentials(session))throw new IOException("登录响应缺少会话凭据，请重试");JSONObject data=response.getJSONObject("data");String name=data.optString("name",data.optString("screen_name","红果用户"));if(name.length()>80||name.matches("(?s).*[\\p{Cntrl}].*"))name="红果用户";
         JSONObject next=empty(session).put("profile",new JSONObject().put("uid",uid).put("name",name).put("maskedPhone",mask(phone)));
-        synchronized(lock){live(op);store.save(next);live(op);disk=next;clearChallenge();phase="logged_in";error="";loginRequired=false;phone="";smsState="";retryAt=0;}
+        synchronized(lock){live(op);store.save(next);live(op);disk=next;clearChallenge();phase="logged_in";error="";diagnostic="";loginRequired=false;phone="";smsState="";retryAt=0;}
     }
     private void clearChallenge(){challenge=null;otp="";mfaExpires=0;mfaExpiresNanos=0;}
     private void expireLocked(){if(challenge!=null&&(clock.now()>=mfaExpires||clock.nanos()>=mfaExpiresNanos)){generation.incrementAndGet();Client client=active;if(client!=null)client.close();active=null;Thread thread=activeThread;if(thread!=null&&thread!=Thread.currentThread())thread.interrupt();activeThread=null;busy=false;clearChallenge();phase="phone";error="短信验证等待已过期，请重新获取验证码";}}
@@ -171,7 +180,7 @@ final class OfficialAccountFlow {
         synchronized(lock){active=null;activeThread=null;busy=false;clearChallenge();phone="";phase=profile()!=null?"logged_in":"phone";error="";}notifyChanged();return status();
     }
     JSONObject logout()throws Exception {
-        cancelLogin();synchronized(lock){generation.incrementAndGet();JSONObject session=copy(disk.getJSONObject("session"));session.put("cookies",new JSONObject());session.remove("token");JSONObject next=empty(session);store.save(next);disk=next;phase="phone";error="";loginRequired=false;smsState="";retryAt=0;}notifyChanged();return status();
+        cancelLogin();synchronized(lock){generation.incrementAndGet();JSONObject session=copy(disk.getJSONObject("session"));session.put("cookies",new JSONObject());session.remove("token");JSONObject next=empty(session);store.save(next);disk=next;phase="phone";error="";diagnostic="";loginRequired=false;smsState="";retryAt=0;}notifyChanged();return status();
     }
-    void expired(long epoch,String expectedUid)throws Exception {synchronized(lock){if(!current(epoch,expectedUid))return;logout();loginRequired=true;error="红果会话已失效，本机账号记录保留，请重新登录";}notifyChanged();}
+    void expired(long epoch,String expectedUid)throws Exception {synchronized(lock){if(!current(epoch,expectedUid))return;logout();loginRequired=true;diagnostic="session_expired";error="红果会话已失效，本机账号记录保留，请重新登录";}notifyChanged();}
 }
