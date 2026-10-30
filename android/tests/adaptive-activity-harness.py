@@ -32,7 +32,10 @@ playlist='PlaybackPlaylist.' in source
 names=['selectEpisode']
 if modern:
     names+=['releaseCurrent','reserveMedia','releasePrepared','discardPendingMedia','adoptMedia','prepareMedia','stageProgress','loadAt','loadAtInternal','bindPlayback','recoverMedia','lowerCurrentMedia','validSwitch','releaseSwitch','cancelQualitySwitch','failQualitySwitch','selectQuality','switchQuality','resolveQualitySwitch','prepareQualitySwitch','validCandidate','lowerQualitySwitch','finishQualitySwitch','schedulePrefetch','renderStatus','qualityLabel']
+for extra in ['stageCeiling','prepareStage','cancelPlaybackWatchdogs','validPlaybackCallback','armPreparationTimeout','updateBufferingWatchdog','observedShortEdge','failCurrentMedia','restoreAutomaticCeiling','cacheEpisode']:
+    if re.search(r'\b'+extra+r'\(',source): names.append(extra)
 if playlist: names+=['owner','mediaKey','closeLocalWindow','pruneReleasedWindow','saveProgress','restoreSelection','savePlaybackState']
+if 'void recordProgress(' in source: names+=['recordProgress','watchProgressSeeks']
 methods=[]
 for name in names:
     found=blocks(r'^    (?:private|public|protected) (?:synchronized )?(?:static )?[^\n{]*\b'+re.escape(name)+r'\([^;\n]*\)(?: throws [^\n{]+)?\s*\{')
@@ -51,9 +54,12 @@ final class AdaptiveActivityHarness {
  VideoView video=new VideoView(this);FrameLayout playerRoot=new FrameLayout();MediaPlayer mediaPlayer;
  String quality="1080p",actualQuality="1080p",protectedQuality="auto",currentKind="fixture",lastMediaError;float requestedSpeed=1,actualSpeed=1;
  final Label title=new Label(),status=new Label(),time=new Label();final SeekBar seek=new SeekBar();
- JSONObject series,episode,queueSeries,protectedEpisode;String protectedSeriesId="",queueIdentity="";PlaybackCache.QueueWindow localWindow,protectedWindow;boolean cleanup=true;final List<JSONObject>queue=new ArrayList<>();int current,generation=7,resumeAt,lastGoodPosition,qualitySerial,videoWidth,videoHeight;
+ JSONObject series,episode,queueSeries,protectedEpisode;String protectedSeriesId="",queueIdentity="";PlaybackCache.QueueWindow localWindow,protectedWindow;boolean cleanup=true;final List<JSONObject>queue=new ArrayList<>();int current,generation=7,resumeAt,lastGoodPosition,qualitySerial,videoWidth,videoHeight,sourceShortEdge,automaticCeiling,protectedCeiling;Runnable playbackPrepareTimeout,bufferingTimeout;boolean decoderPreparing;
  boolean destroyed,offline,autoplay,prepared,completed,userPaused,active=true,protectedCurrent,currentManual,currentCache,currentWeb,buffering,castWasActive;
+ long lastProgressSavedAt;
  int loads,loadedAt,loadedPosition,errors,updates,saves,prunes;Uri manualFile;AlertDialog dialog;
+ // Danmaku is an independent display boundary, certified by DanmakuControllerTest.
+ DanmakuLayer danmaku;static final class DanmakuLayer{void suspend(){}}
  NESTED
  MODERN_FIELD
  AdaptiveActivityHarness()throws Exception{series=new JSONObject().put("seriesId","123").put("title","fixture");for(int i=1;i<=3;i++)queue.add(new JSONObject().put("vid","v"+i).put("index",i));episode=queue.get(0);MODERN_INIT}
@@ -62,7 +68,7 @@ final class AdaptiveActivityHarness {
  boolean casting(){return false;}boolean castCommand(String command,long value){return false;}
  boolean renderCastControls(){return false;}void detachCast(){}
  void showPlayerDialog(AlertDialog d){dialog=d;}void showControls(){}void updateControlsState(){}void installVideoTouch(VideoView v){}
- void updateButtons(){updates++;}void pruneCache(){prunes++;}void saveProgress(){saves++;}void cacheEpisode(JSONObject e,String u,String q){caching.add(e.optString("vid")+":"+q);}
+ void updateButtons(){updates++;}void pruneCache(){prunes++;}void saveProgress(){saves++;}
  Uri downloaded(JSONObject e){return manualFile;}void playbackError(int token,String message){if(token==generation&&!destroyed){errors++;status.setText(message);}}
  Intent getIntent(){return new Intent();}static class Intent{String getStringExtra(String name){return null;}}
  void pump(){for(int i=0;i<8;i++){resolver.flush();main.flush();cacheWorker.flush();main.flush();}}

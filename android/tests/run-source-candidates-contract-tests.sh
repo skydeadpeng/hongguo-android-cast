@@ -21,5 +21,5 @@ package io.github.jackotom.hongguo.android;
 final class MainActivity { boolean isFinishing(){return false;} boolean isDestroyed(){return false;} void script(String value){throw new AssertionError("Unexpected source lookup: offline registration only");} }
 STUB
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
- "$TMP/MainActivity.java" "$SRC/MediaQuality.java" "$SRC/PlaybackSources.java" "$SRC/NetworkGuard.java" "$SRC/AppTransport.java" "$SRC/EpisodeResolver.java" "$SRC/CencDecryptor.java" "$TEST_ROOT/SourceCandidatesContractTest.java"
+ "$TMP/MainActivity.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/NetworkGuard.java" "$SRC/AppTransport.java" "$SRC/EpisodeResolver.java" "$SRC/CencDecryptor.java" "$TEST_ROOT/SourceCandidatesContractTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.SourceCandidatesContractTest "$INPUT"

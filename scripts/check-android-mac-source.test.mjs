@@ -242,10 +242,12 @@ test('32 entropy seeds preserve all Mac request bytes and models across signatur
   assert.equal(signatures.size, 32, 'all seeds exercise distinct signed header bytes');
   t.diagnostic(`entropyPairs=32 branch0=${branches.get(0)} branch2=${branches.get(2)} signatureLengths=${headerLengths.size} networkRequests=0`);
 });
-test('old WebView without AbortSignal.timeout uses a local AbortController timer without editing Mac code', async () => {
+test('old WebView without AbortSignal.timeout uses the whole-operation controller and bounded native 6s requests', async () => {
   const browser = browserFixture({ withoutTimeoutApi: true });
   assert.equal((await browser.source.fetchAppPlayUrl(vid)).url, media);
-  assert.equal(browser.timers.length, 1); assert.equal(browser.timers[0].milliseconds, 12000);
+  assert.equal(browser.timers.length, 1); assert.equal(browser.timers[0].milliseconds, 28000);
+  const requests = browser.calls.filter(call => call.method === 'appRequest');
+  assert.ok(requests.length > 0 && requests.every(call => call.params.timeoutMs <= 6000));
   browser.timers[0].callback();
 });
 test('browser wrapper keeps exact episode matching and server rejection behavior', async () => {

@@ -34,6 +34,7 @@ public final class DlnaSession implements AutoCloseable {
         Prepared prepare(int position, String quality, BooleanSupplier alive) throws Exception;
         void confirmed(int position, long progressMs, boolean cleanup) throws Exception;
         default void progress(int position,long progressMs) { }
+        default void progress(int position,long progressMs,long durationMs) { progress(position,progressMs); }
         default void selecting(int position) { }
         default void playbackConfirmed(int position,String actualQuality,boolean autoplay) { }
         default void autoplayChanged(boolean value) { }
@@ -218,7 +219,7 @@ public final class DlnaSession implements AutoCloseable {
             int nextPosition=current+(currentMedia!=null?Math.max(1,currentMedia.windowCount):1);
 
             emit(false);
-            if(scheduler.nowMs()-lastHistory>=5000){lastHistory=scheduler.nowMs();source.progress(current,position);}
+            if(scheduler.nowMs()-lastHistory>=5000){lastHistory=scheduler.nowMs();source.progress(current,position,duration);}
             if(natural&&autoplay&&nextPosition<count){
                 if(pausedCompletion){
                     // A command may arrive while status() blocks, or after this task is queued.

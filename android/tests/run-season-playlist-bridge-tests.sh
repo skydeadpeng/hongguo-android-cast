@@ -14,5 +14,5 @@ launch=source.index('    private void play(');launch_end=source.index('    /** E
 Path(sys.argv[3]).write_text(template.replace('/* ACTUAL_PLAY_CASE */',source[start:end]).replace('/* ACTUAL_PLAY_METHOD */',source[launch:launch_end]))
 print('SEASON_PLAYLIST_BRIDGE_BINDING dispatch=actual launch=actual')
 PY
-"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/SeasonPlaylistBridgeTest.java" "$SRC/PlaybackPlaylist.java" "$SRC/MediaQuality.java"
+"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/SeasonPlaylistBridgeTest.java" "$SRC/PlaybackPlaylist.java" "$SRC/MediaQuality.java" "$SRC/UpdateOperationGate.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.SeasonPlaylistBridgeTest

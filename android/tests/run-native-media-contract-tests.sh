@@ -65,7 +65,8 @@ final class CencDecryptor {
 }
 STUB
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR:$SDK_JAR" -d "$TMP/plans" \
-  "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" "$ROOT/tests/PlaybackSourcesContractTest.java" "$ROOT/tests/PlaybackSourcesRecoveryTest.java" "$ROOT/tests/PlaybackSourcesLookupRetryTest.java"
+  "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/DanmakuSigner.java" "$SRC/SpadeDecoder.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
+  "$ROOT/tests/PlaybackSourcesContractTest.java" "$ROOT/tests/PlaybackSourcesRecoveryTest.java" "$ROOT/tests/PlaybackSourcesLookupRetryTest.java" "$ROOT/tests/PlaybackSourcesNativeLookupTest.java"
 if [ "$RECOVERY_ONLY" = false ] && [ "$LOOKUP_ONLY" = false ]; then
   "$JAVA_HOME/bin/java" -cp "$TMP/plans:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.PlaybackSourcesContractTest
 fi
@@ -74,5 +75,6 @@ if [ "$LOOKUP_ONLY" = false ]; then
 fi
 if [ "$RECOVERY_ONLY" = false ]; then
   "$JAVA_HOME/bin/java" -cp "$TMP/plans:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.PlaybackSourcesLookupRetryTest
+  "$JAVA_HOME/bin/java" -cp "$TMP/plans:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.PlaybackSourcesNativeLookupTest
 fi
 echo 'PASS NativeMediaContracts offlineOnly=true deviceUntouched=true'

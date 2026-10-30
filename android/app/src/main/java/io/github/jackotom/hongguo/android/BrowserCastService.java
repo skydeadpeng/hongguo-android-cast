@@ -137,7 +137,8 @@ public final class BrowserCastService extends Service {
         private String title(JSONObject episode){return PlaybackPlaylist.owner(request.series,episode).optString("title")+" · 第 "+episode.optInt("index")+" 集";}
         private void releaseLease(String sid,String vid,int index,String quality){cache.release(sid,vid,index,quality);window.prune();}
         public void confirmed(int position,long progress,boolean cleanup)throws Exception{JSONObject episode=request.episodes.get(position);store.history(PlaybackPlaylist.owner(request.series,episode),episode,progress);window.moveTo(position);if(cleanup)window.prune();}
-        public void progress(int position,long progress){if(position>=0&&position<request.episodes.size()){JSONObject episode=request.episodes.get(position);store.history(PlaybackPlaylist.owner(request.series,episode),episode,progress);}}
+        public void progress(int position,long progress){progress(position,progress,0);}
+        public void progress(int position,long progress,long duration){if(position>=0&&position<request.episodes.size()){JSONObject episode=request.episodes.get(position);store.history(PlaybackPlaylist.owner(request.series,episode),episode,progress,Math.max(0,duration));}}
     }
     private static final class RuntimeScheduler implements DlnaSession.Scheduler {
         private final ScheduledExecutorService control=Executors.newSingleThreadScheduledExecutor();

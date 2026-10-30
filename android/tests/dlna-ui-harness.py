@@ -28,6 +28,7 @@ def methods(name):
  return results
 names=['onProtocolCastSnapshot','browserCastCommand','browserCastStatusDetail','castWifiAddress','casting','castCommand','onCastSnapshot','saveProgressBeforeCast','renderCastControls','saveProgress','loadAt','togglePlayback','seekBy','canHideControls','detachCast','playbackDuration','format','qualityLabel','castStatusDetail','notifyCastError','castDiagnosticValue','castDiagnostics','showCastDiagnostics','copyCastDiagnostics','showCastDevices','castMergeWindow','setCastMergeWindow','showMergeCastDialog']
 if 'PlaybackPlaylist.' in source:names += ['owner','closeLocalWindow']
+if 'void recordProgress(' in source:names+=['recordProgress']
 parts=[]
 for name in names:
  found=methods(name)
@@ -45,7 +46,8 @@ class ClipData {final String label,text;ClipData(String l,String t){label=l;text
 class ClipboardManager {int writes;ClipData clip;void setPrimaryClip(ClipData c){writes++;clip=c;}}
 class DialogInterface {void dismiss(){}}
 class AlertDialog extends DialogInterface {interface OnClickListener{void onClick(DialogInterface dialog,int which);}String title,message;String[]items,choices;OnClickListener itemAction,positiveAction,choiceAction;int choiceSelected=-1;void clickItem(int n){itemAction.onClick(this,n);}void clickPositive(){positiveAction.onClick(this,-1);}void clickChoice(int n){choiceAction.onClick(this,n);}static class Builder {final AlertDialog dialog=new AlertDialog();Builder(Object c){}Builder setTitle(String s){dialog.title=s;return this;}Builder setMessage(String s){dialog.message=s;return this;}Builder setItems(String[]s,OnClickListener a){dialog.items=s;dialog.itemAction=a;return this;}Builder setSingleChoiceItems(String[]s,int selected,OnClickListener a){dialog.choices=s;dialog.choiceSelected=selected;dialog.choiceAction=a;return this;}Builder setPositiveButton(String s,OnClickListener a){dialog.positiveAction=a;return this;}Builder setNegativeButton(String s,OnClickListener a){return this;}Builder setNeutralButton(String s,OnClickListener a){return this;}AlertDialog create(){return dialog;}}}
-class LibraryStore {int writes,lastPosition;String lastSeries;void history(JSONObject s,JSONObject e,int p){writes++;lastPosition=p;lastSeries=s.optString("seriesId");}}
+class SystemClock {static long elapsedRealtime(){return 0;}}
+class LibraryStore {int writes,lastPosition;String lastSeries;void history(JSONObject s,JSONObject e,int p){history(s,e,p,0);}void history(JSONObject s,JSONObject e,long p,long d){writes++;lastPosition=(int)p;lastSeries=s.optString("seriesId");}}
 class PlaybackCache {static class QueueWindow {boolean closed;void close(){closed=true;}}}
 class DlnaSession {static class Snapshot {boolean active,preparing,playing,autoplay=true;int current,targetCurrent,episodeIndex;long positionMs,durationMs;String title="",deviceName="MOCK TV",state="PLAYING",error="",actualQuality="720p",preferredQuality="1080p",seriesId="123";}}
 class DlnaCastService {interface Listener {void onSnapshot(DlnaSession.Snapshot s);}DlnaSession.Snapshot state=new DlnaSession.Snapshot();DlnaSession.Snapshot snapshot(){return state;}List<String>calls=new ArrayList<>();void select(int n){calls.add("select:"+n);}void play(){calls.add("play");}void pause(){calls.add("pause");}void seek(long n){calls.add("seek:"+n);}void setAutoplay(boolean b){calls.add("autoplay:"+b);}void removeListener(Listener l){calls.add("removeListener");}void stopCast(){calls.add("stopCast");}String diagnosticText="";String diagnostics(){return diagnosticText;}}
@@ -53,6 +55,7 @@ class BrowserCastService extends DlnaCastService {String url="http://192.168.1.2
 interface SharedPreferences {int getInt(String key,int fallback);Editor edit();interface Editor {Editor putInt(String key,int value);void apply();}}
 class MemoryCastPreferences implements SharedPreferences {final java.util.Map<String,Integer> ints=new java.util.HashMap<>();public int getInt(String key,int fallback){Integer value=ints.get(key);return value==null?fallback:value;}public Editor edit(){return new Editor(){public Editor putInt(String key,int value){ints.put(key,value);return this;}public void apply(){}};}}
 class DlnaUiHarness {
+ long lastProgressSavedAt;
  static final String CONNECTIVITY_SERVICE="connectivity",CLIPBOARD_SERVICE="clipboard";
  static final int MODE_PRIVATE=0;
  final MemoryCastPreferences castPreferences=new MemoryCastPreferences();

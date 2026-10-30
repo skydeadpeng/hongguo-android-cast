@@ -218,3 +218,10 @@
 .tv-layout .account-form input{min-height:56px;font-size:19px}
 .tv-layout .account-section .account-note{font-size:17px}
 .tv-layout .account-section button,.tv-layout .account-section input{scroll-margin-block:36px}
+
+/* Refresh feedback stays beside the last successful list, not over it. */
+.state-inline{display:flex;align-items:center;gap:10px;margin:12px 0 18px;padding:12px 14px;border:1px solid var(--border);border-radius:7px;background:var(--surface);min-width:0}.state-inline>svg{flex-shrink:0;color:var(--muted)}.state-inline>p{flex:1;min-width:0;font-size:13px;overflow-wrap:anywhere}.state-inline>p strong,.state-inline>p span{display:block}.state-inline>p strong{font-weight:600;color:var(--text)}.state-inline.error-state>p span{color:var(--error)}.state-inline>.button{flex-shrink:0}.tv-layout .state-inline>p{font-size:17px}@media(max-width:359px){.state-inline{flex-wrap:wrap}.state-inline>.button{margin-left:auto}}
+
+/* Per-download removal keeps destructive confirmation distinct from playback. */
+.download-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;flex-shrink:0}.download-actions .button{min-height:44px}.download-confirm{padding:18px;margin-bottom:20px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}.download-confirm h2{font-size:17px}.download-confirm p{font-size:14px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}.download-confirm-actions{display:flex;gap:10px;margin-top:16px}.download-confirm-actions .button{min-height:44px}.download-delete-error,.download-destructive{color:var(--error)}.tv-layout .download-confirm h2{font-size:22px}.tv-layout .download-confirm p{font-size:18px}
+@media(max-width:599px){.download-row{flex-wrap:wrap}.download-info{flex-basis:calc(100% - 46px)}.download-actions{width:100%;padding-left:38px;justify-content:flex-start}}

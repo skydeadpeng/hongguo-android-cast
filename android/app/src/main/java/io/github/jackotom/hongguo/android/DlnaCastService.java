@@ -190,19 +190,21 @@ public final class DlnaCastService extends Service {
             store.history(PlaybackPlaylist.owner(request.series,episode),episode,located[1]);
             window.moveTo(located[0]);if(cleanup)window.prune();
         }
-        public void progress(int position,long progress){
+        public void progress(int position,long progress){progress(position,progress,0);}
+        public void progress(int position,long progress,long duration){
             if(position<0||position>=request.episodes.size())return;
-            int[] located=locate(position,progress);JSONObject episode=request.episodes.get(located[0]);
-            store.history(PlaybackPlaylist.owner(request.series,episode),episode,located[1]);
+            WindowMap map=activeMap;int[] located=locate(position,progress,map);JSONObject episode=request.episodes.get(located[0]);long episodeDuration=Math.max(0,duration);
+            if(map!=null&&map.position==position){int offset=located[0]-position;episodeDuration=offset>=0&&offset+1<map.starts.length?Math.max(0,map.starts[offset+1]-map.starts[offset]):0;}
+            store.history(PlaybackPlaylist.owner(request.series,episode),episode,located[1],episodeDuration);
         }
-        private int[] locate(int position,long progress){
-            WindowMap map=activeMap;
-            if (map==null||map.position!=position) return new int[]{position,(int)Math.max(0,progress)};
-            long clamped=Math.max(0,progress);int index=0;
+        private int[] locate(int position,long progress){return locate(position,progress,activeMap);}
+        private int[] locate(int position,long progress,WindowMap map){
+            if (map==null||map.position!=position) return new int[]{position,(int)Math.min(Integer.MAX_VALUE,Math.max(0,progress))};
+            long clamped=Math.min(map.starts[map.starts.length-1],Math.max(0,progress));int index=0;
             for (int i=0;i<map.starts.length-1;i++) if (clamped>=map.starts[i]) index=i;
             long offset=clamped-map.starts[index];
             int queue=position+index;
-            return queue<request.episodes.size()?new int[]{queue,(int)Math.max(0,offset)}:new int[]{position,(int)clamped};
+            return queue<request.episodes.size()?new int[]{queue,(int)Math.min(Integer.MAX_VALUE,Math.max(0,offset))}:new int[]{position,(int)Math.min(Integer.MAX_VALUE,clamped)};
         }
     }
     private static final class RuntimeScheduler implements DlnaSession.Scheduler {

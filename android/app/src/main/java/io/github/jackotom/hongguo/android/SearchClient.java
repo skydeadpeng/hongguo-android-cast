@@ -26,10 +26,11 @@ final class SearchClient {
         Object offsetValue=params.opt("offset");
         if(!(offsetValue instanceof Number)||((Number)offsetValue).doubleValue()!=((Number)offsetValue).intValue())throw new IOException("搜索页位置无效");
         int offset=((Number)offsetValue).intValue();if(offset<0||offset>10000)throw new IOException("搜索页位置无效");
-        long deadline=System.nanoTime()+38_000_000_000L;
+        long deadline=requestDeadline(params);
         boolean locked=false;
         try {
-            locked=LOCK.tryLock(38,TimeUnit.SECONDS);if(!locked)throw new SocketTimeoutException();
+            cancelled(deadline);
+            locked=LOCK.tryLock(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);if(!locked)throw new SocketTimeoutException();
             cancelled(deadline);
             String device=preferences.getString("device_id",""),install=preferences.getString("install_id","");
             if(!validId(device)||!validId(install)){
@@ -40,6 +41,7 @@ final class SearchClient {
             }
             String query=searchQuery(keyword,offset,searchId,passback,device,install);
             JSONObject envelope=transport.request(SEARCH+query,"GET",SearchProtocol.headers(query),new byte[0],deadline);
+            cancelled(deadline);
             JSONObject result=response(envelope,"搜索");
             if(!(result.opt("code") instanceof Number)||result.optInt("code",-1)!=0||result.optJSONArray("search_tabs")==null)throw new IOException("搜索服务未返回有效结果，请重试");
             return result;
@@ -48,6 +50,24 @@ final class SearchClient {
         catch(IOException e){String message=e.getMessage();if(message!=null&&message.startsWith("搜索"))throw e;throw new IOException("搜索服务连接未成功，请重试");}
         catch(Exception e){throw new IOException("搜索服务响应无效，请重试");}
         finally{if(locked)LOCK.unlock();}
+    }
+    /** Local scheduling fields never enter the signed App query or registration payload. */
+    private static long requestDeadline(JSONObject params)throws IOException {
+        long budget=38_000L;
+        if(params.has("timeoutMs"))budget=budgetInteger(params.opt("timeoutMs"),1L,38_000L,"搜索等待期限无效");
+        if(params.has("deadlineMs")) {
+            long end=budgetInteger(params.opt("deadlineMs"),1L,9_007_199_254_740_991L,"搜索截止时间无效");
+            long remaining=end-System.currentTimeMillis();
+            if(remaining<=0)throw new SocketTimeoutException("搜索请求已过期，请重试");
+            budget=Math.min(budget,remaining);
+        }
+        return System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(budget);
+    }
+    private static long budgetInteger(Object value,long minimum,long maximum,String message)throws IOException {
+        if(!(value instanceof Number))throw new IOException(message);
+        Number number=(Number)value;double raw=number.doubleValue();long whole=number.longValue();
+        if(!Double.isFinite(raw)||raw!=(double)whole||whole<minimum||whole>maximum)throw new IOException(message);
+        return whole;
     }
     private static void cancelled(long deadline)throws IOException { if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("搜索已取消");if(System.nanoTime()>=deadline)throw new SocketTimeoutException(); }
     private static String text(JSONObject params,String key,int maximum,boolean required)throws IOException {

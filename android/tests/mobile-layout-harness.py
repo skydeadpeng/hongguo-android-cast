@@ -59,7 +59,7 @@ final class PlayerLayoutHarness extends LayoutActivityBase {
     LinearLayout phoneContent = new LinearLayout(this), phoneActions = new LinearLayout(this), phoneOptions = new LinearLayout(this);
     ScrollView phoneScroller = new ScrollView(this);
     TextView title = new TextView(this), status = new TextView(this), time = new TextView(this);
-    Button back = new Button(this), qualityButton = new Button(this), speedButton = new Button(this);
+    Button back = new Button(this), qualityButton = new Button(this), speedButton = new Button(this), danmakuButton = new Button(this);
     final boolean phoneHasCast = PHONE_HAS_CAST;
     Button[] episodeActions = new Button[BuildConfig.IS_TV || !phoneHasCast ? 5 : 6];
     int safeLeft, safeTop, safeRight, safeBottom;
@@ -77,7 +77,7 @@ final class PlayerLayoutHarness extends LayoutActivityBase {
         phoneContent.setOrientation(LinearLayout.VERTICAL); phoneContent.addView(time);
         View seek=new View(this); seek.minimumHeight=48; phoneContent.addView(seek,new LinearLayout.LayoutParams(-1,48));
         phoneContent.addView(phoneActions); phoneContent.addView(phoneOptions);
-        qualityButton.text="清晰度 1080p · 当前 720p"; speedButton.text="倍速 1.5×";
+        qualityButton.text="清晰度 1080p · 当前 720p"; speedButton.text="倍速 1.5×"; danmakuButton.text="弹幕 读取中";
         String[] labels={"上一集","暂停","下一集","选集","连播 开","投屏"};
         for(int i=0;i<episodeActions.length;i++){episodeActions[i]=new Button(this);episodeActions[i].text=labels[i];}
         phoneScroller.addView(phoneContent); bottom.addView(phoneScroller);

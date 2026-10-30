@@ -9,7 +9,8 @@ public final class PlayerCastCacheGuardsTest {
     static void check(boolean value,String message){checks++;if(!value)throw new AssertionError(message);}
     static void group(String name,Checked action){try{action.run();passed++;System.out.println("PASS "+name);}catch(Throwable failure){failed++;System.out.println("FAIL "+name+": "+failure.getMessage());}}
     static PlayerCastCacheGuardsHarness fresh()throws Exception{return new PlayerCastCacheGuardsHarness();}
-    static void current(PlayerCastCacheGuardsHarness h){h.cacheEpisode(h.queue.get(h.current),"https://fixture.invalid/current.mp4",h.actualQuality);}
+    static void cache(PlayerCastCacheGuardsHarness h,org.json.JSONObject target,String url,String quality){h.cacheEpisode(h.owner(target).optString("seriesId"),target,new PlaybackSources.Plan(url,PlayerCastCacheGuardsHarness.stageCeiling(quality,h.automaticCeiling)),quality,h.generation);}
+    static void current(PlayerCastCacheGuardsHarness h){cache(h,h.queue.get(h.current),"https://fixture.invalid/current.mp4",h.actualQuality);}
     public static void main(String[]args)throws Exception{
         group("active cast blocks local prune",()->{PlayerCastCacheGuardsHarness h=fresh();h.castWasActive=true;h.pruneCache();check(h.cacheWorker.pending.isEmpty(),"cast local cleanup is never queued");h.pump();check(h.cache.prunes.isEmpty(),"cast window is not reduced to local one-episode window");});
         group("queued prune rechecks cast ownership",()->{PlayerCastCacheGuardsHarness h=fresh();h.pruneCache();check(h.cacheWorker.pending.size()==1,"local prune queued before cast");h.castWasActive=true;h.pump();check(h.cache.prunes.isEmpty(),"stale local cleanup does not delete prefetched cast episodes");});
@@ -34,10 +35,12 @@ public final class PlayerCastCacheGuardsTest {
             h.schedulePrefetch(h.generation);h.pump();
             check(PlaybackSources.owners.equals(Collections.singletonList("222222:1001:720p")),"boundary prefetch resolves real next-season sid");
             check(h.cache.ownerFetches.equals(Collections.singletonList("222222:1001:1:720p")),"boundary prefetch stores next season's true local index");
-            h.cache.ownerFetches.clear();h.cacheEpisode(before,"https://fixture.invalid/a.mp4","720p");h.cacheEpisode(following,"https://fixture.invalid/b.mp4","720p");h.series=second;h.pump();
+            h.cache.ownerFetches.clear();cache(h,before,"https://fixture.invalid/a.mp4","720p");cache(h,following,"https://fixture.invalid/b.mp4","720p");h.series=second;h.pump();
             check(h.cache.ownerFetches.equals(Arrays.asList("111111:1001:1:720p","222222:1001:1:720p")),"same vid/local index cannot collide and queued task ignores mutable current series");
             check(h.caching.isEmpty(),"both season markers are released");
         });
+        group("bounded local prefetch keeps exact source and cache ceiling",()->{PlayerCastCacheGuardsHarness h=fresh();h.actualQuality="480p";h.automaticCeiling=539;h.cache.hits.add("v2:480p");h.schedulePrefetch(h.generation);h.pump();check(PlaybackSources.calls.equals(Collections.singletonList("v2:480p")),"unbounded legacy file is not a bound539 cache hit");check(h.cache.lookupCeilings.equals(Collections.singletonList(539))&&h.cache.transferCeilings.equals(Collections.singletonList(539)),"lookup and actual Plan transfer share exact cap539");check(h.cache.capturedPlans.get(0).playbackCeiling==539&&h.caching.isEmpty(),"captured immutable bound plan is retained without marker leak");});
+        group("same-generation ceiling changes discard old local lookup",()->{PlayerCastCacheGuardsHarness h=fresh();h.actualQuality="480p";h.automaticCeiling=575;PlaybackSources.duringResolve=()->h.automaticCeiling=539;h.schedulePrefetch(h.generation);h.pump();check(PlaybackSources.calls.size()==1&&h.cache.fetches.isEmpty(),"resolved plan cannot publish after a changed ceiling even within same generation");check(h.caching.isEmpty(),"old cap-specific lookup marker released");});
         System.out.println("PLAYER_CAST_CACHE_GUARDS_"+(failed==0?"OK":"FAILED")+" groupsPassed="+passed+" groupsFailed="+failed+" checks="+checks+" actualActivityMethods=true networkRequests=0 deviceTests=not_run");
         if(failed>0)System.exit(1);
     }

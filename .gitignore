@@ -84,3 +84,11 @@ HANDOFF.md
 # Generated browser bundle of the shared Mac App source
 src/android/generated/
 src/android/public/generated/startup-bootstrap.js
+
+# Local tool state and unrelated working material
+.mimosa/
+.v2c/
+output/
+未命名文件夹/
+untitled folder/
+Screenshot_*.jpg

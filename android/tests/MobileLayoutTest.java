@@ -46,6 +46,10 @@ public final class MobileLayoutTest {
         eq(actionCount-3,((LinearLayout)player.phoneActions.children.get(1)).children.size(),"actual second row retains all actions");
         if(player.phoneHasCast)check(player.episodeActions[5].text.equals("投屏"),"phone sixth action is casting");
         allActionsReachable(player,"portrait");
+        eq(2,player.phoneOptions.children.size(),"phone keeps media row plus separate danmaku row");
+        LinearLayout mediaOptions=(LinearLayout)player.phoneOptions.children.get(0);
+        eq(2,mediaOptions.children.size(),"quality and speed retain original two-column width");
+        check(player.phoneOptions.children.get(1)==player.danmakuButton,"danmaku remains focusable separate row");
         for(Button b:player.episodeActions){check(b.minimumHeight>=48,"production action touch min");check(b.params.height==-2,"action grows for font rather than fixed clipping");}
         check(player.back.minimumHeight>=48&&player.back.params.width>=48,"Back has actual >=48 target");
         Object originalVideo=player.video;player.episodeActions[2].requestFocus();

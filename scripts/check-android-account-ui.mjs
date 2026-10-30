@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 const ownRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let root = ownRoot, output = path.join(ownRoot, 'verification/android-account-sync/ui');
 for (let i = 2; i < process.argv.length; i++) {
@@ -42,7 +43,42 @@ function installMock() {
     ] },
   };
   f.guest = JSON.parse(JSON.stringify(f.library.history));
-  f.account = { serverUrl: '', authenticated: false, user: null, syncing: false, lastSyncAt: 0, pendingCount: 0, error: '', loginRequired: false };
+  const accountBase = () => ({provider:'hongguo',officialLoginAvailable:true,authenticated:false,phase:'phone',revision:0,busy:false,maskedPhone:'',retryAfter:0,smsState:'',error:'',libraryReady:true,sync:{syncing:false,pendingCount:0,lastSyncAt:0,error:''}});
+  f.owner = () => f.account.authenticated ? 'official:'+(f.account.fixtureOwner||'a').repeat(64) : 'guest';
+  f.account=accountBase(); f.nativePhone=''; f.sendMode='sent';f.loginMode='success';f.verifyDelay=1;
+  f.accountRpc = m => {
+    const plan=m.method==='getAccount'?(f.accountPlans.shift()||{}):{};let result,error=plan.error,delay=plan.delay||1;
+    const fresh=patch=>({...f.account,...patch,revision:f.account.revision+1});
+    const signed=()=>fresh({authenticated:true,phase:'logged_in',busy:false,maskedPhone:'',error:'',user:{name:'合成官方账号',maskedPhone:'138****0000',idSuffix:'尾号 5678'},sync:{syncing:false,pendingCount:0,lastSyncAt:0,error:''}});
+    if(m.method==='getAccount')result=JSON.parse(JSON.stringify(f.account));
+    else if(m.method==='officialSendCode'){
+      if(m.params.phone)f.nativePhone=m.params.phone;
+      if(!f.nativePhone){error='请输入手机号';result=f.account;}
+      else {f.account=fresh({phase:'sending',busy:true,error:''});delay=f.sendDelay||30;result=fresh({phase:f.sendMode==='sent'?'code':'phone',busy:false,maskedPhone:'138****0000',smsState:f.sendMode,retryAfter:f.sendMode==='rejected'?0:60,error:f.sendMode==='rejected'?'合成发码被拒绝':f.sendMode==='uncertain'?'合成发码结果不确定':''});}
+    } else if(m.method==='officialLoginSMS'){
+      f.account=fresh({phase:'submitting',busy:true,error:''});delay=f.loginDelay||40;
+      result=f.loginMode==='wrong'?fresh({phase:'code',busy:false,error:'验证码错误'}):f.loginMode==='mfa'?fresh({phase:'mfa',busy:false,error:'',smsNumber:'106900000001',smsContent:'SYNTHETIC MESSAGE',mfaExpiresAt:Date.now()+600000}):signed();
+    } else if(m.method==='officialVerifyMFA'){
+      f.account=fresh({phase:'mfa_waiting',busy:true,error:''});delay=f.verifyDelay;result=signed();
+    } else if(m.method==='officialCancelLogin'){
+      const background=m.params.reason==='background';
+      f.account=fresh(background?{phase:f.account.phase==='mfa_waiting'?'mfa':f.account.phase==='submitting'?'code':f.account.phase,busy:false,error:''}:{...accountBase(),revision:f.account.revision+1});
+      if(!background)f.nativePhone='';result=f.account;
+    } else if(m.method==='officialLogout'){
+      f.account={...accountBase(),revision:f.account.revision+1};f.nativePhone='';f.library.history=JSON.parse(JSON.stringify(f.guest));result=f.account;
+    } else if(m.method==='officialImportGuest'){
+      f.account=fresh({sync:{...f.account.sync,pendingCount:3}});result={...f.account,importResult:{importedCount:3,historyImportedCount:2,favoritesImportedCount:1,skippedCount:3,historySkippedCount:2,favoritesSkippedCount:1,remainingCount:4,historyRemainingCount:3,favoritesRemainingCount:1}};
+    } else if(m.method==='officialSync'){
+      f.account=fresh({sync:{...f.account.sync,syncing:true}});result=f.account;
+      setTimeout(()=>{f.account=fresh({sync:{syncing:false,pendingCount:0,lastSyncAt:Date.now(),error:''}});window.__androidAccountChanged?.();},100);
+    }
+    const beginRevision=f.account.revision;
+    setTimeout(()=>{
+      if(m.method!=='getAccount'&&m.method!=='officialCancelLogin'&&m.method!=='officialSync'&&!error&&f.account.revision===beginRevision)f.account=JSON.parse(JSON.stringify(result));
+      window.__androidResponse({id:m.id,...(error?{error}:{result:JSON.parse(JSON.stringify(result))})});
+      if(!error&&['officialLoginSMS','officialVerifyMFA','officialLogout'].includes(m.method)&&f.account.revision===result.revision)window.__androidAccountChanged({owner:f.owner()});
+    },delay);
+  };
   f.accountPlans = []; f.loginPlans = []; f.logoutPlans = []; f.syncPlans = []; f.importPlans = [];
   const scenario = new URL(location.href).searchParams.get('scenario');
   if (scenario === 'cap-current') entries['7000000000000000099'] = { seriesId: '7000000000000000099', title: '合成：山海：第99季', episodeCount: 6, episodes: Array.from({ length: 6 }, (_, i) => ({ vid: String(8000000000000990000n + BigInt(i)), index: i + 1 })), description: '合成的第99季，用于验证分页不丢失当前季。' };
@@ -75,8 +111,20 @@ function installMock() {
       search_id: 'synthetic-search', passback: `synthetic-${offset + 20}`,
       data: items.map(item => ({ video_data: [{ series_id: item.seriesId, title: item.title, episode_cnt: item.episodeCount }] })) }] };
   };
+  f.updateCalls = []; f.updateError = '';
+  f.update = {state:'idle',message:'尚未检查更新',busy:false,installedCode:33,installedVersion:'FIXTURE-0.12.10',flavor:new URL(location.href).searchParams.get('tv')==='1'?'tv':'phone',versionCode:0};
+  window.AndroidUpdates = {postMessage(rawMessage) {
+    const m=JSON.parse(rawMessage);f.updateCalls.push(m.method);
+    let error=f.updateError;f.updateError='';
+    if(!error&&m.method==='check')Object.assign(f.update,{state:'available',message:'发现新版本',versionCode:34,versionName:'FIXTURE-0.12.11',notes:'合成更新说明',busy:false});
+    if(!error&&m.method==='download')Object.assign(f.update,{state:'downloading',message:'正在下载',downloaded:40,size:100,busy:true});
+    if(!error&&m.method==='cancel')Object.assign(f.update,{state:'available',message:'下载已取消',busy:false});
+    if(!error&&m.method==='install')Object.assign(f.update,{state:'installing',message:'等待系统确认安装',busy:false});
+    setTimeout(()=>window.__androidUpdatesResponse({id:m.id,...(error?{error}:{result:JSON.parse(JSON.stringify(f.update))})}),1);
+  }};
   window.AndroidBridge = { postMessage(rawMessage) {
     const m = JSON.parse(rawMessage); f.calls.push(m);
+    if(m.method==='getAccount'||m.method.startsWith('official')) { f.accountRpc(m); return; }
     let result, error, delay = 1, plan = {};
     if (m.method === 'getInfo') result = { isTv: new URL(location.href).searchParams.get('tv') === '1', version: 'MOCK-seasons-ui' };
     else if (m.method === 'getAccount') { plan = f.accountPlans.shift() || {}; result = JSON.parse(JSON.stringify(f.account)); }
@@ -84,7 +132,8 @@ function installMock() {
     else if (m.method === 'accountLogout') { plan = f.logoutPlans.shift() || {}; result = null; }
     else if (m.method === 'importGuestHistory') { plan = f.importPlans.shift() || {}; result = null; }
     else if (m.method === 'syncHistory') { plan = f.syncPlans.shift() || {}; result = null; }
-    else if (m.method === 'getLibrary') { plan = f.libraryPlans.shift() || {}; result = JSON.parse(JSON.stringify(f.library)); }
+    else if (m.method === 'getLibrary') { plan = f.libraryPlans.shift() || {}; result = JSON.parse(JSON.stringify({...f.library,owner:f.owner()})); }
+    else if (m.method === 'getSeriesHistory') { result = {owner:f.owner(),history:JSON.parse(JSON.stringify(f.library.history.find(row=>row.seriesId===m.params.seriesId)||null))}; }
     else if (m.method === 'httpGet') {
       const u = new URL(m.params.url);
       if (u.pathname.startsWith('/category/')) result = { status: 200, body: pageHtml({ catalog: { isSuccess: true, categoryRoute: { contentType: u.pathname.split('/')[2] }, recommendList: [first, entries[ids[6]], entries[ids[7]]].map(raw), pagination: { pageNum: 1, totalPages: 1, total: 3 } } }) };
@@ -130,6 +179,7 @@ function installMock() {
 fs.mkdirSync(output,{recursive:true});
 const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'hongguo-seasons-ui-'));
 const report={kind:'real React App + real bridge, MOCK native responses with real source/search parsers; not device or stream QA',root,tests:[],screenshots:[],externalRequests:[],pageErrors:[]};
+report.sourceSha256=Object.fromEntries(['src/android/App.jsx','src/android/AccountPanel.jsx','src/android/account.mjs','src/android/bridge.mjs','src/android/style.css'].map(file=>[file,createHash('sha256').update(fs.readFileSync(path.join(root,file))).digest('hex')]));
 let chrome, server, ws, cdp;
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let passed=0,failed=0,checks=0;
@@ -214,122 +264,156 @@ try {
 
   const accountReady = () => wait('document.querySelector(".account-status")&&!document.querySelector(".account-status").textContent.includes("正在读取")');
   const about = async () => { await nav('关于'); await accountReady(); };
-  const field = (id, value) => evaluate(`(()=>{const e=document.getElementById(${q(id)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${q(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-  const fillLogin = async (name='alice', server='https://sync.example.com:9443', password='fixture Password!') => { await field('account-server',server); await field('account-username',name); await field('account-password',password); };
-  const submit = () => evaluate('document.querySelector(".account-form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
-  const loggedIn = () => wait('document.querySelector(".account-details")&&!document.querySelector(".account-status").textContent.includes("正在登录")');
-  const login = async name => { await fillLogin(name); await submit(); await loggedIn(); };
-  const history = async () => { await nav('我的追剧'); await evaluate('[...document.querySelectorAll(".section-tabs button")].find(e=>e.textContent.includes("观看历史")).click()'); await wait('!document.querySelector(".state-panel [role=status]")'); };
+  const field = (id, value) => evaluate(`(()=>{const e=document.getElementById(${q(id)});if(!e)throw Error('missing '+${q(id)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${q(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const accountCalls = method => evaluate(`window.__seasonFixture.calls.filter(c=>c.method===${q(method)}).map(c=>c.params)`);
-  await group('PHONE account form has persistent labels and no overflow at 320/390 large text', async () => {
-    for (const width of [320,390]) {
-      await reset({width,large:true,open:false}); await about();
-      check(await evaluate('document.querySelector(".account-status").textContent.includes("游客模式")'),'guest mode is explicit');
-      eq(await evaluate('[...document.querySelectorAll(".account-form label")].map(e=>e.htmlFor)'),['account-server','account-username','account-password'],'all credential inputs have visible labels');
-      const sizes=await evaluate('[...document.querySelectorAll(".account-form input,.account-form button")].map(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height}))');
-      check(sizes.every(r=>r.h>=44&&r.w>=44),'touch targets are at least 44px'); await noOverflow();
-      check(await evaluate('document.querySelector(".account-note").textContent.includes("视频缓存保留在本机")'),'scope states that cache stays local');
-      await screenshot(`phone-${width}-account.png`);
+  const retiredCalls = () => evaluate('window.__seasonFixture.calls.filter(c=>["accountLogin","accountLogout","syncHistory","importGuestHistory"].includes(c.method))');
+  const sendCode = async () => {await field('official-phone','13800000000');await button('获取短信验证码');await wait('document.querySelector("#official-code")&&!document.querySelector("#official-code").disabled');};
+  const login = async () => {await field('official-code','001234');await button('登录红果');await wait('document.querySelector(".account-details")&&document.querySelector(".account-status").textContent.includes("已登录红果")');};
+  const visibility = state => evaluate(`Object.defineProperty(document,'visibilityState',{configurable:true,value:${q(state)}});document.dispatchEvent(new Event('visibilitychange'))`);
+  await group('PHONE official SMS form has labels, no retired server controls, and no automatic send', async () => {
+    for(const width of [320,390]){
+      await reset({width,large:true,open:false});await about();
+      eq(await accountCalls('officialSendCode'),[],'opening page never sends SMS');
+      eq(await evaluate('document.querySelectorAll("#account-server,#account-password,input[type=password]").length'),0,'retired credentials absent');
+      check(await evaluate('document.querySelector("label[for=official-phone]").textContent.includes("+86")'),'mainland phone labelled');
+      const sizes=await evaluate('[...document.querySelectorAll(".account-section input,.account-section button")].map(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height}))');check(sizes.every(r=>r.w>=44&&r.h>=44),'touch targets at least44px');
+      await noOverflow();await screenshot(`phone-${width}-official-phone.png`);
     }
   });
-  await group('TV D-pad moves through server, username, password, submit with visible focus', async () => {
-    await reset({tv:true,open:false}); await about(); await fillLogin();
-    await evaluate('document.getElementById("account-server").focus()');
-    for(const next of ['account-username','account-password']) { await key('ArrowDown',40); eq(await evaluate('document.activeElement.id'),next,'next form control '+next); }
-    await key('ArrowDown',40); eq(await evaluate('document.activeElement.closest(".account-form")?.className'), 'account-form', 'remote remains in login form '+await evaluate('document.activeElement.outerHTML'));
-    eq(await evaluate('document.activeElement.type'),'submit','remote reaches login');
-    check(await evaluate('getComputedStyle(document.activeElement).outlineStyle!=="none"'),'TV focus outline visible');
-    await key('Enter',13);await loggedIn();eq((await accountCalls('accountLogin'))[0].deviceName,'Android TV','TV device name'); await noOverflow(); await screenshot('tv-account-signed-in.png');
+  await group('SEND confirms masked phone and cooldown; OTP clears immediately, errors retain native phone', async () => {
+    await reset({open:false});await about();await sendCode();
+    eq(await accountCalls('officialSendCode'),[{phone:'13800000000'}],'one explicit SMS request');
+    check(await evaluate('document.querySelector(".account-status").textContent.includes("138****0000")'),'only masked phone returned');
+    check(await evaluate('!document.querySelector("#official-phone")'),'full phone field dropped after sending');
+    await evaluate('window.__seasonFixture.loginMode="wrong";window.__seasonFixture.loginDelay=150');await field('official-code','001234');await button('登录红果');
+    eq(await evaluate('document.querySelector("#official-code").value'),'','submitted OTP cleared before response');
+    await wait('document.querySelector(".account-error")?.textContent.includes("验证码错误")');
+    eq(await evaluate('document.querySelector("#official-code").value'),'','wrong OTP never restored');
+    eq(await accountCalls('officialLoginSMS'),[{code:'001234'}],'OTP exact including leading zeros, no repeated full phone');
+    await evaluate('window.__seasonFixture.loginMode="success";window.__seasonFixture.loginDelay=1');await login();
+    check(await evaluate('!document.querySelector("#official-code")'),'OTP form destroyed on success');
   });
-  await group('LOGIN custom server and exact password pass only to native; new account history replaces guest', async () => {
-    await reset({open:false}); await about(); await fillLogin('alice','https://sync.example.com:9443/',' fixture password '); await submit(); await loggedIn();
-    eq((await accountCalls('accountLogin'))[0],{serverUrl:'https://sync.example.com:9443',username:'alice',password:' fixture password ',deviceName:'Android 手机'},'exact native contract');
-    check(await evaluate('!document.querySelector("#account-password")'),'password input destroyed after login');
-    check(await evaluate('!JSON.stringify(localStorage).includes("password")&&!JSON.stringify(localStorage).includes("alice")'),'no web credential storage');
-    await history();await wait('document.querySelector(".poster strong")?.textContent==="alice 账号记录"');eq(await evaluate('document.querySelectorAll(".poster").length'),1,'guest records not imported');
-    check(await evaluate('document.querySelector(".poster-caption").textContent.includes("0:42")'),'synced playback progress visible');
+  await group('UNCERTAIN send accepts a received OTP without another SMS request or false sent claim', async () => {
+    await reset({open:false});await about();await evaluate('window.__seasonFixture.sendMode="uncertain"');
+    await field('official-phone','13800000000');await button('获取短信验证码');
+    await wait('document.querySelector("#official-code")&&!document.querySelector("#official-code").disabled','uncertain delivery exposes received-code entry');
+    check(await evaluate('document.querySelector(".account-status").textContent.includes("尚未确认")&&!document.querySelector(".account-status").textContent.includes("验证码已发送")'),'uncertainty never announced as successful send');
+    await wait('document.activeElement.id==="official-code"','uncertain recovery focuses received-code entry');
+    check(await evaluate('document.querySelector(".account-section").textContent.includes("已收到短信")'),'recovery instruction explains received SMS');
+    check(await evaluate('[...document.querySelectorAll(".account-form button")].some(b=>b.disabled&&b.textContent.includes("秒后可重发"))'),'uncertain request preserves resend cooldown');
+    eq((await accountCalls('officialSendCode')).length,1,'received code entry sends no second SMS');await screenshot('phone-uncertain-received-code.png');
+    await field('official-code','001234');await button('登录红果');await wait('document.querySelector(".account-status").textContent.includes("已登录红果")');
+    eq(await accountCalls('officialLoginSMS'),[{code:'001234'}],'uncertain recovery submits exact code using native phone');
+    eq((await accountCalls('officialSendCode')).length,1,'successful recovery still has only one SMS send');
+    await reset({open:false});await about();await evaluate('var f=window.__seasonFixture;f.nativePhone="13800000000";f.account={...f.account,phase:"phone",smsState:"uncertain",maskedPhone:"138****0000",retryAfter:0,revision:f.account.revision+1};window.__androidAccountChanged()');
+    await wait('document.querySelector("#official-code")','uncertain recovery still available after cooldown');
+    check(await evaluate('[...document.querySelectorAll(".account-section button")].some(b=>b.textContent==="换手机号 / 取消")'),'expired uncertain cooldown still permits changing phone');
+    await button('换手机号 / 取消');await wait('document.querySelector("#official-phone")&&!document.querySelector("#official-code")');eq(await accountCalls('officialSendCode'),[],'changing phone never silently resends SMS');
   });
-  await group('LOGIN validation rejects HTTP, credentials and API paths before native', async () => {
+  await group('MFA displays upstream SMS instructions, waits for user, survives SMS-app background round trip', async () => {
+    await reset({open:false});await about();await sendCode();await evaluate('window.__seasonFixture.loginMode="mfa"');await field('official-code','123456');await button('登录红果');
+    await wait('document.querySelector("[aria-label=红果追加短信验证]")');
+    eq(await accountCalls('officialVerifyMFA'),[],'challenge does not auto query before user sends');
+    check(await evaluate('document.querySelector("[aria-label=红果追加短信验证]").textContent.includes("106900000001")&&document.querySelector("[aria-label=红果追加短信验证]").textContent.includes("SYNTHETIC MESSAGE")'),'server number and content displayed');
+    await visibility('hidden');await sleep(30);await visibility('visible');await sleep(50);
+    check(await evaluate('!!document.querySelector("[aria-label=红果追加短信验证]")'),'challenge survives switching to SMS app');
+    check((await accountCalls('officialCancelLogin')).some(x=>x.reason==='background'),'background uses suspend reason');
+    await button('我已发送短信，开始验证');await wait('document.querySelector(".account-status").textContent.includes("已登录红果")');
+    eq((await accountCalls('officialVerifyMFA')).length,1,'one user-confirmed verification');await screenshot('phone-official-signed-in.png');
+  });
+  await group('MFA in-flight cancellation bypasses busy UI and late login reply cannot revive account', async () => {
+    await reset({open:false});await about();await sendCode();await evaluate('window.__seasonFixture.loginMode="mfa"');await field('official-code','123456');await button('登录红果');await wait('document.querySelector("[aria-label=红果追加短信验证]")');
+    await evaluate('window.__seasonFixture.verifyDelay=350');await button('我已发送短信，开始验证');
+    await wait('document.querySelector(".account-status").textContent.includes("90秒")');await button('取消登录');
+    await wait('document.querySelector("#official-phone")&&!document.querySelector("#official-phone").disabled');await sleep(400);
+    check(await evaluate('!!document.querySelector("#official-phone")&&!document.querySelector(".account-section").textContent.includes("合成官方账号")'),'late authenticated reply ignored');
+    eq(await evaluate('document.querySelector("#official-phone").value'),'','explicit cancellation clears phone');
+  });
+  await group('SYNC and guest import require explicit action; logout keeps original local library', async () => {
+    await reset({open:false});await about();await sendCode();await login();
+    eq(await accountCalls('officialImportGuest'),[],'login does not auto import');
+    await button('导入本机记录');await wait('document.querySelector("[aria-label=确认导入本机记录]")');await button('取消');eq(await accountCalls('officialImportGuest'),[],'cancel import writes nothing');
+    await button('导入本机记录');await wait('document.querySelector("[aria-label=确认导入本机记录]")');await button('确认导入');await sleep(40);eq((await accountCalls('officialImportGuest')).length,1,'one confirmed import');
+    check(await evaluate('document.querySelector(".account-import-result")?.textContent.includes("收藏 1 条")&&document.querySelector(".account-import-result").textContent.includes("观看记录 2 条")&&document.querySelector(".account-import-result").textContent.includes("4 条")'),'import reports actual favorite/history counts and remaining retryable records');
+    await sleep(1050);check(await evaluate('document.querySelector(".account-import-result")?.textContent.includes("收藏 1 条")'),'status polling does not erase acknowledged import result');await screenshot('phone-guest-import-counts.png');
+    await button('立即同步');await wait('document.querySelector(".account-status").textContent.includes("正在同步")');await wait('document.querySelector(".account-status").textContent.includes("最近同步")');
+    await button('退出红果账号');await wait('document.querySelector("[aria-label=确认退出红果账号]")');await button('确认退出');await wait('document.querySelector("#official-phone")');
+    eq(await evaluate('JSON.stringify(window.__seasonFixture.library.history)'),await evaluate('JSON.stringify(window.__seasonFixture.guest)'),'original guest history not deleted');
+  });
+  await group('TV official phone/code/confirm focus and remote actions remain accessible', async () => {
+    await reset({tv:true,open:false});await about();await field('official-phone','13800000000');
+    await evaluate('document.getElementById("official-phone").focus()');await key('ArrowDown',40);eq(await evaluate('document.activeElement.textContent'),'获取短信验证码','D-pad reaches send');await key('Enter',13);
+    await wait('document.activeElement.id==="official-code"');await field('official-code','123456');await key('ArrowDown',40);eq(await evaluate('document.activeElement.textContent'),'登录红果','D-pad reaches login');await key('Enter',13);
+    await wait('document.querySelector(".account-status").textContent.includes("已登录红果")');await noOverflow();await screenshot('tv-official-signed-in.png');
+  });
+  await group('AUTOMATIC owner change clears old favorites and history even when new library read fails', async () => {
+    await reset({open:false});
+    await evaluate('var f=window.__seasonFixture;f.account={...f.account,authenticated:true,phase:"logged_in",fixtureOwner:"a",revision:f.account.revision+1,user:{name:"旧账号"}};f.library.favorites=[{...f.entries[f.ids[0]],title:"旧账号私人收藏"}];f.library.history=[{...f.entries[f.ids[1]],...f.entries[f.ids[1]].episodes[1],positionMs:1234,title:"旧账号私人历史"}];window.__androidAccountChanged({owner:f.owner()})');
+    await nav('我的追剧');await wait('document.querySelector(".poster strong")?.textContent==="旧账号私人收藏"');
+    await evaluate('window.__seasonFixture.libraryPlans=[{error:"SAME_OWNER_OFFLINE"}];window.__androidAccountChanged({owner:window.__seasonFixture.owner()})');await wait('document.querySelector(".error-state")?.textContent.includes("SAME_OWNER_OFFLINE")');
+    check(await evaluate('document.querySelector(".poster strong").textContent==="旧账号私人收藏"'),'same-owner failure retains visible favorites');
+    await evaluate('[...document.querySelectorAll(".section-tabs button")].find(e=>e.textContent.includes("观看历史")).click()');
+    check(await evaluate('document.querySelector(".poster strong").textContent==="旧账号私人历史"'),'same-owner failure retains visible history');
+    await evaluate('var f=window.__seasonFixture;f.account={...f.account,authenticated:true,phase:"logged_in",fixtureOwner:"b",revision:f.account.revision+1,user:{name:"新账号"}};f.libraryPlans=[{error:"NEW_OWNER_OFFLINE"}];window.__androidAccountChanged({owner:f.owner()})');
+    await wait('document.querySelector(".error-state")?.textContent.includes("NEW_OWNER_OFFLINE")');
+    eq(await evaluate('document.querySelectorAll(".poster").length'),0,'new-owner read failure never displays previous history');
+    check(await evaluate('!document.querySelector(".main-content").textContent.includes("旧账号私人历史")&&!document.querySelector(".main-content").textContent.includes("旧账号私人收藏")'),'both prior owner texts removed without panel changing event');
+    check(await evaluate('[...document.querySelectorAll(".section-tabs button")].every(e=>e.textContent.includes("(0)"))'),'favorites and history counts both cleared');
+    await evaluate('[...document.querySelectorAll(".section-tabs button")].find(e=>e.textContent.includes("追剧")).click()');
+    eq(await evaluate('document.querySelectorAll(".poster").length'),0,'old favorites stay cleared after tab switch');
+  });
+  await group('POLL coalesces slow account reads and clears a recovered read error', async () => {
     await reset({open:false});await about();
-    for (const url of ['http://sync.example.com','https://a:b@sync.example.com','https://sync.example.com/api']) {
-      await fillLogin('alice',url);await submit();await wait('document.querySelector(".account-error")');eq((await accountCalls('accountLogin')).length,0,'invalid URL blocked');eq(await evaluate('document.querySelector("#account-password").value'),'','password cleared after validation failure');
+    await evaluate('var f=window.__seasonFixture;f.calls=[];f.accountPlans=[{delay:1400,error:"TEMPORARY_ACCOUNT_READ"}];for(let i=0;i<6;i++)window.__androidResume()');
+    await sleep(1100);eq((await accountCalls('getAccount')).length,1,'only one status RPC remains in flight across events and periodic tick');
+    await wait('document.querySelector(".account-error")?.textContent.includes("TEMPORARY_ACCOUNT_READ")','read failure is explicit');
+    await wait('!document.querySelector(".account-error")','successful retry clears only recovered read error');
+    check(await evaluate('!!document.querySelector("#official-phone")'),'recovery keeps usable login form');
+  });
+  await group('NO tokens, OTP, phone or old server credential persisted to browser storage', async () => {
+    await reset({open:false});await about();await sendCode();await login();
+    const storage=await evaluate('JSON.stringify({local:localStorage,session:sessionStorage})');for(const secret of ['13800000000','001234','token','sessionid','PRIVATE'])check(!storage.includes(secret),'browser storage excludes '+secret);
+    eq(await retiredCalls(),[],'no self-hosted operation remains');
+  });
+  await group('COMBINED update download/cancel/install focus and system return do not steal other-section focus', async () => {
+    for(const tv of [false,true]) {
+      await reset({tv,open:false});await about();
+      await wait('document.querySelector("[aria-labelledby=updates-title]")?.textContent.includes("FIXTURE-0.12.10")');
+      await evaluate('document.querySelector("[aria-labelledby=updates-title] button").focus()');
+      await button('检查更新');await wait('document.activeElement.textContent==="下载更新"');
+      check(await evaluate('document.activeElement.closest("[aria-labelledby=updates-title]")!==null'),'check result keeps focus in updates');
+      await button('下载更新');await wait('document.querySelector("progress")?.value===40');
+      eq(await evaluate('document.querySelector("progress").getAttribute("aria-label")'),'更新下载进度','download progress named');
+      await wait('document.activeElement.textContent==="取消"');
+      check(await evaluate('!document.activeElement.disabled'),'download moves focus to enabled cancel after removed download button');
+      await button('取消');await wait('!document.querySelector("progress")');
+      await wait('document.activeElement.textContent==="下载更新"');
+      check(await evaluate('!document.activeElement.disabled'),'cancel moves focus back to enabled download');
+      await evaluate('Object.assign(window.__seasonFixture.update,{state:"ready",message:"安装包已校验",busy:false});window.__androidUpdatesChanged({...window.__seasonFixture.update})');
+      await wait('document.activeElement.textContent==="安装更新"');
+      if(tv) await key('Enter',13); else await button('安装更新');
+      await wait('window.__seasonFixture.update.state==="installing"&&document.querySelector("[aria-labelledby=updates-title]").textContent.includes("等待系统确认安装")');
+      eq(await evaluate('[...document.querySelectorAll("[aria-labelledby=updates-title] button")].filter(e=>e.textContent==="安装更新").length'),0,'install button is unmounted during real native installing state');
+      await wait('document.activeElement.textContent==="检查更新"');
+      check(await evaluate('!document.activeElement.disabled'),'install handoff restores enabled check focus, not body');
+      check(await evaluate('!document.querySelector("[aria-labelledby=updates-title]").textContent.includes("安装成功")'),'installer handoff not called success');
+      // A system installer may temporarily leave WebView with body focus. Its
+      // cancellation response must restore the originating installation action.
+      eq(await evaluate('document.activeElement.blur();document.activeElement===document.body'),true,'fixture simulates system installer returning with body focus');
+      await evaluate('Object.assign(window.__seasonFixture.update,{state:"ready",message:"安装未完成，可以重试",busy:false});window.__androidUpdatesChanged({...window.__seasonFixture.update})');
+      await wait('document.activeElement.textContent==="安装更新"');
+      check(await evaluate('document.activeElement.closest("[aria-labelledby=updates-title]")!==null&&!document.activeElement.disabled'),'system cancellation returns focus to enabled install');
+      // After a deliberate user move to another section, asynchronous installer
+      // state changes must not pull focus back to the update controls.
+      await evaluate('document.querySelector(".account-section input,.account-section button").focus();Object.assign(window.__seasonFixture.update,{state:"installing",message:"等待系统确认安装",busy:false});window.__androidUpdatesChanged({...window.__seasonFixture.update})');
+      await sleep(50);
+      check(await evaluate('document.activeElement.closest(".account-section")!==null'),'installing notification respects user focus in account section');
+      await evaluate('Object.assign(window.__seasonFixture.update,{state:"ready",message:"安装未完成，可以重试",busy:false});window.__androidUpdatesChanged({...window.__seasonFixture.update})');
+      await sleep(50);
+      check(await evaluate('document.activeElement.closest(".account-section")!==null'),'ready notification never steals explicit other-section focus');
+      eq(await retiredCalls(),[],'updates do not invoke retired account');
+      await noOverflow();await screenshot(tv?'tv-combined-account-update.png':'phone-combined-account-update.png');
     }
-  });
-  await group('FAILED LOGIN retains guest data, reveals actionable error and clears password', async () => {
-    await reset({open:false});await about();await evaluate('window.__seasonFixture.loginPlans=[{error:"账号或密码不正确"}]');await fillLogin();await submit();
-    await wait('document.querySelector(".account-error")?.textContent.includes("账号或密码不正确")');
-    eq(await evaluate('document.querySelector("#account-password").value'),'','failed password cleared');
-    await history();await wait('document.querySelectorAll(".poster").length===2');
-    await about();eq(await evaluate('document.querySelector("#account-password").value'),'','navigation never restores password');
-  });
-  await group('STALE guest library response cannot overwrite history after account login', async () => {
-    await reset({open:false});await about();
-    await evaluate('window.__seasonFixture.libraryPlans=[{delay:450}];window.dispatchEvent(new Event("androidresume"));window.__seasonFixture.loginPlans=[{delay:60}]');
-    await fillLogin('bob');await submit();await loggedIn();await sleep(500);await history();
-    await wait('document.querySelector(".poster strong")?.textContent==="bob 账号记录"');eq(await evaluate('document.querySelectorAll(".poster").length'),1,'late guest read ignored');
-  });
-  await group('MANUAL sync updates progress and native account event refreshes background library', async () => {
-    await reset({open:false});await about();await login();
-    await evaluate('window.__seasonFixture.syncPlans=[{positionMs:89000}]');await button('立即同步');await wait('document.querySelector(".account-status").textContent.includes("最近同步")');
-    await history();await wait('document.querySelector(".poster-caption")?.textContent.includes("1:29")');
-    await evaluate('window.__seasonFixture.library.history[0].positionMs=91000;window.__androidAccountChanged()');await wait('document.querySelector(".poster-caption")?.textContent.includes("1:31")');
-    eq((await accountCalls('play')).length,0,'sync never starts playback');
-  });
-  await group('OFFLINE sync error retains authenticated session and allows retry', async () => {
-    await reset({open:false});await about();await login();
-    await evaluate('window.__seasonFixture.syncPlans=[{account:{error:"服务器暂时连接不上",pendingCount:3}}]');await button('立即同步');await wait('document.querySelector(".account-error")?.textContent.includes("连接不上")');
-    check(await evaluate('document.querySelector(".account-status").textContent.includes("本机进度已保留")'),'offline local retention explained');
-    check(await evaluate('!!document.querySelector(".account-details")'),'offline stays authenticated');
-    await evaluate('window.__seasonFixture.syncPlans=[{account:{error:"",pendingCount:0}}]');await button('重试同步');await wait('!document.querySelector(".account-error")');
-  });
-  await group('IMPORT guest history requires confirmation, skips existing records and preserves guest originals on phone/TV', async () => {
-    for (const tv of [false, true]) {
-      await reset({tv,open:false});await about();await login();
-      eq((await accountCalls('importGuestHistory')).length,0,'login does not auto import');
-      await button('导入本机游客记录');await wait('document.querySelector("#account-import-confirm")');
-      check(await evaluate('document.querySelector("#account-import-confirm").textContent.includes("不覆盖云端进度")'),'merge rule explained');
-      eq(await evaluate('document.activeElement.textContent'),'取消','cancel focused before import');
-      await button('取消');eq((await accountCalls('importGuestHistory')).length,0,'cancel leaves all records untouched');
-      await button('导入本机游客记录');await evaluate('window.__seasonFixture.importPlans=[{delay:100}];const b=[...document.querySelectorAll("#account-import-confirm button")].find(e=>e.textContent==="确认导入");b.click();b.click()');
-      await wait('document.querySelector(".account-section").textContent.includes("已补充 1 部剧")');
-      eq((await accountCalls('importGuestHistory')).length,1,'double confirm dispatches one import');
-      check(await evaluate('document.querySelector(".account-section").textContent.includes("跳过 1 条已有或无效记录")'),'existing or invalid legacy records explicitly described');
-      await history();await wait('document.querySelectorAll(".poster").length===2');
-      check(await evaluate('document.querySelector(".poster strong").textContent.includes("alice")&&document.querySelector(".poster-caption").textContent.includes("0:42")'),'existing account progress unchanged');
-      eq(await evaluate('window.__seasonFixture.guest.length'),2,'original guest history preserved');
-    }
-  });
-  await group('IMPORT failure remains retryable and does not claim success', async () => {
-    await reset({open:false});await about();await login();await button('导入本机游客记录');
-    await evaluate('window.__seasonFixture.importPlans=[{error:"首次同步尚未完成，请稍后导入"}]');await button('确认导入');
-    await wait('document.querySelector(".account-error")?.textContent.includes("首次同步")');
-    check(await evaluate('!!document.querySelector("#account-import-confirm")'),'failed import retains retry confirmation');
-    check(await evaluate('!document.querySelector(".account-section").textContent.includes("已补充")'),'no false success notice');
-    await button('确认导入');await wait('document.querySelector(".account-section").textContent.includes("已补充 1 部剧")');
-  });
-  await group('LOGOUT cancel preserves account; confirm restores guest while favorites remain', async () => {
-    await reset({open:false});await evaluate('window.__seasonFixture.library.favorites=[{seriesId:"favorite",title:"本机收藏"}]');await about();await login();
-    await button('退出账号');await wait('document.querySelector(".account-confirm")');eq(await evaluate('document.activeElement.textContent'),'取消','least-destructive confirmation focused');await button('取消');eq((await accountCalls('accountLogout')).length,0,'cancel never sends logout');
-    await button('退出账号');await button('确认退出');await wait('!!document.querySelector("#account-password")');eq(await evaluate('document.querySelector("#account-password").value'),'','logout form password empty');
-    await history();await wait('document.querySelectorAll(".poster").length===2');check(await evaluate('document.querySelector(".section-tabs").textContent.includes("追剧 (1)")'),'favorites unchanged');
-  });
-  await group('LOGIN navigating away in flight settles library and does not retain password', async () => {
-    await reset({open:false});await about();await evaluate('window.__seasonFixture.loginPlans=[{delay:300}]');await fillLogin('alice');await submit();await history();
-    await wait('document.querySelector(".poster strong")?.textContent==="alice 账号记录"');
-    await about();await loggedIn();check(await evaluate('!document.querySelector("#account-password")'),'unmounted login completes without retaining form');
-  });
-  await group('EXPIRED session shows re-login form, server and username without old password', async () => {
-    await reset({open:false});await about();await login();
-    await evaluate('Object.assign(window.__seasonFixture.account,{authenticated:false,loginRequired:true,error:"登录已过期"});window.__androidAccountChanged()');
-    await wait('!!document.querySelector("#account-password")');eq(await evaluate('document.querySelector("#account-username").value'),'alice','correct account retained');eq(await evaluate('document.querySelector("#account-password").value'),'','no password restored');
-    check(await evaluate('document.querySelector(".account-status").textContent.includes("登录已过期")'),'expiry explicit');await field('account-password','fixture Password!');await submit();await loggedIn();
-  });
-  await group('LIBRARY shortcut opens account form and cache copy retains five episode behavior', async () => {
-    await reset({open:false});await nav('我的追剧');await button('账号与同步');await accountReady();
-    await wait('document.activeElement.id==="account-server"');eq(await evaluate('document.activeElement.id'),'account-server','shortcut focuses editable server');
-    check(await evaluate('document.querySelector(".cache-note").textContent.includes("后面 5 集")'),'five episode cast prefetch explanation retained');
-    check(await evaluate('document.querySelector(".cache-note").textContent.includes("不自动跨季")'),'no stale cross-season auto play claim');
-    await screenshot('phone-account-guest.png');
   });
   await group('ISOLATION no browser network, exceptions or unexpected native calls', async () => {
     eq(report.externalRequests,[],'zero external requests');eq(report.pageErrors,[],'zero browser exceptions');eq(await evaluate('window.__seasonFixture.notes'),[],'zero unexpected RPCs');
@@ -344,7 +428,7 @@ try {
   fs.rmSync(temporary,{recursive:true,force:true});
   report.summary={groupsPassed:passed,groupsFailed:failed,assertions:checks,networkRequests:report.externalRequests.length,deviceTests:'not_run',adb:'not_used',emulator:'not_used',cleanup:'own local server and Chrome stopped; temporary profile removed'};
   fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(report,null,2)+'\n');
-  console.log(`ANDROID_ACCOUNT_UI_${failed?'FAILED':'OK'} groupsPassed=${passed} groupsFailed=${failed} assertions=${checks} networkRequests=${report.externalRequests.length} deviceTests=not_run`);
+  console.log(`ANDROID_OFFICIAL_ACCOUNT_UI_${failed?'FAILED':'OK'} groupsPassed=${passed} groupsFailed=${failed} assertions=${checks} networkRequests=${report.externalRequests.length} deviceTests=not_run`);
   console.log('MOCK_UI_CLEANUP ownServer=stopped ownChrome=stopped ownProfile=removed adb=not_used emulator=not_used');
 }
 process.exitCode=failed?1:0;

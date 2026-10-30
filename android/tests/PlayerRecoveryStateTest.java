@@ -20,9 +20,9 @@ public final class PlayerRecoveryStateTest {
   check(!zero.paused&&!zero.web,"playing App/cache recovery flags preserved");
   PlayerRecoveryHarness broken=player();broken.lastGoodPosition=34000;broken.video.throwsPosition=true;
   check(broken.recoverMedia(7,1,-1007,"broken")&&broken.position==34000,"error-state position exception falls back to last good progress");
-  for(int mode=0;mode<4;mode++){
-   PlayerRecoveryHarness skip=player();skip.offline=mode==0;skip.currentManual=mode==1;
-   check(!skip.recoverMedia(mode==3?6:7,1,mode==2?-1010:-1004,"skip"),"offline/manual/unsupported/stale never automatically recover");
+  for(int mode=0;mode<6;mode++){
+   PlayerRecoveryHarness skip=player();skip.offline=mode==0;skip.currentManual=mode==1;skip.destroyed=mode==4;skip.castWasActive=mode==5;
+   check(!skip.recoverMedia(mode==3?6:7,1,mode==2?-1010:-1004,"skip"),"offline/manual/unsupported/stale/destroy/cast never automatically recover");
    check(skip.calls==0,"excluded failures do not call source or mutate episode");
   }
   System.out.println("PASS PlayerRecoveryStateTest checks="+checks+" actualPlayerMethod=true sameEpisode=true progressPauseConfirmedSpeedPreserved=true manualNeverRecovered=true");

@@ -64,10 +64,47 @@ final class NetworkGuard {
         if (!host.matches("[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?") || !host.contains(".") || host.matches("[0-9.]+") || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".lan") || host.endsWith(".home")) throw new IOException("链接必须指向公网域名");
         if (officialOnly) {
             String path = uri.getPath();
-            if (!OFFICIAL.contains(host) || path == null || !(path.equals("/search") || path.startsWith("/search/") || path.startsWith("/category/") || path.startsWith("/player/"))) throw new IOException("仅支持官网分类、搜索及播放页面");
+            if (!OFFICIAL.contains(host) || path == null) throw new IOException("仅支持官网分类、搜索及播放页面");
             if (path.contains("..") || path.contains("\\")) throw new IOException("页面路径无效");
+            boolean legacy = path.equals("/search") || path.startsWith("/search/") || path.startsWith("/category/") || path.startsWith("/player/");
+            boolean detail = path.equals("/detail") && path.equals(uri.getRawPath());
+            boolean searchApi = host.equals("hongguoduanju.com") && path.equals("/api/search/result") && path.equals(uri.getRawPath());
+            if (detail || searchApi) validateOfficialQuery(uri, searchApi);
+            else if (!legacy) throw new IOException("仅支持官网分类、搜索及播放页面");
         }
         return uri;
+    }
+    /** Only two exact metadata endpoints are added; arbitrary official APIs remain closed. */
+    private static void validateOfficialQuery(URI uri, boolean search) throws IOException {
+        Map<String, String> fields = new HashMap<>();
+        String raw = uri.getRawQuery();
+        if (raw == null || raw.isEmpty()) throw new IOException("官网页面参数无效");
+        try {
+            for (String pair : raw.split("&", -1)) {
+                String[] parts = pair.split("=", 2);
+                if (parts.length != 2) throw new IOException("官网页面参数无效");
+                String key = URLDecoder.decode(parts[0], "UTF-8"), value = URLDecoder.decode(parts[1], "UTF-8");
+                if (fields.put(key, value) != null) throw new IOException("官网页面参数重复");
+            }
+        } catch (IllegalArgumentException invalid) { throw new IOException("官网页面参数无效"); }
+        if (!search) {
+            if (fields.size() != 1 || !fields.getOrDefault("series_id", "").matches("[0-9]{1,30}")) throw new IOException("官网剧集编号无效");
+            return;
+        }
+        String keyword = fields.getOrDefault("query", ""), page = fields.getOrDefault("page", "");
+        if (fields.size() != 3 || !"8662".equals(fields.get("aid")) || keyword.trim().isEmpty() || keyword.length() > 100 ||
+            !page.matches("[1-9][0-9]?") || Integer.parseInt(page) > 50) throw new IOException("官网搜索参数无效");
+        for (int i = 0; i < keyword.length(); i++) if (Character.isISOControl(keyword.charAt(i))) throw new IOException("官网搜索参数无效");
+    }
+    /** Convert the caller's absolute wall-clock expiry once; queue time is part of the budget. */
+    static long pageDeadline(long timeoutMs, long deadlineMs) throws IOException {
+        if (timeoutMs < 1 || timeoutMs > 25000 || deadlineMs < 0 || deadlineMs > 9007199254740991L) throw new IOException("页面请求等待期限无效");
+        long budget = timeoutMs;
+        if (deadlineMs > 0) budget = Math.min(budget, deadlineMs - System.currentTimeMillis());
+        if (budget <= 0) throw new SocketTimeoutException("页面请求超时");
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budget);
+        remaining(deadline, Integer.MAX_VALUE);
+        return deadline;
     }
     /** Resolve without altering signed paths/queries; rejected targets are never requested. */
     static URI mediaRedirect(URI from, String location) throws MediaRedirectException {
@@ -151,6 +188,8 @@ final class NetworkGuard {
         return uri.toASCIIString();
     }
     static Reply get(String value) throws Exception { return request(value, true, false); }
+    static Reply get(String value, long deadline) throws Exception { return request(value, true, false, deadline); }
+    static Reply get(String value, long timeoutMs, long deadlineMs) throws Exception { return get(value, pageDeadline(timeoutMs, deadlineMs)); }
     static String media(String value) throws Exception { return request(value, false, true).url; }
     /** Bounded binary transfer; each redirect resolves public IPs and connects TLS to that checked IP. */
     public static void download(String value, File destination, long maxBytes) throws Exception {
@@ -293,7 +332,10 @@ final class NetworkGuard {
         return total;
     }
     private static Reply request(String value, boolean officialOnly, boolean head) throws Exception {
-        long deadline = System.nanoTime() + 25_000_000_000L;
+        return request(value, officialOnly, head, System.nanoTime() + 25_000_000_000L);
+    }
+    private static Reply request(String value, boolean officialOnly, boolean head, long deadline) throws Exception {
+        remaining(deadline, Integer.MAX_VALUE);
         URI uri = validate(value, officialOnly);
         for (int redirects = 0; redirects <= 3; redirects++) {
             InetAddress[] addresses = publicAddresses(uri, deadline);

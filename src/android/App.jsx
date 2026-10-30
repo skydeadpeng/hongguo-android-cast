@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Home, Search, Bookmark, Download, Settings, Play, Heart, Clock, ChevronRight, ExternalLink, RefreshCw, Film } from '../components/icons.jsx';
+import { Home, Search, Bookmark, Download, Settings, Play, Heart, Clock, ChevronRight, ExternalLink, RefreshCw, Film, Radio } from '../components/icons.jsx';
 import { getPlaybackPreferences, nativeCall, requestHtml, setPlaybackPreference } from './bridge.mjs';
 import { CATEGORIES, createSource } from './source.mjs';
 import { createSeasonLookup, parseSeasonTitle, seasonCandidates } from './seasons.mjs';
@@ -7,10 +7,12 @@ import { latestSeasonHistory, assertPlaybackRequestSize } from './season-playbac
 import { fetchAppPlayUrl } from './generated/mac-app-source.mjs';
 import gplLicense from '../../LICENSE?raw';
 import AccountPanel from './AccountPanel.jsx';
+import UpdatePanel from './UpdatePanel.jsx';
+import { createOfficialSeasonLookup, requestOfficialSeries } from './official-series.mjs';
 
 const source = createSource(requestHtml, { fallback: fetchAppPlayUrl,
   searchPage: params => nativeCall('searchQuery', params, 60000) });
-const seasonLookup = createSeasonLookup((keyword, page) => source.search(keyword, page));
+const seasonLookup = createOfficialSeasonLookup(requestOfficialSeries, createSeasonLookup((keyword, page) => source.search(keyword, page)));
 const EMPTY_LIBRARY = { favorites: [], history: [] };
 const NAV = [
   { id: 'discover', label: '发现', Icon: Home },
@@ -39,12 +41,23 @@ const sameSeries = (a, b) => String(a?.seriesId) === String(b?.seriesId);
 const timeText = (ms) => { const s = Math.floor((Number(ms) || 0) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const byteText = (bytes) => { const n = Number(bytes) || 0; return n >= 1024 ** 2 ? `${(n / 1024 ** 2).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`; };
 // Do not duplicate an entire episode list inside library entries or bridge payloads.
-const compactSeries = ({ seriesId, title, coverUrl, episodeCount, episodeLabel, tags }) => ({ seriesId, title, coverUrl, episodeCount, episodeLabel, tags });
+const seriesSyncMetadata = value => ({
+  ...(Number.isSafeInteger(value?.seasonIndex) && value.seasonIndex >= 0 && value.seasonIndex <= 10000 ? { seasonIndex: value.seasonIndex } : {}),
+  ...(typeof value?.multiSeason === 'boolean' ? { multiSeason: value.multiSeason } : {}),
+});
+const compactSeries = value => { const { seriesId, title, coverUrl, episodeCount, episodeLabel, tags } = value; return { seriesId, title, coverUrl, episodeCount, episodeLabel, tags, ...seriesSyncMetadata(value) }; };
+const needsSeriesPoint = (library, series) => !!(library.projection?.historyHasMore && !library.history.some(row => sameSeries(row, series)) || library.projection?.favoritesHasMore && !library.favorites.some(row => sameSeries(row, series)));
+const POINT_FAVORITE_ERROR = '当前剧的账号状态暂未读取，请重试详情后再修改追剧。';
+const POINT_RESUME_ERROR = '较早的本机进度暂未读取；可以重试详情或手动选集。';
 const compactEpisode = ({ vid, index, webAvailable, availability }) => ({ vid, index, webAvailable: !!webAvailable, availability: availability || (webAvailable ? 'available' : 'unknown') });
 
-function Status({ busy, error, onRetry, empty, children }) {
+function Status({ busy, error, onRetry, empty, children, preserve = false, errorTitle = '这次没有加载成功', retryLabel = '重新加载' }) {
+  if (preserve) return <>
+    {busy ? <div className="state-inline" role="status"><RefreshCw size={18} /><p>正在更新，仍可查看已有内容。</p></div> : error ? <div className="state-inline error-state" role="alert"><p><strong>{errorTitle}</strong><span>{error}，仍显示上次内容。</span></p><button type="button" className="button" onClick={onRetry}><RefreshCw />{retryLabel}</button></div> : null}
+    {children}
+  </>;
   if (busy) return <div className="state-panel" role="status"><RefreshCw size={24} /><h2>正在读取…</h2><p>请稍候，正在获取最新内容。</p></div>;
-  if (error) return <div className="state-panel error-state" role="alert"><h2>这次没有加载成功</h2><p>{error}</p><button className="button" onClick={onRetry}><RefreshCw />重新加载</button></div>;
+  if (error) return <div className="state-panel error-state" role="alert"><h2>{errorTitle}</h2><p>{error}</p><button type="button" className="button" onClick={onRetry}><RefreshCw />{retryLabel}</button></div>;
   if (empty) return <div className="state-panel"><Film size={28} /><h2>{empty.title}</h2><p>{empty.text}</p></div>;
   return children;
 }
@@ -69,20 +82,53 @@ function Discover({ onOpen }) {
   const [category, setCategory] = useState(CATEGORIES[0]?.id || 'all');
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
-  const [state, setState] = useState({ busy: true, items: [] });
+  const [state, setState] = useState({ busy: true, items: [], category, page: 1 });
+  const generation = useRef(0), fetching = useRef(false), refreshCatalog = useRef(false);
   useEffect(() => {
-    let current = true;
-    setState({ busy: true, items: [] });
-    source.catalog(category, page).then((result) => { if (current) setState({ ...result, busy: false }); }).catch((error) => { if (current) setState({ busy: false, error: errorText(error), items: [] }); });
-    return () => { current = false; };
+    const current = ++generation.current;
+    fetching.current = true;
+    const previous = state.category === category ? state : { items: [], category, page: 1 };
+    setState({ ...previous, busy: true, error: '', requestedPage: page });
+    const refresh = refreshCatalog.current;
+    refreshCatalog.current = false;
+    Promise.resolve().then(() => source.catalog(category, page, { refresh })).then((result) => {
+      if (generation.current !== current) return;
+      if (!Array.isArray(result?.items)) throw new Error('来源返回的片单无效，请重试。');
+      if (result.page !== undefined && result.page !== page) throw new Error('来源返回的片单页码不一致，请重试。');
+      if (!result.items.length && previous.items.length) throw new Error('这次未返回片单，请重试。');
+      fetching.current = false;
+      setState({ ...result, category, requestedPage: page, page: result.page || page, busy: false });
+    }).catch((error) => {
+      if (generation.current !== current) return;
+      fetching.current = false;
+      setState({ ...previous, busy: false, error: errorText(error), requestedPage: page });
+    });
+    return () => { generation.current++; };
   }, [category, page, reload]);
+  // A changed query never renders the previous query's cards or page controls,
+  // including the render before its effect has started.
+  const shown = state.category === category ? state : { busy: true, items: [], page: 1 };
+  const visiblePage = shown.page || 1;
+  const loadPage = (target, refresh = false) => {
+    if (fetching.current || target < 1) return;
+    fetching.current = true; generation.current++;
+    refreshCatalog.current = refresh;
+    setState(previous => ({ ...previous, busy: true, error: '', requestedPage: target }));
+    setPage(target); setReload(value => value + 1);
+  };
+  const changeCategory = (value) => {
+    if (value === category) return;
+    generation.current++; fetching.current = true; refreshCatalog.current = false;
+    setState({ busy: true, items: [], category: value, page: 1, requestedPage: 1 });
+    setCategory(value); setPage(1);
+  };
   return <>
-    <header className="page-heading"><h1>发现短剧</h1><p>按分类浏览，选择喜欢的故事。</p></header>
-    <div className="category-tabs" role="group" aria-label="短剧分类">{CATEGORIES.map((item) => <button key={item.id} aria-pressed={item.id === category} onClick={() => { setCategory(item.id); setPage(1); }}>{item.label}</button>)}</div>
-    <Status busy={state.busy} error={state.error} onRetry={() => setReload((n) => n + 1)} empty={!state.items?.length && { title: '这个分类暂时没有内容', text: '试试其他分类，或稍后回来查看。' }}>
-      <PosterGrid items={state.items || []} onOpen={onOpen} />
+    <header className="page-heading heading-actions"><div><h1>发现短剧</h1><p>按分类浏览，选择喜欢的故事。</p></div><button type="button" className="button" disabled={shown.busy} aria-label="刷新片单" onClick={() => loadPage(visiblePage, true)}><RefreshCw /><span>刷新</span></button></header>
+    <div className="category-tabs" role="group" aria-label="短剧分类">{CATEGORIES.map((item) => <button key={item.id} aria-pressed={item.id === category} onClick={() => changeCategory(item.id)}>{item.label}</button>)}</div>
+    <Status busy={shown.busy} error={shown.error} preserve={!!shown.items.length} onRetry={() => loadPage(shown.requestedPage || page, true)} empty={!shown.items.length && { title: '这个分类暂时没有内容', text: '试试其他分类，或稍后回来查看。' }}>
+      <PosterGrid items={shown.items} onOpen={onOpen} />
     </Status>
-    {!state.error && !state.busy && <div className="pagination" aria-label="分页"><button className="button" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>上一页</button><span>第 {page} 页{state.totalPages ? ` / ${state.totalPages}` : ''}</span><button className="button" disabled={state.totalPages ? page >= state.totalPages : !state.items?.length} onClick={() => setPage((n) => n + 1)}>下一页</button></div>}
+    {(!!shown.items.length || !shown.busy && !shown.error) && <div className="pagination" aria-label="分页"><button className="button" disabled={shown.busy || visiblePage <= 1} onClick={() => loadPage(visiblePage - 1)}>上一页</button><span>第 {visiblePage} 页{shown.totalPages ? ` / ${shown.totalPages}` : ''}{shown.busy ? ' · 读取中' : shown.error && shown.requestedPage !== visiblePage ? ` · 第 ${shown.requestedPage} 页未加载` : ''}</span><button className="button" disabled={shown.busy || !!shown.error || (shown.totalPages ? visiblePage >= shown.totalPages : !shown.items.length)} onClick={() => loadPage(visiblePage + 1)}>下一页</button></div>}
   </>;
 }
 
@@ -140,18 +186,37 @@ function SearchPage({ onOpen }) {
     const current = ++generation.current;
     if (!query) return;
     fetching.current = true;
-    setState({ busy: true, items: [], page });
+    const previous = state.query === query ? state : { items: [], query, page: 1 };
+    setState({ ...previous, busy: true, error: '', errorCode: undefined, requestedPage: page });
     const refresh = refreshSearch.current;
     refreshSearch.current = false;
     // Pager validation can reject synchronously (for example an expired cursor).
     Promise.resolve().then(() => source.search(query, page, { refresh })).then((result) => {
       if (generation.current !== current) return;
+      if (!Array.isArray(result?.items)) throw new Error('来源返回的搜索结果无效，请重试。');
+      if (result.page !== undefined && result.page !== page) throw new Error('来源返回的搜索页码不一致，请重试。');
+      if (!result.items.length && previous.items.length) {
+        // A valid empty terminal page is cached by the pager. Retrying it as a
+        // transport failure would loop forever; retain the last useful page and
+        // remember this boundary when returning through earlier cached pages.
+        if (result.hasMore === false && page > (previous.page || 1)) {
+          fetching.current = false;
+          setState({ ...previous, busy: false, error: '', errorCode: undefined, hasMore: false,
+            endBeforePage: Math.min(previous.endBeforePage || page, page), requestedPage: previous.page || 1,
+            notice: [previous.notice, `没有更多结果，仍显示第 ${previous.page || 1} 页。`].filter(Boolean).join(' ') });
+          return;
+        }
+        throw new Error('这次未返回搜索结果，请重试。');
+      }
       fetching.current = false;
-      setState({ ...result, busy: false });
+      const atKnownEnd = previous.endBeforePage && page + 1 >= previous.endBeforePage;
+      setState({ ...result, query, page: result.page || page, requestedPage: page, busy: false,
+        endBeforePage: previous.endBeforePage,
+        ...(atKnownEnd ? { hasMore: false, notice: [result.notice, `没有更多结果，仍显示第 ${page} 页。`].filter(Boolean).join(' ') } : {}) });
     }).catch((error) => {
       if (generation.current !== current) return;
       fetching.current = false;
-      setState({ busy: false, items: [], page, error: errorText(error), errorCode: error?.code });
+      setState({ ...previous, busy: false, query, requestedPage: page, error: errorText(error), errorCode: error?.code });
     });
     return () => { generation.current++; };
   }, [query, page, reload]);
@@ -175,17 +240,18 @@ function SearchPage({ onOpen }) {
     fetching.current = true;
     refreshSearch.current = true;
     pageFocus.current = null;
-    setState({ busy: true, items: [], page: 1 });
+    setState(previous => previous.query === value ? { ...previous, busy: true, error: '', errorCode: undefined, endBeforePage: undefined, requestedPage: 1 } : { busy: true, items: [], query: value, page: 1, requestedPage: 1 });
     setKeyword(value); setQuery(value); setPage(1); setReload((n) => n + 1);
     updateHistory('addSearchHistory', value);
   };
-  const visiblePage = state.page || page;
-  const loadPage = (nextPage) => {
+  const visiblePage = state.page || 1;
+  const loadPage = (nextPage, refresh = false) => {
     if (fetching.current || nextPage < 1) return;
     fetching.current = true;
+    refreshSearch.current = refresh;
     generation.current++;
     pageFocus.current = results.current?.contains(document.activeElement) ? document.activeElement : null;
-    setState({ busy: true, items: [], page: nextPage });
+    setState(previous => ({ ...previous, busy: true, error: '', errorCode: undefined, requestedPage: nextPage }));
     setPage(nextPage); setReload((n) => n + 1);
   };
   const submit = (event) => { event.preventDefault(); runSearch(keyword); };
@@ -204,10 +270,10 @@ function SearchPage({ onOpen }) {
     {query ? <section ref={results} aria-label="搜索结果" aria-busy={state.busy}>
       <p className="result-caption">“{query}”{!state.busy && !state.error ? state.totalKnown !== false && Number.isSafeInteger(state.total) ? ` · 共 ${state.total} 个结果` : ` · 本页 ${state.items.length} 个结果` : ''}</p>
       {!state.busy && !state.error && state.notice && <p className="result-caption" role="status">{state.notice}</p>}
-      {state.errorCode === 'SEARCH_EXPIRED' ? <div className="state-panel error-state" role="alert"><h2>搜索已过期</h2><p>{state.error}</p><button type="button" className="button" onClick={() => runSearch(query)}><RefreshCw />重新搜索</button></div> : <Status busy={state.busy} error={state.error} onRetry={() => loadPage(visiblePage)} empty={!state.items.length && { title: visiblePage > 1 ? '这一页没有更多结果' : '没有找到相关短剧', text: visiblePage > 1 ? '可以返回上一页，或搜索其他关键词。' : '可以缩短名称，或换一个关键词。' }}><PosterGrid items={state.items} onOpen={onOpen} /></Status>}
+      <Status busy={state.busy} error={state.error} preserve={!!state.items.length} errorTitle={state.errorCode === 'SEARCH_EXPIRED' ? '搜索已过期' : undefined} retryLabel={state.errorCode === 'SEARCH_EXPIRED' ? '重新搜索' : undefined} onRetry={() => state.errorCode === 'SEARCH_EXPIRED' ? runSearch(query) : loadPage(state.requestedPage || page, (state.requestedPage || page) === 1)} empty={!state.items.length && { title: visiblePage > 1 ? '这一页没有更多结果' : '没有找到相关短剧', text: visiblePage > 1 ? '可以返回上一页，或搜索其他关键词。' : '可以缩短名称，或换一个关键词。' }}><PosterGrid items={state.items} onOpen={onOpen} /></Status>
       <div className="pagination search-pagination" aria-label="搜索结果分页">
         <button type="button" className="button" disabled={state.busy || visiblePage <= 1} onClick={() => loadPage(visiblePage - 1)}>上一页</button>
-        <span className="search-page-status" aria-live="polite">第 {visiblePage} 页{state.totalPages ? ` / ${state.totalPages}` : ''}{state.busy ? ' · 读取中' : ''}</span>
+        <span className="search-page-status" aria-live="polite">第 {visiblePage} 页{state.totalPages ? ` / ${state.totalPages}` : ''}{state.busy ? ' · 读取中' : state.error && state.requestedPage !== visiblePage ? ` · 第 ${state.requestedPage} 页未加载` : ''}</span>
         <button type="button" className="button" disabled={state.busy || !!state.error || !state.hasMore} onClick={() => loadPage(visiblePage + 1)}>下一页</button>
       </div>
     </section> : <Status empty={{ title: '找一部想看的短剧', text: '搜索结果会显示在这里。' }} />}
@@ -218,42 +284,138 @@ function Library({ library, error, busy, onRetry, onOpen, onAccount }) {
   const [view, setView] = useState('favorites');
   const items = library[view] || [];
   return <>
-    <header className="page-heading heading-actions"><div><h1>我的追剧</h1><p>收藏保存在本机；登录同一账号可同步观看记录和进度。</p></div><button type="button" className="button" onClick={onAccount}>账号与同步</button></header>
+    <header className="page-heading heading-actions"><div><h1>我的追剧</h1><p>本机保留记录；登录红果官方账号后同步收藏、历史和进度。</p></div><button type="button" className="button" onClick={onAccount}>账号</button></header>
     <div className="section-tabs" role="group" aria-label="我的内容"><button aria-pressed={view === 'favorites'} onClick={() => setView('favorites')}><Heart />追剧 ({library.favorites.length})</button><button aria-pressed={view === 'history'} onClick={() => setView('history')}><Clock />观看历史 ({library.history.length})</button></div>
-    <Status busy={busy} error={error} onRetry={onRetry} empty={!items.length && { title: view === 'favorites' ? '还没有追剧' : '还没有观看记录', text: view === 'favorites' ? '打开短剧详情，点击「加入追剧」。' : '播放短剧后，进度会自动记录。' }}><PosterGrid items={items} onOpen={onOpen} history={view === 'history'} /></Status>
+    {library.projection?.[view === 'favorites' ? 'favoritesHasMore' : 'historyHasMore'] && <p className="account-note" role="status">当前展示最近 {items.length} 项；完整记录已保存在账号库，较早剧集的原生播放进度仍保留。</p>}
+    <Status busy={busy} error={error} preserve={!!items.length} onRetry={onRetry} empty={!items.length && { title: view === 'favorites' ? '还没有追剧' : '还没有观看记录', text: view === 'favorites' ? '打开短剧详情，点击「加入追剧」。' : '播放短剧后，进度会自动记录。' }}><PosterGrid items={items} onOpen={onOpen} history={view === 'history'} /></Status>
   </>;
 }
 
 function Downloads({ notify }) {
   const [state, setState] = useState({ busy: true, items: [] });
-  const [reload, setReload] = useState(0);
   const [opening, setOpening] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
+  const alive = useRef(false);
+  const fetching = useRef(false);
+  const loaded = useRef(false);
+  const queuedRefresh = useRef(false);
+  const readEpoch = useRef(0);
+  const operation = useRef(null);
+  const deletedIds = useRef(new Set());
+  const list = useRef(null);
+  const refreshButton = useRef(null);
+  const cancelButton = useRef(null);
+  const restoreIndex = useRef(null);
+
+  // Keep one list RPC across refreshes/mutations. Invalidating an old read does
+  // not launch a replacement until that read settles, even after deletion.
+  const refresh = useCallback(async function refresh(force = false) {
+    if (!alive.current || document.visibilityState === 'hidden' || operation.current) return;
+    if (fetching.current) { if (force) queuedRefresh.current = true; return; }
+    fetching.current = true;
+    const epoch = ++readEpoch.current;
+    setState(previous => ({ ...previous, busy: true, error: '' }));
+    try {
+      const result = await nativeCall('getDownloads');
+      if (alive.current && epoch === readEpoch.current) {
+        setState({ busy: false, items: (Array.isArray(result) ? result : []).filter(item => !deletedIds.current.has(item.id)) });
+        loaded.current = true;
+      }
+    } catch (error) {
+      if (alive.current && epoch === readEpoch.current) setState(previous => ({ ...previous, busy: false, error: errorText(error) }));
+    } finally {
+      fetching.current = false;
+      if (alive.current && queuedRefresh.current) { queuedRefresh.current = false; refresh(true); }
+    }
+  }, []);
   useEffect(() => {
-    let active = true;
-    let fetching = false;
-    let loaded = false;
-    const refresh = async () => {
-      if (document.visibilityState === 'hidden' || fetching) return;
-      fetching = true;
-      try { const result = await nativeCall('getDownloads'); if (active) { setState({ busy: false, items: Array.isArray(result) ? result : [] }); loaded = true; } }
-      catch (error) { if (active) setState((previous) => ({ ...previous, busy: false, error: errorText(error) })); }
-      finally { fetching = false; }
-    };
-    const onVisible = () => { if (document.visibilityState !== 'hidden') refresh(); };
+    alive.current = true;
     refresh();
-    const interval = setInterval(() => { if (loaded) refresh(); }, 2500);
+    const interval = setInterval(() => { if (loaded.current) refresh(); }, 2500);
+    const onVisible = () => { if (document.visibilityState !== 'hidden') refresh(); };
+    const onResume = () => refresh();
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('androidresume', refresh);
-    return () => { active = false; clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('androidresume', refresh); };
-  }, [reload]);
-  const open = async (id) => { setOpening(id); try { await nativeCall('playDownload', { id, ...getPlaybackPreferences() }); } catch (error) { notify(errorText(error)); } finally { setOpening(null); } };
+    window.addEventListener('androidresume', onResume);
+    return () => {
+      alive.current = false; readEpoch.current++; queuedRefresh.current = false;
+      clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('androidresume', onResume);
+    };
+  }, [refresh]);
+
+  const cancelConfirmation = useCallback(() => {
+    if (operation.current?.kind !== 'confirm') return;
+    operation.current = null; setConfirm(null); setDeleteError('');
+    refresh(true);
+  }, [refresh]);
+  useEffect(() => {
+    const back = event => {
+      if (!['confirm', 'delete'].includes(operation.current?.kind)) return;
+      event.preventDefault();
+      cancelConfirmation();
+    };
+    window.addEventListener('androiddownloadback', back);
+    return () => window.removeEventListener('androiddownloadback', back);
+  }, [cancelConfirmation]);
+  useEffect(() => {
+    if (confirm) { if (deleting === null) cancelButton.current?.focus(); return; }
+    if (restoreIndex.current === null || opening !== null || deleting !== null) return;
+    const buttons = list.current?.querySelectorAll('.download-delete') || [];
+    const target = buttons[Math.min(restoreIndex.current, buttons.length - 1)] || (!state.busy && refreshButton.current);
+    if (target && !target.disabled) { target.focus(); restoreIndex.current = null; }
+  }, [confirm, deleting, opening, state.items, state.busy]);
+
+  const askDelete = (item, index) => {
+    if (operation.current) return;
+    operation.current = { kind: 'confirm', id: item.id };
+    readEpoch.current++; restoreIndex.current = index;
+    setState(previous => ({ ...previous, busy: false }));
+    setDeleteError(''); setConfirm({ ...item });
+  };
+  const remove = async () => {
+    const selected = operation.current;
+    if (selected?.kind !== 'confirm' || !confirm || selected.id !== confirm.id) return;
+    const id = selected.id;
+    operation.current = { kind: 'delete', id };
+    readEpoch.current++; setDeleting(id); setDeleteError('');
+    try {
+      const result = await nativeCall('deleteDownload', { id, confirmed: true });
+      if (!alive.current) return;
+      if (result?.deleted !== true || result.id !== id) throw new Error('删除结果未确认，请重试。');
+      deletedIds.current.add(id);
+      setState(previous => ({ ...previous, busy: false, items: previous.items.filter(item => item.id !== id) }));
+      setConfirm(null); operation.current = null;
+      refresh(true);
+    } catch (error) {
+      if (alive.current) { operation.current = { kind: 'confirm', id }; setDeleteError(errorText(error)); }
+    } finally {
+      if (alive.current) setDeleting(null);
+    }
+  };
+  const open = async id => {
+    if (operation.current) return;
+    operation.current = { kind: 'open', id }; setOpening(id);
+    try { await nativeCall('playDownload', { id, ...getPlaybackPreferences() }); }
+    catch (error) { if (alive.current) notify(errorText(error)); }
+    finally { if (alive.current) { operation.current = null; setOpening(null); } }
+  };
   const statuses = { pending: '等待下载', running: '正在下载', paused: '已暂停', success: '下载完成', failed: '下载失败' };
+  const activeDownload = item => ['pending', 'running', 'paused'].includes(item.status);
+  const locked = !!confirm || deleting !== null || opening !== null;
   return <>
-    <header className="page-heading heading-actions"><div><h1>下载</h1><p>系统下载任务与设备上的离线视频。</p></div><button className="button" onClick={() => setReload((n) => n + 1)} aria-label="刷新下载列表"><RefreshCw /><span>刷新</span></button></header>
-    <Status busy={state.busy} error={state.error} onRetry={() => setReload((n) => n + 1)} empty={!state.items.length && { title: '还没有下载任务', text: '在短剧详情中选择一集，再点击「下载本集」。' }}>
-      <div className="download-list">{state.items.map((item) => {
+    <header className="page-heading heading-actions"><div><h1>下载</h1><p>系统下载任务与设备上的离线视频。</p></div><button ref={refreshButton} className="button" onClick={() => refresh(true)} disabled={state.busy || locked} aria-label="刷新下载列表"><RefreshCw /><span>刷新</span></button></header>
+    {confirm && <div className="download-confirm" role="group" aria-label="确认删除下载">
+      <h2>{activeDownload(confirm) ? '取消并删除这个下载？' : '删除这个下载？'}</h2>
+      <p>{confirm.title || '短剧'} · 第 {confirm.index} 集</p>
+      <p>{activeDownload(confirm) ? '将取消下载，并删除本机视频文件和下载记录。' : '将删除本机视频文件和下载记录。'}收藏和观看历史会保留。</p>
+      {deleteError && <p className="download-delete-error" role="alert">{deleteError}</p>}
+      <div className="download-confirm-actions"><button ref={cancelButton} type="button" className="button" onClick={cancelConfirmation} disabled={deleting !== null}>取消</button><button type="button" className="button download-destructive" onClick={remove} disabled={deleting !== null}>{deleting !== null ? '删除中…' : '确认删除'}</button></div>
+    </div>}
+    <Status busy={state.busy} error={state.error} preserve={!!state.items.length} onRetry={() => refresh(true)} empty={!state.items.length && { title: '还没有下载任务', text: '在短剧详情中选择一集，再点击「下载本集」。' }}>
+      <div className="download-list" ref={list}>{state.items.map((item, index) => {
         const percent = item.totalBytes > 0 ? Math.min(100, Math.max(0, Math.round(item.downloadedBytes / item.totalBytes * 100))) : null;
-        return <article className="download-row" key={item.id}><div className="download-icon"><Download size={24} /></div><div className="download-info"><h2>{item.title || '短剧'} · 第 {item.index} 集</h2><p className={item.status === 'failed' ? 'text-error' : ''}>{statuses[item.status] || item.status}{percent !== null && item.status !== 'success' ? ` · ${percent}%` : ''} · {byteText(item.downloadedBytes)}{item.totalBytes > 0 ? ` / ${byteText(item.totalBytes)}` : ''}</p>{item.status === 'running' && <progress value={percent ?? undefined} max="100" aria-label={`${item.title}下载进度`} />}{item.reason && item.status !== 'success' ? <p className="download-reason">{item.reason}</p> : null}</div>{item.status === 'success' && <button className="button" onClick={() => open(item.id)} disabled={opening !== null}><Play />{opening === item.id ? '打开中…' : '播放'}</button>}</article>;
+        return <article className="download-row" key={item.id}><div className="download-icon"><Download size={24} /></div><div className="download-info"><h2>{item.title || '短剧'} · 第 {item.index} 集</h2><p className={item.status === 'failed' ? 'text-error' : ''}>{statuses[item.status] || item.status}{percent !== null && item.status !== 'success' ? ` · ${percent}%` : ''} · {byteText(item.downloadedBytes)}{item.totalBytes > 0 ? ` / ${byteText(item.totalBytes)}` : ''}</p>{item.status === 'running' && <progress value={percent ?? undefined} max="100" aria-label={`${item.title}下载进度`} />}{item.reason && item.status !== 'success' ? <p className="download-reason">{item.reason}</p> : null}</div><div className="download-actions">{item.status === 'success' && <button type="button" className="button" onClick={() => open(item.id)} disabled={locked}><Play />{opening === item.id ? '打开中…' : '播放'}</button>}<button type="button" className="button download-delete" aria-label={`${activeDownload(item) ? '取消并删除' : '删除'} ${item.title || '短剧'} 第 ${item.index} 集`} onClick={() => askDelete(item, index)} disabled={locked}>{activeDownload(item) ? '取消并删除' : '删除'}</button></div></article>;
       })}</div>
     </Status>
   </>;
@@ -278,7 +440,8 @@ function About({ info, notify, accountFocus }) {
   return <>
     <header className="page-heading"><h1>关于红果短剧</h1><p>适配手机触控与电视遥控器。</p></header>
     <AccountPanel isTv={!!info.isTv} focusRequest={accountFocus} />
-    <section className="about-section"><h2>应用信息</h2><dl><div><dt>版本</dt><dd>{info.version || '读取中'}</dd></div><div><dt>设备界面</dt><dd>{info.isTv ? 'Android TV / 电视盒子' : 'Android 手机 / 平板'}</dd></div><div><dt>播放方式</dt><dd>安卓原生全屏播放器</dd></div><div><dt>数据存储</dt><dd>本机收藏；登录后同步观看记录与进度</dd></div></dl></section>
+    <UpdatePanel />
+    <section className="about-section"><h2>应用信息</h2><dl><div><dt>版本</dt><dd>{info.version || '读取中'}</dd></div><div><dt>设备界面</dt><dd>{info.isTv ? 'Android TV / 电视盒子' : 'Android 手机 / 平板'}</dd></div><div><dt>播放方式</dt><dd>安卓原生全屏播放器</dd></div><div><dt>数据存储</dt><dd>本机记录；官方账号同步收藏、历史与进度</dd></div></dl></section>
     <section className="about-section"><h2>播放缓存</h2><p className="cache-status" role="status">{cache.busy ? '正在读取缓存…' : typeof cache.files === 'number' ? `${cache.files} 个文件 · ${byteText(cache.bytes)}${cache.budgetBytes ? ` / 预算 ${byteText(cache.budgetBytes)}` : ''}` : '缓存状态暂未读取'}</p><p className="cache-note">自动清理开启时，保留前 1 集和当前集；本机播放预取下一集，投屏连播时依次预缓存后面 5 集，优先下一集，不等待全部缓存再开播。预取与清理均限于当前季，不自动跨季。普通缓存预算 256 MiB，投屏期间 768 MiB，单集上限 96 MiB；容量不足或取源失败时预缓存可能不足 5 集。更早已看缓存自动释放，手动下载保留，正在供流的文件受保护。</p><div className="about-links"><button className="button" disabled={cache.busy || clearing} onClick={clearCache}>{clearing ? '清理中…' : '清理播放缓存'}</button><button className="button" disabled={clearing} onClick={refreshCache}><RefreshCw />刷新缓存状态</button></div>{cache.error && <p className="text-error" role="alert">{cache.error}</p>}</section>
     <section className="about-section"><h2>使用说明</h2><p>电视可用方向键移动焦点、确认键打开。返回键先关闭详情，再回到发现页；播放器左上角可直接返回选集。</p><p>完整分集都可选择；播放和下载依次尝试网页常规入口、网页备用入口与 App 片源。选集中的「自动取源」不是锁定标志，也不表示所有分集已经验证可播；失败会显示实际原因。</p><p>自动连播默认开启，当前集结束后继续为下一集自动取源；取源失败时保留重试和返回入口。下载完成后，可在「下载」页面离线播放。</p></section>
     <section className="about-section"><h2>开源与许可</h2><p>本应用基于 jackotom/hongguo-drama，遵循 GPL-3.0 许可。安卓适配代码与构建说明随完整项目源码提供，分发修改版时需保留许可与源码。</p><div className="about-links"><button className="button" onClick={() => external('https://github.com/jackotom/hongguo-drama')}><ExternalLink />上游项目</button><button className="button" onClick={() => external('https://www.gnu.org/licenses/gpl-3.0.html')}><ExternalLink />GPL-3.0 许可网页</button></div><details className="license-details"><summary tabIndex={0}>GPL-3.0 许可全文（离线）</summary><pre className="license-text" tabIndex={0} aria-label="GPL-3.0 许可全文，可滚动阅读">{gplLicense}</pre></details></section>
@@ -302,6 +465,7 @@ function SeasonDetails({ seed, initialVid, ...props }) {
   const mounted = useRef(true);
   const selectionEpoch = useRef(0);
   const lookupEpoch = useRef(0);
+  const seasonAbort = useRef(null);
   const fetching = useRef(false);
   const directoryRef = useRef(directory);
   const currentSelection = useRef(selection);
@@ -314,18 +478,19 @@ function SeasonDetails({ seed, initialVid, ...props }) {
   const loadSeasons = useCallback(async (page = 1) => {
     if (fetching.current) return;
     const generation = ++lookupEpoch.current;
+    const controller = new AbortController(); seasonAbort.current = controller;
     const previous = directoryRef.current;
     const focused = selector.current?.contains(document.activeElement) ? document.activeElement : null;
     fetching.current = true;
     setDirectory(value => ({ ...value, busy: true, searched: true, error: '', errorCode: '', failedPage: page }));
     try {
-      const result = await seasonLookup.load(familySeed, { page, previous: page > 1 ? previous.items : [] });
+      const result = await seasonLookup.load(familySeed, { page, previous: page > 1 ? previous.items : [], signal: controller.signal });
       if (!mounted.current || generation !== lookupEpoch.current) return;
       const selectedSeed = currentSelection.current.seed;
       let items = result.items;
       if (items.some(candidate => sameSeries(candidate, selectedSeed) && candidate.title !== selectedSeed.title)) {
         const confirmed = seasonCandidates(selectedSeed, [])[0];
-        items = items.map(candidate => sameSeries(candidate, selectedSeed) ? confirmed : candidate);
+        items = items.map(candidate => sameSeries(candidate, selectedSeed) ? { ...candidate, ...confirmed, seasonLabel: candidate.official ? candidate.seasonLabel : confirmed.seasonLabel, seasonNumber: candidate.official ? candidate.seasonNumber : confirmed.seasonNumber } : candidate);
       }
       // A later page can insert lower ordinals before the 40-row cap. Keep
       // both the entry season and the user's current season reachable.
@@ -356,8 +521,10 @@ function SeasonDetails({ seed, initialVid, ...props }) {
   }, [familySeed]);
   useEffect(() => {
     mounted.current = true;
+    const pauseLookup = () => { if (!fetching.current) return; seasonAbort.current?.abort(); lookupEpoch.current++; fetching.current = false; setDirectory(value => ({ ...value, busy: false, error: '分季读取已暂停，返回后可重试。', failedPage: 1 })); };
+    window.addEventListener('androidseriespause', pauseLookup);
     if (parseSeasonTitle(familySeed.title)?.explicit) loadSeasons();
-    return () => { mounted.current = false; lookupEpoch.current++; fetching.current = false; };
+    return () => { mounted.current = false; lookupEpoch.current++; fetching.current = false; seasonAbort.current?.abort(); window.removeEventListener('androidseriespause', pauseLookup); };
   }, [familySeed, loadSeasons]);
   useEffect(() => {
     if (!focusSelection.current) return;
@@ -394,6 +561,7 @@ function SeasonDetails({ seed, initialVid, ...props }) {
   };
   const chooseSeason = candidate => {
     if (locked || sameSeries(candidate, selection.seed)) return;
+    if (candidate.playable === false || candidate.upcoming) { props.notify(candidate.upcoming ? "这一季尚未上线" : "这一季暂不可播放"); return; }
     // The guard reads refs, not a possibly stale rendered disabled state. In
     // particular, invalidate an old options promise before React can remount.
     if (selectionGuard.current && !selectionGuard.current()) return;
@@ -437,19 +605,19 @@ function SeasonDetails({ seed, initialVid, ...props }) {
     if (correctEntry) {
       // Invalidate synchronously, before React's effect cleanup, so an old
       // unmarked/abbreviated-title search cannot publish its filtered results.
-      lookupEpoch.current++; fetching.current = false;
+      lookupEpoch.current++; fetching.current = false; seasonAbort.current?.abort();
       familySeedRef.current = confirmed; setFamilySeed(confirmed);
-      setDirectory(value => ({ ...value, items: seasonCandidates(confirmed, value.items), page: 0, busy: false, searched: false, hasMore: false, error: '', errorCode: '', notice: '', failedPage: null }));
+      setDirectory(value => ({ ...value, items: value.matching === "official" ? value.items.map(row => sameSeries(row, confirmed) ? { ...row, title: confirmed.title } : row) : seasonCandidates(confirmed, value.items), page: 0, busy: false, searched: false, hasMore: false, error: '', errorCode: '', notice: '', failedPage: null }));
     } else {
       setDirectory(value => value.items.some(candidate => sameSeries(candidate, confirmed) && candidate.title !== confirmed.title)
-        ? { ...value, items: value.items.map(candidate => sameSeries(candidate, confirmed) ? confirmed : candidate) } : value);
+        ? { ...value, items: value.items.map(candidate => sameSeries(candidate, confirmed) ? { ...candidate, ...confirmed, seasonLabel: candidate.official ? candidate.seasonLabel : confirmed.seasonLabel, seasonNumber: candidate.official ? candidate.seasonNumber : confirmed.seasonNumber } : candidate) } : value);
     }
   };
-  const seasonCount = candidate => candidate.episodeCount ? `${candidate.episodeCount} 集` : candidate.episodeLabel || '集数待读取';
+  const seasonCount = candidate => candidate.upcoming ? "待上线" : candidate.playable === false ? "暂不可播放" : candidate.episodeCount ? `${candidate.episodeCount} 集` : candidate.episodeLabel || '集数待读取';
   const seasonProgress = candidate => props.library.history.find(entry => sameSeries(entry, candidate));
   const seasonEditions = candidate => directory.items.filter(other => other.seasonLabel === candidate.seasonLabel);
   const tabLabel = candidate => {
-    const label = candidate.seasonLabel.replace(/\s+/g, '');
+    const label = candidate.seasonLabel.replace(/\s+/g, '') + (candidate.upcoming ? ' · 待上线' : candidate.playable === false ? ' · 暂不可播' : '');
     const editions = seasonEditions(candidate);
     if (editions.length < 2) return label;
     const matchingCount = editions.filter(other => seasonCount(other) === seasonCount(candidate));
@@ -467,7 +635,7 @@ function SeasonDetails({ seed, initialVid, ...props }) {
     <div className="season-list" role="tablist" aria-label="分季候选" aria-orientation="horizontal" onKeyDown={moveSeasonFocus}>{directory.items.map(candidate => <button key={candidate.seriesId} id={`season-tab-${candidate.seriesId}`} type="button" role="tab" className="season-choice" data-season-id={candidate.seriesId} aria-selected={sameSeries(candidate, selection.seed)} aria-controls={`season-panel-${candidate.seriesId}`} aria-label={tabDescription(candidate)} tabIndex={!locked && candidate.seriesId === focusedSeasonId ? 0 : -1} disabled={locked} onFocus={event => { setFocusedSeasonId(candidate.seriesId); event.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }} onClick={() => chooseSeason(candidate)}><span className="season-label">{tabLabel(candidate)}</span></button>)}</div>
     <div className="season-current" aria-label="当前季信息"><p className="season-title">{selectedSeason.title}</p><p className="season-count">{seasonCount(selectedSeason)}</p>{selectedProgress && <p className="season-progress">看到第 {selectedProgress.index} 集 · {timeText(selectedProgress.positionMs)}</p>}{seasonEditions(selectedSeason).length > 1 && <p className="season-version">版本 {selectedSeason.seriesId}</p>}</div>
     {directory.items.filter(candidate => !sameSeries(candidate, selection.seed)).map(candidate => <div key={candidate.seriesId} id={`season-panel-${candidate.seriesId}`} role="tabpanel" aria-labelledby={`season-tab-${candidate.seriesId}`} hidden />)}
-    <p className="season-note">{directory.notice || (directory.searched ? '按标题匹配，可能存在不同版本；切季不会自动播放。' : '按标题查找其他季；未标注季数的剧集不推断为第一季。')}</p>
+    <p className="season-note">{directory.notice || (directory.searched ? '按标题匹配，可能存在不同版本；切季不会自动播放。' : '优先读取官方系列关系，失败再按标题查找；未标注季数不推断为第一季。')}</p>
     {directory.busy && <p className="season-status" role="status">正在查找分季…</p>}
     {directory.error && <div className="season-error" role="alert"><p>分季查找未完成：{directory.error} 当前季仍可播放。</p><button type="button" className="button" data-season-action="retry" disabled={locked || directory.busy} onClick={() => loadSeasons(directory.errorCode === 'SEARCH_EXPIRED' ? 1 : directory.failedPage || 1)}>{directory.errorCode === 'SEARCH_EXPIRED' ? '重新查找分季' : '重试查找'}</button></div>}
     {!directory.busy && !directory.error && directory.searched && directory.items.length === 1 && <p className="season-status">本页未匹配到其他季{directory.hasMore ? '，可继续查找。' : '；也可到搜索页查找不同剧名。'}</p>}
@@ -488,6 +656,9 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
   const consumedResume = useRef(null);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [favoriteError, setFavoriteError] = useState('');
+  const [pointEntry, setPointEntry] = useState(null);
+  const [pointError, setPointError] = useState(false), [pointBusy, setPointBusy] = useState(false);
+  const favoritePending = useRef(false);
   const [preferences, setPreferences] = useState(getPlaybackPreferences);
   const [mediaOptions, setMediaOptions] = useState({ quality: 'auto', speed: 1 });
   const [mediaBusy, setMediaBusy] = useState(false);
@@ -535,19 +706,45 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
   useEffect(() => { const resume = () => { syncReturnedEpisode.current = true; }; window.addEventListener('androidresume', resume); return () => window.removeEventListener('androidresume', resume); }, []);
   useEffect(() => {
     let current = true;
-    setState({ busy: true });
-    source.detail(seed.seriesId).then((item) => {
+    setState({ busy: true }); setPointEntry(null); setPointError(false); setPointBusy(false); setFavoriteError('');
+    source.detail(seed.seriesId).then(async (resolved) => {
+      if (!current || !isSeasonCurrent()) return;
+      let item = { ...resolved, ...seriesSyncMetadata(seed), ...seriesSyncMetadata(resolved) };
+      let rememberedRow = libraryRef.current.history.find((entry) => sameSeries(entry, seed));
+      const favoriteRow = libraryRef.current.favorites.find((entry) => sameSeries(entry, seed));
+      item = { ...item, ...seriesSyncMetadata(favoriteRow), ...seriesSyncMetadata(rememberedRow), ...seriesSyncMetadata(resolved) };
+      if (needsSeriesPoint(libraryRef.current, seed)) {
+        const owner = libraryRef.current.owner;
+        try { const result = await nativeCall('getSeriesHistory', { seriesId: seed.seriesId }, 10000); if (!current || owner !== libraryRef.current.owner) return; if (result?.owner !== owner || result.history && result.history.seriesId !== seed.seriesId) throw new Error('剧集账号状态不匹配'); const row = result.history; if (row) { setPointEntry({ ...row, __owner: owner }); item = { ...item, ...seriesSyncMetadata(row), ...seriesSyncMetadata(resolved) }; if (row.index > 0 && typeof row.vid === 'string') rememberedRow = row; } setPointError(false); }
+        catch (_) { if (current && owner === libraryRef.current.owner) { setPointError(true); setFavoriteError(POINT_FAVORITE_ERROR); setResumeError(POINT_RESUME_ERROR); } }
+      }
       if (!current || !isSeasonCurrent()) return;
       setState({ busy: false, item });
       onDetailResolved(item);
-      const remembered = initialVid || libraryRef.current.history.find((entry) => sameSeries(entry, seed))?.vid;
+      const remembered = initialVid || rememberedRow?.vid;
       const first = item.episodes?.[0];
       setSelectedVid(item.episodes?.some((episode) => String(episode.vid) === String(remembered)) ? remembered : first?.vid || null);
     }).catch((error) => { if (current) setState({ busy: false, error: errorText(error) }); });
     return () => { current = false; };
-  }, [seed.seriesId, initialVid, reload]);
+  }, [seed.seriesId, initialVid, reload, library.owner]);
+  // A same-owner cloud refresh may change a row omitted from the bounded lists.
+  // Re-read that point without re-fetching source detail or moving the user's selection.
+  useEffect(() => {
+    if (!state.item || typeof library.owner !== 'string') return;
+    const clearPointErrors = () => { setPointError(false); setFavoriteError(value => value === POINT_FAVORITE_ERROR ? '' : value); setResumeError(value => value === POINT_RESUME_ERROR ? '' : value); };
+    if (!needsSeriesPoint(library, seed)) { setPointEntry(null); setPointBusy(false); clearPointErrors(); return; }
+    let current = true;
+    const owner = library.owner; setPointBusy(true);
+    nativeCall('getSeriesHistory', { seriesId: seed.seriesId }, 10000).then(result => {
+      if (!current || owner !== libraryRef.current.owner) return;
+      if (result?.owner !== owner || result.history && result.history.seriesId !== seed.seriesId) throw new Error('剧集账号状态不匹配');
+      setPointEntry(result.history ? { ...result.history, __owner: owner } : null); clearPointErrors();
+    }).catch(() => { if (current && owner === libraryRef.current.owner) { setPointError(true); setFavoriteError(POINT_FAVORITE_ERROR); setResumeError(POINT_RESUME_ERROR); } })
+      .finally(() => { if (current && owner === libraryRef.current.owner) setPointBusy(false); });
+    return () => { current = false; };
+  }, [library]);
   const item = state.item || seed;
-  const isFavorite = library.favorites.some((entry) => sameSeries(entry, item));
+  const isFavorite = pointEntry && pointEntry.__owner === library.owner ? pointEntry.favoriteAt > 0 : library.favorites.some((entry) => sameSeries(entry, item));
   const episode = state.item?.episodes?.find((entry) => String(entry.vid) === String(selectedVid));
   // Measure rendered lines, not character count: short summaries can still be
   // long at large text sizes or in a narrow phone column.
@@ -559,7 +756,7 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
     observer?.observe(node); measure(); window.addEventListener('resize', measure);
     return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
   }, [state.busy, item.description, isTv]);
-  const lastWatchedVid = library.history.find((entry) => sameSeries(entry, item))?.vid;
+  const lastWatchedVid = library.history.find((entry) => sameSeries(entry, item))?.vid || (pointEntry?.__owner === library.owner && pointEntry?.seriesId === item.seriesId ? pointEntry.vid : null);
   const episodes = state.item?.episodes || [];
   const selectedPosition = episodes.findIndex((entry) => String(entry.vid) === String(selectedVid));
   const grouped = !isTv && episodes.length > 30;
@@ -585,10 +782,12 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
     return next;
   });
   const favorite = async () => {
+    if (favoritePending.current || pointError || pointBusy) return;
+    const owner = libraryRef.current.owner; favoritePending.current = true;
     setFavoriteBusy(true); setFavoriteError('');
-    try { const result = await nativeCall('toggleFavorite', { series: compactSeries(item) }); if (mounted.current) onLibrary(result); }
-    catch (error) { if (mounted.current) setFavoriteError(errorText(error)); }
-    finally { if (mounted.current) setFavoriteBusy(false); }
+    try { const result = await nativeCall('toggleFavorite', { series: compactSeries(item) }); if (mounted.current && owner === libraryRef.current.owner && (result.owner === undefined || result.owner === owner)) { setPointEntry(null); onLibrary(result); } }
+    catch (error) { if (mounted.current && owner === libraryRef.current.owner) setFavoriteError(errorText(error)); }
+    finally { favoritePending.current = false; if (mounted.current) setFavoriteBusy(false); }
   };
   const run = async (action, target = episode) => {
     if (!isSeasonCurrent() || !target || mediaBusy || dispatchedPlay.current || activeOperation.current?.action === 'download') return;
@@ -648,10 +847,10 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
     <div className="season-detail-panel" {...seasonPanel}>
     {resumeError && <p className="resume-error" role="alert">{resumeError}</p>}
     <Status busy={state.busy} error={state.error} onRetry={() => setReload((n) => n + 1)}>
-      <section className="detail-summary"><div className="detail-cover">{item.coverUrl ? <img src={item.coverUrl} alt="" /> : <Film size={48} />}</div><div className="detail-copy"><h1>{item.title}</h1><p className="detail-meta">{item.episodeLabel || (item.episodeCount ? `全 ${item.episodeCount} 集` : '剧集详情')}{item.tags?.length ? ` · ${item.tags.join(' / ')}` : ''}</p><p ref={description} id="detail-description" className={`detail-description${!isTv && !descriptionExpanded ? ' description-collapsed' : ''}`}>{item.description || '暂无剧情简介。'}</p>{!isTv && descriptionOverflow && <button className="description-toggle" type="button" aria-expanded={descriptionExpanded} aria-controls="detail-description" onClick={() => setDescriptionExpanded((value) => !value)}>{descriptionExpanded ? '收起简介' : '展开简介'}</button>}<button className={`button ${isFavorite ? 'saved' : ''}`} onClick={favorite} disabled={favoriteBusy}><Heart />{favoriteBusy ? '保存中…' : isFavorite ? '已加入追剧' : '加入追剧'}</button>{favoriteError && <p className="text-error" role="alert">{favoriteError} 点击追剧按钮重试。</p>}</div></section>
+      <section className="detail-summary"><div className="detail-cover">{item.coverUrl ? <img src={item.coverUrl} alt="" /> : <Film size={48} />}</div><div className="detail-copy"><h1>{item.title}</h1><p className="detail-meta">{item.episodeLabel || (item.episodeCount ? `全 ${item.episodeCount} 集` : '剧集详情')}{item.tags?.length ? ` · ${item.tags.join(' / ')}` : ''}</p><p ref={description} id="detail-description" className={`detail-description${!isTv && !descriptionExpanded ? ' description-collapsed' : ''}`}>{item.description || '暂无剧情简介。'}</p>{!isTv && descriptionOverflow && <button className="description-toggle" type="button" aria-expanded={descriptionExpanded} aria-controls="detail-description" onClick={() => setDescriptionExpanded((value) => !value)}>{descriptionExpanded ? '收起简介' : '展开简介'}</button>}<button className={`button ${isFavorite ? 'saved' : ''}`} onClick={favorite} disabled={favoriteBusy || pointError || pointBusy}><Heart />{favoriteBusy ? '保存中…' : isFavorite ? '已加入追剧' : '加入追剧'}</button>{favoriteError && <p className="text-error" role="alert">{favoriteError} {pointError ? <button type="button" className="button" onClick={() => setReload(n => n + 1)}>重试剧集状态</button> : "点击追剧按钮重试。"}</p>}</div></section>
       <section className="episode-section"><header><h2>选集</h2><p>共 {state.item?.episodes?.length || 0} 集</p></header><p className="episode-note">点击集数直接播放；电视方向键移动、确认键播放。网页 → App 自动取源，逐集点击时核验。</p><div className="episode-browser" hidden={!grouped}><label htmlFor="episode-range">分集范围<select id="episode-range" aria-label="分集范围" value={episodeGroup} onChange={(event) => setEpisodeGroup(Number(event.target.value))}>{Array.from({ length: groupCount }, (_, group) => <option key={group} value={group}>第 {group * 30 + 1}–{Math.min((group + 1) * 30, episodes.length)} 集</option>)}</select></label><button className="button" type="button" disabled={!episode} onClick={locateEpisode}>定位第 {episode?.index || '—'} 集</button></div><div ref={episodeGrid} className="episode-grid" role="group" aria-label="选择剧集">{visibleEpisodes.map((entry) => <button key={`${entry.index}-${entry.vid}`} disabled={operation === 'download' || mediaBusy || playDispatched} title={`播放第 ${entry.index} 集${entry.webAvailable ? '' : '，网页与 App 自动取源'}`} aria-label={`播放第 ${entry.index} 集${entry.webAvailable ? '' : '，自动取源'}`} aria-pressed={String(entry.vid) === String(selectedVid)} onClick={() => playEpisode(entry)}><span>{entry.index}</span>{!entry.webAvailable && <span className="episode-status">自动取源</span>}</button>)}</div>{!state.item?.episodes?.length && <p className="empty-episodes">当前没有剧集。</p>}</section>
       <section className="playback-settings" aria-label="清晰度与倍速">
-        <div className="playback-setting"><div><h2>清晰度</h2><p>首选清晰度按真实视频短边像素选源；连续失败后 1080p → 720p → 自动，播放器显示实际档位与分辨率。手动下载严格使用所选清晰度。</p></div><select aria-label="清晰度" value={mediaOptions.quality} disabled={!!operation || mediaBusy} onChange={event => changeMediaOption('quality', event.target.value)}><option value="auto">自动</option><option value="720p">720p 及以上</option><option value="1080p">1080p 及以上</option></select></div>
+        <div className="playback-setting"><div><h2>清晰度</h2><p>播放失败先自动重新取源，再按真实分辨率尝试较低档（720p / 480p / 360p），保留本集进度、暂停和倍速；降档仅影响当前播放，不覆盖首选。手动下载严格使用所选清晰度。</p></div><select aria-label="清晰度" value={mediaOptions.quality} disabled={!!operation || mediaBusy} onChange={event => changeMediaOption('quality', event.target.value)}><option value="auto">自动</option><option value="720p">720p 及以上</option><option value="1080p">1080p 及以上</option></select></div>
         <div className="playback-setting"><div><h2>播放倍速</h2><p>播放器内也可切换，连播沿用设置；下载文件保持原速度。</p></div><select aria-label="播放倍速" value={mediaOptions.speed} disabled={!!operation || mediaBusy} onChange={event => changeMediaOption('speed', Number(event.target.value))}>{[0.75, 1, 1.25, 1.5, 2].map(speed => <option key={speed} value={speed}>{speed}×</option>)}</select></div>
         {mediaError && <p className="text-error" role="alert">{mediaError}</p>}
       </section>
@@ -730,17 +929,18 @@ export default function App() {
   const content = useRef(null);
   const lastDetailFocus = useRef(null);
   const libraryReadEpoch = useRef(0);
+  const libraryOwner = useRef(null);
   const accountTransition = useRef(false);
   const previousScroll = useRef(0);
   const noticeTimer = useRef(null);
   const loadInfo = useCallback(async () => { try { const result = await nativeCall('getInfo'); setInfo(result); setInfoError(''); } catch (error) { setInfoError(errorText(error)); } }, []);
-  const loadLibrary = useCallback(async () => { if (accountTransition.current) return; const epoch = ++libraryReadEpoch.current; setLibraryBusy(true); try { const result = await nativeCall('getLibrary'); if (epoch !== libraryReadEpoch.current) return; setLibrary({ favorites: result.favorites || [], history: result.history || [] }); setLibraryError(''); } catch (error) { if (epoch === libraryReadEpoch.current) setLibraryError(errorText(error)); } finally { if (epoch === libraryReadEpoch.current) setLibraryBusy(false); } }, []);
+  const loadLibrary = useCallback(async () => { if (accountTransition.current) return; const epoch = ++libraryReadEpoch.current; setLibraryBusy(true); setLibraryError(''); try { const result = await nativeCall('getLibrary'); if (epoch !== libraryReadEpoch.current) return; if (typeof result.owner === "string") libraryOwner.current = result.owner; setLibrary({ favorites: result.favorites || [], history: result.history || [], projection: result.projection || null, owner: result.owner }); setLibraryError(''); } catch (error) { if (epoch === libraryReadEpoch.current) setLibraryError(errorText(error)); } finally { if (epoch === libraryReadEpoch.current) setLibraryBusy(false); } }, []);
   const replaceLibrary = useCallback(value => { libraryReadEpoch.current++; setLibrary(value); setLibraryBusy(false); }, []);
   const notify = useCallback((text) => { setNotice(text); clearTimeout(noticeTimer.current); noticeTimer.current = setTimeout(() => setNotice(''), 4500); }, []);
   useEffect(() => {
     loadInfo(); loadLibrary();
-    const refresh = () => loadLibrary();
-    const changing = () => { accountTransition.current = true; libraryReadEpoch.current++; setLibrary(previous => ({ ...previous, history: [] })); setLibraryBusy(true); setLibraryError(''); };
+    const refresh = event => { const owner = event?.detail?.owner; if (typeof owner === 'string' && owner !== libraryOwner.current) { libraryOwner.current = owner; libraryReadEpoch.current++; setLibrary({ ...EMPTY_LIBRARY }); setLibraryError(''); } loadLibrary(); };
+    const changing = () => { accountTransition.current = true; libraryReadEpoch.current++; libraryOwner.current = null; setLibrary({ ...EMPTY_LIBRARY }); setLibraryBusy(true); setLibraryError(''); };
     const settled = () => { accountTransition.current = false; loadLibrary(); };
     window.addEventListener('androidresume', refresh);
     window.addEventListener('androidaccountchanged', refresh);
@@ -763,7 +963,7 @@ export default function App() {
   useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [tab]);
   useEffect(() => { if (content.current) content.current.scrollTop = detail ? 0 : previousScroll.current; if (detail) content.current?.querySelector('.back-button')?.focus(); }, [detail?.seed?.seriesId]);
   useEffect(() => {
-    const back = () => { if (detail) { closeDetail(); return true; } if (tab !== 'discover') { setTab('discover'); return true; } return false; };
+    const back = () => { if (!window.dispatchEvent(new CustomEvent('androiddownloadback', { cancelable: true }))) return true; if (detail) { closeDetail(); return true; } if (tab !== 'discover') { setTab('discover'); return true; } return false; };
     window.__androidBack = back;
     const keydown = (event) => { if (event.key !== 'Escape' && event.key !== 'Backspace') return; if (event.target?.matches('input,textarea')) return; if (back()) event.preventDefault(); };
     document.addEventListener('keydown', keydown);

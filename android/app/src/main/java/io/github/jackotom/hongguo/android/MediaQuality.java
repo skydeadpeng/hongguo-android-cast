@@ -4,7 +4,7 @@ package io.github.jackotom.hongguo.android;
 final class MediaQuality {
     static String normalize(String value) {
         if(value==null) return "auto";
-        if(!value.equals("auto")&&!value.equals("720p")&&!value.equals("1080p")) throw new IllegalArgumentException("清晰度无效，请选择自动、720p或1080p");
+        if(!value.equals("auto")&&!value.equals("720p")&&!value.equals("1080p")&&!value.equals("480p")&&!value.equals("360p")) throw new IllegalArgumentException("播放清晰度无效");
         return value;
     }
     static boolean meets(int width,int height,String quality) {

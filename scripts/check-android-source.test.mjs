@@ -232,7 +232,7 @@ test('createSource uses independent official HTTPS paths and encodes Unicode/sea
   const urls = [];
   const source = createSource(async url => { urls.push(url); return url.includes('/category/') ? catalog() : url.includes('/search/') ? search() : url.endsWith(`/${vid}`) ? playback() : detail(); });
   await source.catalog(); await source.catalog('real-drama', 2); await source.search(' 短剧 /?& '); await source.detail(sid); await source.playback(sid, vid);
-  assert.deepEqual(urls, [`${SITE_ORIGIN}/category/real-drama`, `${SITE_ORIGIN}/category/real-drama?page=2`, `${SITE_ORIGIN}/search/${encodeURIComponent('短剧 /?&')}`, `${SITE_ORIGIN}/player/${sid}`, `${SITE_ORIGIN}/player/${sid}/${vid}`]);
+  assert.deepEqual(urls, [`${SITE_ORIGIN}/category/real-drama`, `${SITE_ORIGIN}/category/real-drama?page=2`, `${SITE_ORIGIN}/search/${encodeURIComponent('短剧 /?&')}`, `${SITE_ORIGIN}/player/${sid}`, `${SITE_ORIGIN}/detail?series_id=${sid}`, `${SITE_ORIGIN}/player/${sid}/${vid}`]);
 });
 test('createSource resolves an unknown directory episode on demand without a count gate', async () => {
   const fourthVid = '1004', urls = [];
@@ -243,7 +243,7 @@ test('createSource resolves an unknown directory episode on demand without a cou
   });
   assert.equal((await source.detail(sid)).episodes[3].availability, 'unknown');
   assert.equal((await source.playback(sid, fourthVid)).vid, fourthVid);
-  assert.deepEqual(urls, [`${SITE_ORIGIN}/player/${sid}`, `${SITE_ORIGIN}/player/${sid}/${fourthVid}`]);
+  assert.deepEqual(urls, [`${SITE_ORIGIN}/player/${sid}`, `${SITE_ORIGIN}/detail?series_id=${sid}`, `${SITE_ORIGIN}/player/${sid}/${fourthVid}`]);
 });
 test('concurrent identical requests share one operation, success is cached and expires', async () => {
   let calls = 0; const source = createSource(async () => { calls++; return catalog(); });

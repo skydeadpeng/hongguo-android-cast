@@ -37,6 +37,8 @@ const seasonsModulePath = path.join(root, 'src/android/seasons.mjs');
 const seasonsModule = fs.existsSync(seasonsModulePath) ? await import(pathToFileURL(seasonsModulePath).href) : null;
 const seasonPlaybackModulePath = path.join(root, 'src/android/season-playback.mjs');
 const seasonPlaybackModule = fs.existsSync(seasonPlaybackModulePath) ? await import(pathToFileURL(seasonPlaybackModulePath).href) : null;
+const officialSeriesModulePath = path.join(root, 'src/android/official-series.mjs');
+const officialSeriesModule = fs.existsSync(officialSeriesModulePath) ? await import(pathToFileURL(officialSeriesModulePath).href) : null;
 await group('FUNCTION source preview=3 leaves episode 4 unknown in full 5-episode directory', async () => {
   sourceModule = await import(`${pathToFileURL(path.join(root, 'src/android/source.mjs')).href}?gate=${Date.now()}`);
   detail = sourceModule.parseDetail(detailHtml, sid);
@@ -52,7 +54,7 @@ await group('FUNCTION exact fourth-episode on-demand resolution and unavailable 
   const video = await source.playback(sid, directory.episodes[3].vid);
   verify(video.vid === vids[3] && video.seriesId === sid, 'response bound to requested identity');
   verify(video.url === 'https://cdn.example.net/episode4.mp4?token=synthetic%20only', 'signed query preserved while Range removed');
-  assert.deepEqual(requests, [`https://hongguoduanju.com/player/${sid}`, `https://hongguoduanju.com/player/${sid}/${vids[3]}`]); assertions++;
+  assert.deepEqual(requests, [`https://hongguoduanju.com/player/${sid}`, `https://hongguoduanju.com/detail?series_id=${sid}`, `https://hongguoduanju.com/player/${sid}/${vids[3]}`]); assertions++;
   let code;
   try { sourceModule.parsePlayback(playerHtml(false), sid, vids[3]); } catch (error) { code = error.code; }
   verify(code === 'EPISODE_UNAVAILABLE', 'explicit unavailable response stops playback');
@@ -97,7 +99,7 @@ await group('FUNCTION rendered Detail controls allow episode 4 and submit queue/
   const calls = [], requested = [];
   const fixtureSource = sourceModule.createSource(async url => { requested.push(url); return playerHtml(true); });
   const preferences = { autoplay: true, cleanupPlaybackCache: true, keepPreviousEpisodes: 1 };
-  let stateIndex = 0, accountPanelRenders = 0;
+  let stateIndex = 0, accountPanelRenders = 0, updatePanelRenders = 0;
   const react = {
     createElement: (type, props, ...children) => ({ type, props: props || {}, children }),
     useState: initial => [stateIndex++ === 0 ? { busy: false, item: detail } : typeof initial === 'function' ? initial() : initial, () => {}],
@@ -111,9 +113,11 @@ await group('FUNCTION rendered Detail controls allow episode 4 and submit queue/
     if (name === './generated/mac-app-source.mjs') return { fetchAppPlayUrl() { throw new Error('App fallback unexpectedly called for valid web fixture'); } };
     if (name === './seasons.mjs' && seasonsModule) return seasonsModule;
     if (name === './season-playback.mjs' && seasonPlaybackModule) return seasonPlaybackModule;
-    // This gate invokes Detail only. AccountPanel belongs exclusively to About;
+    if (name === './official-series.mjs' && officialSeriesModule) return officialSeriesModule;
+    // This gate invokes Detail only. AccountPanel and UpdatePanel belong to About;
     // register its import without executing or weakening any playback assertions.
     if (name === './AccountPanel.jsx') return { __esModule: true, default() { accountPanelRenders++; throw new Error('AccountPanel must not render in the Detail playback gate'); } };
+    if (name === './UpdatePanel.jsx') return { __esModule: true, default() { updatePanelRenders++; throw new Error('UpdatePanel must not render in the Detail playback gate'); } };
     if (name === './source.mjs') return { ...sourceModule, createSource: () => fixtureSource };
     if (name === './bridge.mjs') return { getPlaybackPreferences: () => preferences, setPlaybackPreference() {}, requestHtml() {}, nativeCall: async (method, params) => { if (method === 'getPlaybackOptions') return { quality: 'auto', speed: 1 }; calls.push({ method, params }); return { started: true }; } };
     if (name.includes('LICENSE')) return '';
@@ -136,6 +140,7 @@ await group('FUNCTION rendered Detail controls allow episode 4 and submit queue/
   verify(params.episodes.length === 5 && params.episode.vid === vids[3] && params.episode.availability === 'unknown', 'full ordered queue, selection and unknown hint preserved');
   verify(params.autoplay && params.cleanupPlaybackCache && params.keepPreviousEpisodes === 1, 'native player receives actual UI playback defaults');
   verify(accountPanelRenders === 0, 'Detail playback does not execute About account UI');
+  verify(updatePanelRenders === 0, 'Detail playback does not execute About update UI');
 });
 
 for (const test of ['run-episode-resolver-tests.sh', 'run-playback-cache-tests.sh', 'run-playback-queue-tests.sh']) {

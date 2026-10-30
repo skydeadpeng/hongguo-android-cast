@@ -62,8 +62,20 @@ class AlertDialog {static int shown;static class Builder{Builder(Activity activi
 class AccountSync {
     static final AccountSync instance=new AccountSync();Runnable listener;int foregroundCalls,flushCalls;
     static AccountSync get(){return instance;}
+    String ownerStamp(){return "guest";}
     void setListener(Runnable value){listener=value;}
     void clearListener(Runnable expected){if(listener==expected)listener=null;}
     void foreground(){foregroundCalls++;}
     void flush(){flushCalls++;}
+}
+
+/** Collaborator boundaries only: startup executes the unmodified production MainActivity. */
+class AppUpdater {
+    AppUpdater(MainActivity host){}
+    final class Bridge {}
+    void pageReady(){} void pageUnavailable(){} void resume(){} void pause(){} void destroy(){}
+}
+class OfficialSeriesBridge {
+    OfficialSeriesBridge(MainActivity host){}
+    void resume(){} void close(){}
 }

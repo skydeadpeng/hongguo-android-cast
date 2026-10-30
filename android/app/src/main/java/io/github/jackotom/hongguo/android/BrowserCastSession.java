@@ -217,7 +217,7 @@ final class BrowserCastSession implements AutoCloseable {
     }
     private void saveProgress(){
         if(!confirmed||current!=target)return;long now=scheduler.nowMs();
-        if(ended||lastHistory<0||now-lastHistory>=5000){lastHistory=now;try{source.progress(current,position);}catch(RuntimeException ignored){}}
+        if(ended||lastHistory<0||now-lastHistory>=5000){lastHistory=now;try{source.progress(current,position,duration);}catch(RuntimeException ignored){}}
     }
     private void checkHeartbeat(){
         if(closing.get()||!paired||!started)return;

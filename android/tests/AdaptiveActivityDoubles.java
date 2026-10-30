@@ -2,8 +2,9 @@ package io.github.jackotom.hongguo.android;
 
 import java.io.*;import java.net.*;import java.util.*;import java.util.concurrent.*;import org.json.*;
 /** Deterministic boundary doubles: no Android process, disk media, decoder or network traffic. */
+class SystemClock {static long elapsedRealtime(){return 0;}}
 class Uri {
- final String value;Uri(String s){value=s;}static Uri parse(String s){return new Uri(s);}static Uri fromFile(File f){return new Uri("file:"+f.getPath());}String getScheme(){return value.split(":")[0];}
+ final String value;Uri(String s){value=s;}static Uri parse(String s){return new Uri(s);}static Uri fromFile(File f){return new Uri("file:"+f.getPath());}String getScheme(){return value.split(":")[0];}String getPath(){try{return new java.net.URI(value).getPath();}catch(Exception e){return null;}}
 }
 class MediaPlayer {
  static final int MEDIA_ERROR_UNSUPPORTED=-1010,MEDIA_INFO_BUFFERING_START=701,MEDIA_INFO_BUFFERING_END=702;
@@ -30,7 +31,7 @@ class AlertDialog {
  static class Builder {final AlertDialog dialog=new AlertDialog();Builder(Object a){}Builder setTitle(String title){return this;}Builder setSingleChoiceItems(String[] labels,int current,Choice choice){dialog.labels=labels;dialog.choice=choice;return this;}Builder setNegativeButton(String text,Choice c){return this;}AlertDialog create(){return dialog;}}
 }
 class MainLoop {
- final Deque<Runnable> callbacks=new ArrayDeque<>();final Set<Runnable> delayed=new HashSet<>();void post(Runnable r){callbacks.addLast(r);}void postDelayed(Runnable r,long delay){delayed.add(r);}void removeCallbacks(Runnable r){delayed.remove(r);callbacks.remove(r);}void flush(){while(!callbacks.isEmpty())callbacks.removeFirst().run();}
+ final Deque<Runnable> callbacks=new ArrayDeque<>();final Set<Runnable> delayed=new HashSet<>();final Map<Runnable,Long> delays=new HashMap<>();void post(Runnable r){callbacks.addLast(r);}void postDelayed(Runnable r,long delay){delayed.add(r);delays.put(r,delay);}void removeCallbacks(Runnable r){delayed.remove(r);delays.remove(r);callbacks.remove(r);}void flush(){while(!callbacks.isEmpty())callbacks.removeFirst().run();}
 }
 class Worker {
  static class Job extends FutureTask<Void> {Job(Runnable r){super(r,null);}}
@@ -44,6 +45,15 @@ class PlaybackCache {
 
  final Map<String,Integer> protectedKeys=new HashMap<>();final List<String> fetches=new ArrayList<>(),invalidations=new ArrayList<>();final Set<String> hits=new HashSet<>();final Map<String,Exception> failures=new HashMap<>();
  String key(String vid,String quality){return vid+":"+quality;}void protect(String s,String vid,int i,String q){String owned=ownerKey(s,vid,i,q);ownerReservations.put(owned,ownerReservations.getOrDefault(owned,0)+1);String k=key(vid,q);protectedKeys.put(k,protectedKeys.getOrDefault(k,0)+1);}void release(String s,String vid,int i,String q){String owned=ownerKey(s,vid,i,q);releasedOwners.add(owned);int count=ownerReservations.getOrDefault(owned,0);if(count<=1)ownerReservations.remove(owned);else ownerReservations.put(owned,count-1);String k=key(vid,q);int n=protectedKeys.getOrDefault(k,0);if(n<=1)protectedKeys.remove(k);else protectedKeys.put(k,n-1);}
+ final Map<String,Integer> scopedReservations=new HashMap<>();final List<String> scopedFinds=new ArrayList<>(),scopedFetches=new ArrayList<>(),backgroundFetches=new ArrayList<>();final List<PlaybackSources.Plan> fetchedPlans=new ArrayList<>();
+ String scoped(String sid,String vid,int i,String q,int ceiling){return ownerKey(sid,vid,i,q)+":"+ceiling;}
+ void protect(String sid,String vid,int i,String q,int ceiling){protect(sid,vid,i,q);String k=scoped(sid,vid,i,q,ceiling);scopedReservations.put(k,scopedReservations.getOrDefault(k,0)+1);}
+ void release(String sid,String vid,int i,String q,int ceiling){release(sid,vid,i,q);String k=scoped(sid,vid,i,q,ceiling);int n=scopedReservations.getOrDefault(k,0);if(n<=1)scopedReservations.remove(k);else scopedReservations.put(k,n-1);}
+ File find(String sid,String vid,int i,String q,int ceiling){scopedFinds.add(scoped(sid,vid,i,q,ceiling));if(ceiling==0)return find(sid,vid,i,q);return hits.contains(key(vid,q)+":"+ceiling)?new File("fixture-bound-"+vid+"-"+q+"-"+ceiling+".mp4"):null;}
+ File fetchForeground(String sid,String vid,int i,PlaybackSources.Plan plan,String q)throws Exception{fetchedPlans.add(plan);scopedFetches.add(scoped(sid,vid,i,q,plan.playbackCeiling));return fetchForeground(sid,vid,i,plan.url,q);}
+ File fetch(String sid,String vid,int i,PlaybackSources.Plan plan,String q)throws Exception{fetchedPlans.add(plan);backgroundFetches.add(vid+":"+q);scopedFetches.add(scoped(sid,vid,i,q,plan.playbackCeiling));return new File("fixture-background-"+vid+"-"+q+".mp4");}
+ File fetch(String sid,String vid,int i,String url,String q)throws Exception{backgroundFetches.add(vid+":"+q);return new File("fixture-background-"+vid+"-"+q+".mp4");}
+ void invalidate(String sid,String vid,int i,String q,int ceiling){invalidatedOwners.add(ownerKey(sid,vid,i,q));invalidations.add(key(vid,q));hits.remove(ceiling==0?key(vid,q):key(vid,q)+":"+ceiling);}
  File find(String sid,String vid,int i,String q){return hits.contains(key(vid,q))?new File("fixture-"+vid+"-"+q+".mp4"):null;}
  File fetchForeground(String sid,String vid,int i,String url,String q)throws Exception{fetches.add(key(vid,q));fetchedOwners.add(ownerKey(sid,vid,i,q));Exception failure=failures.get(q);if(failure!=null)throw failure;return new File("fixture-"+vid+"-"+q+".mp4");}
  void invalidate(String sid,String vid,int i,String q){invalidatedOwners.add(ownerKey(sid,vid,i,q));invalidations.add(key(vid,q));hits.remove(key(vid,q));}
@@ -51,11 +61,13 @@ class PlaybackCache {
 class NetworkGuard {static final String UA="fixture-ua",REFERER="https://fixture.invalid/";}
 class PlaybackSources {
  static final class QualityUnavailableException extends IOException {QualityUnavailableException(String m){super(m);}}
- static final class Plan {String source="app",url="https://fixture.invalid/media",userAgent="fixture-ua",referer="https://fixture.invalid/";}
- static final List<String> calls=new ArrayList<>(),owners=new ArrayList<>();static final Map<String,Exception> failures=new HashMap<>();static final Map<String,String> sourceKinds=new HashMap<>();
- static void reset(){calls.clear();owners.clear();failures.clear();sourceKinds.clear();PlayerOptions.saved.clear();PlayerOptions.failSave=false;Toast.messages.clear();}
- static Plan resolve(String sid,String vid,String q)throws Exception{calls.add("resolve:"+vid+":"+q);owners.add(sid+":"+vid+":"+q);Exception e=failures.get(q);if(e!=null)throw e;Plan p=new Plan();p.source=sourceKinds.getOrDefault(q,"app");return p;}
- static Plan recover(String sid,String vid,String q,boolean web)throws Exception{Plan p=resolve(sid,vid,q);calls.set(calls.size()-1,"recover:"+vid+":"+q);return p;}
+ static final class Plan {int width,height,playbackCeiling;String source="app",url="https://fixture.invalid/media",userAgent="fixture-ua",referer="https://fixture.invalid/";}
+ static final List<String> calls=new ArrayList<>(),owners=new ArrayList<>();static final Map<String,Exception> failures=new HashMap<>(),onceFailures=new HashMap<>();static final Map<String,String> sourceKinds=new HashMap<>();static Runnable onResolve;static final Map<String,Integer> ceilings=new HashMap<>(),pixelEdges=new HashMap<>();static final List<String> playbackRequests=new ArrayList<>();
+ static void reset(){calls.clear();owners.clear();failures.clear();onceFailures.clear();sourceKinds.clear();ceilings.clear();pixelEdges.clear();playbackRequests.clear();onResolve=null;PlayerOptions.saved.clear();PlayerOptions.failSave=false;Toast.messages.clear();}
+ static Plan resolve(String sid,String vid,String q)throws Exception{calls.add("resolve:"+vid+":"+q);owners.add(sid+":"+vid+":"+q);Runnable action=onResolve;onResolve=null;if(action!=null)action.run();Exception e=onceFailures.remove(q);if(e==null)e=failures.get(q);if(e!=null)throw e;Plan p=new Plan();p.source=sourceKinds.getOrDefault(q,"app");return p;}
+ static Plan recover(String sid,String vid,String q,boolean web)throws Exception{int index=calls.size();try{return resolve(sid,vid,q);}finally{if(calls.size()>index)calls.set(index,"recover:"+vid+":"+q);}}
+ static Plan resolvePlayback(String sid,String vid,String q,int ceiling,boolean fresh,boolean failedWeb)throws Exception{playbackRequests.add(q+":"+ceiling+":"+fresh+":"+failedWeb);Plan p=fresh?recover(sid,vid,q,failedWeb):resolve(sid,vid,q);p.playbackCeiling=ceiling;p.width=pixelEdges.getOrDefault(q,0);p.height=p.width*2;ceilings.put(q,ceiling);return p;}
+ static boolean canRecoverPlayback(Exception e){return !(e instanceof java.io.InterruptedIOException)&&!(e instanceof javax.net.ssl.SSLException)&&canLowerQuality(e)||e instanceof java.net.SocketTimeoutException;}
  static Plan find(String u,String q){return null;}static Plan register(JSONObject info,String vid,boolean checked){return new Plan();}
  static boolean canLowerQuality(Exception e){return e instanceof QualityUnavailableException||e instanceof UnknownHostException||e instanceof SocketTimeoutException||e instanceof IOException&&"片源响应 HTTP 403".equals(e.getMessage());}
 }
@@ -64,7 +76,7 @@ class PlayerOptions {
  static float observedSpeed(MediaPlayer p){return p.rate;}static float setVerifiedSpeed(MediaPlayer p,float requested,boolean playing){p.rate=requested;p.playing=playing;return requested;}
  static void update(Object context,JSONObject value)throws Exception{if(failSave)throw new IOException("fixture preference commit failed");saved.add(value.getString("quality"));}
 }
-class LibraryStore {final List<String> histories=new ArrayList<>(),ownedHistories=new ArrayList<>();void history(JSONObject s,JSONObject e,int position){histories.add(e.optString("vid")+":"+position);ownedHistories.add(s.optString("seriesId")+":"+e.optString("vid")+":"+e.optInt("index")+":"+position);}}
+class LibraryStore {final List<String> histories=new ArrayList<>(),ownedHistories=new ArrayList<>();void history(JSONObject s,JSONObject e,int position){history(s,e,position,0);}void history(JSONObject s,JSONObject e,long position,long duration){histories.add(e.optString("vid")+":"+position);ownedHistories.add(s.optString("seriesId")+":"+e.optString("vid")+":"+e.optInt("index")+":"+position);}}
 
 class Bundle {
  final Map<String,Object> values=new HashMap<>();void putString(String k,String v){values.put(k,v);}void putInt(String k,int v){values.put(k,v);}void putBoolean(String k,boolean v){values.put(k,v);}void putDouble(String k,double v){values.put(k,v);}

@@ -11,9 +11,13 @@ import org.json.*;
 final class PlaybackSources {
     static final class Plan {
         final String url, contentKey, userAgent, referer, source, vid, seriesId, requestedQuality, quality;
-        final int width, height;
+        final int width, height, playbackCeiling;
         final List<Plan> variants;
         Plan(String url, String key, String ua, String ref, String source, String vid, String seriesId, String requestedQuality, int width, int height, String quality, List<Plan> variants) {
+            this(url,key,ua,ref,source,vid,seriesId,requestedQuality,width,height,quality,variants,0);
+        }
+        Plan(String url,String key,String ua,String ref,String source,String vid,String seriesId,String requestedQuality,int width,int height,String quality,List<Plan> variants,int playbackCeiling) {
+            this.playbackCeiling=playbackCeiling;
             this.url=url; contentKey=key; userAgent=ua; referer=ref; this.source=source; this.vid=vid; this.seriesId=seriesId;
             this.requestedQuality=requestedQuality;this.width=width;this.height=height;this.quality=quality;
             this.variants=Collections.unmodifiableList(new ArrayList<>(variants));
@@ -24,13 +28,14 @@ final class PlaybackSources {
             if (width>0) result.put("width",width);
             if (height>0) result.put("height",height);
             if (quality!=null) result.put("quality",quality);
+            if (playbackCeiling>0) result.put("playbackCeiling",playbackCeiling);
             if (!variants.isEmpty()) { JSONArray rows=new JSONArray();for(Plan variant:variants)rows.put(variant.json());result.put("variants",rows); }
             return result;
         }
     }
     private static final class Pending {
-        final String sid, vid, requestedQuality; final CompletableFuture<JSONObject> future = new CompletableFuture<>();
-        Pending(String sid, String vid, String requestedQuality) { this.sid=sid;this.vid=vid;this.requestedQuality=requestedQuality; }
+        final String sid, vid, requestedQuality; final int playbackCeiling; final CompletableFuture<JSONObject> future = new CompletableFuture<>();
+        Pending(String sid, String vid, String requestedQuality,int playbackCeiling) { this.sid=sid;this.vid=vid;this.requestedQuality=requestedQuality;this.playbackCeiling=playbackCeiling; }
     }
     private static WeakReference<MainActivity> activity = new WeakReference<>(null);
     private static final Map<String,Pending> pending = new ConcurrentHashMap<>();
@@ -39,6 +44,8 @@ final class PlaybackSources {
     private static final long WEB_FAILURE_NANOS = TimeUnit.MINUTES.toNanos(5);
     private static final int MAX_MEDIA_TRANSFERS = 16;
     private static final Set<String> LOOKUP_TRANSIENT_CODES = new HashSet<>(Arrays.asList("ENOTFOUND","EAI_AGAIN","ETIMEDOUT","ECONNABORTED","ECONNRESET","ECONNREFUSED","EHOSTUNREACH","ENETUNREACH","EPIPE"));
+    // A valid HTTP response without data may be retried, but does not prove a lower quality exists.
+    private static final String RESPONSE_RETRY_CODE = "APP_EMPTY_RESPONSE";
     private static final class AppLookupException extends IOException {
         final String code;
         AppLookupException(String message,String code){super(message);this.code=code;}
@@ -47,6 +54,11 @@ final class PlaybackSources {
         QualityUnavailableException(String message) { super(message); }
     }
     static synchronized void attach(MainActivity value) { activity = new WeakReference<>(value); }
+    /** Native-UI lookup used when no WebView page owns resolution; phone/tv keep the page path. */
+    interface NativeLookup { JSONObject lookup(String sid, String vid, String requestedQuality, int ceiling, long timeoutMs) throws Exception; }
+    private static volatile NativeLookup nativeLookup;
+    static void attachNative(NativeLookup lookup) { nativeLookup = lookup; }
+    static void detachNative(NativeLookup lookup) { if (nativeLookup == lookup) nativeLookup = null; }
     static synchronized void detach(MainActivity value) {
         if (activity.get() != value) return;
         activity.clear();
@@ -97,13 +109,16 @@ final class PlaybackSources {
         }
         // Validate identities, URLs, headers and keys for every candidate before
         // a missing resolution can qualify for playback-only quality fallback.
-        for (Plan candidate:checked)
+        for (Plan candidate:checked) {
             if (!candidate.requestedQuality.equals("auto") && (candidate.source.equals("web") || !MediaQuality.meets(candidate.width,candidate.height,candidate.requestedQuality)))
                 throw new QualityUnavailableException("本集暂无尺寸可确认且满足 "+candidate.requestedQuality+" 的 App 片源，未降级播放");
+            if (candidate.playbackCeiling>0 && (candidate.source.equals("web") || candidate.width<=0 || candidate.height<=0 || Math.min(candidate.width,candidate.height)>candidate.playbackCeiling))
+                throw new QualityUnavailableException("本集暂无真实尺寸符合播放降档边界的 App 片源");
+        }
         // App CDNs do not consistently support HEAD/Range probes. Prepare the actual full
         // GET below, like the desktop media path; never publish ciphertext as playable cache.
         String url=preflight && primary.source.equals("web")?NetworkGuard.media(primary.url):primary.url;
-        return new Plan(url,primary.contentKey,primary.userAgent,primary.referer,primary.source,vid,primary.seriesId,primary.requestedQuality,primary.width,primary.height,primary.quality,variants);
+        return new Plan(url,primary.contentKey,primary.userAgent,primary.referer,primary.source,vid,primary.seriesId,primary.requestedQuality,primary.width,primary.height,primary.quality,variants,primary.playbackCeiling);
     }
     private static Plan parse(JSONObject input,String vid,Plan parent) throws Exception {
         if (input == null || !vid.equals(input.optString("vid",vid))) throw new IOException("片源与分集不一致");
@@ -121,6 +136,14 @@ final class PlaybackSources {
             if (!(value instanceof String)) throw new IOException("片源清晰度无效");
             requestedQuality=MediaQuality.normalize((String)value);
             if (parent!=null&&!parent.requestedQuality.equals(requestedQuality)) throw new IOException("备用片源清晰度不一致");
+        }
+        int playbackCeiling=parent==null?0:parent.playbackCeiling;
+        if(input.has("playbackCeiling")) {
+            Object raw=input.opt("playbackCeiling");
+            if(!(raw instanceof Number))throw new IOException("播放清晰度边界无效");
+            double value=((Number)raw).doubleValue();
+            if(!Double.isFinite(value)||value!=Math.rint(value)||value<0||value>16384||parent!=null&&value!=parent.playbackCeiling)throw new IOException("播放清晰度边界不匹配");
+            playbackCeiling=(int)value;
         }
         int width=dimension(input,"width"),height=dimension(input,"height");
         String quality=null;
@@ -145,7 +168,7 @@ final class PlaybackSources {
         }
         boolean validReferer=app?(ref.isEmpty()||ref.equals("https://novelquickapp.com/")):ref.equals(NetworkGuard.REFERER);
         if (ua.isEmpty() || ua.length()>2048 || ua.indexOf('\r')>=0 || ua.indexOf('\n')>=0 || !validReferer) throw new IOException("片源请求头无效");
-        return new Plan(url,key,ua,ref,source,vid,sid,requestedQuality,width,height,quality,Collections.emptyList());
+        return new Plan(url,key,ua,ref,source,vid,sid,requestedQuality,width,height,quality,Collections.emptyList(),playbackCeiling);
     }
     private static int dimension(JSONObject input,String name) throws Exception {
         if (!input.has(name)) return 0;
@@ -164,6 +187,7 @@ final class PlaybackSources {
     static Plan resolve(String sid,String vid,String quality) throws Exception {
         String requestedQuality=MediaQuality.normalize(quality);
         requireIdentity(sid,vid);
+        if (requestedQuality.equals("480p")||requestedQuality.equals("360p"))return resolvePlayback(sid,vid,requestedQuality,defaultPlaybackCeiling(requestedQuality),false,false);
         if (!requestedQuality.equals("auto")) return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true);
         if (webFailureActive(sid,vid)) {
             try { return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true); }
@@ -181,6 +205,20 @@ final class PlaybackSources {
             return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true);
         }
     }
+    static int defaultPlaybackCeiling(String quality) {
+        switch(MediaQuality.normalize(quality)) {case "720p":return 1079;case "480p":return 719;case "360p":return 479;default:return 0;}
+    }
+    /** Fresh or bounded playback lookup; this opt-in path never changes manual download policy. */
+    static Plan resolvePlayback(String sid,String vid,String quality,int ceiling,boolean fresh,boolean failedWeb) throws Exception {
+        String requested=MediaQuality.normalize(quality);requireIdentity(sid,vid);
+        if(ceiling<0||ceiling>16384)throw new IllegalArgumentException("播放清晰度边界无效");
+        if(ceiling==0&&(requested.equals("480p")||requested.equals("360p")))ceiling=defaultPlaybackCeiling(requested);
+        if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
+        if(failedWeb)markWebFailure(sid,vid);
+        if(ceiling==0&&!fresh)return resolve(sid,vid,requested);
+        if(fresh)recoveryPause();
+        return register(bindSeries(resolveApp(sid,vid,requested,!fresh,ceiling),sid),vid,true);
+    }
     private static Plan resolveWeb(String sid,String vid) throws Exception {
         String url=EpisodeResolver.resolve(sid,vid);
         return register(new JSONObject().put("url",url).put("vid",vid).put("seriesId",sid).put("source","web"),vid,true);
@@ -191,7 +229,8 @@ final class PlaybackSources {
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
         if(failedWeb)markWebFailure(sid,vid);
         recoveryPause();
-        return register(bindSeries(resolveApp(sid,vid,requestedQuality,false),sid),vid,true);
+        int ceiling=requestedQuality.equals("480p")||requestedQuality.equals("360p")?defaultPlaybackCeiling(requestedQuality):0;
+        return register(bindSeries(resolveApp(sid,vid,requestedQuality,false,ceiling),sid),vid,true);
     }
     private static void requireIdentity(String sid,String vid) throws IOException {
         if(sid==null||vid==null||!sid.matches("[0-9]{1,30}")||!vid.matches("[0-9]{1,30}"))throw new IOException("分集请求信息无效");
@@ -232,28 +271,49 @@ final class PlaybackSources {
         return resolveApp(sid,vid,requestedQuality,true);
     }
     private static JSONObject resolveApp(String sid,String vid,String requestedQuality,boolean retryInitialLookup) throws Exception {
+        return resolveApp(sid,vid,requestedQuality,retryInitialLookup,0);
+    }
+    private static JSONObject resolveApp(String sid,String vid,String requestedQuality,boolean retryInitialLookup,int ceiling) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(30);
         for(int attempt=0;;attempt++) {
             long remaining=TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime());
             if(remaining<=0)throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT");
-            try {return resolveAppAttempt(sid,vid,requestedQuality,Math.min(14000,remaining));}
+            try {return resolveAppAttempt(sid,vid,requestedQuality,Math.min(28000,remaining),ceiling);}
             catch(AppLookupException error) {
                 // Android 12 AddressCache retains negative DNS results for two seconds.
-                long delayMs=error.code.equals("ENOTFOUND")||error.code.equals("EAI_AGAIN")?2100:500;
-                if(!retryInitialLookup||attempt!=0||!LOOKUP_TRANSIENT_CODES.contains(error.code)||cancelled(error)||deadline-System.nanoTime()<=TimeUnit.MILLISECONDS.toNanos(delayMs))throw error;
+                long delayMs=RESPONSE_RETRY_CODE.equals(error.code)?700:error.code.equals("ENOTFOUND")||error.code.equals("EAI_AGAIN")?2100:500;
+                boolean retryable=LOOKUP_TRANSIENT_CODES.contains(error.code)||RESPONSE_RETRY_CODE.equals(error.code);
+                if(!retryInitialLookup||attempt!=0||!retryable||cancelled(error)||deadline-System.nanoTime()<=TimeUnit.MILLISECONDS.toNanos(delayMs)) {
+                    if(retryInitialLookup&&attempt>0&&RESPONSE_RETRY_CODE.equals(error.code))
+                        throw new AppLookupException(error.getMessage()+"（已重取1次仍未返回有效数据，请稍后重试）",error.code);
+                    throw error;
+                }
                 recoveryPause(delayMs);
             }
         }
     }
-    private static JSONObject resolveAppAttempt(String sid,String vid,String requestedQuality,long timeoutMs) throws Exception {
+    private static JSONObject resolveAppAttempt(String sid,String vid,String requestedQuality,long timeoutMs,int ceiling) throws Exception {
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
+        NativeLookup lookup = nativeLookup;
+        if (lookup != null) {
+            if (pending.size()>=8) throw new IOException("分集正在准备，请稍后重试");
+            JSONObject info;
+            try { info = lookup.lookup(sid, vid, requestedQuality, ceiling, timeoutMs); }
+            catch (AppMediaSource.AppSourceException error) { throw new AppLookupException(error.getMessage()==null?"App片源暂未取得":error.getMessage(), error.code); }
+            catch (java.net.SocketTimeoutException error) { throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT"); }
+            catch (InterruptedIOException error) { throw error; }
+            catch (Exception error) { throw new AppLookupException(error.getMessage()==null?"App片源暂未取得":error.getMessage(), ""); }
+            if (!requestedQuality.equals(info.optString("requestedQuality", requestedQuality))) throw new IOException("片源清晰度结果不匹配");
+            if (ceiling>0 && info.optInt("playbackCeiling",-1)!=ceiling) throw new IOException("播放清晰度边界结果不匹配");
+            return info;
+        }
         MainActivity host;
         synchronized(PlaybackSources.class) { host=activity.get(); }
         if (host==null || host.isFinishing() || host.isDestroyed()) throw new IOException("App片源服务尚未准备");
         if (pending.size()>=8) throw new IOException("分集正在准备，请稍后重试");
-        String id=UUID.randomUUID().toString(); Pending request=new Pending(sid,vid,requestedQuality);pending.put(id,request);
+        String id=UUID.randomUUID().toString(); Pending request=new Pending(sid,vid,requestedQuality,ceiling);pending.put(id,request);
         try {
-            host.script("window.__androidAppResolve && window.__androidAppResolve("+JSONObject.quote(id)+","+JSONObject.quote(sid)+","+JSONObject.quote(vid)+","+JSONObject.quote(requestedQuality)+")");
+            host.script("window.__androidAppResolve && window.__androidAppResolve("+JSONObject.quote(id)+","+JSONObject.quote(sid)+","+JSONObject.quote(vid)+","+JSONObject.quote(requestedQuality)+(ceiling>0?","+ceiling:"")+")");
             return request.future.get(timeoutMs,TimeUnit.MILLISECONDS);
         } catch (ExecutionException error) {
             if(error.getCause() instanceof AppLookupException)throw(AppLookupException)error.getCause();
@@ -261,7 +321,15 @@ final class PlaybackSources {
         }
         catch (InterruptedException error) { Thread.currentThread().interrupt(); throw error; }
         catch (TimeoutException error) { throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT"); }
-        finally { pending.remove(id); }
+        finally {
+            pending.remove(id);
+            // A timed-out or interrupted native waiter must also abort its JS/native
+            // registration/model job; completed replies already own their cleanup.
+            if (!request.future.isDone()) {
+                request.future.cancel(false);
+                host.script("window.__androidAppCancelResolve && window.__androidAppCancelResolve("+JSONObject.quote(id)+")");
+            }
+        }
     }
     static void result(JSONObject params) throws Exception {
         Pending request=pending.get(params.getString("requestId"));
@@ -270,14 +338,27 @@ final class PlaybackSources {
         if (!request.sid.equals(params.optString("seriesId")) || !request.vid.equals(params.optString("vid"))) throw new IOException("分集结果不匹配");
         String qualityField=params.has("requestedQuality")?"requestedQuality":params.has("quality")?"quality":null;
         if (qualityField==null?!request.requestedQuality.equals("auto"):!request.requestedQuality.equals(params.opt(qualityField))) throw new IOException("分集清晰度结果不匹配");
+        if(request.playbackCeiling>0) {
+            Object raw=params.opt("playbackCeiling");
+            if(!(raw instanceof Number)||((Number)raw).doubleValue()!=request.playbackCeiling)throw new IOException("播放清晰度边界结果不匹配");
+        } else if(params.has("playbackCeiling")&&params.optInt("playbackCeiling",-1)!=0)throw new IOException("播放清晰度边界结果不匹配");
         String error=params.isNull("error")?"":params.optString("error","");
         if (!error.isEmpty()) {
             String code=params.optString("errorCode","");
-            request.future.completeExceptionally(new AppLookupException(error.length()>300?"App片源暂未取得":error,LOOKUP_TRANSIENT_CODES.contains(code)||code.equals("QUALITY_UNAVAILABLE")?code:""));
+            request.future.completeExceptionally(new AppLookupException(error.length()>300?"App片源暂未取得":error,LOOKUP_TRANSIENT_CODES.contains(code)||code.equals("QUALITY_UNAVAILABLE")||RESPONSE_RETRY_CODE.equals(code)||code.equals("APP_INVALID_RESPONSE")?code:""));
         }
         else {
             JSONObject info=params.getJSONObject("playInfo");
             if (info.has("requestedQuality")&&!request.requestedQuality.equals(info.opt("requestedQuality"))) throw new IOException("片源清晰度结果不匹配");
+            if(request.playbackCeiling>0) {
+                Object raw=info.opt("playbackCeiling");
+                if(!(raw instanceof Number)||((Number)raw).doubleValue()!=request.playbackCeiling)throw new IOException("播放片源边界结果不匹配");
+                JSONArray variants=info.optJSONArray("variants");
+                if(variants!=null)for(int i=0;i<variants.length();i++) {
+                    JSONObject candidate=variants.getJSONObject(i);
+                    if(candidate.has("playbackCeiling")&&candidate.optInt("playbackCeiling",-1)!=request.playbackCeiling)throw new IOException("备用片源边界结果不匹配");
+                }
+            }
             request.future.complete(new JSONObject(info.toString()).put("requestedQuality",request.requestedQuality));
         }
         } catch (Exception invalid) {
@@ -299,6 +380,12 @@ final class PlaybackSources {
             if (AppTransport.domain(new URI(url).getHost(),"qznovelvod.com","fqnovelvod.com","douyinvod.com")) throw new IOException("App片源准备信息已过期，请重新取源");
             NetworkGuard.download(url,destination,maxBytes); return;
         }
+        download(plan,destination,maxBytes);
+    }
+    /** Captured playback plans cannot be replaced by another job's URL/quality registration. */
+    static void download(Plan plan,File destination,long maxBytes) throws Exception {
+        if(plan==null)throw new IllegalArgumentException("播放片源准备信息无效");
+        String requestedQuality=MediaQuality.normalize(plan.requestedQuality);
         Exception last=null;
         int transfers=0, refreshes=0;
         boolean forbiddenRetryUsed=false, forbiddenFailureSeen=false;
@@ -350,7 +437,7 @@ final class PlaybackSources {
             recoveryPause(dnsTransferFailure?2100:500L*(refreshes+1));
             // Refresh only this job's in-memory plan. The original URL remains its cache identity.
             ++refreshes;
-            current=preparePlan(bindSeries(resolveApp(plan.seriesId,plan.vid,plan.requestedQuality,false),plan.seriesId),plan.vid,false);
+            current=preparePlan(bindSeries(resolveApp(plan.seriesId,plan.vid,plan.requestedQuality,false,plan.playbackCeiling),plan.seriesId),plan.vid,false);
         }
         String addressChange=refreshes==0?"":current.url.equals(plan.url)?"，主地址未变化":"，主地址已变化";
         throw new IOException("App片源准备未成功："+(last==null?"请重试":last.getMessage())+
@@ -377,6 +464,21 @@ final class PlaybackSources {
         String message=error.getMessage();
         return "播放缓存下载超时".equals(message) || message!=null&&message.matches("片源响应 HTTP (?:403|404|408|410|5[0-9]{2})");
     }
+    /** Playback may reconnect a transient empty model, but never malformed metadata or business denial. */
+    static boolean canRecoverPlayback(Exception error) {
+        if(error==null||cancelled(error))return false;
+        boolean recoverable=false;Set<Throwable> seen=Collections.newSetFromMap(new IdentityHashMap<Throwable,Boolean>());
+        for(Throwable cause=error;cause!=null&&seen.add(cause);cause=cause.getCause()) {
+            if(cause instanceof javax.net.ssl.SSLException||cause instanceof java.security.cert.CertificateException||cause instanceof JSONException||cause instanceof IllegalArgumentException||cause instanceof java.net.URISyntaxException||cause instanceof SecurityException||cause instanceof CancellationException)return false;
+            if(cause instanceof AppLookupException) {
+                String code=((AppLookupException)cause).code;
+                if(RESPONSE_RETRY_CODE.equals(code)||code.equals("QUALITY_UNAVAILABLE")||LOOKUP_TRANSIENT_CODES.contains(code))recoverable=true;
+                else return false;
+            } else if(cause instanceof QualityUnavailableException)recoverable=true;
+            else if(cause instanceof Exception&&refreshableTransfer((Exception)cause))recoverable=true;
+        }
+        return recoverable;
+    }
     /** Only the playback coordinator may choose a lower quality; downloads remain strict. */
     static boolean canLowerQuality(Exception error) {
         if (error==null || cancelled(error)) return false;
@@ -389,6 +491,7 @@ final class PlaybackSources {
             if (cause instanceof QualityUnavailableException) recoverable=true;
             else if (cause instanceof AppLookupException) {
                 String code=((AppLookupException)cause).code;
+                if(RESPONSE_RETRY_CODE.equals(code)||code.equals("APP_INVALID_RESPONSE"))return false;
                 if (code.equals("QUALITY_UNAVAILABLE") || LOOKUP_TRANSIENT_CODES.contains(code)) recoverable=true;
                 else return false;
             } else if (cause instanceof Exception && refreshableTransfer((Exception)cause)) recoverable=true;

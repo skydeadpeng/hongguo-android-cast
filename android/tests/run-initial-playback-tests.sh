@@ -60,7 +60,7 @@ final class CencDecryptor {
 }
 STUB
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
- "$TMP/InitialPlaybackStubs.java" "$SRC/MediaQuality.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
+ "$TMP/InitialPlaybackStubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
  "$TEST_ROOT/InitialPlaybackFallbackTest.java" "$TEST_ROOT/Playback1080RecoveryTest.java"
 STATUS=0
 if [ "$INITIAL" = true ]; then

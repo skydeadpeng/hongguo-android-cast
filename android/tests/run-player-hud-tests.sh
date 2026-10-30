@@ -46,7 +46,7 @@ def method(name,optional=False):
     raise SystemExit('Unclosed real Activity method: '+name)
 modern='controlsHud = new PlayerHud(' in source
 methods='\n'.join(method(name) for name in ['installVideoTouch','showControls','exitPlayer','dispatchKeyEvent','onKeyDown','onPause','onResume','onDestroy'])
-methods+='\n'+ '\n'.join(method(name,True) for name in ['canHideControls','updateControlsState','showPlayerDialog','dispatchTouchEvent'])
+methods+='\n'+ '\n'.join(method(name,True) for name in ['canHideControls','updateControlsState','showPlayerDialog','dispatchTouchEvent','cancelPlaybackWatchdogs','validPlaybackCallback','armPreparationTimeout','updateBufferingWatchdog'])
 setup=''
 if modern:
     start=source.index('controlsHud = new PlayerHud(')
@@ -94,7 +94,10 @@ class HudActivityBase {
 final class PlayerHudHarness extends HudActivityBase {
  final MainLoop main=new MainLoop();final Worker resolver=new Worker(),cacheWorker=new Worker();
  final View top=new View(),bottom=new View(),toggle=new View(),back=new View();VideoView video=new VideoView();
- boolean active,prepared,completed,userPaused,buffering,dragging,touchingControls,destroyed;int generation,hudDialogs,wakeKey=KeyEvent.KEYCODE_UNKNOWN,toggleCalls,seekCalls;Object qualitySwitch;
+ boolean active,prepared,completed,userPaused,buffering,dragging,touchingControls,destroyed,decoderPreparing,castWasActive;Runnable playbackPrepareTimeout,bufferingTimeout;int generation,hudDialogs,wakeKey=KeyEvent.KEYCODE_UNKNOWN,toggleCalls,seekCalls;Object qualitySwitch;
+ // Independent danmaku and install-lock lifecycle boundaries.
+ boolean registeredPlayer;static final java.util.concurrent.atomic.AtomicInteger LIVE_PLAYERS=new java.util.concurrent.atomic.AtomicInteger();
+ DanmakuLayer danmaku;static final class DanmakuLayer{void suspend(){}void close(){}}
  HUD_FIELD
  PlayerHudHarness(){installVideoTouch(video);HUD_SETUP video.requestFocus();}
  void sync(){HUD_SYNC}
@@ -104,6 +107,8 @@ final class PlayerHudHarness extends HudActivityBase {
  boolean casting(){return false;}boolean castCommand(String command,long value){return false;}
  boolean renderCastControls(){return false;}void detachCast(){}
  final JSONObject target=new JSONObject();JSONObject owner(JSONObject value){return value;}void closeLocalWindow(){}
+ // Source recovery is outside the HUD boundary, separately exercised by PlaybackFailureActivityTest.
+ void failCurrentMedia(int token,String reason,boolean unsupported){}
  void saveProgress(){saves++;}void releaseCurrent(){}void cancelQualitySwitch(){}void discardPendingMedia(){}
  void togglePlayback(){toggleCalls++;video.playing=!video.playing;userPaused=!video.playing;sync();}void move(int delta){}void updateButtons(){sync();}void seekBy(int delta){seekCalls++;}
  ACTIVITY_METHODS

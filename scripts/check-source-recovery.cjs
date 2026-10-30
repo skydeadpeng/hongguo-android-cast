@@ -171,7 +171,7 @@ const checks = [
     for (const candidate of result.variants) {
       assert.equal(candidate.source, 'app'); assert.equal(candidate.vid, '11');
       assert.equal(candidate.userAgent, f.calls[0].headers['User-Agent']);
-      assert.equal(candidate.referer, 'https://novelquickapp.com/');
+      assert.equal(candidate.referer, '');
       assert.equal(candidate.variants, undefined);
     }
     assert.equal(result.variants[2].contentKey, key1); assert.equal(result.variants[3].contentKey, key2);

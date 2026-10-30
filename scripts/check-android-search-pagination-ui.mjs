@@ -23,7 +23,7 @@ const { build } = createRequire(import.meta.url)('esbuild');
 function installFixture() {
   const fixture = window.__searchFixture = {
     calls: [], requests: [], unexpected: [], searchKeywords: ['历史词'], plans: [],
-    activeSearch: 0, maxActiveSearch: 0, nowOffset: 0, options: { quality: '1080p', speed: 1 },
+    activeSearch: 0, maxActiveSearch: 0, nowOffset: 0, webEnabled: false, options: { quality: '1080p', speed: 1 },
   };
   const realNow = Date.now;
   Date.now = () => realNow() + fixture.nowOffset;
@@ -32,8 +32,8 @@ function installFixture() {
   const html = data => `<!doctype html><script>window._ROUTER_DATA=${JSON.stringify(data)}</script>`;
   fixture.protocol = function protocol(url) {
     if (url.pathname.startsWith('/category/')) return { kind: 'catalog', body: html({ loaderData: { category: { categoryRoute: { contentType: 'real-drama' }, isSuccess: true, recommendList: [row('首页', 1)], pagination: { pageNum: 1, totalPages: 1, total: 1 } } } }) };
-    if (url.pathname.startsWith('/player/')) {
-      const seriesId = url.pathname.split('/')[2];
+    if (url.pathname.startsWith('/player/') || url.pathname === '/detail') {
+      const seriesId = url.pathname === '/detail' ? url.searchParams.get('series_id') : url.pathname.split('/')[2];
       return { kind: 'detail', body: html({ loaderData: { 'player_(series_id)/page': { isSuccess: true, series_id: seriesId, seriesDetail: { ...row('详情', 1), series_id: seriesId, vid_list: ['20000001','20000002','20000003','20000004'], accessible_episode_cnt: 4 } } } }) };
     }
     // The old 0.11.5 baseline may load its real SSR first page. Query parameters
@@ -41,6 +41,11 @@ function installFixture() {
     if (url.pathname.startsWith('/search/')) {
       const keyword = decodeURIComponent(url.pathname.slice('/search/'.length));
       return { kind: 'search', keyword, page: 1, body: html({ loaderData: { 'search_(keyword)/page': { isSuccess: true, totalCount: '211', searchList: Array.from({ length: 10 }, (_, n) => ({ video_data: row(keyword, n + 1) })) } } }) };
+    }
+    if (url.pathname === '/api/search/result') {
+      const keyword=url.searchParams.get('query'),page=Number(url.searchParams.get('page'));
+      const start=page===1?1:11,count=page===1?10:2;
+      return {kind:'search-web',keyword,page,status:fixture.webEnabled?200:503,body:JSON.stringify({searchList:Array.from({length:count},(_,n)=>({video_data:row(keyword,start+n)})),pageNum:page,totalCount:12,totalPages:2,hasMore:page===1})};
     }
     throw Error('UNEXPECTED_HTTP_PATH ' + url.pathname);
   };
@@ -82,8 +87,9 @@ function installFixture() {
           fixture.activeSearch++; fixture.maxActiveSearch = Math.max(fixture.maxActiveSearch, fixture.activeSearch);
           const plan = planFor(response); delay = plan.delay || 1; error = plan.error;
           result = { status: plan.status || 200, body: response.body };
-        } else result = { status: 200, body: response.body };
-      } else if (message.method === 'getInfo') result = { isTv: new URL(location.href).searchParams.get('tv') === '1', version: 'SYNTHETIC-search-pagination' };
+        } else result = { status: response.status || 200, body: response.body };
+      } else if (message.method === 'cancelHttp') result = { cancelled: true };
+      else if (message.method === 'getInfo') result = { isTv: new URL(location.href).searchParams.get('tv') === '1', version: 'SYNTHETIC-search-pagination' };
       else if (message.method === 'getLibrary') result = { favorites: [], history: [] };
       else if (message.method === 'getPlaybackOptions') result = { ...fixture.options };
       else if (message.method === 'getSearchHistory') result = { keywords: [...fixture.searchKeywords] };
@@ -298,6 +304,16 @@ try {
       }
       await screenshot(`phone-${width}x${height}${large ? '-large-text' : ''}-search.png`);
     }
+  });
+  await group('FUNCTION real App fallback uses official JSON and keeps its own pagination channel', async () => {
+    await reset();await evaluate('window.__searchFixture.webEnabled=true;window.__searchFixture.plans=[{keyword:"备用",page:1,status:503}]');
+    await submit('备用');await wait('document.querySelectorAll(".page-slot .poster strong").length===10&&!document.querySelector("[aria-label=搜索结果]").getAttribute("aria-busy").includes("true")');
+    check(await evaluate('[...document.querySelectorAll(".result-caption")].some(n=>n.textContent.includes("官网搜索"))'),'fallback channel is visible');
+    await button('下一页','.search-pagination');await wait('document.querySelectorAll(".page-slot .poster strong").length===2');
+    eq((await titles())[0],'备用 第11项','official page two rendered');eq((await requests()).filter(x=>x.keyword==='备用').length,1,'only first page tried App');
+    eq(await evaluate('window.__searchFixture.requests.filter(x=>x.kind==="search-web").map(x=>x.page)'),[1,2],'official pages use fixed numeric channel');
+    await button('上一页','.search-pagination');await wait('document.querySelectorAll(".page-slot .poster strong").length===10');
+    await screenshot('phone-official-search-fallback.png');
   });
   await group('ISOLATION real source and bridge made no unexpected RPC or external browser request', async () => {
     await collectNative();

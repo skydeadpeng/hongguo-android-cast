@@ -19,6 +19,8 @@ public final class MainActivity extends Activity {
     private WebView web;
     private FrameLayout webContainer;
     private NativeBridge bridge;
+    private OfficialSeriesBridge officialSeries;
+    private AppUpdater updates;
     private boolean loaded;
     private final Handler startupHandler = new Handler(Looper.getMainLooper());
     private final StartupPolicy startup = new StartupPolicy();
@@ -26,10 +28,14 @@ public final class MainActivity extends Activity {
     private LinearLayout startupPanel;
     private boolean softwareRendering;
     private boolean manualDiagnostics;
-    private final Runnable accountChanged = () -> script("window.__androidAccountChanged && window.__androidAccountChanged()");
+    private final Runnable accountChanged = () -> {
+        try { script("window.__androidAccountChanged && window.__androidAccountChanged(" + new org.json.JSONObject().put("owner", AccountSync.get().ownerStamp()) + ")"); }
+        catch (Exception ignored) { script("window.__androidAccountChanged && window.__androidAccountChanged()"); }
+    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        updates = new AppUpdater(this);
         AccountSync.get().setListener(accountChanged);
         softwareRendering = BuildConfig.IS_TV && state != null && state.getBoolean("startupSoftwareRendering", false);
         FrameLayout container = new FrameLayout(this); webContainer = container;
@@ -87,6 +93,9 @@ public final class MainActivity extends Activity {
             candidate.setWebViewClient(createWebClient(candidate, token));
             bridge = new NativeBridge(this);
             candidate.addJavascriptInterface(bridge, "AndroidBridge");
+            officialSeries = new OfficialSeriesBridge(this);
+            candidate.addJavascriptInterface(officialSeries, "AndroidSeries");
+            candidate.addJavascriptInterface(updates.new Bridge(), "AndroidUpdates");
             candidate.addJavascriptInterface(new CryptoBridge(), "AndroidCrypto");
             candidate.addJavascriptInterface(new StartupBridge(candidate, token), "AndroidStartup");
             startupTimeout = () -> failStartup(candidate, token, "timeout");
@@ -147,6 +156,7 @@ public final class MainActivity extends Activity {
             startupHandler.post(() -> {
                 if (!token.equals(callbackToken) || !currentStartup(candidate, token) || !startup.ready(token)) return;
                 loaded = true; cancelStartupTimeout(); hideStartupPanel(); candidate.setVisibility(View.VISIBLE); candidate.requestFocus();
+                updates.pageReady();
             });
         }
         @JavascriptInterface public void failed(String callbackToken, String code) {
@@ -245,12 +255,15 @@ public final class MainActivity extends Activity {
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private void hideStartupPanel() { if (startupPanel != null && webContainer != null) webContainer.removeView(startupPanel); startupPanel = null; manualDiagnostics = false; }
     private void destroyWebView() {
+        if (updates != null) updates.pageUnavailable();
+        OfficialSeriesBridge oldSeries = officialSeries; officialSeries = null;
+        if (oldSeries != null) oldSeries.close();
         NativeBridge oldBridge = bridge; bridge = null;
         if (oldBridge != null) oldBridge.close();
         WebView oldWeb = web; web = null;
         if (oldWeb != null) {
             try {
-                oldWeb.removeJavascriptInterface("AndroidBridge"); oldWeb.removeJavascriptInterface("AndroidCrypto"); oldWeb.removeJavascriptInterface("AndroidStartup");
+                oldWeb.removeJavascriptInterface("AndroidSeries"); oldWeb.removeJavascriptInterface("AndroidBridge"); oldWeb.removeJavascriptInterface("AndroidCrypto"); oldWeb.removeJavascriptInterface("AndroidStartup"); oldWeb.removeJavascriptInterface("AndroidUpdates");
                 oldWeb.stopLoading();
             } catch (RuntimeException ignored) { /* A dead renderer may reject operations; removal and destruction still follow. */ }
             finally {
@@ -271,8 +284,8 @@ public final class MainActivity extends Activity {
     private static WebResourceResponse error(int status) { return new WebResourceResponse("text/plain", "UTF-8", status, "Blocked", Collections.emptyMap(), new ByteArrayInputStream(new byte[0])); }
     boolean trusted() { return web != null && web.getUrl() != null && local(Uri.parse(web.getUrl())); }
     void script(String source) { runOnUiThread(() -> { if (!isFinishing() && trusted()) web.evaluateJavascript(source, null); }); }
-    @Override protected void onResume() { super.onResume(); AccountSync.get().setListener(accountChanged); AccountSync.get().foreground(); if (web != null) { web.onResume(); if (loaded) script("window.__androidResume && window.__androidResume()"); } }
-    @Override protected void onPause() { AccountSync.get().flush(); if (web != null) web.onPause(); super.onPause(); }
+    @Override protected void onResume() { super.onResume(); if (officialSeries != null) officialSeries.resume(); if (updates != null) updates.resume(); AccountSync.get().setListener(accountChanged); AccountSync.get().foreground(); if (web != null) { web.onResume(); if (loaded) script("window.__androidResume && window.__androidResume()"); } }
+    @Override protected void onPause() { if (updates != null) updates.pause(); AccountSync.get().flush(); if (web != null) web.onPause(); super.onPause(); }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (BuildConfig.IS_TV && event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
             if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) showManualDiagnostics();
@@ -286,5 +299,5 @@ public final class MainActivity extends Activity {
         web.evaluateJavascript("Boolean(window.__androidBack && window.__androidBack())", result -> { if (!"true".equals(result)) confirmExit(); });
     }
     private void confirmExit() { new AlertDialog.Builder(this).setTitle("退出红果？").setMessage("收藏、观看进度和下载记录会保留在本机。").setNegativeButton("继续使用", null).setPositiveButton("退出", (dialog, which) -> finish()).show(); }
-    @Override protected void onDestroy() { AccountSync.get().clearListener(accountChanged); cancelStartupTimeout(); startup.destroy(); PlaybackSources.detach(this); destroyWebView(); super.onDestroy(); }
+    @Override protected void onDestroy() { if (updates != null) updates.destroy(); AccountSync.get().clearListener(accountChanged); cancelStartupTimeout(); startup.destroy(); PlaybackSources.detach(this); destroyWebView(); super.onDestroy(); }
 }

@@ -32,10 +32,18 @@ public final class PlayerOptionsTest {
     }
     public static void main(String[] args) throws Exception {
         Preferences prefs = new Preferences(); MemoryContext app = new MemoryContext(prefs);
+        for(String internal:new String[]{"480p","360p"}) rejects(()->PlayerOptions.quality(internal),"internal recovery grade must not become a manual download preference");
         JSONObject defaults = PlayerOptions.read(app);
         check(defaults.getString("quality").equals("auto") && defaults.getDouble("speed")==1, "defaults auto/1");
         check(prefs.commits==0 && prefs.data.isEmpty(), "read has no mutation");
         check("player_options".equals(app.requestedFile), "one native preference file");
+        check(!defaults.getBoolean("danmaku"), "danmaku is opt-in by default");
+        check(PlayerOptions.update(app,new JSONObject().put("danmaku",true)).getBoolean("danmaku"), "enable danmaku after commit");
+        check(PlayerOptions.read(new MemoryContext(prefs)).getBoolean("danmaku"), "danmaku survives new context");
+        String savedDanmaku=PlayerOptions.read(app).toString();
+        for(Object bad:new Object[]{"true",1,JSONObject.NULL}) { rejects(()->PlayerOptions.update(app,new JSONObject().put("danmaku",bad)),"invalid danmaku accepted");check(savedDanmaku.equals(PlayerOptions.read(app).toString()),"invalid danmaku update remains atomic"); }
+        PlayerOptions.update(app,new JSONObject().put("danmaku",false));
+        check(!PlayerOptions.read(app).getBoolean("danmaku"),"disable danmaku");
         for (String q : new String[]{"auto","720p","1080p"}) {
             JSONObject value=PlayerOptions.update(app,new JSONObject().put("quality",q));
             check(q.equals(value.getString("quality")), "quality returned only after commit");

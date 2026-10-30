@@ -18,13 +18,20 @@ final class NativeBridge {
     private final LibraryStore store;
     private final DownloadManager downloads;
     private final ThreadPoolExecutor worker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(16));
+    // Page races have their own bounded lane and never queue behind media preparation.
+    private final ThreadPoolExecutor httpWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(8));
+    private final ConcurrentHashMap<String, FutureTask<Void>> httpRequests = new ConcurrentHashMap<>();
+    // Registered playback metadata never queues behind a media download or login.
+    private final ThreadPoolExecutor modelWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
+    private final ConcurrentHashMap<String, RegisteredPlaybackModel> modelCalls = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, FutureTask<Void>> modelTasks = new ConcurrentHashMap<>();
     private final ThreadPoolExecutor downloadWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(4));
     // Slow search/registration must not occupy playback's request workers.
     // No queued searches: reject overload promptly rather than exceed the JS deadline.
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    // Account IO has its own bounded lane; it never delays playback/source requests.
-    private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(4));
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "appRequest", "appResolveResult", "getLibrary", "toggleFavorite", "play", "download", "getDownloads", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "accountLogin", "accountLogout", "syncHistory", "importGuestHistory"));
+    // Login/cloud control never occupies source or media request workers.
+    private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest"));
     NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
@@ -38,25 +45,167 @@ final class NativeBridge {
             params = request.optJSONObject("params") == null ? new JSONObject() : request.getJSONObject("params");
         } catch (JSONException error) { return; }
         activity.runOnUiThread(() -> {
-            if (!activity.trusted()) return;
+            if (closed || !activity.trusted()) return;
+            // Control callbacks never enter a network queue; only registered page IDs are cancellable.
+            if (method.equals("cancelHttp")) {
+                Object requestId = params.opt("requestId");
+                boolean cancelled = requestId instanceof String && (cancelHttp((String) requestId) | cancelRegisteredModel((String) requestId));
+                try { respond(id, new JSONObject().put("cancelled", cancelled), null); } catch (JSONException ignored) { }
+                return;
+            }
+            // Cancellation closes the active account socket immediately, never behind MFA polling.
+            if (method.equals("officialCancelLogin")) {
+                try { respond(id, "background".equals(params.optString("reason")) ? AccountSync.get().suspendLogin() : AccountSync.get().cancelLogin(), null); } catch (Exception error) { respond(id, null, "取消登录未完成，请重试"); }
+                return;
+            }
+            if (method.equals("httpGet")) { startHttp(id, params); return; }
+            if (method.equals("appRegisteredModel")) { startRegisteredModel(id, params); return; }
             // Completion callbacks must not wait behind HTTP or full-media preparation.
             if (method.equals("appResolveResult")) {
                 try { handle(id, method, params); } catch (Exception error) { respond(id, null, "分集结果不匹配"); }
                 return;
             }
-            ThreadPoolExecutor executor = method.equals("accountLogin") || method.equals("accountLogout") || method.equals("importGuestHistory") ? accountWorker : method.equals("searchQuery") ? searchWorker : method.equals("download") ? downloadWorker : worker;
-            try { executor.execute(() -> { try { handle(id, method, params); } catch (Exception error) { respond(id, null, error.getMessage() == null ? "操作未成功，请重试" : error.getMessage()); } }); }
+            final AccountSync.Selection favoriteSelection;
+            final LibraryStore favoriteStore;
+            if (method.equals("toggleFavorite")) {
+                try {
+                    favoriteSelection = AccountSync.get().captureSelection();
+                    favoriteStore = new LibraryStore(activity);
+                    AccountSync.get().requireCurrent(favoriteSelection);
+                } catch (Exception error) { respond(id, null, "账号正在切换，请稍后重试收藏"); return; }
+            } else { favoriteSelection = null; favoriteStore = null; }
+            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") ? searchWorker : method.equals("download") ? downloadWorker : worker;
+            try { executor.execute(() -> { try (AutoCloseable updateLease = (method.equals("download") || method.equals("playDownload")) ? UpdateInstallCheckpoint.operation() : null) { handle(id, method, params, favoriteStore, favoriteSelection); } catch (Exception error) { respond(id, null, error.getMessage() == null ? "操作未成功，请重试" : error.getMessage()); } }); }
             catch (RejectedExecutionException error) { respond(id, null, "请求较多，请稍后重试"); }
         });
     }
-    private void handle(Object id, String method, JSONObject params) throws Exception {
+    private void startRegisteredModel(Object id, JSONObject params) {
+        final String key = String.valueOf(id), vid;
+        try { vid = RegisteredPlaybackModel.requestedVid(params); }
+        catch (Exception invalid) { respondHttpError(id, "分集请求信息无效", "INVALID_INPUT"); return; }
+        if (closed) return;
+        final RegisteredPlaybackModel operation = new RegisteredPlaybackModel();
+        if (modelCalls.putIfAbsent(key, operation) != null) { operation.close(); respondHttpError(id, "片源请求编号重复", "INVALID_INPUT"); return; }
+        FutureTask<Void> task = new FutureTask<Void>(() -> {
+            JSONObject result = null; String error = null, code = null;
+            try { result = operation.fetch(vid); }
+            catch (Exception failure) {
+                code = failure instanceof java.net.SocketTimeoutException ? "ETIMEDOUT" : failure instanceof java.io.InterruptedIOException ? "ERR_CANCELED" : failure instanceof RegisteredPlaybackModel.ModelError ? ((RegisteredPlaybackModel.ModelError) failure).code : "APP_INVALID_RESPONSE";
+                error = code.equals("ETIMEDOUT") ? "App片源登记和取源超时，请重试" : code.equals("ERR_CANCELED") ? "App片源请求已取消" : failure instanceof RegisteredPlaybackModel.ModelError ? failure.getMessage() : "App片源登记或取源未完成，请重试";
+            }
+            final JSONObject ready = result; final String message = error, errorCode = code;
+            activity.runOnUiThread(() -> {
+                try {
+                    if (!closed && operation.current() && modelCalls.get(key) == operation) {
+                        JSONObject response = new JSONObject().put("id", id).put("result", ready == null ? JSONObject.NULL : ready).put("error", message == null ? JSONObject.NULL : message);
+                        if (errorCode != null) response.put("errorCode", errorCode);
+                        activity.script("window.__androidResponse && window.__androidResponse(" + response.toString() + ")");
+                    }
+                } catch (JSONException ignored) { }
+                finally { modelCalls.remove(key, operation); operation.close(); }
+            });
+            return null;
+        }) { @Override protected void done() { modelTasks.remove(key, this); } };
+        modelTasks.put(key, task);
+        if (closed || modelCalls.get(key) != operation) { cancelRegisteredModel(key); return; }
+        try { modelWorker.execute(task); }
+        catch (RejectedExecutionException busy) { modelTasks.remove(key, task); modelCalls.remove(key, operation); operation.close(); task.cancel(true); respondHttpError(id, "片源请求较多，请稍后重试", "ETIMEDOUT"); }
+    }
+    private boolean cancelRegisteredModel(String id) {
+        RegisteredPlaybackModel operation = modelCalls.remove(id); FutureTask<Void> task = modelTasks.remove(id);
+        if (operation != null) operation.close(); if (task != null) task.cancel(true);
+        return operation != null || task != null;
+    }
+    private void closeRegisteredModels() {
+        for (String id : new ArrayList<>(modelCalls.keySet())) cancelRegisteredModel(id);
+        for (FutureTask<Void> task : modelTasks.values()) task.cancel(true);
+        modelCalls.clear(); modelTasks.clear(); modelWorker.shutdownNow();
+    }
+    private static long httpInteger(JSONObject params, String key, long fallback) throws Exception {
+        if (!params.has(key)) return fallback;
+        Object value = params.opt(key);
+        if (!(value instanceof Number)) throw new Exception("页面请求等待期限无效");
+        double number = ((Number) value).doubleValue();
+        if (!Double.isFinite(number) || number != Math.rint(number) || number < 1 || number > 9007199254740991d) throw new Exception("页面请求等待期限无效");
+        return ((Number) value).longValue();
+    }
+    private void startHttp(Object id, JSONObject params) {
+        final String key = String.valueOf(id), url;
+        final long deadline;
+        try {
+            url = LibraryStore.text(params, "url", 4096);
+            deadline = NetworkGuard.pageDeadline(httpInteger(params, "timeoutMs", 25000), httpInteger(params, "deadlineMs", 0));
+        } catch (Exception error) {
+            respondHttpError(id, error.getMessage(), error instanceof java.net.SocketTimeoutException ? "ETIMEDOUT" : "INVALID_INPUT");
+            return;
+        }
+        FutureTask<Void> task = new FutureTask<Void>(() -> {
+            try {
+                if (closed) return null;
+                NetworkGuard.Reply reply = NetworkGuard.get(url, deadline);
+                if (!Thread.currentThread().isInterrupted()) respond(id, new JSONObject().put("body", reply.body).put("status", reply.status).put("url", reply.url), null);
+            } catch (Exception error) {
+                String code = Thread.currentThread().isInterrupted() ? "ERR_CANCELED" :
+                    error instanceof java.net.SocketTimeoutException || System.nanoTime() >= deadline ? "ETIMEDOUT" :
+                    error instanceof java.io.InterruptedIOException ? "ERR_CANCELED" : null;
+                respondHttpError(id, error.getMessage() == null ? "页面请求未成功，请重试" : error.getMessage(), code);
+            }
+            return null;
+        }) {
+            @Override protected void done() { httpRequests.remove(key, this); httpWorker.remove(this); }
+        };
+        if (closed) { task.cancel(true); return; }
+        if (httpRequests.putIfAbsent(key, task) != null) { respondHttpError(id, "页面请求编号重复", "INVALID_INPUT"); return; }
+        try { httpWorker.execute(task); }
+        catch (RejectedExecutionException error) { task.cancel(true); respondHttpError(id, "页面请求较多，请稍后重试", null); }
+    }
+    private boolean cancelHttp(String id) {
+        FutureTask<Void> task = httpRequests.remove(id);
+        return task != null && task.cancel(true);
+    }
+    private void closeHttp() {
+        for (FutureTask<Void> task : httpRequests.values()) task.cancel(true);
+        httpRequests.clear();
+        httpWorker.shutdownNow();
+    }
+    private void respondHttpError(Object id, String message, String code) {
+        if (closed) return;
+        try {
+            JSONObject response = new JSONObject().put("id", id).put("result", JSONObject.NULL).put("error", message == null ? "页面请求未成功，请重试" : message);
+            if (code != null) response.put("errorCode", code);
+            final String source = "window.__androidResponse && window.__androidResponse(" + response.toString() + ")";
+            activity.runOnUiThread(() -> { if (!closed) activity.script(source); });
+        } catch (JSONException ignored) { }
+    }
+    private JSONObject currentSeriesHistory(JSONObject params) throws Exception {
+        Object raw = params.opt("seriesId");
+        if (!(raw instanceof String) || !((String) raw).matches("[0-9]{6,30}")) throw new JSONException("剧集身份无效");
+        AccountSync.Selection selection = AccountSync.get().captureSelection();
+        String before = AccountSync.get().ownerStamp();
+        JSONObject row = new LibraryStore(activity).seriesHistory((String) raw);
+        AccountSync.get().requireCurrent(selection);
+        if (!before.equals(AccountSync.get().ownerStamp())) throw new JSONException("账号已切换，请重新读取本剧进度");
+        return new JSONObject().put("owner", before).put("history", row == null ? JSONObject.NULL : row);
+    }
+    private JSONObject currentLibrary() throws Exception {
+        AccountSync.Selection selection = AccountSync.get().captureSelection();
+        String before = AccountSync.get().ownerStamp();
+        JSONObject result = new LibraryStore(activity).library();
+        AccountSync.get().requireCurrent(selection);
+        if (!before.equals(AccountSync.get().ownerStamp())) throw new JSONException("账号已切换，请重新读取记录");
+        return result.put("owner", before);
+    }
+    private void handle(Object id, String method, JSONObject params) throws Exception { handle(id, method, params, null, null); }
+    private void handle(Object id, String method, JSONObject params, LibraryStore favoriteStore, AccountSync.Selection favoriteSelection) throws Exception {
         if (closed) return;
         switch (method) {
             case "getAccount": respond(id, AccountSync.get().getAccount(), null); break;
-            case "accountLogin": respond(id, AccountSync.get().login(params), null); break;
-            case "accountLogout": respond(id, AccountSync.get().logout(), null); break;
-            case "syncHistory": respond(id, AccountSync.get().syncNow(), null); break;
-            case "importGuestHistory": respond(id, AccountSync.get().importGuestHistory(), null); break;
+            case "officialSendCode": respond(id, AccountSync.get().sendCode(params), null); break;
+            case "officialLoginSMS": respond(id, AccountSync.get().loginSMS(params), null); break;
+            case "officialVerifyMFA": respond(id, AccountSync.get().verifyMfa(), null); break;
+            case "officialLogout": respond(id, AccountSync.get().logout(), null); break;
+            case "officialSync": respond(id, AccountSync.get().syncNow(), null); break;
+            case "officialImportGuest": respond(id, AccountSync.get().importGuest(), null); break;
             case "getPlaybackOptions": respond(id, PlayerOptions.read(activity), null); break;
             case "setPlaybackOptions": respond(id, PlayerOptions.update(activity, params), null); break;
             case "getSearchHistory": respond(id, store.searchHistory(), null); break;
@@ -65,17 +214,34 @@ final class NativeBridge {
             case "clearSearchHistory": respond(id, store.clearSearchHistory(), null); break;
             case "searchQuery": respond(id, SearchClient.search(activity, params), null); break;
             case "getInfo": respond(id, new JSONObject().put("version", BuildConfig.VERSION_NAME).put("isTv", BuildConfig.IS_TV).put("platform", "android"), null); break;
-            case "httpGet": {
-                NetworkGuard.Reply reply = NetworkGuard.get(LibraryStore.text(params, "url", 4096));
-                respond(id, new JSONObject().put("body", reply.body).put("status", reply.status).put("url", reply.url), null); break;
-            }
             case "appRequest": respond(id, AppTransport.request(params), null); break;
             case "appResolveResult": PlaybackSources.result(params); respond(id, new JSONObject().put("accepted", true), null); break;
-            // Player/cast stores intentionally retain their original account scope.
-            // UI reads must instead use the newly selected account after login/logout.
-            case "getLibrary": respond(id, new LibraryStore(activity).library(), null); break;
-            case "toggleFavorite": store.toggle(LibraryStore.series(params.getJSONObject("series"))); respond(id, new LibraryStore(activity).library(), null); break;
+            // Library reads remain on-device; the retired sync account is not selected.
+            case "getLibrary": respond(id, currentLibrary(), null); break;
+            case "getSeriesHistory": respond(id, currentSeriesHistory(params), null); break;
+            case "toggleFavorite": AccountSync.get().requireCurrent(favoriteSelection); if (favoriteStore == null) throw new JSONException("收藏操作缺少账号归属"); favoriteStore.toggle(LibraryStore.series(params.getJSONObject("series"))); respond(id, currentLibrary(), null); break;
             case "getDownloads": respond(id, downloadRows(), null); break;
+            case "deleteDownload": {
+                DownloadDeletion.confirmedId(params);
+                Object owner=new Object();
+                try {
+                    UpdateInstallCheckpoint.prepareDownloadDeletion(activity,owner);
+                    respond(id,DownloadDeletion.delete(store,activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),new DownloadDeletion.Provider() {
+                        public DownloadDeletion.Record query(long downloadId) throws Exception {
+                            if(downloads==null)throw new java.io.IOException("系统下载服务暂不可用，请重试");
+                            try(Cursor cursor=downloads.query(new DownloadManager.Query().setFilterById(downloadId))) {
+                                if(cursor==null)throw new java.io.IOException("系统下载状态读取未完成，请重试");
+                                if(!cursor.moveToFirst())return null;
+                                if(cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_ID))!=downloadId)throw new java.io.IOException("系统下载身份不一致");
+                                int uriColumn=cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI),descriptionColumn=cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_DESCRIPTION);
+                                return new DownloadDeletion.Record(cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)),cursor.isNull(uriColumn)?null:cursor.getString(uriColumn),cursor.isNull(descriptionColumn)?null:cursor.getString(descriptionColumn));
+                            }
+                        }
+                        public int remove(long downloadId) {return downloads.remove(downloadId);}
+                    },params),null);
+                } finally {UpdateInstallCheckpoint.release(owner);}
+                break;
+            }
             case "getPlaybackCache": respond(id, PlaybackCache.get(activity).status(), null); break;
             case "clearPlaybackCache": respond(id, PlaybackCache.get(activity).clear(), null); break;
             case "play": {
@@ -129,7 +295,7 @@ final class NativeBridge {
                 if (!planSid.equals(series.getString("seriesId"))) throw new JSONException("片源与剧集不一致");
                 info.put("seriesId", planSid);
                 JSONObject mediaOptions = PlayerOptions.read(activity);
-                String requestedQuality = MediaQuality.normalize(params.optString("quality", info.optString("requestedQuality", "auto")));
+                String requestedQuality = PlayerOptions.quality(params.optString("quality", info.optString("requestedQuality", "auto")));
                 if (info.has("requestedQuality") && !requestedQuality.equals(info.getString("requestedQuality"))) throw new JSONException("清晰度结果不匹配");
                 info.put("requestedQuality", requestedQuality);
                 params.put("quality", requestedQuality);
@@ -143,13 +309,14 @@ final class NativeBridge {
                 if (Uri.parse(url).getPath() != null && Uri.parse(url).getPath().toLowerCase(Locale.ROOT).endsWith(".m3u8")) throw new Exception("当前为流式播放列表，请在线播放；下载支持完整视频文件");
                 if (closed) return;
                 String title = series.getString("title") + " · 第 " + episode.getInt("index") + " 集";
+                String downloadFilename=series.getString("seriesId") + "_" + episode.getInt("index") + "_" + System.currentTimeMillis() + ".mp4";
                 DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url)).setTitle(title).setDescription("红果 · 视频下载")
                     .addRequestHeader("User-Agent", plan.userAgent).addRequestHeader("Referer", plan.referer)
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                     .setAllowedOverMetered(true).setAllowedOverRoaming(false)
-                    .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_DOWNLOADS, series.getString("seriesId") + "_" + episode.getInt("index") + "_" + System.currentTimeMillis() + ".mp4");
+                    .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_DOWNLOADS, downloadFilename);
                 long downloadId = downloads.enqueue(request);
-                try { store.addDownload(downloadId, series, episode); } catch (Exception error) { downloads.remove(downloadId); throw error; }
+                try { store.addManagedDownload(downloadId, series, episode, downloadFilename); } catch (Exception error) { downloads.remove(downloadId); throw error; }
                 respond(id, new JSONObject().put("id", downloadId), null); break;
             }
             case "playDownload": {
@@ -169,21 +336,14 @@ final class NativeBridge {
         }
     }
     private void play(Object id, JSONObject series, JSONObject episode, JSONArray episodes, String url, boolean local, JSONObject params) {
+        final UpdateOperationGate.Lease launchLease;
+        try { launchLease = UpdateInstallCheckpoint.operation(); }
+        catch (Exception busy) { respond(id, null, busy.getMessage()); return; }
         activity.runOnUiThread(() -> {
-            if (closed || activity.isFinishing() || activity.isDestroyed()) return;
-            try {
-                JSONObject defaults = PlayerOptions.read(activity);
-                String quality = MediaQuality.normalize(params.optString("quality", defaults.getString("quality")));
-                double speed = params.optDouble("speed", defaults.getDouble("speed"));
-                PlayerOptions.validateSpeed(speed);
-                Intent intent = new Intent(activity, PlayerActivity.class).putExtra("series", series.toString()).putExtra("episode", episode.toString())
-                    .putExtra("episodes", episodes.toString()).putExtra("url", url).putExtra("download", local)
-                    .putExtra("quality", quality).putExtra("speed", speed)
-                    .putExtra("autoplay", params.optBoolean("autoplay", true)).putExtra("cleanupPlaybackCache", params.optBoolean("cleanupPlaybackCache", true))
-                    .putExtra("keepPreviousEpisodes", 1).putExtra("playInfo", params.optJSONObject("playInfo") == null ? "" : params.getJSONObject("playInfo").toString());
-                // The compact descriptor crosses Binder once. Decorated per-episode owners
-                // exist only inside the player/services, never duplicated in Intent extras.
-                if (!local && params.optJSONObject("playlist") != null) intent.putExtra("playlist", params.getJSONObject("playlist").toString());
+            try (UpdateOperationGate.Lease held = launchLease) {
+                if (closed || activity.isFinishing() || activity.isDestroyed()) return;
+                Intent intent = PlayLauncher.build(activity, series, episode, episodes, url, local, params);
+                UpdateInstallCheckpoint.playerLaunching();
                 activity.startActivity(intent); respond(id, new JSONObject().put("started", true), null);
             } catch (Exception error) { respond(id, null, "播放器启动未成功"); }
         });
@@ -291,5 +451,5 @@ final class NativeBridge {
             activity.runOnUiThread(() -> { if (!closed) activity.script(source); });
         } catch (JSONException ignored) { }
     }
-    void close() { closed = true; worker.shutdownNow(); downloadWorker.shutdownNow(); searchWorker.shutdownNow(); accountWorker.shutdownNow(); }
+    void close() { closed = true; closeRegisteredModels(); closeHttp(); worker.shutdownNow(); downloadWorker.shutdownNow(); searchWorker.shutdownNow(); accountWorker.shutdownNow(); try { AccountSync.get().cancelLogin(); } catch (Exception ignored) { } }
 }

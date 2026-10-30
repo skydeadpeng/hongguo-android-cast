@@ -40,3 +40,6 @@ final class PlayerActivity {}
 final class LibraryStore {static JSONObject series(JSONObject value){return value;}static JSONObject episode(JSONObject value){return value;}static JSONArray episodes(JSONArray rows,JSONObject selected){return rows==null?new JSONArray().put(selected):rows;}static String text(JSONObject value,String key,int max)throws Exception{return value.getString(key);}}
 final class PlayerOptions {static JSONObject read(Object activity)throws Exception{return new JSONObject().put("quality","auto").put("speed",1.0);}static void validateSpeed(double speed){if(!Double.isFinite(speed)||speed<0.5||speed>2)throw new IllegalArgumentException("speed");}}
 final class PlaybackSources {static int registered;static class Plan {final JSONObject value;final String url;Plan(JSONObject v){value=v;url=v.optString("url");}JSONObject json(){return value;}}static Plan registerInitial(JSONObject input,String sid,String vid,String q){registered++;return new Plan(input);}}
+
+// Installation coordination is tested separately with actual checkpoint production code.
+class UpdateInstallCheckpoint { private static final UpdateOperationGate gate = new UpdateOperationGate(); static UpdateOperationGate.Lease operation() throws java.io.IOException { return gate.operation(); } static void playerLaunching() { } }

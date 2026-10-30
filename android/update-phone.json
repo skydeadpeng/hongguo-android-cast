@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 41,
+  "versionName": "0.12.18",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.18/Hongguo-0.12.18-phone-release-compatible.apk",
+  "size": 526700,
+  "sha256": "ec376dba98a210a7cec2d78ea1197e1edd474513cceec74a35c0da0df65761d2",
+  "notes": "修复下一集已经自动打开、但 App 模型返回空数据而播放失败的问题。旧模型空响应时，使用独立的匿名设备登记与单集模型兼容路径；不依赖账号登录，不读取或保存账号凭据。\n保留原片源成功路径、手动下载清晰度和自动降档，注册与取源共享有限等待；换集、取消和退出会结束对应请求。\n手机版 API32 模拟器实测：《王妈在顾家当保姆后全家只会搞笑了》第3集从断点播至片尾，自动进入第4集；第4集完整播放约80秒后自动进入第5集，实际1080×1920，进度正常推进。没有使用下一集按钮或注入完成事件。TV完成构建和共享逻辑回归，不宣称实体TV验收。\n本版继续保留0.12.17的更新检查与APK下载自动加速；手机和TV均兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-10-27T05:25:05.725Z"
+}

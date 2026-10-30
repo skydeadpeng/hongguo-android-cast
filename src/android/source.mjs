@@ -1,5 +1,6 @@
 /** Android directory/playback source, with an optional native cursor-search adapter. */
-import { createSearchPager } from './search.mjs';
+import { createFallbackSearch } from './search-fallback.mjs';
+import { loadDetail } from './detail-loader.mjs';
 export const SITE_ORIGIN = 'https://hongguoduanju.com';
 export const CATEGORIES = Object.freeze([
   Object.freeze({ id: 'real-drama', label: '真人剧' }),
@@ -128,7 +129,7 @@ export function parseSearch(html) {
 export function parseDetail(html, seriesId) {
   requireId(seriesId, '剧集编号');
   const loaders = extractRouterData(html).loaderData;
-  const data = loaders?.['player_(series_id)/page'] ?? loaders?.['player_(series_id)/(vid)/page'];
+  const data = loaders?.['player_(series_id)/page'] ?? loaders?.['player_(series_id)/(vid)/page'] ?? loaders?.detail_page;
   const detail = data?.seriesDetail;
   if (data?.isSuccess === false || detail?.series_id !== seriesId ||
       data.series_id !== undefined && data.series_id !== seriesId) throw error('剧集详情与请求编号不一致', 'IDENTITY_MISMATCH');
@@ -204,32 +205,35 @@ export function parsePlayback(html, seriesId, vid) {
 export function createSource(request, { fallback, webFallback = !!fallback, searchPage } = {}) {
   if (typeof request !== 'function') throw error('需要提供页面请求函数', 'INVALID_INPUT');
   if (fallback !== undefined && typeof fallback !== 'function') throw error('片源回退必须是请求函数', 'INVALID_INPUT');
-  const pagedSearch = searchPage === undefined ? null : createSearchPager(searchPage);
+  const pagedSearch = searchPage === undefined ? null : createFallbackSearch(searchPage, request);
   const cache = new Map(), pending = new Map();
-  const cachedLoad = (key, execute) => {
+  const cachedLoad = (key, execute, { refresh = false } = {}) => {
+    if (refresh) cache.delete(key);
     const cached = cache.get(key);
-    if (cached?.expires > Date.now()) return Promise.resolve(cached.value);
-    if (pending.has(key)) return pending.get(key);
+    if (!refresh && cached?.expires > Date.now()) return Promise.resolve(cached.value);
+    if (!refresh && pending.has(key)) return pending.get(key);
     const task = Promise.resolve().then(execute).then(value => {
-      cache.set(key, { value, expires: Date.now() + CACHE_MS });
-      if (cache.size > 64) cache.delete(cache.keys().next().value);
+      if (pending.get(key) === task) {
+        cache.set(key, { value, expires: Date.now() + CACHE_MS });
+        if (cache.size > 64) cache.delete(cache.keys().next().value);
+      }
       return value;
-    }).finally(() => pending.delete(key));
+    }).finally(() => { if (pending.get(key) === task) pending.delete(key); });
     pending.set(key, task);
     return task;
   };
-  const load = (path, parse, recover, quality) => {
+  const load = (path, parse, recover, quality, options) => {
     const url = SITE_ORIGIN + path;
     return cachedLoad(quality === undefined ? url : `${url}#quality=${quality}`, () =>
       Promise.resolve().then(() => request(url)).then(parse).catch(cause => {
         if (!recover) throw cause;
         return recover(cause);
-      }));
+      }), options);
   };
   return Object.freeze({
-    catalog(category = 'real-drama', page = 1) {
+    catalog(category = 'real-drama', page = 1, options = {}) {
       requireCategory(category); requirePage(page);
-      return load(`/category/${category}${page > 1 ? `?page=${page}` : ''}`, html => parseCatalog(html, { category, page }));
+      return load(`/category/${category}${page > 1 ? `?page=${page}` : ''}`, html => parseCatalog(html, { category, page }), undefined, undefined, options);
     },
     search(keyword, page = 1, options = {}) {
       if (typeof keyword !== 'string' || !keyword.trim() || keyword.trim().length > 100) throw error('请输入 1 至 100 字的搜索词', 'INVALID_INPUT');
@@ -240,7 +244,7 @@ export function createSource(request, { fallback, webFallback = !!fallback, sear
     },
     detail(seriesId) {
       requireId(seriesId, '剧集编号');
-      return load(`/player/${seriesId}`, html => parseDetail(html, seriesId));
+      return cachedLoad(`${SITE_ORIGIN}/detail:${seriesId}`, () => loadDetail(request, seriesId, html => parseDetail(html, seriesId)));
     },
     playback(seriesId, vid, { quality = 'auto' } = {}) {
       requireId(seriesId, '剧集编号'); requireId(vid, '分集编号');

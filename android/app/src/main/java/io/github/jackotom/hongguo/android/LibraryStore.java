@@ -14,7 +14,16 @@ import java.util.*;
 final class LibraryStore {
     private static final String SEARCH_KEY = "search_keywords_v1";
     private static final int SEARCH_LIMIT = 20;
-    interface HistoryAccess { JSONArray rows() throws JSONException; void record(JSONObject row) throws JSONException; }
+    interface HistoryAccess {
+        JSONArray rows() throws JSONException;
+        void record(JSONObject row) throws JSONException;
+        // Null preserves older history-only providers; official providers override with an isolated list.
+        default JSONArray favorites() throws JSONException { return null; }
+        default void toggleFavorite(JSONObject series) throws JSONException { throw new JSONException("此账号收藏暂不可用"); }
+        default int position(JSONObject series, JSONObject episode) throws JSONException { return -1; }
+        default JSONObject projection() throws JSONException { return null; }
+        default JSONObject seriesHistory(String seriesId) throws JSONException { return null; }
+    }
     interface HistoryFactory { HistoryAccess open(); }
     private static volatile HistoryFactory historyFactory;
     static void setHistoryFactory(HistoryFactory factory) { historyFactory=factory; }
@@ -40,6 +49,12 @@ final class LibraryStore {
             .put("episodeLabel", text(input, "episodeLabel", 100));
         JSONArray tags = input.optJSONArray("tags"), clean = new JSONArray();
         if (tags != null) for (int i = 0; i < Math.min(8, tags.length()); i++) { String tag = tags.optString(i); if (tag.length() <= 80) clean.put(tag); }
+        if (input.has("seasonIndex")) {
+            Object raw = input.opt("seasonIndex");
+            if (!(raw instanceof Number) || !Double.isFinite(((Number) raw).doubleValue()) || ((Number) raw).doubleValue() != Math.rint(((Number) raw).doubleValue()) || ((Number) raw).doubleValue() < 0 || ((Number) raw).doubleValue() > 10000) throw new JSONException("分季序号无效");
+            result.put("seasonIndex", ((Number) raw).intValue());
+        }
+        if (input.has("multiSeason")) { if (!(input.opt("multiSeason") instanceof Boolean)) throw new JSONException("分季标记无效"); result.put("multiSeason", input.getBoolean("multiSeason")); }
         return result.put("tags", clean);
     }
     static JSONObject episode(JSONObject input) throws JSONException {
@@ -145,37 +160,68 @@ final class LibraryStore {
         else editor.remove(SEARCH_KEY);
         return editor;
     }
-    JSONObject library() throws JSONException { synchronized (LibraryStore.class) { return new JSONObject().put("favorites", read("favorites")).put("history", historyRows()); } }
+    /** Synchronous disk barrier for application replacement; call only off the UI thread. */
+    static void checkpoint(Context context) throws IOException {
+        synchronized (LibraryStore.class) {
+            SharedPreferences prefs = context.getSharedPreferences("hongguo_library_v1", Context.MODE_PRIVATE);
+            // A new generation snapshots the entire current preference map, including pending apply writes.
+            if (!prefs.edit().putLong("update_checkpoint_at", System.currentTimeMillis()).commit())
+                throw new IOException("本机观看记录保存未完成，请稍后重试更新");
+        }
+    }
+    JSONObject library() throws JSONException { synchronized (LibraryStore.class) { JSONArray accountFavorites = accountHistory == null ? null : accountHistory.favorites(); JSONObject result = new JSONObject().put("favorites", accountFavorites == null ? read("favorites") : accountFavorites).put("history", historyRows()); JSONObject projection = accountHistory == null ? null : accountHistory.projection(); if (projection != null) result.put("projection", projection); return result; } }
     JSONObject toggle(JSONObject series) throws JSONException {
         synchronized (LibraryStore.class) {
+            if (accountHistory != null && accountHistory.favorites() != null) { accountHistory.toggleFavorite(series); return library(); }
             JSONArray old = read("favorites"), next = new JSONArray(); boolean found = false;
             for (int i = 0; i < old.length(); i++) { JSONObject row = old.optJSONObject(i); if (row == null) continue; if (series.getString("seriesId").equals(row.optString("seriesId"))) found = true; else next.put(row); }
-            if (!found) { if (next.length() >= 200) throw new JSONException("收藏已达 200 部上限"); next.put(series); }
+            if (!found) { if (next.length() >= 200) throw new JSONException("收藏已达 200 部上限"); next.put(new JSONObject(series.toString()).put("favoriteAt", Math.max(1, System.currentTimeMillis()))); }
             preferences.edit().putString("favorites", next.toString()).apply(); return library();
         }
     }
-    void history(JSONObject series, JSONObject episode, long position) {
+    void history(JSONObject series, JSONObject episode, long position) { history(series, episode, position, 0); }
+    void history(JSONObject series, JSONObject episode, long position, long duration) {
         synchronized (LibraryStore.class) {
             try {
                 JSONObject row = new JSONObject(series.toString()).put("vid", episode.getString("vid")).put("index", episode.getInt("index"))
-                    .put("positionMs", Math.max(0, position)).put("updatedAt", System.currentTimeMillis());
+                    .put("positionMs", Math.max(0, position)).put("durationMs", Math.max(0, Math.min(86_400_000L, duration))).put("updatedAt", System.currentTimeMillis());
                 if(accountHistory!=null) { accountHistory.record(row);return; }
                 JSONArray next = new JSONArray().put(row), old = read("history");
-                for (int i = 0; i < old.length() && next.length() < 100; i++) { JSONObject item = old.optJSONObject(i); if (item != null && !series.getString("seriesId").equals(item.optString("seriesId"))) next.put(item); }
+                for (int i = 0; i < old.length(); i++) {
+                    JSONObject item = old.optJSONObject(i); if (item == null) continue;
+                    if (series.getString("seriesId").equals(item.optString("seriesId"))) {
+                        if (row.optLong("durationMs") == 0 && episode.getString("vid").equals(item.optString("vid"))) row.put("durationMs", Math.max(0, Math.min(86_400_000L, item.optLong("durationMs"))));
+                    } else if (next.length() < 100) next.put(item);
+                }
                 preferences.edit().putString("history", next.toString()).apply();
             } catch (JSONException ignored) { }
         }
     }
     int position(JSONObject series, JSONObject episode) {
         synchronized (LibraryStore.class) {
+            if (accountHistory != null) try { int position = accountHistory.position(series, episode); if (position >= 0) return position; } catch (JSONException failure) { return 0; }
             JSONArray rows;try{rows=historyRows();}catch(JSONException ignored){return 0;}
             for (int i = 0; i < rows.length(); i++) { JSONObject row = rows.optJSONObject(i); if (row != null && row.optString("seriesId").equals(series.optString("seriesId")) && row.optString("vid").equals(episode.optString("vid"))) return (int) Math.min(Integer.MAX_VALUE, row.optLong("positionMs")); }
             return 0;
         }
     }
+    JSONObject seriesHistory(String seriesId) throws JSONException {
+        if (seriesId == null || !seriesId.matches("[0-9]{6,30}")) throw new JSONException("剧集身份无效");
+        synchronized (LibraryStore.class) {
+            if (accountHistory != null) { JSONObject direct = accountHistory.seriesHistory(seriesId); if (direct != null) return direct; }
+            JSONArray rows = historyRows();
+            for (int i=0;i<rows.length();i++) { JSONObject row=rows.optJSONObject(i); if (row!=null&&seriesId.equals(row.optString("seriesId"))) return new JSONObject(row.toString()); }
+            return null;
+        }
+    }
     JSONArray downloads() { synchronized (LibraryStore.class) { return read("downloads"); } }
     void addDownload(long id, JSONObject series, JSONObject episode) throws JSONException {
         addDownload(id, series, episode, null);
+    }
+    void addManagedDownload(long id, JSONObject series, JSONObject episode, String filename) throws Exception {
+        JSONObject row = new JSONObject().put("series",series).put("episode",episode);
+        if (filename==null || !filename.matches(java.util.regex.Pattern.quote(preparedPrefix(row))+"[0-9]{10,17}\\.mp4")) throw new IOException("下载文件名无效");
+        addDownload(id,series,episode,new JSONObject().put("downloadFile",filename));
     }
     void addPreparedDownload(long id, JSONObject series, JSONObject episode, File directory, File target) throws Exception {
         JSONObject row = new JSONObject().put("series",series).put("episode",episode);
@@ -187,7 +233,8 @@ final class LibraryStore {
             JSONArray old = read("downloads"), next = new JSONArray();
             if (old.length() >= 200) throw new JSONException("下载记录已达 200 条上限");
             JSONObject row = new JSONObject().put("id", id).put("title", series.getString("title")).put("index", episode.getInt("index")).put("series", series).put("episode", episode);
-            if (prepared != null) row.put("preparedFile",prepared.getString("preparedFile")).put("preparedBytes",prepared.getLong("preparedBytes"));
+            if (prepared != null && prepared.has("preparedFile")) row.put("preparedFile",prepared.getString("preparedFile")).put("preparedBytes",prepared.getLong("preparedBytes"));
+            else if (prepared != null) row.put("downloadFile",prepared.getString("downloadFile"));
             next.put(row);
             for (int i = 0; i < old.length(); i++) next.put(old.get(i));
             if (!preferences.edit().putString("downloads", next.toString()).commit()) throw new JSONException("下载记录保存未成功");
@@ -206,6 +253,50 @@ final class LibraryStore {
             return result;
         }
     }
+    /** Persist an exact retry target before any irreversible provider/file operation. */
+    void stageDownloadDeletion(long id,String filename) throws Exception {
+        synchronized (LibraryStore.class) {
+            JSONArray rows=read("downloads");JSONObject selected=null;int matches=0;
+            for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&row.optLong("id",-1)==id){selected=row;matches++;}}
+            if(matches!=1)throw new IOException("下载记录不存在或身份重复");
+            selected.put("deleting",true);
+            if(filename!=null)selected.put("deletingFile",filename);
+            commitDownloadDeletion(rows,null);
+        }
+    }
+    boolean deletedDownload(long id) {
+        synchronized (LibraryStore.class) {
+            JSONArray ids=read("deleted_download_ids_v1");String expected=Long.toString(id);
+            for(int i=0;i<ids.length();i++)if(expected.equals(ids.optString(i)))return true;
+            return false;
+        }
+    }
+    void finishDownloadDeletion(long id) throws Exception {
+        synchronized (LibraryStore.class) {
+            JSONArray rows=read("downloads"),next=new JSONArray();int matches=0;
+            for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&row.optLong("id",-1)==id)matches++;else next.put(rows.get(i));}
+            if(matches!=1)throw new IOException("下载记录已变化，请重新读取后重试");
+            JSONArray ids=read("deleted_download_ids_v1"),deleted=new JSONArray().put(Long.toString(id));
+            for(int i=0;i<ids.length()&&deleted.length()<1000;i++)if(!Long.toString(id).equals(ids.optString(i)))deleted.put(ids.get(i));
+            commitDownloadDeletion(next,deleted);
+        }
+    }
+    /** Android updates SharedPreferences memory even when disk commit returns false. */
+    private void commitDownloadDeletion(JSONArray rows,JSONArray deleted) throws IOException {
+        String previous=preferences.getString("downloads",null),previousDeleted=preferences.getString("deleted_download_ids_v1",null);
+        try {
+            SharedPreferences.Editor edit=preferences.edit().putString("downloads",rows.toString());
+            if(deleted!=null)edit.putString("deleted_download_ids_v1",deleted.toString());
+            if(edit.commit())return;
+        }catch(RuntimeException ignored){ }
+        try {
+            SharedPreferences.Editor restore=preferences.edit();
+            if(previous==null)restore.remove("downloads");else restore.putString("downloads",previous);
+            if(previousDeleted==null)restore.remove("deleted_download_ids_v1");else restore.putString("deleted_download_ids_v1",previousDeleted);
+            restore.commit();
+        }catch(RuntimeException ignored){ }
+        throw new IOException("下载删除状态保存未成功，请重试；已删除的视频文件不会恢复");
+    }
     static File preparedFile(Context context,JSONObject row) {
         return preparedFile(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),row);
     }
@@ -218,12 +309,12 @@ final class LibraryStore {
             return ownedPreparedFile(directory,row,row.getString("preparedFile"),bytes);
         }catch(Exception ignored){return null;}
     }
-    private static String preparedPrefix(JSONObject row) throws Exception {
+    static String preparedPrefix(JSONObject row) throws Exception {
         JSONObject series=row.getJSONObject("series"),episode=episode(row.getJSONObject("episode"));
         Object sid=series.opt("seriesId");if(!(sid instanceof String)||!((String)sid).matches("[0-9]{6,30}"))throw new IOException("下载剧集信息无效");
         return sid+"_"+episode.getInt("index")+"_";
     }
-    private static boolean preparedName(JSONObject row,String name) throws Exception {
+    static boolean preparedName(JSONObject row,String name) throws Exception {
         String prefix=preparedPrefix(row);
         return name.startsWith(prefix)&&name.substring(prefix.length()).matches("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}\\.mp4");
     }

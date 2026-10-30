@@ -56,6 +56,6 @@ final class CencDecryptor {
 }
 STUB
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
- "$TMP/Http403Stubs.java" "$SRC/MediaQuality.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
+ "$TMP/Http403Stubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
  "$TEST_ROOT/Http403RecoveryTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.Http403RecoveryTest
