@@ -2,11 +2,14 @@ package io.github.jackotom.hongguo.android;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.util.Base64;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
@@ -25,8 +28,12 @@ public final class TvAccountActivity extends Activity {
     private TextView status, error;
     private EditText phone, code;
     private Button send, sync;
-    private String rendered = "", action = "", localMessage = "";
+    private String rendered = "", action = "", localMessage = "", webPhase = "idle";
     private JSONObject snapshot;
+    private ImageView qrView;
+    private TextView qrStatus;
+    private Bitmap qrImage;
+    private volatile boolean qrActive, qrPolling;
     private volatile boolean visible;
     private Future<?> currentTask;
     private volatile int generation;
@@ -58,7 +65,13 @@ public final class TvAccountActivity extends Activity {
             String phase = snapshot.optString("phase", "phone");
             boolean received = phase.equals("code") || phase.equals("submitting") || phase.equals("phone") && snapshot.optString("smsState").equals("uncertain") && !snapshot.optString("maskedPhone").isEmpty();
             String screen = authenticated ? "signed" : phase.startsWith("mfa") ? "mfa" : received ? "code" : "phone";
-            if (!screen.equals(rendered)) { rendered = screen; renderForm(screen); }
+            // The website QR session re-renders independently of the SMS screen.
+            JSONObject web = snapshot.optJSONObject("web");
+            boolean webAuth = web != null && web.optBoolean("authenticated");
+            webPhase = web == null ? "idle" : web.optString("phase", "idle");
+            if (webAuth) { qrActive = false; qrImage = null; }
+            String key = screen + "|" + (webAuth ? "1" : "0") + (qrActive ? "1" : "0") + webPhase;
+            if (!key.equals(rendered)) { rendered = key; renderForm(screen, webAuth); }
             JSONObject cloud = snapshot.optJSONObject("sync");
             String message = authenticated ? "已登录 · " + snapshot.optJSONObject("user").optString("name", "红果用户")
                 : screen.equals("code") ? "请输入发送至 " + snapshot.optString("maskedPhone") + " 的验证码"
@@ -72,8 +85,9 @@ public final class TvAccountActivity extends Activity {
             for (Button button : actions) button.setEnabled(!busy);
             if (phone != null) phone.setEnabled(!busy); if (code != null) code.setEnabled(!busy);
             long retry = snapshot.optLong("retryAfter");
-            if (send != null) { send.setEnabled(!busy && retry == 0); send.setText(retry > 0 ? retry + " 秒后可重发" : rendered.equals("code") ? "重新获取验证码" : "获取短信验证码"); }
+            if (send != null) { send.setEnabled(!busy && retry == 0); send.setText(retry > 0 ? retry + " 秒后可重发" : screen.equals("code") ? "重新获取验证码" : "获取短信验证码"); }
             if (sync != null && cloud != null && cloud.optBoolean("syncing")) sync.setEnabled(false);
+            if (qrStatus != null) qrStatus.setText(webPhase.equals("scanned") ? "已扫描，请在手机红果 App 中确认登录" : "等待扫码（" + (web == null ? 0 : web.optInt("expiresIn")) + " 秒后过期）…");
         } catch (Exception failure) { error.setText(TvUi.message(failure)); }
     }
     private void showMessage(String message) { localMessage = message; error.setText(message); }
@@ -89,8 +103,8 @@ public final class TvAccountActivity extends Activity {
         field.setFilters(new InputFilter[]{new InputFilter.LengthFilter(otp ? 8 : 16)}); field.setContentDescription(label);
         form.addView(field, new LinearLayout.LayoutParams(TvUi.dp(this, 300), TvUi.dp(this, 48))); return field;
     }
-    private void renderForm(String screen) {
-        form.removeAllViews(); actions.clear(); phone = null; code = null; send = null; sync = null;
+    private void renderForm(String screen, boolean webAuth) {
+        form.removeAllViews(); actions.clear(); phone = null; code = null; send = null; sync = null; qrView = null; qrStatus = null;
         if (screen.equals("signed")) {
             sync = addAction("立即同步", () -> perform("sync", null));
             addAction("导入本机记录", () -> confirm("导入本机记录？", "将本应用登录前的收藏、历史与进度合并到当前账号，并进行云端同步；原本机记录保留。", "import"));
@@ -119,6 +133,23 @@ public final class TvAccountActivity extends Activity {
             Button cancel = TvUi.button(this, "取消登录 / 换手机号"); cancel.setOnClickListener(v -> cancel());
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, -2); params.topMargin = TvUi.dp(this, 10); form.addView(cancel, params);
         }
+        // The website QR login is an independent official session: no SMS code, no extra verification.
+        form.addView(TvUi.text(this, "官网扫码登录", 16, TvUi.TEXT));
+        if (webAuth) {
+            JSONObject user = snapshot == null ? null : snapshot.optJSONObject("web");
+            JSONObject account = user == null ? null : user.optJSONObject("user");
+            form.addView(TvUi.text(this, "已通过官网扫码登录：" + (account == null ? "红果用户" : account.optString("name", "红果用户") + " " + account.optString("idSuffix")), 14, TvUi.TEXT));
+            addAction("退出官网账号", () -> perform("webLogout", null));
+        } else if (qrActive) {
+            qrView = new ImageView(this); qrView.setImageBitmap(qrImage); qrView.setContentDescription("红果官网登录二维码");
+            LinearLayout.LayoutParams image = new LinearLayout.LayoutParams(TvUi.dp(this, 320), TvUi.dp(this, 320)); image.topMargin = TvUi.dp(this, 8);
+            form.addView(qrView, image);
+            qrStatus = TvUi.text(this, "等待扫码…", 14, TvUi.TEXT); form.addView(qrStatus);
+            addAction("取消扫码", () -> perform("webCancel", null));
+        } else {
+            form.addView(TvUi.text(this, "无法完成短信验证时，可改用手机红果 App 扫码确认；不需要短信验证码。", 13, TvUi.MUTED));
+            addAction("获取官网二维码", () -> perform("webQrcode", null));
+        }
         addAction("重新读取状态", this::refresh);
     }
     private void confirm(String title, String text, String method) {
@@ -142,6 +173,9 @@ public final class TvAccountActivity extends Activity {
                     case "sync": result = AccountSync.get().syncNow(); break;
                     case "import": result = AccountSync.get().importGuest(); break;
                     case "logout": result = AccountSync.get().logout(); break;
+                    case "webQrcode": result = AccountSync.get().webQrcode(); break;
+                    case "webCancel": result = AccountSync.get().webCancel(); break;
+                    case "webLogout": result = AccountSync.get().webLogout(); break;
                 }
             } catch (Exception problem) { failure = TvUi.message(problem); }
             final String message = failure; final JSONObject response = result;
@@ -153,8 +187,34 @@ public final class TvAccountActivity extends Activity {
                     JSONObject count = response.optJSONObject("importResult");
                     showMessage("已导入收藏 " + count.optInt("favoritesImportedCount") + " 条、观看历史 " + count.optInt("historyImportedCount") + " 条");
                 }
+                if (method.equals("webQrcode")) {
+                    Bitmap image = message.isEmpty() && response != null ? qrBitmap(response.optString("image")) : null;
+                    if (image != null) { qrImage = image; qrActive = true; refresh(); startQrPolling(); }
+                    else if (message.isEmpty()) showMessage("二维码获取未完成，请重试");
+                } else if (method.equals("webCancel") || method.equals("webLogout")) { qrActive = false; qrImage = null; }
             });
         });
+    }
+    /** Polls the scan state on the worker while a QR is on screen; expiry and errors stop the loop. */
+    private void startQrPolling() {
+        if (qrPolling) return;
+        qrPolling = true;
+        worker.submit(() -> {
+            while (qrActive && alive()) {
+                try { AccountSync.get().webPoll(); }
+                catch (Exception problem) { String text = TvUi.message(problem); main.post(() -> { if (alive()) showMessage(text); }); qrActive = false; }
+                main.post(this::refresh);
+                if (!qrActive || !alive()) break;
+                try { Thread.sleep(2500); } catch (InterruptedException stopped) { break; }
+            }
+            qrPolling = false;
+        });
+    }
+    private static Bitmap qrBitmap(String dataUrl) {
+        int at = dataUrl == null ? -1 : dataUrl.lastIndexOf("base64,");
+        if (at < 0 || dataUrl.length() - at > 1024 * 1024) return null;
+        try { byte[] bytes = Base64.decode(dataUrl.substring(at + 7), Base64.DEFAULT); return BitmapFactory.decodeByteArray(bytes, 0, bytes.length); }
+        catch (Exception invalid) { return null; }
     }
     private void cancel() {
         ++generation; action = ""; if (currentTask != null) currentTask.cancel(true); if (phone != null) phone.setText(""); if (code != null) code.setText("");
@@ -166,7 +226,7 @@ public final class TvAccountActivity extends Activity {
         AccountSync.get().setListener(changed); main.post(tick);
     }
     @Override protected void onPause() {
-        visible = false; ++generation; action = ""; if (currentTask != null) currentTask.cancel(true); main.removeCallbacks(tick); AccountSync.get().clearListener(changed);
+        visible = false; ++generation; action = ""; qrActive = false; if (currentTask != null) currentTask.cancel(true); main.removeCallbacks(tick); AccountSync.get().clearListener(changed);
         if (phone != null) phone.setText(""); if (code != null) code.setText("");
         try { if (snapshot == null || !snapshot.optBoolean("authenticated")) AccountSync.get().suspendLogin(); } catch (Exception ignored) { }
         AccountSync.get().flush(); super.onPause();

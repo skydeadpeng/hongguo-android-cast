@@ -43,9 +43,10 @@ function installMock() {
     ] },
   };
   f.guest = JSON.parse(JSON.stringify(f.library.history));
-  const accountBase = () => ({provider:'hongguo',officialLoginAvailable:true,authenticated:false,phase:'phone',revision:0,busy:false,maskedPhone:'',retryAfter:0,smsState:'',error:'',libraryReady:true,sync:{syncing:false,pendingCount:0,lastSyncAt:0,error:''}});
+  const accountBase = () => ({provider:'hongguo',officialLoginAvailable:true,authenticated:false,phase:'phone',revision:0,busy:false,maskedPhone:'',retryAfter:0,smsState:'',error:'',libraryReady:true,sync:{syncing:false,pendingCount:0,lastSyncAt:0,error:''},web:{...f.webState}});
   f.owner = () => f.account.authenticated ? 'official:'+(f.account.fixtureOwner||'a').repeat(64) : 'guest';
-  f.account=accountBase(); f.nativePhone=''; f.sendMode='sent';f.loginMode='success';f.verifyDelay=1;
+  f.webState={available:true,phase:'idle',authenticated:false,busy:false,error:'',diagnostic:'',expiresIn:0,scanState:''};
+  f.account=accountBase(); f.nativePhone=''; f.sendMode='sent';f.loginMode='success';f.verifyDelay=1;f.webMode='scanned';
   f.accountRpc = m => {
     const plan=m.method==='getAccount'?(f.accountPlans.shift()||{}):{};let result,error=plan.error,delay=plan.delay||1;
     const fresh=patch=>({...f.account,...patch,revision:f.account.revision+1});
@@ -71,10 +72,20 @@ function installMock() {
     } else if(m.method==='officialSync'){
       f.account=fresh({sync:{...f.account.sync,syncing:true}});result=f.account;
       setTimeout(()=>{f.account=fresh({sync:{syncing:false,pendingCount:0,lastSyncAt:Date.now(),error:''}});window.__androidAccountChanged?.();},100);
+    } else if(m.method==='officialWebQrcode'){
+      f.webState={...f.webState,phase:'qrcode',authenticated:false,busy:false,error:'',diagnostic:'',expiresIn:180,scanState:'waiting'};
+      f.account=fresh({web:{...f.webState}});result={provider:'hongguo_web',...f.webState,image:'data:image/png;base64,SYNTHETIC_QR'};
+    } else if(m.method==='officialWebPoll'){
+      const confirmed=f.webMode==='confirmed';
+      f.webState={...f.webState,phase:confirmed?'logged_in':'scanned',authenticated:confirmed,busy:false,error:'',diagnostic:'',expiresIn:180,scanState:confirmed?'':'scanned',user:confirmed?{name:'扫码官方账号',idSuffix:'尾号 5678'}:undefined};
+      f.account=fresh({web:{...f.webState}});result={provider:'hongguo_web',...f.webState};
+    } else if(m.method==='officialWebCancel'||m.method==='officialWebLogout'){
+      f.webState={...f.webState,phase:'idle',authenticated:false,busy:false,error:'',diagnostic:'',expiresIn:0,scanState:''};
+      f.account=fresh({web:{...f.webState}});result={provider:'hongguo_web',...f.webState};
     }
     const beginRevision=f.account.revision;
     setTimeout(()=>{
-      if(m.method!=='getAccount'&&m.method!=='officialCancelLogin'&&m.method!=='officialSync'&&!error&&f.account.revision===beginRevision)f.account=JSON.parse(JSON.stringify(result));
+      if(!['getAccount','officialCancelLogin','officialSync','officialWebQrcode','officialWebPoll','officialWebCancel','officialWebLogout'].includes(m.method)&&!error&&f.account.revision===beginRevision)f.account=JSON.parse(JSON.stringify(result));
       window.__androidResponse({id:m.id,...(error?{error}:{result:JSON.parse(JSON.stringify(result))})});
       if(!error&&['officialLoginSMS','officialVerifyMFA','officialLogout'].includes(m.method)&&f.account.revision===result.revision)window.__androidAccountChanged({owner:f.owner()});
     },delay);
@@ -279,6 +290,23 @@ try {
       const sizes=await evaluate('[...document.querySelectorAll(".account-section input,.account-section button")].map(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height}))');check(sizes.every(r=>r.w>=44&&r.h>=44),'touch targets at least44px');
       await noOverflow();await screenshot(`phone-${width}-official-phone.png`);
     }
+  });
+  await group('WEBSITE QR login renders a scannable code, polls the scan state and reports the official account', async () => {
+    await reset({open:false});await about();
+    check(await evaluate('!!document.querySelector(".account-web")'),'the website QR section is present');
+    eq(await accountCalls('officialWebQrcode'),[],'opening the panel never requests a QR code');
+    check(await evaluate('document.querySelector(".account-web .account-note").textContent.includes("不需要短信验证码")'),'the section explains that no SMS code is needed');
+    await button('获取二维码');
+    await wait('document.querySelector(".account-qr img")');
+    eq((await accountCalls('officialWebQrcode')).length,1,'one explicit QR request');
+    check(await evaluate('document.querySelector(".account-qr img").getAttribute("src").startsWith("data:image/png;base64,")'),'the QR image comes from the native data URL');
+    await screenshot('phone-official-web-qrcode.png');
+    await sleep(2600);
+    check((await accountCalls('officialWebPoll')).length>0,'the scan state is polled while the QR is on screen');
+    await evaluate('window.__seasonFixture.webMode="confirmed"');
+    await sleep(2600);
+    await wait('document.querySelector(".account-web").textContent.includes("扫码官方账号")');
+    await noOverflow();await screenshot('phone-official-web-login.png');
   });
   await group('SEND confirms masked phone and cooldown; OTP clears immediately, errors retain native phone', async () => {
     await reset({open:false});await about();await sendCode();

@@ -213,6 +213,14 @@
 .account-error>.button{margin-top:12px}
 .account-confirm{margin-top:16px;padding:16px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
 .account-section button,.account-section input{scroll-margin-block:24px}
+/* The website QR login is a separate official session from the SMS login. */
+.account-web{max-width:640px;margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
+.account-web-title{margin:0 0 4px;font-size:1rem;color:var(--text)}
+.account-qr{margin:16px 0;display:flex;justify-content:center}
+.account-qr img{width:min(280px,72vw);height:auto;aspect-ratio:1/1;object-fit:contain;padding:10px;border:1px solid var(--border);border-radius:9px;background:#fff}
+.tv-layout .account-web{max-width:720px}
+.tv-layout .account-web-title{font-size:19px}
+.tv-layout .account-qr img{width:min(360px,60vw)}
 .tv-layout .account-form{max-width:720px}
 .tv-layout .account-form>label{font-size:18px}
 .tv-layout .account-form input{min-height:56px;font-size:19px}

@@ -12,6 +12,7 @@ final class AccountSync {
     static synchronized AccountSync get(){if(instance==null)throw new IllegalStateException("红果账号尚未初始化");return instance;}
     private final OfficialAccountFlow flow;
     private final OfficialLibrary library;
+    private final OfficialWebAccount web;
     interface CloudClients { OfficialApiClient create(JSONObject session)throws Exception; }
     private final CloudClients cloudClients;
     private final ScheduledThreadPoolExecutor syncWorker=new ScheduledThreadPoolExecutor(1,r->{Thread t=new Thread(r,"hongguo-official-sync");t.setDaemon(true);return t;});
@@ -33,9 +34,13 @@ final class AccountSync {
             };}
         },System::currentTimeMillis,Thread::sleep);
     }
-    private AccountSync(Context context)throws Exception {this(createFlow(context),new OfficialLibrary(context),OfficialApiClient::new,true);}
-    AccountSync(OfficialAccountFlow flow,OfficialLibrary library,CloudClients clients,boolean periodic)throws Exception {
-        this.flow=flow;this.library=library;this.cloudClients=clients;
+    private static OfficialWebAccount createWeb(Context context)throws Exception {
+        return new OfficialWebAccount(new OfficialWebSessionStore(context),new OfficialWebGateway(),System::currentTimeMillis);
+    }
+    private AccountSync(Context context)throws Exception {this(createFlow(context),new OfficialLibrary(context),OfficialApiClient::new,true,createWeb(context));}
+    AccountSync(OfficialAccountFlow flow,OfficialLibrary library,CloudClients clients,boolean periodic)throws Exception {this(flow,library,clients,periodic,null);}
+    AccountSync(OfficialAccountFlow flow,OfficialLibrary library,CloudClients clients,boolean periodic,OfficialWebAccount web)throws Exception {
+        this.flow=flow;this.library=library;this.cloudClients=clients;this.web=web;
         syncWorker.setRemoveOnCancelPolicy(true);
         flow.setListener(this::notifyChanged);library.setOnDirty(()->schedule(2000));
         selectLibrary();
@@ -90,8 +95,17 @@ final class AccountSync {
     }
     JSONObject getAccount()throws JSONException {
         JSONObject value=flow.status(),status=library.status();boolean ready=libraryReady&&flow.uid().equals(selectedUid);String localError=!selectionError.isEmpty()?selectionError:!ready?"账号本机记录正在切换，请稍候":"";value.put("sync",status.put("syncing",syncing||syncRequested||status.optBoolean("syncing")).put("error",!localError.isEmpty()?localError:!syncError.isEmpty()?syncError:status.optString("error","")));
-        value.put("localOnly",!value.optBoolean("authenticated")).put("libraryReady",ready);return value;
+        value.put("localOnly",!value.optBoolean("authenticated")).put("libraryReady",ready);value.put("web",webStatus());return value;
     }
+    /** The website session is reported on its own: it is not the mobile passport session that drives the library. */
+    JSONObject webStatus()throws JSONException {
+        if(web==null)return new JSONObject().put("available",false);
+        JSONObject value=web.status();value.put("available",true);return value;
+    }
+    JSONObject webQrcode()throws Exception {if(web==null)throw new java.io.IOException("红果官网扫码登录不可用");JSONObject value=web.start();notifyChanged();return value;}
+    JSONObject webPoll()throws Exception {if(web==null)throw new java.io.IOException("红果官网扫码登录不可用");JSONObject value=web.poll();notifyChanged();return value;}
+    JSONObject webLogout()throws Exception {if(web==null)throw new java.io.IOException("红果官网扫码登录不可用");JSONObject value=web.logout();notifyChanged();return value;}
+    JSONObject webCancel()throws Exception {if(web==null)throw new java.io.IOException("红果官网扫码登录不可用");JSONObject value=web.cancel();notifyChanged();return value;}
     JSONObject sendCode(JSONObject params)throws Exception{flow.sendCode(params.optString("phone",flow.phoneForLogin()));return getAccount();}
     JSONObject loginSMS(JSONObject params)throws Exception {
         flow.loginSMS(params.optString("phone",flow.phoneForLogin()),params.optString("code",""));selectLibrary();if(!flow.uid().isEmpty())schedule(0);notifyChanged();return getAccount();
@@ -130,7 +144,7 @@ final class AccountSync {
         }
     }
     private void cancelSync(){synchronized(syncLock){syncGeneration++;syncRequested=false;if(scheduled!=null){scheduled.cancel(true);scheduled=null;}}OfficialApiClient current=syncClient;if(current!=null)current.close();}
-    void foreground(){selectLibrary();schedule(0);notifyChanged();}
+    void foreground(){selectLibrary();schedule(0);if(web!=null)syncWorker.execute(()->{try{web.restore();}catch(RuntimeException ignored){}});notifyChanged();}
     void flush(){try{flow.suspendLogin();}catch(JSONException ignored){}cancelSync();syncWorker.execute(()->{try{library.checkpoint();}catch(Exception failure){syncError="本机账号记录保存未完成，请检查存储空间";notifyChanged();}});}
     void checkpoint()throws Exception{library.checkpoint();}
     void close(){cancelSync();syncWorker.shutdownNow();try{flow.cancelLogin();}catch(JSONException ignored){}}

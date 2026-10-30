@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 JAVA_HOME="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
 JSON_JAR="${JSON_JAR:-$HOME/.m2/repository/com/vaadin/external/google/android-json/0.0.20131108.vaadin1/android-json-0.0.20131108.vaadin1.jar}"
 TMP="$(mktemp -d -t hongguo-official-coordinator.XXXXXX)";trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP/stubs/android/content" "$TMP/stubs/android/os"
+mkdir -p "$TMP/stubs/android/content" "$TMP/stubs/android/os" "$TMP/stubs/android/util" "$TMP/stubs/android/security/keystore"
 cat > "$TMP/stubs/android/content/Context.java" <<'JAVA'
 package android.content;public abstract class Context {public static final int MODE_PRIVATE=0;public Context getApplicationContext(){return this;}public abstract java.io.File getFilesDir();public abstract java.io.File getExternalFilesDir(String type);public abstract SharedPreferences getSharedPreferences(String name,int mode);}
 JAVA
@@ -13,6 +13,15 @@ package android.content;public interface SharedPreferences {java.util.Map<String
 JAVA
 cat > "$TMP/stubs/android/os/Environment.java" <<'JAVA'
 package android.os;public final class Environment {public static final String DIRECTORY_DOWNLOADS="Download";}
+JAVA
+cat > "$TMP/stubs/android/util/Base64.java" <<'JAVA'
+package android.util;public final class Base64 {public static final int DEFAULT=0,NO_WRAP=2;private Base64(){}public static byte[] decode(String value,int flags){return java.util.Base64.getMimeDecoder().decode(value);}public static String encodeToString(byte[] value,int flags){return java.util.Base64.getEncoder().encodeToString(value);}}
+JAVA
+cat > "$TMP/stubs/android/security/keystore/KeyProperties.java" <<'JAVA'
+package android.security.keystore;public final class KeyProperties {public static final String KEY_ALGORITHM_AES="AES",BLOCK_MODE_GCM="GCM",ENCRYPTION_PADDING_NONE="NoPadding";public static final int PURPOSE_ENCRYPT=1,PURPOSE_DECRYPT=2;private KeyProperties(){}}
+JAVA
+cat > "$TMP/stubs/android/security/keystore/KeyGenParameterSpec.java" <<'JAVA'
+package android.security.keystore;public final class KeyGenParameterSpec implements java.security.spec.AlgorithmParameterSpec {private KeyGenParameterSpec(){}public static final class Builder {public Builder(String alias,int purposes){}public Builder setBlockModes(String... modes){return this;}public Builder setEncryptionPaddings(String... paddings){return this;}public KeyGenParameterSpec build(){return new KeyGenParameterSpec();}}}
 JAVA
 cat > "$TMP/OfficialApiClient.java" <<'JAVA'
 package io.github.jackotom.hongguo.android;
@@ -37,8 +46,8 @@ JAVA
 cat > "$TMP/OfficialSessionStore.java" <<'JAVA'
 package io.github.jackotom.hongguo.android;
 import android.content.Context;import org.json.*;
-final class OfficialSessionStore implements OfficialAccountFlow.Store{OfficialSessionStore(Context context){}public JSONObject load(){throw new AssertionError("production keystore constructor not used by injected test");}public void save(JSONObject value){throw new AssertionError("production store not used");}}
+final class OfficialSessionStore implements OfficialAccountFlow.Store{interface Vault{String seal(String value)throws Exception;String open(String value)throws Exception;}OfficialSessionStore(Context context){}public JSONObject load(){throw new AssertionError("production keystore constructor not used by injected test");}public void save(JSONObject value){throw new AssertionError("production store not used");}}
 JAVA
 SRC="$ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
-"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/stubs/android/content/Context.java" "$TMP/stubs/android/content/SharedPreferences.java" "$TMP/stubs/android/os/Environment.java" "$TMP/OfficialApiClient.java" "$TMP/OfficialSessionStore.java" "$SRC/AccountLog.java" "$SRC/LibraryStore.java" "$SRC/OfficialLibrary.java" "$SRC/OfficialAccountFlow.java" "$SRC/AccountSync.java" "$ROOT/android/tests/OfficialAccountFlowTest.java" "$ROOT/android/tests/OfficialLibraryTest.java" "$ROOT/android/tests/OfficialAccountCoordinatorTest.java" "$ROOT/android/tests/OfficialCoordinatorReviewTest.java"
+"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/stubs/android/content/Context.java" "$TMP/stubs/android/content/SharedPreferences.java" "$TMP/stubs/android/os/Environment.java" "$TMP/stubs/android/util/Base64.java" "$TMP/stubs/android/security/keystore/KeyProperties.java" "$TMP/stubs/android/security/keystore/KeyGenParameterSpec.java" "$TMP/OfficialApiClient.java" "$TMP/OfficialSessionStore.java" "$SRC/AccountLog.java" "$SRC/LibraryStore.java" "$SRC/OfficialLibrary.java" "$SRC/OfficialAccountFlow.java" "$SRC/OfficialWebPassport.java" "$SRC/OfficialWebGateway.java" "$SRC/OfficialWebAccount.java" "$SRC/OfficialAccountVault.java" "$SRC/OfficialWebSessionStore.java" "$SRC/NetworkGuard.java" "$SRC/DanmakuSigner.java" "$SRC/AccountSync.java" "$ROOT/android/tests/OfficialAccountFlowTest.java" "$ROOT/android/tests/OfficialLibraryTest.java" "$ROOT/android/tests/OfficialAccountCoordinatorTest.java" "$ROOT/android/tests/OfficialCoordinatorReviewTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.OfficialCoordinatorReviewTest "${1:-all}"

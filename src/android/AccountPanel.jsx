@@ -6,6 +6,7 @@ const signal = name => window.dispatchEvent(new Event(name));
 export default function AccountPanel({ focusRequest }) {
   const [account, setAccount] = useState(null), [error, setError] = useState(''), [readError, setReadError] = useState(''), [action, setAction] = useState('');
   const [phone, setPhone] = useState(''), [code, setCode] = useState(''), [confirm, setConfirm] = useState(''), [importSummary, setImportSummary] = useState('');
+  const [qrImage, setQrImage] = useState(''), [qrError, setQrError] = useState('');
   const reading = useRef(null);
   const mounted = useRef(false), operation = useRef(0), revision = useRef(-1), currentAccount = useRef(null), currentAction = useRef('');
   const section = useRef(null), phoneInput = useRef(null), codeInput = useRef(null), verifyButton = useRef(null), syncButton = useRef(null), logoutButton = useRef(null), refreshButton = useRef(null), cancelButton = useRef(null), shouldFocus = useRef(false);
@@ -68,7 +69,42 @@ export default function AccountPanel({ focusRequest }) {
   const send = event => { event.preventDefault(); try { perform('officialSendCode', phoneFields(phone)); } catch (failure) { setError(failure.message); } };
   const login = event => { event.preventDefault(); try { const params = otpFields(code); setCode(''); perform('officialLoginSMS', params); } catch (failure) { setCode(''); setError(failure.message); } };
   const cancel = () => { setPhone(''); setCode(''); perform('officialCancelLogin'); };
+  // The website QR handshake needs no SMS code and no additional short-message verification.
+  const startQr = async () => {
+    setQrError(''); setQrImage('');
+    try {
+      const value = await nativeCall('officialWebQrcode', {}, 30000);
+      if (!mounted.current) return;
+      const image = typeof value?.image === 'string' ? value.image : '';
+      setQrImage(image);
+      if (!image) setQrError('二维码获取未完成，请重试。');
+      refresh();
+    } catch (failure) { if (mounted.current) setQrError(failure?.message || '二维码获取未完成，请重试。'); }
+  };
+  const cancelQr = async () => {
+    setQrError(''); setQrImage('');
+    try { await nativeCall('officialWebCancel', {}, 15000); } catch (failure) { if (mounted.current) setQrError(failure?.message || '取消扫码未完成，请重试。'); }
+    refresh();
+  };
+  const webLogout = async () => {
+    setQrError(''); setQrImage('');
+    try { await nativeCall('officialWebLogout', {}, 20000); } catch (failure) { if (mounted.current) setQrError(failure?.message || '退出官网账号未完成，请重试。'); }
+    refresh();
+  };
   const busy = !!action || account?.busy, phase = account?.phase || 'phone', signedIn = account?.authenticated === true;
+  const webPhase = account?.web?.phase || 'idle';
+  // Poll the scan state while a QR is on screen. The phase string is the only dependency, so the
+  // one-second status refresh never restarts this timer.
+  useEffect(() => {
+    if (webPhase !== 'qrcode' && webPhase !== 'scanned') return undefined;
+    let stopped = false;
+    const timer = setInterval(() => {
+      if (stopped || document.visibilityState === 'hidden') return;
+      nativeCall('officialWebPoll', {}, 20000).then(() => { if (!stopped && mounted.current) refresh(); })
+        .catch(failure => { if (!stopped && mounted.current) setQrError(failure?.message || '扫码状态读取未完成，请重试。'); });
+    }, 2000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [webPhase, refresh]);
   const receivedCodeAllowed = phase === 'code' || phase === 'submitting' || phase === 'phone' && account?.smsState === 'uncertain' && !!account?.maskedPhone;
   const visibleError = error || account?.error || account?.sync.error || readError;
   return <section ref={section} className="about-section account-section" aria-labelledby="account-title" aria-busy={!!busy}>
@@ -87,6 +123,24 @@ export default function AccountPanel({ focusRequest }) {
       {(phase === 'mfa' || phase === 'mfa_waiting') && <div className="account-confirm" role="group" aria-label="红果追加短信验证"><p>请使用 {account?.maskedPhone || '登录手机号'} 向以下号码发送指定短信：</p><dl className="account-details"><div><dt>收件号码</dt><dd>{account?.smsNumber}</dd></div><div><dt>短信内容</dt><dd style={{ overflowWrap: 'anywhere' }}>{account?.smsContent}</dd></div></dl><p className="account-note">短信由你在手机上手动发送；发完后点击下面按钮。本机验证最多等待90秒，可取消。</p><p className="account-note">无法手动发送这条短信时，请改用下方「官网扫码登录」——用手机红果 App 扫二维码确认即可，不需要追加短信。</p><div className="account-actions"><button ref={verifyButton} type="button" className="button primary" disabled={!!busy} onClick={() => perform('officialVerifyMFA')}>我已发送短信，开始验证</button></div></div>}
       {(phase !== 'phone' || receivedCodeAllowed || busy || account?.retryAfter > 0) && <div className="account-actions"><button ref={cancelButton} type="button" className="button" onClick={cancel}>{busy ? '取消登录' : '换手机号 / 取消'}</button></div>}
     </>}
+    {account?.web?.available && <div className="account-web">
+      <h3 className="account-web-title">官网扫码登录</h3>
+      {account.web.authenticated ? <>
+        <p className="account-note">已通过官网扫码登录红果官方账号：{account.web.user?.name} {account.web.user?.idSuffix}。这是与短信验证码登录相互独立的官方会话。</p>
+        <div className="account-actions"><button type="button" className="button" disabled={!!busy} onClick={webLogout}>退出官网账号</button></div>
+      </> : <>
+        <p className="account-note">用手机红果 App 扫描二维码并在手机上确认即可登录官方账号：不需要短信验证码，也不会要求追加短信验证。</p>
+        {qrImage && <div className="account-qr"><img src={qrImage} alt="红果官网登录二维码" /></div>}
+        {webPhase === 'scanned' && <p className="account-note">已扫描，请在手机红果 App 中确认登录。</p>}
+        {webPhase === 'qrcode' && qrImage && <p className="account-note">等待扫码（{account.web.expiresIn} 秒后过期）…</p>}
+        {qrError && <p className="account-error" role="alert">{qrError}</p>}
+        <div className="account-actions">
+          {qrImage
+            ? <button type="button" className="button" disabled={!!busy} onClick={cancelQr}>取消扫码</button>
+            : <button type="button" className="button primary" disabled={!!busy} onClick={startQr}>获取二维码</button>}
+        </div>
+      </>}
+    </div>}
     <div className="account-actions"><button ref={refreshButton} type="button" className="button" disabled={!!action} onClick={refresh}>重新读取状态</button></div>
   </section>;
 }

@@ -6,6 +6,7 @@ export function accountView(value) {
   const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
   const masked = value => typeof value === 'string' && /^1\d{2}\*{4}\d{4}$/.test(value) ? value : '';
   const sync = value.sync && typeof value.sync === 'object' ? value.sync : {};
+  const web = value.web && typeof value.web === 'object' ? value.web : {};
   return {
     provider: 'hongguo', authenticated: value.authenticated, officialLoginAvailable: true,
     revision: count(value.revision), phase: value.phase, busy: value.busy === true,
@@ -19,6 +20,18 @@ export function accountView(value) {
     smsContent: text(value.smsContent, 256), mfaExpiresAt: count(value.mfaExpiresAt),
     libraryReady: value.libraryReady !== false,
     sync: { syncing: sync.syncing === true, pendingCount: count(sync.pendingCount), lastSyncAt: count(sync.lastSyncAt), error: text(sync.error), authExpired: sync.authExpired === true },
+    // The website QR session is a separate credential: it never carries the mobile passport state.
+    web: {
+      available: web.available === true,
+      phase: ['idle', 'qrcode', 'scanned', 'logged_in'].includes(web.phase) ? web.phase : 'idle',
+      authenticated: web.authenticated === true,
+      busy: web.busy === true,
+      error: text(web.error),
+      diagnostic: /^[a-z_]{1,40}$/.test(web.diagnostic || '') ? web.diagnostic : '',
+      expiresIn: Math.min(600, count(web.expiresIn)),
+      scanState: ['waiting', 'scanned'].includes(web.scanState) ? web.scanState : '',
+      user: web.authenticated && web.user && typeof web.user === 'object' ? { name: text(web.user.name, 80) || '红果用户', idSuffix: /^尾号 \d{1,4}$/.test(web.user.idSuffix || '') ? web.user.idSuffix : '' } : null,
+    },
   };
 }
 export function phoneFields(phone) {
