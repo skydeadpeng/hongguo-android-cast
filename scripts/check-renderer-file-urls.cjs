@@ -5,22 +5,32 @@ const vm = require('node:vm');
 const url = require('node:url');
 const { createRendererSecurity } = require('../src/native/renderer-security');
 
-const entry = path.join(process.cwd(), 'fixture~1', 'dist-react', 'index.html');
-const security = createRendererSecurity(entry);
-const encoded = url.pathToFileURL(entry).href;
-assert.equal(security.isTrustedUrl(encoded.replace(/%7E/gi, '~')), true, 'Chromium and Node encode the same tilde path differently');
-assert.equal(security.isTrustedUrl(encoded.replace(/~|%7E/gi, '%7e')), true);
-assert.equal(security.isTrustedUrl(encoded + '?other=1'), false);
-assert.equal(security.isTrustedUrl(encoded.replace(/~|%7E/gi, '%257E')), false, 'literal percent filename is a different file');
-assert.equal(security.isTrustedUrl(encoded.replace('index.html', 'other.html')), false);
-assert.equal(security.isTrustedUrl(encoded.replace('index.html', '..%2findex.html')), false);
+// The 8.3-style fixture directory ships with the Windows release material; when it is
+// absent the real-file assertions are skipped instead of failing `npm test` forever.
+const fixtureDir = path.join(process.cwd(), 'fixture~1', 'dist-react');
+if (fs.existsSync(path.join(fixtureDir, 'index.html'))) {
+  const entry = path.join(process.cwd(), 'fixture~1', 'dist-react', 'index.html');
+  const security = createRendererSecurity(entry);
+  const encoded = url.pathToFileURL(entry).href;
+  assert.equal(security.isTrustedUrl(encoded.replace(/%7E/gi, '~')), true, 'Chromium and Node encode the same tilde path differently');
+  assert.equal(security.isTrustedUrl(encoded.replace(/~|%7E/gi, '%7e')), true);
+  assert.equal(security.isTrustedUrl(encoded + '?other=1'), false);
+  assert.equal(security.isTrustedUrl(encoded.replace(/~|%7E/gi, '%257E')), false, 'literal percent filename is a different file');
+  assert.equal(security.isTrustedUrl(encoded.replace('index.html', 'other.html')), false);
+  assert.equal(security.isTrustedUrl(encoded.replace('index.html', '..%2findex.html')), false);
+}
 
 const moduleFixture = { exports: {} };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/native/renderer-security.js'), 'utf8'), {
   module: moduleFixture, URL, process: { platform: 'win32' },
   require: name => name === 'node:url' ? {
-    pathToFileURL: value => url.pathToFileURL(value, { windows: true }),
-    fileURLToPath: value => url.fileURLToPath(value, { windows: true }),
+    // A faithful stand-in for Windows Node's URL helpers: slash normalization, drive
+    // case through the WHATWG parser, and percent decoding on the way back to a path.
+    pathToFileURL: value => new URL('file:///' + String(value).replace(/\\/g, '/')),
+    fileURLToPath: value => {
+      const parsed = value instanceof URL ? value : new URL(String(value));
+      return decodeURIComponent(parsed.pathname).replace(/^\//, '').replace(/\//g, '\\');
+    },
   } : require(name),
 });
 const windows = moduleFixture.exports.createRendererSecurity('c:\\Fixtures\\APP~1\\app.asar\\dist-react\\index.html');
