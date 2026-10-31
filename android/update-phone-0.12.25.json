@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 48,
+  "versionName": "0.12.25",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.25/Hongguo-0.12.25-phone-release-compatible.apk",
+  "size": 633460,
+  "sha256": "f05e488745ceae1eeced1ecfda714bd6395c6c498410bde86062b10177bb63c8",
+  "notes": "剧集页按视频类 App 标准收紧：元信息并入海报旁一列（追剧移入标签行、简介一行加行内展开）、单季不再显示分季区、选集区紧贴其上；首屏可见的选集数量约为上一版的两倍。返回键与各区间距同步压缩；底部「立即播放/缓存」不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-10-31T12:41:08.376Z"
+}
