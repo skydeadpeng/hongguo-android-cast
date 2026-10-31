@@ -131,6 +131,97 @@ final class NetworkGuard {
     static InetAddress[] publicAddresses(URI uri) throws IOException {
         return publicAddresses(uri, System.nanoTime() + 25_000_000_000L);
     }
+    /** Injected by tests; the production value queries the two public DoH endpoints. */
+    static volatile java.util.function.Function<String, InetAddress[]> dohProbe;
+    private static final String[] DOH_ENDPOINTS = {"https://1.1.1.1/dns-query?name=%s&type=A", "https://223.5.5.5/resolve?name=%s&type=A"};
+
+    /**
+     * Official-site resolution that survives a VPN's fake-IP DNS: the system resolver and
+     * the two trusted DoH endpoints race, and whichever answer is publicly routable first
+     * wins. Fake-IP answers (198.18/15 and friends) are already rejected by publicAddress,
+     * so a captured system resolver can only lose the race, never poison the winner.
+     */
+    static InetAddress[] officialAddresses(URI uri, long deadline) throws IOException {
+        if (!OFFICIAL.contains(uri.getHost().toLowerCase(Locale.ROOT)) && !uri.getHost().toLowerCase(Locale.ROOT).endsWith(".hongguoduanju.com")) return publicAddresses(uri, deadline);
+        String host = uri.getHost();
+        Callable<InetAddress[]> system = () -> InetAddress.getAllByName(host);
+        Callable<InetAddress[]> trusted = () -> {
+            IOException last = null;
+            for (String endpoint : DOH_ENDPOINTS) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException("网络请求已取消");
+                try {
+                    InetAddress[] answer = dohProbe != null ? dohProbe.apply(host) : dohHttp(String.format(endpoint, URLEncoder.encode(host, "UTF-8")));
+                    if (answer != null && answer.length > 0) return answer;
+                } catch (IOException error) { last = error; }
+                catch (Exception invalid) { last = new IOException("可信解析不可用", invalid); }
+            }
+            throw last == null ? new UnknownHostException("可信解析无结果") : last;
+        };
+        Future<InetAddress[]> first, second;
+        try { first = DNS.submit(system); second = DNS.submit(trusted); }
+        catch (RejectedExecutionException error) { return publicAddresses(uri, deadline); }
+        IOException[] failures = new IOException[2];
+        try {
+            for (int done = 0; done < 2; done++) {
+                Future<InetAddress[]> finished;
+                try { finished = laneDone(first, second); }
+                catch (InterruptedException stopped) { Thread.currentThread().interrupt(); throw new InterruptedIOException("网络请求已取消"); }
+                try {
+                    InetAddress[] addresses;
+                    try { addresses = finished.get(remaining(deadline, Integer.MAX_VALUE), TimeUnit.MILLISECONDS); }
+                    catch (InterruptedException stopped) { Thread.currentThread().interrupt(); throw new InterruptedIOException("网络请求已取消"); }
+                    remaining(deadline, Integer.MAX_VALUE);
+                    if (addresses != null && addresses.length > 0) {
+                        for (InetAddress address : addresses) if (address == null || !publicAddress(address)) throw new IOException("域名解析到非公网地址");
+                        return addresses;
+                    }
+                    throw new UnknownHostException("域名解析为空");
+                } catch (ExecutionException error) {
+                    Throwable cause = error.getCause();
+                    IOException failure = cause instanceof IOException ? (IOException) cause : new IOException("域名解析失败", cause);
+                    if (failures[0] == null) failures[0] = failure; else failures[1] = failure;
+                } catch (TimeoutException error) { if (failures[0] == null) failures[0] = new SocketTimeoutException("域名解析超时"); }
+            }
+            throw failures[0] != null ? failures[0] : failures[1];
+        } finally { first.cancel(true); second.cancel(true); }
+    }
+    /** Returns whichever resolver lane finishes first; both are bounded by the caller's deadline. */
+    private static <T> Future<T> laneDone(Future<T> first, Future<T> second) throws InterruptedException {
+        while (true) {
+            if (first.isDone()) return first;
+            if (second.isDone()) return second;
+            Thread.sleep(5);
+        }
+    }
+    /** One DoH JSON query over TLS pinned to the resolver's own IP; bounded body, short timeout. */
+    private static InetAddress[] dohHttp(String endpoint) throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(endpoint);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(3000);
+            connection.setReadTimeout(3000);
+            connection.setRequestProperty("Accept", "application/dns-json");
+            connection.setRequestProperty("User-Agent", UA);
+            if (connection.getResponseCode() != 200) throw new IOException("DoH 响应 HTTP " + connection.getResponseCode());
+            try (InputStream input = connection.getInputStream(); ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
+                byte[] chunk = new byte[4096];
+                for (int read; (read = input.read(chunk)) >= 0; ) { buffer.write(chunk, 0, read); if (buffer.size() > 2 * 1024 * 1024) throw new IOException("DoH 响应过长"); }
+                org.json.JSONObject payload = new org.json.JSONObject(buffer.toString("UTF-8"));
+                if (payload.optInt("Status", -1) != 0) throw new IOException("DoH 返回状态 " + payload.optInt("Status", -1));
+                org.json.JSONArray answers = payload.optJSONArray("Answer");
+                List<InetAddress> addresses = new ArrayList<>();
+                for (int at = 0; answers != null && at < answers.length(); at++) {
+                    org.json.JSONObject answer = answers.optJSONObject(at);
+                    String data = answer == null ? "" : answer.optString("data", "");
+                    if (answer != null && answer.optInt("type") == 1 && data.matches("[0-9.]{7,15}")) addresses.add(InetAddress.getByName(data));
+                }
+                if (addresses.isEmpty()) throw new UnknownHostException("DoH 无 A 记录");
+                return addresses.toArray(new InetAddress[0]);
+            }
+        } finally { if (connection != null) connection.disconnect(); }
+    }
+    /** Orders two futures by completion; used to race the resolver lanes. */
     static InetAddress[] publicAddresses(URI uri, long deadline) throws IOException {
         return resolvePublic(() -> InetAddress.getAllByName(uri.getHost()), deadline);
     }
@@ -338,7 +429,9 @@ final class NetworkGuard {
         remaining(deadline, Integer.MAX_VALUE);
         URI uri = validate(value, officialOnly);
         for (int redirects = 0; redirects <= 3; redirects++) {
-            InetAddress[] addresses = publicAddresses(uri, deadline);
+            // Official pages race the system resolver against trusted DoH: a VPN's fake-IP
+            // answer loses the race instead of hanging the episode.
+            InetAddress[] addresses = officialOnly ? officialAddresses(uri, deadline) : publicAddresses(uri, deadline);
             Socket raw = connectPublic(addresses, deadline);
             try (SocketGuard ignored = guardSocket(raw, deadline)) {
                 raw.setSoTimeout(remaining(deadline, 15_000));
