@@ -1,5 +1,5 @@
 package io.github.jackotom.hongguo.android;
-import java.util.*;import java.nio.charset.StandardCharsets;import org.json.*;
+import java.util.*;import java.nio.charset.StandardCharsets;import android.content.Intent;import org.json.*;
 /** Actual dispatch case and actual launch helper are inserted; only Android/library boundaries are doubles. */
 public final class SeasonPlaylistBridgeTest {
  final MainActivity activity=new MainActivity();boolean closed;JSONObject response;String error;int checks;
@@ -35,10 +35,9 @@ public final class SeasonPlaylistBridgeTest {
  }
 }
 final class MainActivity {final Deque<Runnable>pending=new ArrayDeque<>();int starts;Intent last;boolean isFinishing(){return false;}boolean isDestroyed(){return false;}void runOnUiThread(Runnable action){pending.add(action);}void startActivity(Intent value){starts++;last=value;}void pump(){while(!pending.isEmpty())pending.removeFirst().run();}}
-final class Intent {final Map<String,Object>extras=new LinkedHashMap<>();Intent(Object activity,Class<?>target){}Intent putExtra(String key,Object value){extras.put(key,value);return this;}Object get(String key){return extras.get(key);}}
 final class PlayerActivity {}
 final class LibraryStore {static JSONObject series(JSONObject value){return value;}static JSONObject episode(JSONObject value){return value;}static JSONArray episodes(JSONArray rows,JSONObject selected){return rows==null?new JSONArray().put(selected):rows;}static String text(JSONObject value,String key,int max)throws Exception{return value.getString(key);}}
-final class PlayerOptions {static JSONObject read(Object activity)throws Exception{return new JSONObject().put("quality","auto").put("speed",1.0);}static void validateSpeed(double speed){if(!Double.isFinite(speed)||speed<0.5||speed>2)throw new IllegalArgumentException("speed");}}
+final class PlayerOptions {static JSONObject read(android.content.Context activity)throws org.json.JSONException{return new JSONObject().put("quality","auto").put("speed",1.0);}static void validateSpeed(double speed){if(!Double.isFinite(speed)||speed<0.5||speed>2)throw new IllegalArgumentException("speed");}}
 final class PlaybackSources {static int registered;static class Plan {final JSONObject value;final String url;Plan(JSONObject v){value=v;url=v.optString("url");}JSONObject json(){return value;}}static Plan registerInitial(JSONObject input,String sid,String vid,String q){registered++;return new Plan(input);}}
 
 // Installation coordination is tested separately with actual checkpoint production code.

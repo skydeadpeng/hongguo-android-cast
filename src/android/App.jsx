@@ -675,7 +675,9 @@ function SeasonDetails({ seed, initialVid, ...props }) {
   };
   const selectedSeason = directory.items.find(candidate => sameSeries(candidate, selection.seed)) || selection.seed;
   const selectedProgress = seasonProgress(selectedSeason);
-  const seasonSelector = <section ref={selector} className="season-selector" aria-label="选择季" aria-busy={directory.busy}>
+  // Single-season shows nothing here — the episode grid starts right under the summary.
+  const seasonWanted = directory.items.length > 1 || directory.searched || directory.busy || !!directory.error || !!recent;
+  const seasonSelector = !seasonWanted ? null : <section ref={selector} className="season-selector" aria-label="选择季" aria-busy={directory.busy}>
     <header><h2>选择季</h2>{!directory.searched && <button type="button" className="button" data-season-action="search" disabled={locked || directory.busy} onClick={() => loadSeasons()}>查找其他季</button>}</header>
     {recent && <div className="season-history" aria-label="同系列观看进度"><div><strong>上次看到 {parseSeasonTitle(recent.title)?.explicit ? `${parseSeasonTitle(recent.title).label} · ` : ''}第 {recent.index} 集 · {timeText(recent.positionMs)}</strong><p>{recent.title}</p></div><button type="button" className="button" data-season-action="resume" disabled={locked} onClick={continueSeason}>继续播放</button></div>}
     <div className="season-list" role="tablist" aria-label="分季候选" aria-orientation="horizontal" onKeyDown={moveSeasonFocus}>{directory.items.map(candidate => <button key={candidate.seriesId} id={`season-tab-${candidate.seriesId}`} type="button" role="tab" className="season-choice" data-season-id={candidate.seriesId} aria-selected={sameSeries(candidate, selection.seed)} aria-controls={`season-panel-${candidate.seriesId}`} aria-label={tabDescription(candidate)} tabIndex={!locked && candidate.seriesId === focusedSeasonId ? 0 : -1} disabled={locked} onFocus={event => { setFocusedSeasonId(candidate.seriesId); event.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }} onClick={() => chooseSeason(candidate)}><span className="season-label">{tabLabel(candidate)}</span></button>)}</div>
@@ -718,7 +720,6 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
   const [mediaError, setMediaError] = useState('');
   const [episodeGroup, setEpisodeGroup] = useState(0);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
-  const [descriptionOverflow, setDescriptionOverflow] = useState(false);
   const description = useRef(null);
   const episodeGrid = useRef(null);
   const operationError = useRef(null);
@@ -799,16 +800,9 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
   const item = state.item || seed;
   const isFavorite = pointEntry && pointEntry.__owner === library.owner ? pointEntry.favoriteAt > 0 : library.favorites.some((entry) => sameSeries(entry, item));
   const episode = state.item?.episodes?.find((entry) => String(entry.vid) === String(selectedVid));
-  // Measure rendered lines, not character count: short summaries can still be
-  // long at large text sizes or in a narrow phone column.
-  useEffect(() => {
-    const node = description.current;
-    if (isTv || !node) return;
-    const measure = () => setDescriptionOverflow(node.scrollHeight > (Number.parseFloat(getComputedStyle(node).lineHeight) || 24) * 3 + 1);
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
-    observer?.observe(node); measure(); window.addEventListener('resize', measure);
-    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
-  }, [state.busy, item.description, isTv]);
+  // The collapsed row shows a single line; long synopses offer an inline expander.
+  // Length is deterministic here — DOM measurement raced layout in embedded WebViews.
+  const synopsisLong = (item.description || '').length > 60;
   const lastWatchedVid = library.history.find((entry) => sameSeries(entry, item))?.vid || (pointEntry?.__owner === library.owner && pointEntry?.seriesId === item.seriesId ? pointEntry.vid : null);
   const episodes = state.item?.episodes || [];
   // Batch range derives from the loaded directory; the inputs reset when it changes.
@@ -929,7 +923,7 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
     <div className="season-detail-panel" {...seasonPanel}>
     {resumeError && <p className="resume-error" role="alert">{resumeError}</p>}
     <Status busy={state.busy} error={state.error} onRetry={() => setReload((n) => n + 1)}>
-      <section className="detail-summary">{item.coverUrl && <div className="detail-hero" aria-hidden="true"><img src={item.coverUrl} alt="" /></div>}<div className="detail-cover">{item.coverUrl ? <img src={item.coverUrl} alt="" /> : <Film size={48} />}</div><div className="detail-copy"><h1>{item.title}</h1><div className="detail-chips"><span className="chip chip-strong">{item.episodeLabel || (item.episodeCount ? `全 ${item.episodeCount} 集` : '剧集详情')}</span>{(item.tags || []).slice(0, 3).map(tag => <span key={tag} className="chip">{tag}</span>)}</div><p ref={description} id="detail-description" className={`detail-description${!isTv && !descriptionExpanded ? ' description-collapsed' : ''}`}>{item.description || '暂无剧情简介。'}</p>{!isTv && descriptionOverflow && <button className="description-toggle" type="button" aria-expanded={descriptionExpanded} aria-controls="detail-description" onClick={() => setDescriptionExpanded((value) => !value)}>{descriptionExpanded ? '收起' : '展开'}</button>}<div className="detail-actions-row"><button type="button" className={`favorite-chip${isFavorite ? ' on' : ''}`} onClick={favorite} disabled={favoriteBusy || pointError || pointBusy} aria-pressed={isFavorite}><Heart size={16} />{favoriteBusy ? '保存中…' : isFavorite ? '已追' : '追剧'}</button></div>{favoriteError && <p className="text-error" role="alert">{favoriteError} {pointError ? <button type="button" className="button" onClick={() => setReload(n => n + 1)}>重试剧集状态</button> : "点击追剧按钮重试。"}</p>}</div></section>
+      <section className="detail-summary">{item.coverUrl && <div className="detail-hero" aria-hidden="true"><img src={item.coverUrl} alt="" /></div>}<div className="detail-cover">{item.coverUrl ? <img src={item.coverUrl} alt="" /> : <Film size={48} />}</div><div className="detail-copy"><h1 className="title-clamp">{item.title}</h1><div className="detail-chips"><span className="chip chip-strong">{item.episodeLabel || (item.episodeCount ? `全 ${item.episodeCount} 集` : '剧集详情')}</span>{(item.tags || []).slice(0, 3).map(tag => <span key={tag} className="chip">{tag}</span>)}<button type="button" className={`favorite-chip chip-fav${isFavorite ? ' on' : ''}`} onClick={favorite} disabled={favoriteBusy || pointError || pointBusy} aria-pressed={isFavorite}><Heart size={16} />{favoriteBusy ? '保存中…' : isFavorite ? '已追' : '追剧'}</button></div>{!isTv && synopsisLong ? <div className="desc-row"><p ref={description} id="detail-description" className={`detail-description${!descriptionExpanded ? ' description-collapsed' : ''}`}>{item.description || '暂无剧情简介。'}</p><button className="description-toggle" type="button" aria-expanded={descriptionExpanded} aria-controls="detail-description" onClick={() => setDescriptionExpanded((value) => !value)}>{descriptionExpanded ? '收起' : '展开'}</button></div> : <p ref={description} id="detail-description" className="detail-description">{item.description || '暂无剧情简介。'}</p>}{favoriteError && <p className="text-error" role="alert">{favoriteError} {pointError ? <button type="button" className="button" onClick={() => setReload(n => n + 1)}>重试剧集状态</button> : "点击追剧按钮重试。"}</p>}</div></section>
       <section className="episode-section"><header><h2>选集</h2><span className="episode-count">{state.item?.episodes?.length || 0} 集</span><button className="text-toggle" type="button" disabled={!!batch?.running || mediaBusy} onClick={() => setBatchPanel(value => !value)}>{batchPanel ? '收起' : '批量下载'}</button></header>
       {batchPanel && <div className="batch-panel" role="group" aria-label="批量下载">
         <div className="batch-range">

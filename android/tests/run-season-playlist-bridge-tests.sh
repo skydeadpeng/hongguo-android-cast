@@ -14,5 +14,23 @@ launch=source.index('    private void play(');launch_end=source.index('    /** E
 Path(sys.argv[3]).write_text(template.replace('/* ACTUAL_PLAY_CASE */',source[start:end]).replace('/* ACTUAL_PLAY_METHOD */',source[launch:launch_end]))
 print('SEASON_PLAYLIST_BRIDGE_BINDING dispatch=actual launch=actual')
 PY
-"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/SeasonPlaylistBridgeTest.java" "$SRC/PlaybackPlaylist.java" "$SRC/MediaQuality.java" "$SRC/UpdateOperationGate.java"
+mkdir -p "$TMP/android/content" "$TMP/io/github/jackotom/hongguo/android"
+cat > "$TMP/android/content/Context.java" <<'STUB'
+package android.content;
+public class Context { }
+STUB
+sed -i '' 's/final class MainActivity {/final class MainActivity extends android.content.Context {/' "$TMP/SeasonPlaylistBridgeTest.java"
+cat > "$TMP/android/content/Intent.java" <<'STUB'
+package android.content;
+/** Offline double: putExtra/toString shape the player intent contract relies on. */
+public class Intent {
+    public final java.util.LinkedHashMap<String, Object> extras = new java.util.LinkedHashMap<>();
+    public Intent() { }
+    public Intent(android.content.Context context, Class<?> target) { }
+    public Intent putExtra(String key, Object value) { extras.put(key, value); return this; }
+    public Object get(String key) { return extras.get(key); }
+    @Override public String toString() { return extras.toString(); }
+}
+STUB
+"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" "$TMP/android/content/Context.java" "$TMP/android/content/Intent.java" "$TMP/SeasonPlaylistBridgeTest.java" "$SRC/PlayLauncher.java" "$SRC/PlaybackPlaylist.java" "$SRC/MediaQuality.java" "$SRC/UpdateOperationGate.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.SeasonPlaylistBridgeTest

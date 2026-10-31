@@ -329,3 +329,46 @@
 
 /* Detail redesign tweaks: the synopsis toggle is a full-row tap target. */
 .description-toggle{width:100%;text-align:center;font-weight:600}
+
+/* ==== Detail compact v2: video-app density ==========================================
+   Target: first episode row within ~260px of the top on a 390px phone. Everything
+   meta lives beside the poster; the grid starts immediately. */
+.back-button{margin:0 0 6px}
+.season-selector{margin:0 0 8px;padding:0 0 8px;border-bottom:0}
+.season-selector>header{margin-bottom:6px}
+.detail-summary{grid-template-columns:96px minmax(0,1fr);gap:14px;padding:6px 0 8px}
+.detail-hero{top:-32px;height:180px;filter:blur(24px) saturate(1.15);opacity:.5}
+.detail-cover{border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.18)}
+.title-clamp{font-size:19px;line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.detail-chips{margin-top:8px;gap:6px}
+.chip{font-size:11px;padding:3px 9px}
+.chip-fav{margin-left:auto;min-height:44px;height:44px;padding:6px 14px;font-size:13px}
+.desc-row{display:flex;align-items:center;gap:6px;margin-top:6px}
+.desc-row .detail-description{flex:1;min-width:0;margin:0}
+.description-collapsed{-webkit-line-clamp:1}
+.description-toggle{width:auto;min-height:44px;padding:0 8px;font-size:13px}
+.detail-description{font-size:13px;line-height:1.6;margin:6px 0 0}
+.episode-section{margin-top:2px;padding-top:8px;border-top:0}
+.episode-section>header{min-height:44px}
+.episode-section>header h2{font-size:17px}
+.episode-count{font-size:13px}
+.episode-grid{gap:8px}
+.episode-grid>button{height:44px;border-radius:9px;font-size:14px}
+.dock-play{font-size:15px}
+@media(min-width:600px){
+  .detail-summary{grid-template-columns:120px minmax(0,1fr);gap:18px}
+  .title-clamp{font-size:24px}
+  .episode-grid{gap:10px}
+  .episode-grid>button{height:50px;font-size:15px}
+}
+.tv-layout .season-selector{margin-bottom:10px;padding-bottom:10px}
+.tv-layout .detail-summary{padding-top:8px}
+.tv-layout .episode-section{padding-top:10px}
+.tv-layout .episode-grid{gap:12px}
+@media(max-width:359px){
+  .detail-summary{grid-template-columns:84px minmax(0,1fr);gap:11px}
+  .title-clamp{font-size:17px}
+  .chip{font-size:10px;padding:2px 8px}
+  .chip-fav{padding:4px 10px}
+}
+.description-toggle{min-width:48px;justify-content:center}
