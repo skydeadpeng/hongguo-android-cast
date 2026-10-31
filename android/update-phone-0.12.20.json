@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 43,
+  "versionName": "0.12.20",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.20/Hongguo-0.12.20-phone-release-compatible.apk",
+  "size": 617860,
+  "sha256": "4d526b9b202582f4144063313307acaacddfe2fb68a9d79d46955864f4128127",
+  "notes": "修复扫码登录后的状态显示：官网扫码会话现在作为正式登录态展示，登录后立即出现同步、导入与退出入口；云端权限验证结果直接显示在账号页。\n其他说明见 0.12.19：批量下载、合并整剧、发现页换一批、深色模式、远程公告与 DoH 竞速。兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-10-31T06:25:21.520Z"
+}
