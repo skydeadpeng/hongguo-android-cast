@@ -1,0 +1,6 @@
+{
+  "id": "android-emergency-placeholder-20261031",
+  "title": "紧急公告占位",
+  "body": "此文件在未启用状态保持占位。仅在确认需要紧急通知（服务异常、强提醒）时填写真实情况、更换新 id 并把 active 设为 true。",
+  "active": false
+}

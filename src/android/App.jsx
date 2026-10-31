@@ -9,6 +9,7 @@ import gplLicense from '../../LICENSE?raw';
 import AccountPanel from './AccountPanel.jsx';
 import UpdatePanel from './UpdatePanel.jsx';
 import { createOfficialSeasonLookup, requestOfficialSeries } from './official-series.mjs';
+import { announcementLink, createAnnouncements } from './announcements.mjs';
 
 const source = createSource(requestHtml, { fallback: fetchAppPlayUrl,
   searchPage: params => nativeCall('searchQuery', params, 60000) });
@@ -421,7 +422,7 @@ function Downloads({ notify }) {
   </>;
 }
 
-function About({ info, notify, accountFocus }) {
+function About({ info, notify, accountFocus, announcementsRef }) {
   const [cache, setCache] = useState({ busy: true });
   const [clearing, setClearing] = useState(false);
   const mounted = useRef(true);
@@ -441,6 +442,7 @@ function About({ info, notify, accountFocus }) {
     <header className="page-heading"><h1>关于红果短剧</h1><p>适配手机触控与电视遥控器。</p></header>
     <AccountPanel isTv={!!info.isTv} focusRequest={accountFocus} />
     <UpdatePanel />
+    <AnnouncementSettings announcementsRef={announcementsRef} notify={notify} />
     <section className="about-section"><h2>应用信息</h2><dl><div><dt>版本</dt><dd>{info.version || '读取中'}</dd></div><div><dt>设备界面</dt><dd>{info.isTv ? 'Android TV / 电视盒子' : 'Android 手机 / 平板'}</dd></div><div><dt>播放方式</dt><dd>安卓原生全屏播放器</dd></div><div><dt>数据存储</dt><dd>本机记录；官方账号同步收藏、历史与进度</dd></div></dl></section>
     <section className="about-section"><h2>播放缓存</h2><p className="cache-status" role="status">{cache.busy ? '正在读取缓存…' : typeof cache.files === 'number' ? `${cache.files} 个文件 · ${byteText(cache.bytes)}${cache.budgetBytes ? ` / 预算 ${byteText(cache.budgetBytes)}` : ''}` : '缓存状态暂未读取'}</p><p className="cache-note">自动清理开启时，保留前 1 集和当前集；本机播放预取下一集，投屏连播时依次预缓存后面 5 集，优先下一集，不等待全部缓存再开播。预取与清理均限于当前季，不自动跨季。普通缓存预算 256 MiB，投屏期间 768 MiB，单集上限 96 MiB；容量不足或取源失败时预缓存可能不足 5 集。更早已看缓存自动释放，手动下载保留，正在供流的文件受保护。</p><div className="about-links"><button className="button" disabled={cache.busy || clearing} onClick={clearCache}>{clearing ? '清理中…' : '清理播放缓存'}</button><button className="button" disabled={clearing} onClick={refreshCache}><RefreshCw />刷新缓存状态</button></div>{cache.error && <p className="text-error" role="alert">{cache.error}</p>}</section>
     <section className="about-section"><h2>使用说明</h2><p>电视可用方向键移动焦点、确认键打开。返回键先关闭详情，再回到发现页；播放器左上角可直接返回选集。</p><p>完整分集都可选择；播放和下载依次尝试网页常规入口、网页备用入口与 App 片源。选集中的「自动取源」不是锁定标志，也不表示所有分集已经验证可播；失败会显示实际原因。</p><p>自动连播默认开启，当前集结束后继续为下一集自动取源；取源失败时保留重试和返回入口。下载完成后，可在「下载」页面离线播放。</p></section>
@@ -916,6 +918,72 @@ function useTvNavigation(isTv) {
   }, [isTv]);
 }
 
+/** Remote announcement dialog: urgent waits for acknowledgement, normal auto-collapses. */
+function AnnouncementDialog({ announcement, onClose }) {
+  const [remaining, setRemaining] = useState(30);
+  const urgent = announcement.urgent === true;
+  const link = announcementLink(announcement.body);
+  useEffect(() => {
+    if (urgent) return undefined;
+    const timer = setInterval(() => setRemaining(value => value - 1), 1000);
+    return () => clearInterval(timer);
+  }, [urgent]);
+  useEffect(() => { if (!urgent && remaining <= 0) onClose(''); }, [remaining, urgent, onClose]);
+  return <div className="announcement-overlay" role="dialog" aria-modal="true" aria-label={urgent ? '紧急公告' : '公告'}>
+    <div className="announcement-card">
+      <p className={`announcement-tag${urgent ? ' urgent' : ''}`}>{urgent ? '紧急公告' : '公告'}</p>
+      <h2>{announcement.title}</h2>
+      <p className="announcement-body">{announcement.body}</p>
+      {link && <div className="announcement-actions"><button type="button" className="button" onClick={() => { nativeCall('openExternal', { url: link }).catch(() => { }); }}><ExternalLink />在浏览器打开链接</button></div>}
+      <div className="announcement-actions">
+        {urgent
+          ? <button type="button" className="button primary" onClick={() => onClose('')}>知道了</button>
+          : <>
+            <button type="button" className="button" onClick={() => onClose('day')}>今日不再提醒</button>
+            <button type="button" className="button" onClick={() => onClose('version')}>更新前不再提醒</button>
+          </>}
+      </div>
+      {!urgent && remaining > 0 && <p className="announcement-count">{remaining} 秒后自动收起</p>}
+    </div>
+  </div>;
+}
+
+/** About-page switches for the two announcement channels plus a manual view. */
+function AnnouncementSettings({ announcementsRef, notify }) {
+  const [preferences, setPreferences] = useState(null);
+  const [manual, setManual] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { const service = announcementsRef.current?.service; if (service) setPreferences(service.getPreferences()); }, [announcementsRef]);
+  const toggle = key => {
+    const service = announcementsRef.current?.service; if (!service || !preferences) return;
+    const result = service.setPreferences({ [key]: !preferences[key] });
+    if (result.success) { setPreferences(result.preferences); setError(''); } else setError(result.error);
+  };
+  const view = async () => {
+    const service = announcementsRef.current?.service; if (!service) return;
+    setBusy(true); setError('');
+    try { const result = await service.manual(); setManual(result); if (result.error) setError(result.error); }
+    catch (failure) { setError(errorText(failure)); }
+    finally { setBusy(false); }
+  };
+  return <section className="about-section announcement-settings" aria-label="公告设置">
+    <h2>公告</h2>
+    {preferences && <div className="announcement-switches">
+      <label><input type="checkbox" checked={preferences.normalEnabled} onChange={() => toggle('normalEnabled')} />普通公告（版本更新等说明）</label>
+      <label><input type="checkbox" checked={preferences.emergencyEnabled} onChange={() => toggle('emergencyEnabled')} />紧急公告（服务异常等必要通知）</label>
+    </div>}
+    {error && <p className="text-error" role="alert">{error}</p>}
+    <div className="about-links"><button className="button" disabled={busy} onClick={view}>{busy ? '正在读取…' : '查看当前公告'}</button></div>
+    {manual?.announcement && <div className="announcement-manual">
+      <p className="announcement-tag">{manual.announcement.urgent ? '紧急公告' : '公告'}</p>
+      <p><strong>{manual.announcement.title}</strong></p>
+      <p className="announcement-body">{manual.announcement.body}</p>
+      <div className="about-links"><button className="button" onClick={() => setManual(null)}>收起</button></div>
+    </div>}
+  </section>;
+}
+
 export default function App() {
   const [tab, setTab] = useState('discover');
   const [detail, setDetail] = useState(null);
@@ -937,6 +1005,23 @@ export default function App() {
   const loadLibrary = useCallback(async () => { if (accountTransition.current) return; const epoch = ++libraryReadEpoch.current; setLibraryBusy(true); setLibraryError(''); try { const result = await nativeCall('getLibrary'); if (epoch !== libraryReadEpoch.current) return; if (typeof result.owner === "string") libraryOwner.current = result.owner; setLibrary({ favorites: result.favorites || [], history: result.history || [], projection: result.projection || null, owner: result.owner }); setLibraryError(''); } catch (error) { if (epoch === libraryReadEpoch.current) setLibraryError(errorText(error)); } finally { if (epoch === libraryReadEpoch.current) setLibraryBusy(false); } }, []);
   const replaceLibrary = useCallback(value => { libraryReadEpoch.current++; setLibrary(value); setLibraryBusy(false); }, []);
   const notify = useCallback((text) => { setNotice(text); clearTimeout(noticeTimer.current); noticeTimer.current = setTimeout(() => setNotice(''), 4500); }, []);
+  const [announcement, setAnnouncement] = useState(null);
+  const announcements = useRef(null);
+  // Remote announcements: startup check plus a five-minute emergency watch, once the
+  // version is known. Failures never surface; only validated announcements render.
+  useEffect(() => {
+    if (!info.version) return undefined;
+    if (!announcements.current || announcements.current.version !== info.version) {
+      try { announcements.current = { version: info.version, service: createAnnouncements((method, params, timeout) => nativeCall(method, params, timeout), info.version) }; }
+      catch { return undefined; }
+    }
+    const service = announcements.current.service;
+    let stopped = false;
+    const check = () => service.check().then(result => { if (!stopped && result?.announcement) setAnnouncement(result.announcement); }).catch(() => { });
+    check();
+    const timer = setInterval(() => { if (document.visibilityState !== 'hidden') check(); }, 5 * 60 * 1000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [info.version]);
   useEffect(() => {
     loadInfo(); loadLibrary();
     const refresh = event => { const owner = event?.detail?.owner; if (typeof owner === 'string' && owner !== libraryOwner.current) { libraryOwner.current = owner; libraryReadEpoch.current++; setLibrary({ ...EMPTY_LIBRARY }); setLibraryError(''); } loadLibrary(); };
@@ -960,6 +1045,16 @@ export default function App() {
   const closeDetail = useCallback(() => { setDetail(null); setTimeout(() => lastDetailFocus.current?.isConnected && lastDetailFocus.current.focus(), 0); }, []);
   const openDetail = (series, vid) => { lastDetailFocus.current = document.activeElement; previousScroll.current = content.current?.scrollTop || 0; setDetail({ seed: series, initialVid: vid }); };
   const navigate = (id) => { previousScroll.current = 0; setDetail(null); setTab(id); };
+  const closeAnnouncement = mode => {
+    const current = announcement;
+    setAnnouncement(null);
+    if (!current || !announcements.current?.service) return;
+    // An urgent dialog is marked seen even when the store write fails; the service
+    // reports that, not the UI. Normal dialogs silence by day or by version.
+    const result = current.urgent ? announcements.current.service.acknowledge(current.id)
+      : ['day', 'version'].includes(mode) ? announcements.current.service.dismiss(mode) : { success: true };
+    if (!result.success) notify(result.error);
+  };
   useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [tab]);
   useEffect(() => { if (content.current) content.current.scrollTop = detail ? 0 : previousScroll.current; if (detail) content.current?.querySelector('.back-button')?.focus(); }, [detail?.seed?.seriesId]);
   useEffect(() => {
@@ -984,8 +1079,9 @@ export default function App() {
         {tab === 'search' && <SearchPage onOpen={openDetail} />}
         {tab === 'library' && <Library library={library} error={libraryError} busy={libraryBusy} onRetry={loadLibrary} onOpen={openDetail} onAccount={() => { navigate('about'); setAccountFocus(value => value + 1); }} />}
         {tab === 'downloads' && !detail && <Downloads notify={notify} />}
-        {tab === 'about' && <About info={info} notify={notify} accountFocus={accountFocus} />}
+        {tab === 'about' && <About info={info} notify={notify} accountFocus={accountFocus} announcementsRef={announcements} />}
       </div>
     </main></div>{notice && <div className="toast" role="status">{notice}</div>}
+    {announcement && <AnnouncementDialog announcement={announcement} onClose={closeAnnouncement} />}
   </div>;
 }

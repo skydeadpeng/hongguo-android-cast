@@ -221,6 +221,19 @@
 .tv-layout .account-web{max-width:720px}
 .tv-layout .account-web-title{font-size:19px}
 .tv-layout .account-qr img{width:min(360px,60vw)}
+
+/* Remote announcements share the dialog pattern and never block scrolling underneath. */
+.announcement-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
+.announcement-card{width:min(560px,92vw);max-height:82vh;overflow:auto;padding:20px;border:1px solid var(--border);border-radius:12px;background:var(--background)}
+.announcement-card h2{margin:8px 0;font-size:1.1rem;color:var(--text)}
+.announcement-tag{display:inline-block;margin:0;padding:3px 10px;border-radius:999px;background:var(--surface);font-size:.8rem;color:var(--muted)}
+.announcement-tag.urgent{background:#d8434330;color:#d84343}
+.announcement-body{margin:12px 0;white-space:pre-line;overflow-wrap:anywhere;line-height:1.7;color:var(--text)}
+.announcement-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+.announcement-count{margin-top:8px;font-size:.82rem;color:var(--muted)}
+.announcement-switches{display:flex;flex-direction:column;gap:10px;margin:12px 0;color:var(--text)}
+.announcement-switches label{display:flex;align-items:center;gap:10px;min-height:44px}
+.announcement-manual{margin-top:16px;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
 .tv-layout .account-form{max-width:720px}
 .tv-layout .account-form>label{font-size:18px}
 .tv-layout .account-form input{min-height:56px;font-size:19px}

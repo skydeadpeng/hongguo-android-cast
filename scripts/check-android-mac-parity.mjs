@@ -98,6 +98,7 @@ await group('FUNCTION real Detail uses native play preparation and complete stri
     // Season/series helpers load at module scope; the exported Detail flow under test
     // only needs them to be callable. Panels render nothing without their effects.
     if (name === './seasons.mjs') return { createSeasonLookup: () => ({}), parseSeasonTitle: () => ({ base: '', season: 0 }), seasonCandidates: seed => [seed] };
+    if (name === './announcements.mjs') return { announcementLink: () => '', createAnnouncements: () => ({}) };
     if (name === './season-playback.mjs') return { latestSeasonHistory: () => [], assertPlaybackRequestSize() {} };
     if (name === './official-series.mjs') return { createOfficialSeasonLookup: () => ({}), requestOfficialSeries: async () => [] };
     if (name === './AccountPanel.jsx' || name === './UpdatePanel.jsx') return { __esModule: true, default: () => null };

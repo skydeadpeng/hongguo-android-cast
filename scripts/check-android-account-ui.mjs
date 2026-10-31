@@ -46,7 +46,7 @@ function installMock() {
   const accountBase = () => ({provider:'hongguo',officialLoginAvailable:true,authenticated:false,phase:'phone',revision:0,busy:false,maskedPhone:'',retryAfter:0,smsState:'',error:'',libraryReady:true,sync:{syncing:false,pendingCount:0,lastSyncAt:0,error:''},web:{...f.webState}});
   f.owner = () => f.account.authenticated ? 'official:'+(f.account.fixtureOwner||'a').repeat(64) : 'guest';
   f.webState={available:true,phase:'idle',authenticated:false,busy:false,error:'',diagnostic:'',expiresIn:0,scanState:''};
-  f.account=accountBase(); f.nativePhone=''; f.sendMode='sent';f.loginMode='success';f.verifyDelay=1;f.webMode='scanned';
+  f.account=accountBase(); f.nativePhone=''; f.sendMode='sent';f.loginMode='success';f.verifyDelay=1;f.webMode='scanned';f.announcementFixture=null;
   f.accountRpc = m => {
     const plan=m.method==='getAccount'?(f.accountPlans.shift()||{}):{};let result,error=plan.error,delay=plan.delay||1;
     const fresh=patch=>({...f.account,...patch,revision:f.account.revision+1});
@@ -163,6 +163,11 @@ function installMock() {
     else if (m.method === 'getSearchHistory') result = { keywords: [...f.searchKeywords] };
     else if (m.method === 'addSearchHistory') { f.searchKeywords = [m.params.keyword, ...f.searchKeywords.filter(x => x !== m.params.keyword)].slice(0, 20); result = { keywords: [...f.searchKeywords] }; }
     else if (m.method === 'toggleFavorite') { f.library.favorites = [m.params.series]; result = f.library; }
+    else if (m.method === 'getAnnouncements') {
+      // A localStorage fixture survives the harness's per-group reload; absent key = no active file.
+      const file = localStorage.getItem('hongguo:announcements:fixture');
+      result = { normal: file, emergency: null };
+    }
     else { error = 'UNEXPECTED_RPC_' + m.method; f.notes.push(error); }
     delay = plan.delay || delay; error = plan.error || error;
     setTimeout(() => {
@@ -442,6 +447,33 @@ try {
       eq(await retiredCalls(),[],'updates do not invoke retired account');
       await noOverflow();await screenshot(tv?'tv-combined-account-update.png':'phone-combined-account-update.png');
     }
+  });
+  await group('ANNOUNCEMENTS the validated remote file renders a dialog and the switches persist', async () => {
+    await evaluate('localStorage.removeItem("hongguo:announcements:fixture");localStorage.removeItem("hongguo:announcements:v1")');
+    await reset({open:false});await about();
+    // No active remote file: no dialog, and the switches render from stored defaults.
+    check(await evaluate('!document.querySelector(".announcement-overlay")'),'no dialog without an active file');
+    check(await evaluate('!!document.querySelector(".announcement-settings")'),'the About section renders');
+    check(await evaluate('document.querySelector(".announcement-switches input").checked'),'the normal switch defaults on');
+    await evaluate('document.querySelector(".announcement-switches input").click()');
+    check(await evaluate('!document.querySelector(".announcement-switches input").checked'),'the switch toggles off');
+    // An active normal file shows the dialog with bounded dismissal actions; the
+    // fixture rides localStorage so it survives the harness's per-group reload, and
+    // the earlier switch test's stored preference is reset first.
+    await evaluate('localStorage.removeItem("hongguo:announcements:v1")');
+    await evaluate('localStorage.setItem("hongguo:announcements:fixture",JSON.stringify({id:"notice-ui-1",title:"合成公告",body:"第一行",active:true}))');
+    await reset({open:false});await about();
+    await wait('document.querySelector(".announcement-overlay")','the validated file opens the dialog');
+    check(await evaluate('document.querySelector(".announcement-card h2").textContent==="合成公告"'),'the validated title renders');
+    check(await evaluate('document.querySelector(".announcement-tag").textContent==="公告"'),'a normal file is not tagged urgent');
+    check(await evaluate('document.querySelector(".announcement-actions .button").textContent==="今日不再提醒"'),'bounded dismissal actions exist');
+    await screenshot('phone-announcement-dialog.png');
+    await evaluate('document.querySelector(".announcement-actions .button").click()');
+    await wait('!document.querySelector(".announcement-overlay")','the dismissal closes the dialog');
+    // A second load in the same browser stays silenced for the rest of the local day.
+    await reset({open:false});await about();
+    check(await evaluate('!document.querySelector(".announcement-overlay")'),'the day dismissal silences the same file');
+    await evaluate('localStorage.removeItem("hongguo:announcements:fixture");localStorage.removeItem("hongguo:announcements:v1")');
   });
   await group('ISOLATION no browser network, exceptions or unexpected native calls', async () => {
     eq(report.externalRequests,[],'zero external requests');eq(report.pageErrors,[],'zero browser exceptions');eq(await evaluate('window.__seasonFixture.notes'),[],'zero unexpected RPCs');
