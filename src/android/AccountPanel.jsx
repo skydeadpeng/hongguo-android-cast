@@ -78,7 +78,10 @@ export default function AccountPanel({ focusRequest }) {
     try { await nativeCall('officialWebLogout', {}, 20000); } catch (failure) { if (mounted.current) setQrError(failure?.message || '退出官网账号未完成，请重试。'); }
     refresh();
   };
-  const busy = !!action || account?.busy, signedIn = account?.authenticated === true;
+  const busy = !!action || account?.busy;
+  // The website QR session is a first-class login; the retired SMS session may coexist.
+  const passportIn = account?.authenticated === true, webIn = account?.web?.authenticated === true;
+  const signedIn = passportIn || webIn;
   const webPhase = account?.web?.phase || 'idle';
   // Poll the scan state while a QR is on screen. The phase string is the only dependency, so the
   // one-second status refresh never restarts this timer.
@@ -99,17 +102,14 @@ export default function AccountPanel({ focusRequest }) {
     <p className="account-note">用手机红果 App 扫码登录官方账号，同步收藏、历史与进度。未登录也可继续观看，本机记录不会自动上传或合并。</p>
     {visibleError && <p className="account-error" role="alert">{visibleError}</p>}
     {signedIn && <>
-      <dl className="account-details"><div><dt>当前账号</dt><dd>{account.user?.name} {account.user?.maskedPhone || account.user?.idSuffix}</dd></div><div><dt>待同步</dt><dd>{account.sync.pendingCount} 条</dd></div></dl>
-      <div className="account-actions"><button ref={syncButton} type="button" className="button primary" disabled={!!busy || account.sync.syncing} onClick={() => perform('officialSync')}>{account.sync.syncing ? '同步中…' : '立即同步'}</button><button type="button" className="button" disabled={!!busy || account.sync.syncing} onClick={() => { shouldFocus.current = true; setConfirm('import'); }}>导入本机记录</button><button ref={logoutButton} type="button" className="button" disabled={!!busy} onClick={() => { shouldFocus.current = true; setConfirm('logout'); }}>退出红果账号</button></div>
+      <dl className="account-details"><div><dt>当前账号</dt><dd>{(passportIn ? account.user?.name : account.web.user?.name) || '红果用户'} {passportIn ? account.user?.maskedPhone || account.user?.idSuffix : account.web.user?.idSuffix}</dd></div><div><dt>待同步</dt><dd>{account.sync.pendingCount} 条</dd></div></dl>
+      <div className="account-actions"><button ref={syncButton} type="button" className="button primary" disabled={!!busy || account.sync.syncing} onClick={() => perform('officialSync')}>{account.sync.syncing ? '同步中…' : '立即同步'}</button><button type="button" className="button" disabled={!!busy || account.sync.syncing} onClick={() => { shouldFocus.current = true; setConfirm('import'); }}>导入本机记录</button><button ref={logoutButton} type="button" className="button" disabled={!!busy} onClick={() => { shouldFocus.current = true; if (passportIn) setConfirm('logout'); else webLogout(); }}>{passportIn ? '退出红果账号' : '退出官网账号'}</button></div>
       {importSummary && <p className="account-note account-import-result" role="status">{importSummary}</p>}
       {confirm && <div className="account-confirm" role="group" aria-label={confirm === 'logout' ? '确认退出红果账号' : '确认导入本机记录'}><p>{confirm === 'logout' ? '退出后显示原本机记录；当前账号的本机库和待同步操作保留。' : '只在确认后合并登录前的本机收藏和观看记录；原本机库保留，云端同步可能随后写入这些记录。'}</p><div className="account-actions"><button ref={cancelButton} type="button" className="button" onClick={() => setConfirm('')}>取消</button><button type="button" className="button" onClick={() => perform(confirm === 'logout' ? 'officialLogout' : 'officialImportGuest')}>{confirm === 'logout' ? '确认退出' : '确认导入'}</button></div></div>}
     </>}
-    {account?.web?.available && <div className="account-web">
-      <h3 className="account-web-title">{signedIn ? '官网扫码登录' : '扫码登录'}</h3>
-      {account.web.authenticated ? <>
-        <p className="account-note">已通过官网扫码登录红果官方账号：{account.web.user?.name} {account.web.user?.idSuffix}。</p>
-        <div className="account-actions"><button type="button" className="button" disabled={!!busy} onClick={webLogout}>退出官网账号</button></div>
-      </> : <>
+    {account?.web?.available && (passportIn || !webIn) && <div className="account-web">
+      <h3 className="account-web-title">扫码登录</h3>
+      {!account.web.authenticated && <>
         {qrImage && <div className="account-qr"><img src={qrImage} alt="红果官网登录二维码" /></div>}
         {webPhase === 'scanned' && <p className="account-note">已扫描，请在手机红果 App 中确认登录。</p>}
         {webPhase === 'qrcode' && qrImage && <p className="account-note">等待扫码（{account.web.expiresIn} 秒后过期）…</p>}

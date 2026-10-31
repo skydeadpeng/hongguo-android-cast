@@ -58,19 +58,20 @@ public final class TvAccountActivity extends Activity {
         if (!alive()) return;
         try {
             snapshot = AccountSync.get().getAccount();
-            boolean authenticated = snapshot.optBoolean("authenticated");
-            // The website QR flow is the only login; the short-message screens are retired.
+            // The website QR session is a first-class login; the SMS session may coexist.
             JSONObject web = snapshot.optJSONObject("web");
             boolean webAuth = web != null && web.optBoolean("authenticated");
+            boolean authenticated = snapshot.optBoolean("authenticated");
+            boolean signed = authenticated || webAuth;
             webPhase = web == null ? "idle" : web.optString("phase", "idle");
             if (webAuth) { qrActive = false; qrImage = null; }
-            String key = (authenticated ? "signed" : "qr") + "|" + (webAuth ? "1" : "0") + (qrActive ? "1" : "0") + webPhase;
-            if (!key.equals(rendered)) { rendered = key; renderForm(authenticated, webAuth); }
+            String key = (signed ? "signed" : "qr") + "|" + (webAuth ? "1" : "0") + (qrActive ? "1" : "0") + webPhase;
+            if (!key.equals(rendered)) { rendered = key; renderForm(signed, webAuth); }
             JSONObject cloud = snapshot.optJSONObject("sync");
-            String message = authenticated ? "已登录 · " + snapshot.optJSONObject("user").optString("name", "红果用户")
-                : webAuth ? "已通过官网扫码登录" : qrActive ? "等待扫码" : "未登录 · 扫码登录后同步收藏与进度";
+            String message = signed ? "已登录 · " + (authenticated ? snapshot.optJSONObject("user").optString("name", "红果用户") : web.optString("user", "{}").isEmpty() ? "红果用户" : snapshot.optJSONObject("web").optJSONObject("user").optString("name", "红果用户"))
+                : qrActive ? "等待扫码" : "未登录 · 扫码登录后同步收藏与进度";
             if (!action.isEmpty() || snapshot.optBoolean("busy")) message = "正在处理账号请求…";
-            else if (authenticated && cloud != null) message += cloud.optBoolean("syncing") ? " · 正在同步…" : " · 待同步 " + cloud.optInt("pendingCount") + " 条";
+            else if (signed && cloud != null) message += cloud.optBoolean("syncing") ? " · 正在同步…" : " · 待同步 " + cloud.optInt("pendingCount") + " 条";
             status.setText(message);
             String problem = snapshot.optString("error", ""); if (problem.isEmpty() && cloud != null) problem = cloud.optString("error", "");
             error.setText(problem.isEmpty() ? localMessage : problem);
@@ -91,11 +92,12 @@ public final class TvAccountActivity extends Activity {
         if (authenticated) {
             sync = addAction("立即同步", () -> perform("sync", null));
             addAction("导入本机记录", () -> confirm("导入本机记录？", "将本应用登录前的收藏、历史与进度合并到当前账号，并进行云端同步；原本机记录保留。", "import"));
-            addAction("退出账号", () -> confirm("退出红果账号？", "退出后显示登录前的本机记录，当前账号的本地记录与待同步操作保留。", "logout"));
+            // The logout lane follows the session that actually holds the login.
+            if (authenticated && !webAuth) addAction("退出账号", () -> confirm("退出红果账号？", "退出后显示登录前的本机记录，当前账号的本地记录与待同步操作保留。", "logout"));
         }
         // The website QR login is the only entry: no SMS code, no extra verification.
         form.addView(TvUi.text(this, "扫码登录", 16, TvUi.TEXT));
-        if (authenticated || webAuth) {
+        if (webAuth) {
             JSONObject user = snapshot == null ? null : snapshot.optJSONObject("web");
             JSONObject account = user == null ? null : user.optJSONObject("user");
             form.addView(TvUi.text(this, "已通过官网扫码登录：" + (account == null ? "红果用户" : account.optString("name", "红果用户") + " " + account.optString("idSuffix")), 14, TvUi.TEXT));

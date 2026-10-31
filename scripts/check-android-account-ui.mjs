@@ -309,7 +309,8 @@ try {
     check((await accountCalls('officialWebPoll')).length>0,'the scan state is polled while the QR is on screen');
     await evaluate('window.__seasonFixture.webMode="confirmed"');
     await sleep(2600);
-    await wait('document.querySelector(".account-web").textContent.includes("扫码官方账号")');
+    // A web-only session is promoted to the main account area.
+    await wait('document.querySelector(".account-details").textContent.includes("扫码官方账号")');
     await noOverflow();await screenshot('phone-official-web-login.png');
   });
   await group('SYNC and guest import require explicit action; logout keeps original local library', async () => {

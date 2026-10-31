@@ -38,7 +38,15 @@ export function accountView(value) {
 }
 export function accountStatus(account) {
   if (!account) return '正在读取红果账号状态…';
+  // The website QR session is a first-class login: it drives the same cloud library.
+  const webIn = account.web?.authenticated === true;
   if (account.authenticated) return account.sync.syncing ? '正在同步红果收藏、历史与进度…' : account.sync.error ? '云同步未完成 · 本机记录已保留' : account.sync.pendingCount ? `有 ${account.sync.pendingCount} 条操作待同步` : account.sync.lastSyncAt ? `最近同步：${new Date(account.sync.lastSyncAt).toLocaleString('zh-CN', { hour12: false })}` : '已登录红果 · 本机记录已保存';
+  if (webIn) {
+    if (account.sync.syncing) return '正在同步红果收藏、历史与进度…';
+    if (account.sync.error) return account.sync.error;
+    if (!account.web.cloudReady) return /probe/.test(account.web.diagnostic || '') ? '官网会话云端验证未通过，请退出官网账号后重新扫码' : '正在验证官网会话的云端权限…';
+    return account.sync.pendingCount ? `有 ${account.sync.pendingCount} 条操作待同步` : account.sync.lastSyncAt ? `最近同步：${new Date(account.sync.lastSyncAt).toLocaleString('zh-CN', { hour12: false })}` : '已登录红果（官网扫码）· 本机记录已保存';
+  }
   // Short-message login is retired from the UI; the website QR flow is the only entry.
   return account.loginRequired ? '红果会话已失效，请用扫码登录；本机记录保留' : '未登录红果 · 扫码登录后同步收藏与进度';
 }
