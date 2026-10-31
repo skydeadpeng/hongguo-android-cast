@@ -56,8 +56,8 @@ SRC="$ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
   "$TMP/stubs/android/content/Context.java" "$TMP/stubs/android/content/SharedPreferences.java" "$TMP/stubs/android/os/Environment.java" \
   "$TMP/stubs/android/util/Base64.java" "$TMP/stubs/android/security/keystore/KeyProperties.java" "$TMP/stubs/android/security/keystore/KeyGenParameterSpec.java" \
   "$TMP/io/github/jackotom/hongguo/android/OfficialApiClient.java" "$TMP/io/github/jackotom/hongguo/android/OfficialSessionStore.java" \
-  "$SRC/AccountLog.java" "$SRC/LibraryStore.java" "$SRC/OfficialLibrary.java" "$SRC/OfficialAccountFlow.java" \
+  "$SRC/AccountLog.java" "$SRC/AccountSigner.java" "$SRC/LibraryStore.java" "$SRC/OfficialLibrary.java" "$SRC/OfficialAccountFlow.java" \
   "$SRC/OfficialWebPassport.java" "$SRC/OfficialWebGateway.java" "$SRC/OfficialWebAccount.java" "$SRC/OfficialWebSessionStore.java" "$SRC/OfficialAccountVault.java" \
-  "$SRC/AccountSync.java" "$SRC/NetworkGuard.java" "$SRC/DanmakuSigner.java" \
+  "$SRC/AccountSync.java" "$SRC/AppTransport.java" "$SRC/NetworkGuard.java" "$SRC/DanmakuSigner.java" \
   "$ROOT/android/tests/OfficialWebSyncTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.OfficialWebSyncTest

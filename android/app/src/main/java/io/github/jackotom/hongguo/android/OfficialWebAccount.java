@@ -183,7 +183,7 @@ final class OfficialWebAccount {
     }
 
     /** Probe lanes: the same signed request under the profiles other clients have proven. */
-    private static final String LANE_FULL="passport_full",LANE_MINIMAL="passport_minimal",LANE_UPSTREAM_UA="passport_upstream_ua";
+    private static final String LANE_UPSTREAM="upstream_72232",LANE_FULL="passport_full",LANE_MINIMAL="passport_minimal",LANE_UPSTREAM_UA="passport_upstream_ua";
     private static final String UPSTREAM_UA="com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)";
     private String cookieFor(String lane){
         String header=jar.header();
@@ -196,18 +196,19 @@ final class OfficialWebAccount {
         }
         return minimal.length()>0?minimal.toString():header;
     }
-    private static String laneUserAgent(String lane){return LANE_UPSTREAM_UA.equals(lane)?UPSTREAM_UA:null;}
+    private static String laneUserAgent(String lane){return LANE_UPSTREAM_UA.equals(lane)?UPSTREAM_UA:LANE_UPSTREAM.equals(lane)?AccountSigner.USER_AGENT:null;}
 
     /**
      * Proves the web cookie opens the signed cloud APIs: the profile request must answer
      * with this exact account id. Every lane is tried; the winning lane is remembered.
      */
     boolean probeCloud(){
-        String[] lanes={LANE_FULL,LANE_MINIMAL,LANE_UPSTREAM_UA};
+        String[] lanes={LANE_UPSTREAM,LANE_FULL,LANE_MINIMAL,LANE_UPSTREAM_UA};
         for(String lane:lanes){
             OfficialApiClient client=null;
             try{
                 synchronized(lock){cloudLane=lane;}
+                if(LANE_UPSTREAM.equals(lane)){ if(probeUpstreamLane()) return true; continue; }
                 client=cloudClient();
                 JSONObject reply=client.cloud("/reading/user/info/v1/","GET",new JSONObject(),null,false);
                 JSONObject data=reply.optJSONObject("data");
@@ -224,6 +225,35 @@ final class OfficialWebAccount {
         }
         synchronized(lock){cloudReady=false;cloudGeneration++;diagnostic="cloud_probe_rejected";}
         AccountLog.warn("official_web_cloud_probe_rejected");
+        return false;
+    }
+    /**
+     * The verified desktop lane: the 72232 hongguoTV signer over the web cookie. This is the
+     * path the upstream release actually validates cloud reads with, tried first.
+     */
+    private boolean probeUpstreamLane() throws Exception {
+        String deviceId, iid, cdid, cookie;
+        synchronized(lock){
+            if(profile==null)throw new IOException("官网会话未登录");
+            deviceId=String.valueOf(1000000000000000L+(long)(Math.random()*281474976710655L));
+            iid=String.valueOf(1000000000000000L+(long)(Math.random()*281474976710655L));
+            cdid=java.util.UUID.randomUUID().toString();
+            cookie=jar.header();
+        }
+        long now=System.currentTimeMillis();
+        java.security.SecureRandom random=new java.security.SecureRandom();
+        int[] randoms=new int[7];
+        for(int at=0;at<7;at++)randoms[at]=random.nextInt();
+        AccountSigner.Signed signed=AccountSigner.request("/reading/user/info/v1/",new java.util.LinkedHashMap<>(),deviceId,iid,cdid,now,"AXYQOS6n2m60x1fVZHIrH3iol",now-60000,randoms);
+        signed.headers.put("Cookie",cookie);
+        String raw=AppTransport.accountTextRequest(signed.url,signed.headers,System.nanoTime()+8_000_000_000L);
+        org.json.JSONObject reply=new org.json.JSONObject(raw);
+        JSONObject data=reply.optJSONObject("data");
+        String answered=data==null?"":data.optString("user_id_str",data.optString("user_id",""));
+        if(!answered.isEmpty()&&answered.equals(uid())){
+            synchronized(lock){cloudReady=true;cloudLane=LANE_UPSTREAM;AccountLog.warn("official_web_cloud_ready:lane=upstream_72232");return true;}
+        }
+        AccountLog.warn("official_web_cloud_lane_mismatch:lane=upstream_72232 answered="+(answered.isEmpty()?"none":answered.equals(uid())?"match":"different"));
         return false;
     }
 

@@ -10,7 +10,7 @@ import org.json.*;
 
 /** Fixed-domain App JSON transport. Never forwards a signed POST to a redirect destination. */
 final class AppTransport {
-    private static final Set<String> HEADERS = new HashSet<>(Arrays.asList("user-agent", "accept", "content-type", "x-xs-from-web", "x-ss-req-ticket", "x-tt-request-tag", "sdk-version", "passport-sdk-version", "x-vc-bdturing-sdk-version", "x-ss-stub", "x-gorgon", "x-khronos", "x-ladon", "x-argus", "x-helios", "x-medusa", "x-tt-dt"));
+    private static final Set<String> HEADERS = new HashSet<>(Arrays.asList("user-agent", "accept", "content-type", "x-xs-from-web", "x-ss-req-ticket", "x-tt-request-tag", "sdk-version", "passport-sdk-version", "x-vc-bdturing-sdk-version", "x-ss-stub", "x-gorgon", "x-khronos", "x-ladon", "x-argus", "x-helios", "x-medusa", "x-tt-dt", "cookie"));
     // Also bounds legacy NetworkGuard implementations/test doubles that expose only publicAddresses(URI).
     private static final ExecutorService SEARCH_DNS = new ThreadPoolExecutor(0,2,30,TimeUnit.SECONDS,new SynchronousQueue<Runnable>(), runnable -> {Thread thread=new Thread(runnable,"hongguo-app-dns");thread.setDaemon(true);return thread;},new ThreadPoolExecutor.AbortPolicy());
     /** One daemon timer closes stalled TCP/TLS/write/read operations on deadline or owner cancellation. */
@@ -111,6 +111,16 @@ final class AppTransport {
             if(!HEADERS.contains(name)||text==null||text.length()>16384||text.indexOf('\r')>=0||text.indexOf('\n')>=0)throw new IOException("搜索请求头无效");
         }
         return execute(value, method, headers, body, false, true, deadline);
+    }
+    /** Signed account GET on the 72232 host; returns the raw body text for the caller to parse. */
+    static String accountTextRequest(String url, Map<String, String> headers, long deadline) throws Exception {
+        remaining(deadline, 12000);
+        for (Map.Entry<String,String> entry : headers.entrySet()) {
+            String name = entry.getKey().toLowerCase(Locale.ROOT), text = entry.getValue();
+            if (!HEADERS.contains(name) || text == null || text.length() > 16384 || text.indexOf('\r') >= 0 || text.indexOf('\n') >= 0) throw new IOException("账号请求头无效");
+        }
+        JSONObject reply = execute(url, "GET", headers, new byte[0], false, false, deadline);
+        return reply.optString("body", "");
     }
     static boolean searchEndpoint(URI uri, String method) {
         return method.equals("POST") && "log.snssdk.com".equals(uri.getHost()) && "/service/2/device_register/".equals(uri.getRawPath())
