@@ -265,3 +265,67 @@
 /* Per-download removal keeps destructive confirmation distinct from playback. */
 .download-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;flex-shrink:0}.download-actions .button{min-height:44px}.download-confirm{padding:18px;margin-bottom:20px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}.download-confirm h2{font-size:17px}.download-confirm p{font-size:14px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}.download-confirm-actions{display:flex;gap:10px;margin-top:16px}.download-confirm-actions .button{min-height:44px}.download-delete-error,.download-destructive{color:var(--error)}.tv-layout .download-confirm h2{font-size:22px}.tv-layout .download-confirm p{font-size:18px}
 @media(max-width:599px){.download-row{flex-wrap:wrap}.download-info{flex-basis:calc(100% - 46px)}.download-actions{width:100%;padding-left:38px;justify-content:flex-start}}
+
+/* ==== Series detail redesign (phone + TV WebView + dark) ==========================
+   Streaming-app layout: blurred cover backdrop, tag chips, chip favorite,
+   episode tiles with the current one filled, one strong dock action. */
+.detail-summary{position:relative;display:grid;grid-template-columns:118px minmax(0,1fr);gap:18px;padding:14px 0 20px;overflow:hidden}
+.detail-hero{position:absolute;left:-24%;right:-24%;top:-56px;height:280px;z-index:0;pointer-events:none;filter:blur(30px) saturate(1.15);opacity:.55}
+.detail-hero img{width:100%;height:100%;object-fit:cover}
+.detail-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,var(--bg) 82%)}
+.detail-summary>*{position:relative;z-index:1}
+.detail-cover{aspect-ratio:3/4;border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.22)}
+.detail-copy{min-width:0}
+.detail-copy h1{font-size:22px;line-height:1.35}
+.detail-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.chip{padding:4px 11px;border-radius:999px;background:var(--inset);color:var(--muted);font-size:12px;font-weight:500;line-height:1.4}
+.chip-strong{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.detail-actions-row{display:flex;gap:10px;margin-top:12px}
+.favorite-chip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 18px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);color:var(--muted);font-size:14px;font-weight:600}
+.favorite-chip:hover:not(:disabled){border-color:var(--accent-border);color:var(--accent)}
+.favorite-chip.on{border-color:var(--accent-border);background:var(--accent-soft);color:var(--accent)}
+.favorite-chip.on svg{fill:currentColor}
+.episode-section{margin-top:6px;padding-top:18px;border-top:1px solid var(--border)}
+.episode-section>header{gap:10px}
+.episode-section>header h2{font-size:19px}
+.episode-count{color:var(--faint);font-size:14px;font-weight:400;align-self:center}
+.text-toggle{margin-left:auto;background:none;border:0;color:var(--accent);font-size:14px;font-weight:600;min-height:44px;padding:0 10px}
+.text-toggle:hover:not(:disabled){opacity:.8}
+.episode-note{display:none}
+.batch-toggle{display:none}
+.episode-grid{gap:10px}
+.episode-grid>button{height:48px;border-radius:11px;border:1px solid transparent;background:var(--inset);color:var(--text);font-size:15px;font-weight:600}
+.episode-grid>button:hover:not(:disabled){background:var(--surface);border-color:var(--border-strong)}
+.episode-grid>button[aria-pressed="true"]{background:var(--primary);color:#fff;box-shadow:0 5px 14px rgba(232,80,58,.32)}
+.episode-grid>button:disabled{background:transparent;color:var(--faint)}
+.dock-play{flex:2;font-size:16px;font-weight:700;letter-spacing:.02em;box-shadow:0 6px 16px rgba(232,80,58,.3)}
+.dock-download{flex:1;max-width:150px}
+.play-actions>p{margin-bottom:8px}
+@media(min-width:600px){
+  .detail-summary{grid-template-columns:170px minmax(0,1fr);gap:26px;padding-top:20px}
+  .detail-copy h1{font-size:27px}
+  .episode-grid{gap:12px}
+  .episode-grid>button{height:52px;font-size:16px}
+}
+.tv-layout .detail-summary{grid-template-columns:210px minmax(0,1fr);gap:30px;padding-top:22px}
+.tv-layout .detail-hero{top:-70px;height:340px;opacity:.6}
+.tv-layout .detail-cover{border-radius:14px}
+.tv-layout .detail-copy h1{font-size:32px}
+.tv-layout .chip{font-size:15px;padding:5px 14px}
+.tv-layout .favorite-chip{min-height:52px;font-size:17px;padding:10px 22px}
+.tv-layout .episode-section>header h2{font-size:23px}
+.tv-layout .episode-count{font-size:17px}
+.tv-layout .text-toggle{font-size:17px;min-height:52px}
+.tv-layout .episode-grid{gap:14px}
+.tv-layout .episode-grid>button{height:58px;font-size:21px;border-radius:12px}
+.tv-layout .dock-play{font-size:20px}
+@media(max-width:359px){
+  .detail-summary{grid-template-columns:88px minmax(0,1fr);gap:13px}
+  .detail-copy h1{font-size:19px}
+  .chip{font-size:11px;padding:3px 9px}
+  .episode-grid>button{height:44px;font-size:14px;border-radius:10px}
+  .dock-download{max-width:110px}
+}
+
+/* Detail redesign tweaks: the synopsis toggle is a full-row tap target. */
+.description-toggle{width:100%;text-align:center;font-weight:600}

@@ -17,7 +17,7 @@ SRC="$SOURCE_ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
 TMP="$(mktemp -d -t hongguo-startup-native.XXXXXX)"
 trap 'python3 -c "import shutil,sys;shutil.rmtree(sys.argv[1])" "$TMP"' EXIT
 mkdir -p "$TMP/sdk35" "$TMP/classes" "$TMP/io/github/jackotom/hongguo/android"
-printf '%s\n' 'package io.github.jackotom.hongguo.android; public final class BuildConfig {public static final boolean IS_TV=true,DEBUG=true;public static final String VERSION_NAME="fixture";}' > "$TMP/io/github/jackotom/hongguo/android/BuildConfig.java"
+printf '%s\n' 'package io.github.jackotom.hongguo.android; public final class BuildConfig {public static final boolean IS_TV=true,NATIVE_UI=false,DEBUG=true;public static final String VERSION_NAME="fixture";}' > "$TMP/io/github/jackotom/hongguo/android/BuildConfig.java"
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -source 17 -target 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d "$TMP/sdk35" "$TMP/io/github/jackotom/hongguo/android/BuildConfig.java" "$SRC/"*.java
 echo 'PASS StartupNative SDK35 allProductionCompile=true deviceUntouched=true'
 python3 "$TEST_ROOT/startup-main-harness.py" "$SRC" "$TMP/MainActivity.java"

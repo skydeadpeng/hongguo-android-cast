@@ -1,6 +1,7 @@
 package io.github.jackotom.hongguo.android;
 
 import android.app.Activity;
+import android.graphics.drawable.GradientDrawable;
 import android.app.AlertDialog;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -20,7 +21,7 @@ public class TvDetailActivity extends Activity {
     private JSONArray episodes;
     private TextView title, meta, description, status;
     private Button resume, favorite, download, more, retry;
-    private LinearLayout seasons, posterSlot;
+    private LinearLayout seasons, posterSlot, chips;
     private HorizontalScrollView seasonScroll;
     private GridView grid;
     private BaseAdapter adapter;
@@ -44,16 +45,23 @@ public class TvDetailActivity extends Activity {
 
         LinearLayout overview = TvUi.row(this); overview.setPadding(0, TvUi.dp(this, 8), 0, TvUi.dp(this, 8));
         posterSlot = new LinearLayout(this);
-        overview.addView(posterSlot, new LinearLayout.LayoutParams(TvUi.dp(this, 78), TvUi.dp(this, 104)));
+        posterSlot.setGravity(Gravity.CENTER);
+        posterSlot.setBackground(TvUi.chipShape(this, 12, TvUi.SURFACE));
+        overview.addView(posterSlot, new LinearLayout.LayoutParams(TvUi.dp(this, 118), TvUi.dp(this, 158)));
         LinearLayout info = new LinearLayout(this); info.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, -1, 1f); infoParams.leftMargin = TvUi.dp(this, 16);
         overview.addView(info, infoParams);
         meta = TvUi.text(this, "", 13, TvUi.MUTED); meta.setSingleLine(); meta.setEllipsize(TextUtils.TruncateAt.END);
+        meta.setVisibility(View.GONE);
         info.addView(meta, new LinearLayout.LayoutParams(-1, -2));
+        chips = TvUi.row(this); chips.setPadding(0, TvUi.dp(this, 2), 0, TvUi.dp(this, 2));
+        info.addView(chips, new LinearLayout.LayoutParams(-1, -2));
         description = TvUi.text(this, "正在读取剧集详情…", 13, TvUi.MUTED); description.setMaxLines(2); description.setEllipsize(TextUtils.TruncateAt.END);
         info.addView(description, new LinearLayout.LayoutParams(-1, 0, 1f));
         LinearLayout actions = TvUi.row(this);
         resume = TvUi.button(this, "开始观看"); resume.setOnClickListener(view -> play(resolveResume()));
+        resume.setTextColor(0xffffffff);
+        resume.setBackground(TvUi.focusSurface(8, this));
         favorite = TvUi.button(this, "收藏"); favorite.setOnClickListener(view -> toggleFavorite());
         download = TvUi.button(this, "下载第 1 集"); download.setOnClickListener(view -> confirmDownload());
         more = TvUi.button(this, "更多"); more.setOnClickListener(view -> showMore());
@@ -62,7 +70,7 @@ public class TvDetailActivity extends Activity {
             ((LinearLayout.LayoutParams) button.getLayoutParams()).rightMargin = TvUi.dp(this, 8);
         }
         info.addView(actions, new LinearLayout.LayoutParams(-1, TvUi.dp(this, 40)));
-        root.addView(overview, new LinearLayout.LayoutParams(-1, TvUi.dp(this, 120)));
+        root.addView(overview, new LinearLayout.LayoutParams(-1, TvUi.dp(this, 170)));
         seasonScroll = new HorizontalScrollView(this); seasonScroll.setHorizontalScrollBarEnabled(false); seasonScroll.setVisibility(View.GONE);
         seasons = TvUi.row(this); seasonScroll.addView(seasons, new HorizontalScrollView.LayoutParams(-2, -2));
         root.addView(seasonScroll, new LinearLayout.LayoutParams(-1, TvUi.dp(this, 42)));
@@ -85,6 +93,24 @@ public class TvDetailActivity extends Activity {
         setContentView(root); load(seriesId);
     }
     private boolean current(int ticket, String id) { return !isFinishing() && !isDestroyed() && ticket == generation && id.equals(seriesId); }
+    /** Count chip in accent + up to three muted tag chips, streaming-app style. */
+    private void renderChips(int count, JSONArray tags) {
+        chips.removeAllViews();
+        addChip("全 " + count + " 集", true);
+        if (tags != null) for (int i = 0; i < Math.min(3, tags.length()); i++) {
+            String tag = tags.optString(i, "").trim(); if (!tag.isEmpty()) addChip(tag, false);
+        }
+    }
+    private void addChip(String text, boolean strong) {
+        TextView chip = new TextView(this); chip.setText(text); chip.setTextSize(13);
+        chip.setTextColor(strong ? 0xffffffff : TvUi.MUTED);
+        chip.setGravity(Gravity.CENTER); chip.setPadding(TvUi.dp(this, 12), 0, TvUi.dp(this, 12), 0);
+        chip.setHeight(TvUi.dp(this, 30));
+        GradientDrawable background = TvUi.chipShape(this, 15, strong ? TvUi.ACCENT : 0xff2a2d30);
+        chip.setBackground(background);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, TvUi.dp(this, 30));
+        params.rightMargin = TvUi.dp(this, 8); chips.addView(chip, params);
+    }
     private void setActions() {
         boolean ready = detail != null && episodes != null && episodes.length() > 0;
         resume.setEnabled(ready && libraryReady && !downloadBusy); favorite.setEnabled(detail != null && libraryReady && !favoriteBusy && !downloadBusy);
@@ -107,9 +133,8 @@ public class TvDetailActivity extends Activity {
                 runOnUiThread(() -> {
                     if (!current(ticket, target)) return;
                     detail = loaded; episodes = loaded.optJSONArray("episodes"); title.setText(loaded.optString("title", "短剧详情"));
-                    StringBuilder line = new StringBuilder("全 ").append(episodes.length()).append(" 集");
-                    JSONArray tags = loaded.optJSONArray("tags"); if (tags != null) for (int i = 0; i < Math.min(3, tags.length()); i++) line.append(" · ").append(tags.optString(i));
-                    meta.setText(line.toString()); description.setText(loaded.optString("description", "暂无剧情简介"));
+                    renderChips(episodes.length(), loaded.optJSONArray("tags"));
+                    meta.setText("全 " + episodes.length() + " 集"); description.setText(loaded.optString("description", "暂无剧情简介"));
                     ImageView poster = TvUi.poster(this, loaded); posterSlot.addView(poster, new LinearLayout.LayoutParams(-1, -1));
                     status.setText("选集 · 确认播放，方向键选择下载目标"); setActions(); adapter.notifyDataSetChanged(); resume.requestFocus();
                     refreshLibrary(true); loadSeasons(target, ticket);

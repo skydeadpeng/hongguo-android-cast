@@ -13,6 +13,7 @@ class Handler { final List<Runnable> delayed=new ArrayList<>(),posted=new ArrayL
 class Activity {
     boolean finishing,destroyed;int delegatedKeyEvents; View content; final Window window=new Window(); final AssetManager assets=new AssetManager();
     public void onCreate(Bundle state){}protected void onResume(){}protected void onPause(){}protected void onDestroy(){destroyed=true;}protected void onSaveInstanceState(Bundle state){}public void onConfigurationChanged(Configuration config){}public void onBackPressed(){}public boolean dispatchKeyEvent(KeyEvent event){delegatedKeyEvents++;return false;}
+    protected void onNewIntent(Intent intent){}public void startActivity(Intent intent){}Intent getIntent(){return new Intent();}
     Window getWindow(){return window;}void setContentView(View view){content=view;}void finish(){finishing=true;}boolean isFinishing(){return finishing;}void runOnUiThread(Runnable action){action.run();}AssetManager getAssets(){return assets;}Resources getResources(){return new Resources();}
 }
 class Resources { Metrics getDisplayMetrics(){return new Metrics();} } class Metrics { float density=1f; }
@@ -30,6 +31,7 @@ class TextView extends View {String text="";TextView(Activity context){super(con
 class Button extends TextView {Button(Activity context){super(context);}void setAllCaps(boolean value){} }
 class Gravity {static final int CENTER=17;}
 class KeyEvent {static final int KEYCODE_MENU=82,KEYCODE_BACK=4,ACTION_DOWN=0,ACTION_UP=1;final int action,code,repeat;KeyEvent(int action,int code){this(action,code,0);}KeyEvent(int action,int code,int repeat){this.action=action;this.code=code;this.repeat=repeat;}int getAction(){return action;}int getKeyCode(){return code;}int getRepeatCount(){return repeat;}}
+class Intent {Uri data;Intent(){}Intent(String action){}Intent setData(Uri value){data=value;return this;}Uri getData(){return data;}Intent addCategory(String category){return this;}Intent setFlags(int flags){return this;}Intent putExtra(String key,String value){return this;} }
 class Build {static class VERSION {static int SDK_INT=35;} }
 class PackageInfo {String packageName="com.android.webview",versionName="69.0.3497.100";}
 class WebSettings {static final int MIXED_CONTENT_NEVER_ALLOW=1;boolean javascript,dom,file,content,fileFromFile,universal,multiple,popup,gesture;int mixed;void setJavaScriptEnabled(boolean value){javascript=value;}void setDomStorageEnabled(boolean value){dom=value;}void setAllowFileAccess(boolean value){file=value;}void setAllowContentAccess(boolean value){content=value;}void setAllowFileAccessFromFileURLs(boolean value){fileFromFile=value;}void setAllowUniversalAccessFromFileURLs(boolean value){universal=value;}void setMixedContentMode(int value){mixed=value;}void setJavaScriptCanOpenWindowsAutomatically(boolean value){popup=value;}void setSupportMultipleWindows(boolean value){multiple=value;}void setMediaPlaybackRequiresUserGesture(boolean value){gesture=value;} }

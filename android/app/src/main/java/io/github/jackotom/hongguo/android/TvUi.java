@@ -37,6 +37,8 @@ final class TvUi {
         if (border != 0) shape.setStroke(dp(context, 2), border);
         return shape;
     }
+    /** Rounded rectangle for chips; package-visible for the native detail page. */
+    static GradientDrawable chipShape(Context context, int radiusDp, int color) { return shape(context, radiusDp, color, 0); }
     static StateListDrawable focusSurface(int radiusDp, Context context) {
         StateListDrawable result = new StateListDrawable();
         result.addState(new int[]{android.R.attr.state_focused}, shape(context, radiusDp, 0xff343a3f, TEXT));

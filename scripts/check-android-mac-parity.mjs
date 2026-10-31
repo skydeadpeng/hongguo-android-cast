@@ -113,7 +113,7 @@ await group('FUNCTION real Detail uses native play preparation and complete stri
   const elements = [], walk = value => { if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === 'object') { if ('type' in value) elements.push(value); walk(value.children); } };
   const text = value => Array.isArray(value) ? value.map(text).join('') : value && typeof value === 'object' ? text(value.children) : typeof value === 'string' ? value : '';
   walk(tree);
-  for (const [method, title] of [['play', '播放本集'], ['download', '下载本集']]) {
+  for (const [method, title] of [['play', '立即播放'], ['download', '缓存']]) {
     const button = elements.find(element => element.type === 'button' && text(element.children).includes(title));
     verify(button && button.props.disabled !== true, `${method} action is enabled`); await button.props.onClick();
     const request = calls.find(call => call.method === method);
