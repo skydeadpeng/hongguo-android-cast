@@ -32,23 +32,65 @@ final class EpisodeResolver {
     private static void requireId(String value, String label) throws ResolverException {
         if (value == null || !value.matches("[0-9]{1,30}")) throw error("INVALID_INPUT", label + "必须是 1 至 30 位数字字符串");
     }
+    /** Short first budget: a hung CDN edge must not consume the whole wait alone. */
+    private static final int FIRST_BUDGET_MS = 2000, HEDGE_BUDGET_MS = 6000;
     /** Returns a lexically checked URL; the player's transport must run NetworkGuard.media before use. */
     static String resolve(String seriesId, String vid) throws Exception {
         requireId(seriesId, "剧集编号");
         requireId(vid, "分集编号");
-        Exception failure = null;
-        // Match the desktop's two official webpage routes. '_' is a route placeholder,
-        // never the actual series identity accepted by the response parser.
-        for (String path : new String[]{"/player/" + seriesId + "/" + vid, "/player/_/" + vid}) {
-            if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("已切换分集");
-            try {
-                NetworkGuard.Reply response = NetworkGuard.get(ORIGIN + path);
-                if (response.status == 404) throw error("EPISODE_UNAVAILABLE", "该分集未向官网提供公开播放页面，请在官方 App 查看");
-                if (response.status < 200 || response.status >= 300) throw error("SOURCE_HTTP", "播放页面响应 HTTP " + response.status);
-                return parse(response.body, seriesId, vid);
-            } catch (Exception error) { failure = error; }
-        }
-        throw failure;
+        // '_' is a route placeholder, never the actual series identity accepted by the
+        // response parser. Each official route gets a short budget in turn, then only
+        // dual transport timeouts race both routes once more on fresh connections,
+        // mirroring the desktop's hedged webpage retry. Definitive verdicts (404,
+        // HTTP status, identity) stay final and keep their sequential error.
+        String canonical = ORIGIN + "/player/" + seriesId + "/" + vid, underscore = ORIGIN + "/player/_/" + vid;
+        Exception[] failures = new Exception[2];
+        // SocketTimeoutException extends InterruptedIOException, so the timeout must be
+        // caught BEFORE cancellation or a hung first route aborts the whole resolution.
+        try { return attempt(canonical, seriesId, vid, FIRST_BUDGET_MS); }
+        catch (java.net.SocketTimeoutException timedOut) { failures[0] = timedOut; }
+        catch (java.io.InterruptedIOException cancelled) { throw cancelled; }
+        catch (Exception error) { failures[0] = error; }
+        try { return attempt(underscore, seriesId, vid, FIRST_BUDGET_MS); }
+        catch (java.net.SocketTimeoutException timedOut) { failures[1] = timedOut; }
+        catch (java.io.InterruptedIOException cancelled) { throw cancelled; }
+        catch (Exception error) { failures[1] = error; }
+        if (!transportTimeout(failures[0]) || !transportTimeout(failures[1])) throw failures[1] != null ? failures[1] : failures[0];
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2, runnable -> {
+            Thread thread = new Thread(runnable, "hongguo-episode-resolve");
+            thread.setDaemon(true);
+            return thread;
+        });
+        try {
+            java.util.concurrent.CompletionService<String> service = new java.util.concurrent.ExecutorCompletionService<>(pool);
+            Exception[] hedge = new Exception[2];
+            for (int index = 0; index < 2; index++) {
+                final int which = index;
+                final String url = index == 0 ? canonical : underscore;
+                service.submit(() -> {
+                    try { return attempt(url, seriesId, vid, HEDGE_BUDGET_MS); }
+                    catch (Exception failure) { hedge[which] = failure; throw failure; }
+                });
+            }
+            for (int done = 0; done < 2; done++) {
+                java.util.concurrent.Future<String> finished;
+                try { finished = service.take(); }
+                catch (InterruptedException stopped) { throw new java.io.InterruptedIOException("已切换分集"); }
+                try { return finished.get(); }
+                catch (java.util.concurrent.ExecutionException ignored) { }
+            }
+            throw hedge[1] != null ? hedge[1] : hedge[0];
+        } finally { pool.shutdownNow(); }
+    }
+    private static boolean transportTimeout(Exception error) {
+        return error instanceof java.net.SocketTimeoutException || error instanceof java.net.ConnectException || error instanceof java.net.SocketException;
+    }
+    private static String attempt(String url, String seriesId, String vid, int budgetMs) throws Exception {
+        if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("已切换分集");
+        NetworkGuard.Reply response = NetworkGuard.get(url, budgetMs, System.currentTimeMillis() + budgetMs);
+        if (response.status == 404) throw error("EPISODE_UNAVAILABLE", "该分集未向官网提供公开播放页面，请在官方 App 查看");
+        if (response.status < 200 || response.status >= 300) throw error("SOURCE_HTTP", "播放页面响应 HTTP " + response.status);
+        return parse(response.body, seriesId, vid);
     }
     /** Pure parser: no DNS, HTTP, media requests, JavaScript execution or preview-count gating. */
     static String parse(String html, String seriesId, String vid) throws Exception {

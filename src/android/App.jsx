@@ -965,9 +965,15 @@ export default function App() {
   useEffect(() => {
     const back = () => { if (!window.dispatchEvent(new CustomEvent('androiddownloadback', { cancelable: true }))) return true; if (detail) { closeDetail(); return true; } if (tab !== 'discover') { setTab('discover'); return true; } return false; };
     window.__androidBack = back;
+    // A share link resolves to a series id natively; only an exact numeric id may open a detail.
+    window.__androidOpenSeries = (seriesId) => { const id = String(seriesId || ''); if (/^\d{1,30}$/.test(id)) openDetail({ seriesId: id, title: '' }); };
     const keydown = (event) => { if (event.key !== 'Escape' && event.key !== 'Backspace') return; if (event.target?.matches('input,textarea')) return; if (back()) event.preventDefault(); };
     document.addEventListener('keydown', keydown);
-    return () => { document.removeEventListener('keydown', keydown); if (window.__androidBack === back) delete window.__androidBack; };
+    return () => {
+      document.removeEventListener('keydown', keydown);
+      if (window.__androidBack === back) delete window.__androidBack;
+      if (window.__androidOpenSeries) delete window.__androidOpenSeries;
+    };
   }, [detail, tab, closeDetail]);
   return <div className={`android-app ${info.isTv ? 'tv-layout' : 'phone-layout'}`}>
     <nav className="app-nav" aria-label="主要导航"><div className="nav-brand"><span><Play size={21} /></span><strong>红果短剧</strong></div><div className="nav-items">{NAV.map(({ id, label, Icon }) => <button key={id} aria-current={!detail && tab === id ? 'page' : undefined} onClick={() => navigate(id)}><Icon size={22} /><span>{label === '我的追剧' ? <><span className="nav-word">我的</span><span className="nav-word">追剧</span></> : label}</span></button>)}</div>{info.isTv && <p className="nav-version">遥控器方向键选择<br />v{info.version || '—'}</p>}</nav>

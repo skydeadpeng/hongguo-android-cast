@@ -95,6 +95,12 @@ await group('FUNCTION real Detail uses native play preparation and complete stri
     if (name.includes('icons.jsx')) return new Proxy({ __esModule: true }, { get: (target, key) => key in target ? target[key] : () => null });
     if (name === './source.mjs') return sourceModule;
     if (name === './generated/mac-app-source.mjs') return { fetchAppPlayUrl: async requestedVid => { fallbackCalls.push(requestedVid); return playInfo; } };
+    // Season/series helpers load at module scope; the exported Detail flow under test
+    // only needs them to be callable. Panels render nothing without their effects.
+    if (name === './seasons.mjs') return { createSeasonLookup: () => ({}), parseSeasonTitle: () => ({ base: '', season: 0 }), seasonCandidates: seed => [seed] };
+    if (name === './season-playback.mjs') return { latestSeasonHistory: () => [], assertPlaybackRequestSize() {} };
+    if (name === './official-series.mjs') return { createOfficialSeasonLookup: () => ({}), requestOfficialSeries: async () => [] };
+    if (name === './AccountPanel.jsx' || name === './UpdatePanel.jsx') return { __esModule: true, default: () => null };
     if (name === './bridge.mjs') return { requestHtml: async () => { throw new Error('HTTP 404'); },
       nativeCall: async (method, params) => { calls.push({ method, params }); return method === 'getPlaybackOptions' ? { quality: 'auto', speed: 1 } : { started: true }; },
       getPlaybackPreferences: () => ({ autoplay: true, cleanupPlaybackCache: true, keepPreviousEpisodes: 1 }), setPlaybackPreference() {} };

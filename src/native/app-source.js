@@ -296,32 +296,70 @@ async function fetchAppPlayUrl(vid, options = {}) {
         biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
         mixed_video_id_map: { '1004': [vid] },
     });
-    let info, registered = false;
-    try {
-        const signed = signedVideoRequest(payload);
-        const response = await requestJson(signed.url, { method: 'POST', headers: signed.headers, data: signed.body }, deadline, signal, 'model_post');
-        if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-        const entry = response.data?.[vid];
-        const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
-        if (!model) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
-        const fallback = parseFallback(model.fallback_api);
-        if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
-        const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal, 'fallback_get');
-        if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
-            throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+    let info = null, registered = false, inline = false;
+    const registeredProvider = typeof options.registeredModelProvider === 'function' ? options.registeredModelProvider : null;
+    const inlineOf = model => Array.isArray(model?.video_list) ? model.video_list.length > 0
+        : model?.video_list && typeof model.video_list === 'object' ? Object.keys(model.video_list).length > 0 : 0;
+    const acceptInline = model => {
+        inline = inlineOf(model) > 0;
+        if (!inline) return false;
+        info = model; registered = true;
+        return true;
+    };
+    if (registeredProvider) {
+        // Registered identity first: the endpoint increasingly refuses the synthetic signed
+        // model POST, and the native registration needs no signature at all. A provider
+        // failure before any usable model only falls back; a mismatch after one is final.
+        try {
+            const reply = await registeredProvider(vid);
+            if (!reply || reply.vid !== vid || !reply.video_model || typeof reply.video_model !== 'object' || Array.isArray(reply.video_model)) {
+                throw Object.assign(new Error('App 已登记设备的单集模型与请求不一致'), { code: 'APP_INVALID_RESPONSE' });
+            }
+            if (!acceptInline(reply.video_model)) {
+                const fallback = parseFallback(reply.video_model.fallback_api);
+                if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
+                const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal, 'fallback_get');
+                if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
+                    throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+                }
+                info = outer?.video_info?.data; registered = true;
+            }
+            if (!info || !info.video_list || typeof info.video_list !== 'object') throw Object.assign(new Error('App 单集模型缺少有效片源列表'), { code: 'APP_INVALID_RESPONSE' });
+        } catch (providerError) {
+            if (registered) throw providerError;
+            info = null;
         }
-        info = outer?.video_info?.data;
-        if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
-    } catch (error) {
-        // Only a locally classified empty model POST can take this Android opt-in path.
-        // Desktop callers, valid business refusals, wrong IDs, HTML and fallback GET errors keep their old behavior.
-        if (error?.code !== 'APP_EMPTY_RESPONSE' || error.responseStage !== 'model_post' || typeof options.registeredModelProvider !== 'function') throw error;
-        const reply = await options.registeredModelProvider(vid);
-        if (!reply || reply.vid !== vid || !reply.video_model || typeof reply.video_model !== 'object' || Array.isArray(reply.video_model)) {
-            throw Object.assign(new Error('App 已登记设备的单集模型与请求不一致'), { code: 'APP_INVALID_RESPONSE' });
+    }
+    if (!info) {
+        try {
+            const signed = signedVideoRequest(payload);
+            const response = await requestJson(signed.url, { method: 'POST', headers: signed.headers, data: signed.body }, deadline, signal, 'model_post');
+            if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+            const entry = response.data?.[vid];
+            const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
+            if (!model) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
+            // Current models may carry the video list inline; the legacy fallback round trip is then skipped.
+            if (!acceptInline(model)) {
+                const fallback = parseFallback(model.fallback_api);
+                if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
+                const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal, 'fallback_get');
+                if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
+                    throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+                }
+                info = outer?.video_info?.data;
+                if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
+            }
+        } catch (error) {
+            // Only a locally classified empty model POST can still take the registered path.
+            // Valid business refusals, wrong IDs, HTML and fallback GET errors keep their behavior.
+            if (error?.code !== 'APP_EMPTY_RESPONSE' || error.responseStage !== 'model_post' || !registeredProvider) throw error;
+            const reply = await registeredProvider(vid);
+            if (!reply || reply.vid !== vid || !reply.video_model || typeof reply.video_model !== 'object' || Array.isArray(reply.video_model)) {
+                throw Object.assign(new Error('App 已登记设备的单集模型与请求不一致'), { code: 'APP_INVALID_RESPONSE' });
+            }
+            if (!acceptInline(reply.video_model)) { info = reply.video_model; registered = true; }
+            if (!info || !info.video_list || typeof info.video_list !== 'object') throw Object.assign(new Error('App 单集模型缺少有效片源列表'), { code: 'APP_INVALID_RESPONSE' });
         }
-        info = reply.video_model; registered = true;
-        if (!info.video_list || typeof info.video_list !== 'object') throw Object.assign(new Error('App 单集模型缺少有效片源列表'), { code: 'APP_INVALID_RESPONSE' });
     }
     const rows = Object.values(info?.video_list || {}).filter(item => item && (item.main_url || item.backup_url || Array.isArray(item.backup_url_list))).map(item => {
         const codec = str(item.codec_type || item.video_meta?.codec_type).toLowerCase();
@@ -350,6 +388,11 @@ async function fetchAppPlayUrl(vid, options = {}) {
     for (const selected of rows) {
         try {
             const spade = selected.item.spade_a || selected.item.encrypt_info?.spade_a;
+            // Inline models are unsigned only with an explicit no-encryption flag;
+            // anything else without a spade key cannot be decoded.
+            if (inline && !spade && ![false, 0, '0', 'false'].includes(selected.item.encrypt_info?.encrypt)) {
+                throw Object.assign(new Error('本集片源缺少有效解密信息'), { code: 'INVALID_RESPONSE' });
+            }
             const key = spade ? (registered ? deriveRegisteredContentKey(spade) : deriveContentKey(spade)) : null;
             for (const candidate of [selected.item.main_url, selected.item.backup_url, ...(Array.isArray(selected.item.backup_url_list) ? selected.item.backup_url_list : [])]) {
                 if (typeof candidate !== 'string' || !candidate) continue;

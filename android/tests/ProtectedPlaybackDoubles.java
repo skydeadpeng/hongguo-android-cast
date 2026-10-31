@@ -27,6 +27,8 @@ final class NetworkGuard {
         if(requests.size()>responses.size())throw new AssertionError("unexpected extra webpage GET");
         return new Reply(responses.get(requests.size()-1),200,url);
     }
+    // The resolver passes an explicit budget; the double records the same single GET.
+    static Reply get(String url,int timeoutMs,long deadlineMs) { return get(url); }
     static URI validate(String value,boolean official)throws Exception {
         URI uri=new URI(value);
         if(!"https".equals(uri.getScheme())||uri.getHost()==null||uri.getUserInfo()!=null||uri.getPort()!=-1&&uri.getPort()!=443)throw new IOException("fixture invalid HTTPS URL");

@@ -30,13 +30,21 @@ cat > "$TMP/NetworkGuard.java" <<'STUB'
 package io.github.jackotom.hongguo.android;
 final class NetworkGuard {
     static final class Reply { final String body, url; final int status; Reply(String body, int status, String url) { this.body = body; this.status = status; this.url = url; } }
-    static Reply[] replies; static int requests, totalRequests;
-    static final java.util.List<String> requested = new java.util.ArrayList<>();
-    static void reset(Reply... next) { replies = next; requests = 0; requested.clear(); }
-    static Reply get(String url) {
+    // A queue entry is a Reply or a thrown exception (a synthetic transport timeout).
+    static Object[] replies; static int totalRequests;
+    static final java.util.concurrent.atomic.AtomicInteger requests = new java.util.concurrent.atomic.AtomicInteger();
+    static final java.util.List<String> requested = new java.util.concurrent.CopyOnWriteArrayList<>();
+    static void reset(Object... next) { replies = next; requests.set(0); requested.clear(); }
+    static int requests() { return requests.get(); }
+    static Reply get(String url) throws Exception { return get(url, 0, 0L); }
+    static Reply get(String url, int timeoutMs, long deadlineMs) throws Exception {
         requested.add(url); totalRequests++;
-        if (requests >= replies.length) throw new AssertionError("unexpected extra GET " + url);
-        return replies[requests++];
+        int at = requests.getAndIncrement();
+        if (at >= replies.length) throw new AssertionError("unexpected extra GET " + url);
+        Object next = replies[at];
+        if (next instanceof RuntimeException) throw (RuntimeException) next;
+        if (next instanceof Exception) throw (Exception) next;
+        return (Reply) next;
     }
 }
 STUB
