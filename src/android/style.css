@@ -208,7 +208,7 @@
 .account-actions>.button{min-width:110px}
 .account-details{margin:16px 0}
 .account-details dd{overflow-wrap:anywhere;word-break:break-word}
-.account-error{margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+.account-error{margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:7px;background:var(--surface);overflow-wrap:anywhere}
 .account-error>p{color:var(--error);overflow-wrap:anywhere}
 .account-error>.button{margin-top:12px}
 .account-confirm{margin-top:16px;padding:16px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
@@ -233,10 +233,14 @@
 .announcement-count{margin-top:8px;font-size:.82rem;color:var(--muted)}
 .announcement-switches{display:flex;flex-direction:column;gap:10px;margin:12px 0;color:var(--text)}
 .announcement-switches label{display:flex;align-items:center;gap:10px;min-height:44px}
+.announcement-switches input[type=checkbox]{width:22px;height:22px;accent-color:var(--primary);flex-shrink:0}
 .announcement-manual{margin-top:16px;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
 
 /* Watch-history states: completed rows and same-series hints are captions, not actions. */
 .poster-hint{display:block;margin-top:4px;font-size:.78rem;line-height:1.5;color:var(--muted);text-align:left;overflow-wrap:anywhere}
+.heading-buttons{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.heading-actions{flex-wrap:wrap}
+.heading-actions>div{min-width:0;flex:1}
 .tv-layout .account-form{max-width:720px}
 .tv-layout .account-form>label{font-size:18px}
 .tv-layout .account-form input{min-height:56px;font-size:19px}

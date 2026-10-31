@@ -88,6 +88,8 @@ function Discover({ onOpen }) {
   const [reload, setReload] = useState(0);
   const [state, setState] = useState({ busy: true, items: [], category, page: 1 });
   const generation = useRef(0), fetching = useRef(false), refreshCatalog = useRef(false);
+  // Per-category positions: switching back resumes the last browsed batch.
+  const positions = useRef({});
   useEffect(() => {
     const current = ++generation.current;
     fetching.current = true;
@@ -101,6 +103,7 @@ function Discover({ onOpen }) {
       if (result.page !== undefined && result.page !== page) throw new Error('来源返回的片单页码不一致，请重试。');
       if (!result.items.length && previous.items.length) throw new Error('这次未返回片单，请重试。');
       fetching.current = false;
+      positions.current[category] = result.page || page;
       setState({ ...result, category, requestedPage: page, page: result.page || page, busy: false });
     }).catch((error) => {
       if (generation.current !== current) return;
@@ -123,11 +126,17 @@ function Discover({ onOpen }) {
   const changeCategory = (value) => {
     if (value === category) return;
     generation.current++; fetching.current = true; refreshCatalog.current = false;
-    setState({ busy: true, items: [], category: value, page: 1, requestedPage: 1 });
-    setCategory(value); setPage(1);
+    const remembered = positions.current[value] || 1;
+    setState({ busy: true, items: [], category: value, page: remembered, requestedPage: remembered });
+    setCategory(value); setPage(remembered);
+  };
+  // 换一批 advances the current category to its real next page and wraps at the end.
+  const nextBatch = () => {
+    const next = shown.totalPages ? (visiblePage >= shown.totalPages ? 1 : visiblePage + 1) : visiblePage + 1;
+    loadPage(next);
   };
   return <>
-    <header className="page-heading heading-actions"><div><h1>发现短剧</h1><p>按分类浏览，选择喜欢的故事。</p></div><button type="button" className="button" disabled={shown.busy} aria-label="刷新片单" onClick={() => loadPage(visiblePage, true)}><RefreshCw /><span>刷新</span></button></header>
+    <header className="page-heading heading-actions"><div><h1>发现短剧</h1><p>按分类浏览，选择喜欢的故事。</p></div><div className="heading-buttons"><button type="button" className="button" disabled={shown.busy} aria-label="换一批片单" onClick={nextBatch}><RefreshCw /><span>换一批</span></button><button type="button" className="button" disabled={shown.busy} aria-label="刷新片单" onClick={() => loadPage(visiblePage, true)}><RefreshCw /><span>刷新</span></button></div></header>
     <div className="category-tabs" role="group" aria-label="短剧分类">{CATEGORIES.map((item) => <button key={item.id} aria-pressed={item.id === category} onClick={() => changeCategory(item.id)}>{item.label}</button>)}</div>
     <Status busy={shown.busy} error={shown.error} preserve={!!shown.items.length} onRetry={() => loadPage(shown.requestedPage || page, true)} empty={!shown.items.length && { title: '这个分类暂时没有内容', text: '试试其他分类，或稍后回来查看。' }}>
       <PosterGrid items={shown.items} onOpen={onOpen} />

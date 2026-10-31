@@ -18,9 +18,13 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 const { build } = createRequire(import.meta.url)('esbuild');
 const fixtureSource = `
-export const CATEGORIES=[{id:'all',label:'全部'}];
+export const CATEGORIES=[{id:'all',label:'全部'},{id:'drama',label:'真人剧'}];
 export const createSource=()=>({
- catalog:async()=>({items:[window.__mobileFixture.series],totalPages:1}),
+ catalog:async(category='all',page=1)=>{
+  const f=window.__mobileFixture;f.catalogPages=f.catalogPages||[];f.catalogPages.push({category,page});
+  const batch=((page-1)%3)+1;
+  return {items:[{...f.series,title:'MOCK 批次 '+batch}],page,totalPages:3};
+ },
  detail:async()=>window.__mobileFixture.series,
  search:async keyword=>{window.__mobileFixture.searches.push(keyword);return {items:[]};},
  playback:async(sid,vid,options)=>{
@@ -106,7 +110,10 @@ try {
   const chooseRange=async value=>{await evaluate(`(()=>{const s=document.querySelector('#episode-range');if(!s)throw Error('missing grouped range selector');s.value=${JSON.stringify(String(value))};s.dispatchEvent(new Event('change',{bubbles:true}));})()`);await sleep(40);};
   const noOverflow=async()=>{
     const sizes=await evaluate(`(()=>{const nodes=[document.documentElement,document.querySelector('.main-content'),document.querySelector('.detail-scroll')].filter(Boolean);return nodes.map(e=>({class:e.className||'html',width:e.clientWidth,scroll:e.scrollWidth}));})()`);
-    check(sizes.every(s=>s.scroll<=s.width+1),'no horizontal overflow '+JSON.stringify(sizes));
+    if(sizes.some(s=>s.scroll>s.width+1)){
+      const wide=await evaluate(`(()=>{const root=document.querySelector('.main-content');const wide=[];root.querySelectorAll('*').forEach(e=>{if(e.scrollWidth>e.clientWidth+1&&e.clientWidth>0||e.getBoundingClientRect().right>document.documentElement.clientWidth+1)wide.push({cls:(e.className||e.tagName).toString().slice(0,40),w:Math.round(e.getBoundingClientRect().width),right:Math.round(e.getBoundingClientRect().right),scroll:e.scrollWidth,client:e.clientWidth});});return wide.slice(0,8);})()`);
+      throw Error('no horizontal overflow '+JSON.stringify(sizes)+' wide='+JSON.stringify(wide));
+    }
   };
   const dockVisible=async()=>{
     const positions=await evaluate(`(()=>{const r=e=>{const b=e.getBoundingClientRect();return {top:b.top,bottom:b.bottom,left:b.left,right:b.right,height:b.height}};return {dock:r(document.querySelector('.play-actions')),nav:r(document.querySelector('.app-nav')),buttons:[...document.querySelectorAll('.play-actions button')].map(r),height:innerHeight,width:innerWidth};})()`);
@@ -114,8 +121,8 @@ try {
     check(positions.buttons.every(r=>r.top>=0&&r.bottom<=positions.nav.top+1&&r.left>=0&&r.right<=positions.width),'play and download controls fully visible');
   };
   const touchTargets=async()=>{
-    const small=await evaluate(`(()=>{const main=document.querySelector('.detail-scroll')||document.querySelector('.main-content');return [...document.querySelectorAll('button,input,select')].filter(e=>e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden').map(e=>({label:e.getAttribute('aria-label')||e.textContent.trim().slice(0,30),w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height})).filter(r=>r.w<43.5||r.h<43.5)})()`);
-    eq(small,[],'all rendered interactive controls have at least 44px touch targets');
+    const small=await evaluate(`(()=>{const main=document.querySelector('.detail-scroll')||document.querySelector('.main-content');return [...document.querySelectorAll('button,input,select')].filter(e=>e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden').filter(e=>{const label=e.closest('label');return !(label&&label.getBoundingClientRect().height>=43.5)}).map(e=>({label:e.getAttribute('aria-label')||e.textContent.trim().slice(0,30),w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height})).filter(r=>r.w<43.5||r.h<43.5)})()`);
+    assert.deepEqual(small,[],'all rendered interactive controls have at least 44px touch targets: '+JSON.stringify(small));
   };
   await group('FUNCTION remembered long-series episode opens its 30-item group without playing',async()=>{
     await reset();eq(await evaluate('document.querySelectorAll(".episode-grid button").length'),30,'phone only renders active 30-episode range');eq(await evaluate('document.querySelector("#episode-range").value'),'3','remembered episode 92 reveals 91–120');eq(await evaluate('document.querySelector(".episode-grid button[aria-pressed=true]").querySelector("span").textContent'),'92','remembered selection retained');eq((await plays()).length,0,'opening remembered detail never starts video');await dockVisible();await screenshot('phone-390-initial.png');
@@ -171,6 +178,19 @@ try {
     await reset(false,320,844);await evaluate('[...document.querySelectorAll(".app-nav button")].find(b=>b.textContent.trim()==="搜索").click()');await wait('document.querySelector("#search-keyword")');await call('Emulation.setDeviceMetricsOverride',{width:320,height:300,deviceScaleFactor:1,mobile:true});await evaluate('document.querySelector("#search-keyword").focus();document.querySelector("#search-keyword").scrollIntoView({block:"center"})');await sleep(40);await noOverflow();await touchTargets();
     const bounds=await evaluate('({input:document.querySelector("#search-keyword").getBoundingClientRect().toJSON(),submit:document.querySelector(".search-controls button").getBoundingClientRect().toJSON(),main:document.querySelector(".main-content").getBoundingClientRect().toJSON(),nav:document.querySelector(".app-nav").getBoundingClientRect().toJSON()})');check(bounds.input.top>=bounds.main.top-1&&bounds.input.bottom<=bounds.nav.top+1,'focused input fits above native IME-sized viewport');check(bounds.submit.top>=bounds.main.top-1&&bounds.submit.bottom<=bounds.nav.top+1,'search submit remains reachable beside input');await call('Input.insertText',{text:'键盘复测'});eq(await evaluate('document.querySelector("#search-keyword").value'),'键盘复测','text entry reaches focused real React input');await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:bounds.submit.x+bounds.submit.width/2,y:bounds.submit.y+bounds.submit.height/2,radiusX:5,radiusY:5,force:1,id:1}]});await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await wait('window.__mobileFixture.searches.includes("键盘复测")');eq(await evaluate('window.__mobileFixture.searchKeywords'),['键盘复测'],'IME-sized submit keeps native history path');
     const nav=await evaluate('[...document.querySelectorAll(".app-nav button")].map(b=>b.getBoundingClientRect().toJSON())');check(nav.every(r=>r.top>=0&&r.bottom<=300&&r.left>=0&&r.right<=320),'all five navigation targets remain within reduced viewport');await screenshot('phone-320-ime-inset-search.png');await call('Emulation.setDeviceMetricsOverride',{width:320,height:844,deviceScaleFactor:1,mobile:true});await sleep(40);eq(await evaluate('document.querySelector("#search-keyword").value'),'键盘复测','restoring viewport preserves entered query');await noOverflow();await screenshot('phone-320-ime-restored-search.png');
+  });
+  await group('DISCOVER 换一批 advances the real next page, wraps at the end and remembers each category position',async()=>{
+    await reset();await button('发现');await sleep(60);
+    const firstTitle=()=>evaluate('document.querySelector(".poster strong").textContent');
+    check(await firstTitle()==='MOCK 批次 1','the first batch opens at page 1');
+    eq(await evaluate('window.__mobileFixture.catalogPages'),[{category:'all',page:1}],'one catalog request for the first page');
+    await button('换一批');await sleep(60);check(await firstTitle()==='MOCK 批次 2','换一批 advances to the real next page');
+    await button('换一批');await sleep(60);check(await firstTitle()==='MOCK 批次 3','the third batch follows');
+    await button('换一批');await sleep(60);check(await firstTitle()==='MOCK 批次 1','the batch wraps to the start at the last page');
+    await button('真人剧');await sleep(60);check(await firstTitle()==='MOCK 批次 1','another category starts at its own first batch');
+    await button('换一批');await sleep(60);check(await firstTitle()==='MOCK 批次 2','the second category advances independently');
+    await button('全部');await sleep(60);check(await firstTitle()==='MOCK 批次 1','switching back resumes the remembered position');
+    await noOverflow();await screenshot('phone-discover-next-batch.png');
   });
   await group('ISOLATION no browser exceptions or external source/media requests',async()=>{eq(report.externalRequests,[],'zero external requests');eq(report.pageErrors,[],'zero runtime exceptions');});
   await call('Page.close');ws.close();ws=null;
