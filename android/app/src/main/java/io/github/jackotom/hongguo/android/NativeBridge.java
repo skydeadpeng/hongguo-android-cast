@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
 import android.webkit.JavascriptInterface;
+import java.io.File;
 import java.util.*;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.*;
