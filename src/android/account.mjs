@@ -34,27 +34,11 @@ export function accountView(value) {
     },
   };
 }
-export function phoneFields(phone) {
-  let value = String(phone || '').trim().replace(/ /g, '');
-  if (value.startsWith('+86')) value = value.slice(3); else if (value.length === 13 && value.startsWith('86')) value = value.slice(2);
-  if (!/^1[3-9]\d{9}$/.test(value)) throw new Error('请输入有效的中国大陆手机号（+86）。');
-  return { phone: value };
-}
-export function otpFields(code) {
-  if (typeof code !== 'string' || !/^\d{4,8}$/.test(code)) throw new Error('请输入4至8位短信验证码。');
-  return { code };
-}
 export function accountStatus(account) {
   if (!account) return '正在读取红果账号状态…';
   if (account.authenticated) return account.sync.syncing ? '正在同步红果收藏、历史与进度…' : account.sync.error ? '云同步未完成 · 本机记录已保留' : account.sync.pendingCount ? `有 ${account.sync.pendingCount} 条操作待同步` : account.sync.lastSyncAt ? `最近同步：${new Date(account.sync.lastSyncAt).toLocaleString('zh-CN', { hour12: false })}` : '已登录红果 · 本机记录已保存';
-  if (account.phase === 'sending') return '正在登记设备并获取短信验证码…';
-  if (account.phase === 'submitting') return '正在验证短信并登录红果…';
-  if (account.phase === 'mfa_waiting') return '正在等待短信验证，最多90秒；可随时取消';
-  if (account.phase === 'mfa') return '红果要求追加短信验证，请使用登录手机号发送下方短信';
-  if (account.phase === 'code') return account.smsState === 'uncertain' ? '发码结果尚未确认；如果已收到短信，可直接输入验证码' : `验证码已发送至 ${account.maskedPhone || '当前手机号'}`;
-  if (account.smsState === 'uncertain') return '发码结果尚未确认，请先检查短信并等待倒计时，避免重复发送';
-  if (account.smsState === 'limited') return '红果暂时限制发码，请等待倒计时后重试';
-  return account.loginRequired ? '红果会话已失效，请重新登录；本机记录保留' : '未登录红果 · 本机观看、收藏与下载继续可用';
+  // Short-message login is retired from the UI; the website QR flow is the only entry.
+  return account.loginRequired ? '红果会话已失效，请用扫码登录；本机记录保留' : '未登录红果 · 扫码登录后同步收藏与进度';
 }
 
 /** Acknowledged native import counts only; polling snapshots do not claim imports. */

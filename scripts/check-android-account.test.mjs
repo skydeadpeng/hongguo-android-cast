@@ -1,27 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { accountStatus, accountView, phoneFields, otpFields, accountImportSummary } from '../src/android/account.mjs';
+import { accountStatus, accountView, accountImportSummary } from '../src/android/account.mjs';
 const state = { provider: 'hongguo', authenticated: false, officialLoginAvailable: true, phase: 'phone', revision: 1 };
 
 test('public projection contains only masked official state and excludes native session', () => {
-  const value = accountView({ ...state, token: 'PRIVATE_TOKEN', cookies: { sessionid: 'PRIVATE_COOKIE' }, session: { private: 'PRIVATE_SESSION' }, phone: '13800000000', maskedPhone: '138****0000', smsState: 'sent', retryAfter: 60, sync: { pendingCount: 3 } });
+  const value = accountView({ ...state, token: 'PRIVATE_TOKEN', cookies: { sessionid: 'PRIVATE_COOKIE' }, session: { private: 'PRIVATE_SESSION' }, phone: '13800000000', maskedPhone: '138****0000', sync: { pendingCount: 3 } });
   assert.equal(value.maskedPhone, '138****0000'); assert.equal(value.sync.pendingCount, 3);
   for (const secret of ['PRIVATE_TOKEN', 'PRIVATE_COOKIE', 'PRIVATE_SESSION', '13800000000']) assert.equal(JSON.stringify(value).includes(secret), false);
 });
 test('stale custom provider or malformed readiness cannot become official login', () => {
   for (const value of [null, undefined, {}, { ...state, provider: 'custom' }, { ...state, authenticated: 'true' }, { ...state, officialLoginAvailable: false }, { ...state, phase: 'fake' }]) assert.throws(() => accountView(value));
 });
-test('phone and OTP validation preserve leading zeros and reject non-mainland or non-numeric input', () => {
-  assert.deepEqual(phoneFields('+86 13800000000'), { phone: '13800000000' }); assert.deepEqual(phoneFields('8613800000000'), { phone: '13800000000' });
-  for (const phone of ['', '1380000000', '+85261234567', '1380000000a', '12800000000']) assert.throws(() => phoneFields(phone));
-  assert.deepEqual(otpFields('001234'), { code: '001234' }); for (const code of ['', '123', '123456789', 123456, '12 3456', 'abcdef']) assert.throws(() => otpFields(code));
-});
-test('status never declares successful send/login/sync for uncertainty, MFA waiting, or pending outbox', () => {
-  assert.match(accountStatus(accountView({ ...state, smsState: 'uncertain' })), /尚未确认/);
-  assert.match(accountStatus(accountView({ ...state, phase: 'mfa_waiting', busy: true })), /90秒/);
+test('status never claims a login that has not happened', () => {
+  assert.match(accountStatus(accountView({ ...state })), /扫码登录/);
   assert.match(accountStatus(accountView({ ...state, authenticated: true, phase: 'logged_in', sync: { pendingCount: 2 } })), /2 条/);
   assert.match(accountStatus(accountView({ ...state, authenticated: true, phase: 'logged_in', sync: { syncing: true } })), /正在同步/);
+  assert.match(accountStatus(accountView({ ...state, loginRequired: true })), /失效/);
 });
 test('native cancellation runs on UI fast path before account executor and routes SMS-app suspend separately', async () => {
   const source = await fs.readFile(new URL('../android/app/src/main/java/io/github/jackotom/hongguo/android/NativeBridge.java', import.meta.url), 'utf8');
@@ -34,10 +29,11 @@ test('native cancellation runs on UI fast path before account executor and route
   assert.match(source, /favoriteStore\.toggle/);
   for (const legacy of ['"accountLogin"', '"accountLogout"', '"syncHistory"', '"importGuestHistory"']) assert.equal(source.includes(legacy), false);
 });
-test('UI keeps OTP only in React memory and distinguishes background suspend from explicit cancel', async () => {
+test('UI retires the short-message entry and keeps only the website QR login', async () => {
   const code = await fs.readFile(new URL('../src/android/AccountPanel.jsx', import.meta.url), 'utf8');
-  assert.match(code, /setCode\(''\); perform\('officialLoginSMS'/);
-  assert.match(code, /reason: 'background'/); assert.match(code, /我已发送短信，开始验证/);
+  for (const retired of ['officialSendCode', 'officialLoginSMS', 'officialVerifyMFA', 'officialCancelLogin', '我已发送短信', '短信验证码', 'phoneFields', 'otpFields', '#official-phone', '#official-code'])
+    assert.equal(code.includes(retired), false, `retired SMS entry "${retired}" must not appear`);
+  assert.match(code, /officialWebQrcode/);
   for (const legacy of ['serverUrl', 'type="password"', 'localStorage', 'sessionStorage']) assert.equal(code.includes(legacy), false);
 });
 test('web bridge permits exact official actions but rejects retired methods before dispatch', async () => {
@@ -79,9 +75,7 @@ test('native library and point reads capture owner before and after a fresh stor
   }
 });
 
-test('uncertain OTP state and import counts never advertise false send or complete import', () => {
-  assert.match(accountStatus(accountView({ ...state, phase: 'code', smsState: 'uncertain', maskedPhone: '138****0000' })), /尚未确认/);
-  assert.doesNotMatch(accountStatus(accountView({ ...state, phase: 'code', smsState: 'uncertain' })), /验证码已发送/);
+test('import counts never advertise a complete import', () => {
   const text = accountImportSummary({ historyImportedCount: 2, favoritesImportedCount: 1, skippedCount: 3, remainingCount: 4 });
   assert.match(text, /收藏 1 条/); assert.match(text, /观看记录 2 条/); assert.match(text, /还有 4 条/);
   assert.doesNotMatch(text, /已处理完毕/);

@@ -1,20 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { nativeCall } from './bridge.mjs';
-import { accountStatus, accountView, phoneFields, otpFields, accountImportSummary } from './account.mjs';
+import { accountStatus, accountView, accountImportSummary } from './account.mjs';
 
 const signal = name => window.dispatchEvent(new Event(name));
 export default function AccountPanel({ focusRequest }) {
   const [account, setAccount] = useState(null), [error, setError] = useState(''), [readError, setReadError] = useState(''), [action, setAction] = useState('');
-  const [phone, setPhone] = useState(''), [code, setCode] = useState(''), [confirm, setConfirm] = useState(''), [importSummary, setImportSummary] = useState('');
+  const [confirm, setConfirm] = useState(''), [importSummary, setImportSummary] = useState('');
   const [qrImage, setQrImage] = useState(''), [qrError, setQrError] = useState('');
   const reading = useRef(null);
   const mounted = useRef(false), operation = useRef(0), revision = useRef(-1), currentAccount = useRef(null), currentAction = useRef('');
-  const section = useRef(null), phoneInput = useRef(null), codeInput = useRef(null), verifyButton = useRef(null), syncButton = useRef(null), logoutButton = useRef(null), refreshButton = useRef(null), cancelButton = useRef(null), shouldFocus = useRef(false);
+  const section = useRef(null), syncButton = useRef(null), logoutButton = useRef(null), refreshButton = useRef(null), cancelButton = useRef(null), qrButton = useRef(null), shouldFocus = useRef(false);
   const accept = useCallback(value => {
     const next = accountView(value); if (next.revision < revision.current) return;
     revision.current = next.revision; currentAccount.current = next; setAccount(next);
-    if (next.phase !== 'phone') setPhone('');
-    if (next.phase !== 'code' && !(next.phase === 'phone' && next.smsState === 'uncertain' && next.maskedPhone)) setCode('');
     if (!next.authenticated) setImportSummary('');
   }, []);
   const refresh = useCallback(() => {
@@ -31,45 +29,34 @@ export default function AccountPanel({ focusRequest }) {
   useEffect(() => {
     mounted.current = true; refresh();
     const changed = () => refresh();
-    const visible = () => {
-      if (document.visibilityState === 'hidden') {
-        setCode(''); setPhone(''); operation.current++; currentAction.current = ''; setAction('');
-        if (!currentAccount.current?.authenticated) nativeCall('officialCancelLogin', { reason: 'background' }, 10000).catch(() => {});
-      } else refresh();
-    };
+    const visible = () => { if (document.visibilityState !== 'hidden') refresh(); };
     const timer = setInterval(() => { if (document.visibilityState !== 'hidden') refresh(); }, 1000);
     window.addEventListener('androidaccountchanged', changed); window.addEventListener('androidresume', refresh); document.addEventListener('visibilitychange', visible);
     return () => {
       mounted.current = false; operation.current++; clearInterval(timer); window.removeEventListener('androidaccountchanged', changed); window.removeEventListener('androidresume', refresh); document.removeEventListener('visibilitychange', visible);
-      if (!currentAccount.current?.authenticated) nativeCall('officialCancelLogin', {}, 10000).catch(() => {});
     };
   }, [refresh]);
-  useEffect(() => { if (focusRequest) { shouldFocus.current = true; (phoneInput.current || syncButton.current || verifyButton.current || codeInput.current)?.focus(); } }, [focusRequest]);
+  useEffect(() => { if (focusRequest) { shouldFocus.current = true; (syncButton.current || qrButton.current || refreshButton.current)?.focus(); } }, [focusRequest]);
   useEffect(() => {
     if (!shouldFocus.current) return;
     const active = document.activeElement; if (active !== document.body && !section.current?.contains(active)) { shouldFocus.current = false; return; }
-    const target = confirm ? cancelButton.current : account?.authenticated ? [syncButton.current, logoutButton.current, refreshButton.current].find(button => button && !button.disabled) : (account?.phase === 'code' || account?.phase === 'phone' && account?.smsState === 'uncertain' && account?.maskedPhone) ? codeInput.current : account?.phase === 'mfa' ? verifyButton.current : account?.busy ? cancelButton.current : phoneInput.current;
+    const target = confirm ? cancelButton.current : account?.authenticated ? [syncButton.current, logoutButton.current, refreshButton.current].find(button => button && !button.disabled) : qrButton.current && !qrButton.current.disabled ? qrButton.current : refreshButton.current;
     if (target && !target.disabled) target.focus({ preventScroll: true });
-  }, [account?.phase, account?.busy, account?.sync.syncing, action, confirm]);
+  }, [account?.authenticated, account?.busy, account?.sync.syncing, account?.web?.phase, action, confirm, qrImage]);
   const perform = async (method, params = {}) => {
-    const cancelling = method === 'officialCancelLogin';
-    if (currentAction.current && !cancelling) return;
+    if (currentAction.current) return;
     const token = ++operation.current; currentAction.current = method; setAction(method); setError(''); setConfirm(''); setImportSummary(''); shouldFocus.current = true;
-    const identity = ['officialLoginSMS', 'officialVerifyMFA', 'officialLogout'].includes(method);
-    if (identity) signal('androidaccountchanging');
+    if (method === 'officialLogout') signal('androidaccountchanging');
     try {
-      const value = await nativeCall(method, params, method === 'officialVerifyMFA' ? 120000 : 90000);
+      const value = await nativeCall(method, params, 90000);
       if (mounted.current && operation.current === token) { accept(value); if (value.error) setError(value.error); else if (method === 'officialImportGuest') setImportSummary(accountImportSummary(value.importResult)); }
     } catch (failure) { if (mounted.current && operation.current === token) setError(failure?.message || '账号操作未完成，请重试。'); }
     finally {
-      if (identity) signal('androidaccountsettled');
+      if (method === 'officialLogout') signal('androidaccountsettled');
       if (mounted.current && operation.current === token) { currentAction.current = ''; setAction(''); await refresh(); }
     }
   };
-  const send = event => { event.preventDefault(); try { perform('officialSendCode', phoneFields(phone)); } catch (failure) { setError(failure.message); } };
-  const login = event => { event.preventDefault(); try { const params = otpFields(code); setCode(''); perform('officialLoginSMS', params); } catch (failure) { setCode(''); setError(failure.message); } };
-  const cancel = () => { setPhone(''); setCode(''); perform('officialCancelLogin'); };
-  // The website QR handshake needs no SMS code and no additional short-message verification.
+  // The website QR handshake is the only login: no SMS code, no extra verification.
   const startQr = async () => {
     setQrError(''); setQrImage('');
     try {
@@ -91,7 +78,7 @@ export default function AccountPanel({ focusRequest }) {
     try { await nativeCall('officialWebLogout', {}, 20000); } catch (failure) { if (mounted.current) setQrError(failure?.message || '退出官网账号未完成，请重试。'); }
     refresh();
   };
-  const busy = !!action || account?.busy, phase = account?.phase || 'phone', signedIn = account?.authenticated === true;
+  const busy = !!action || account?.busy, signedIn = account?.authenticated === true;
   const webPhase = account?.web?.phase || 'idle';
   // Poll the scan state while a QR is on screen. The phase string is the only dependency, so the
   // one-second status refresh never restarts this timer.
@@ -105,31 +92,24 @@ export default function AccountPanel({ focusRequest }) {
     }, 2000);
     return () => { stopped = true; clearInterval(timer); };
   }, [webPhase, refresh]);
-  const receivedCodeAllowed = phase === 'code' || phase === 'submitting' || phase === 'phone' && account?.smsState === 'uncertain' && !!account?.maskedPhone;
   const visibleError = error || account?.error || account?.sync.error || readError;
   return <section ref={section} className="about-section account-section" aria-labelledby="account-title" aria-busy={!!busy}>
     <h2 id="account-title">红果账号</h2>
-    <p className="account-status" role="status" aria-live="polite">{action === 'officialVerifyMFA' ? '正在等待短信验证，最多90秒；可随时取消' : action === 'officialSendCode' ? '正在登记设备并获取短信验证码…' : action === 'officialLoginSMS' ? '正在验证短信并登录红果…' : accountStatus(account)}</p>
-    <p className="account-note">直接登录红果官方账号；自建同步服务器已移除。未登录也可继续观看，本机记录不会自动上传或合并。</p>
+    <p className="account-status" role="status" aria-live="polite">{accountStatus(account)}</p>
+    <p className="account-note">用手机红果 App 扫码登录官方账号，同步收藏、历史与进度。未登录也可继续观看，本机记录不会自动上传或合并。</p>
     {visibleError && <p className="account-error" role="alert">{visibleError}</p>}
-    {signedIn ? <>
+    {signedIn && <>
       <dl className="account-details"><div><dt>当前账号</dt><dd>{account.user?.name} {account.user?.maskedPhone || account.user?.idSuffix}</dd></div><div><dt>待同步</dt><dd>{account.sync.pendingCount} 条</dd></div></dl>
       <div className="account-actions"><button ref={syncButton} type="button" className="button primary" disabled={!!busy || account.sync.syncing} onClick={() => perform('officialSync')}>{account.sync.syncing ? '同步中…' : '立即同步'}</button><button type="button" className="button" disabled={!!busy || account.sync.syncing} onClick={() => { shouldFocus.current = true; setConfirm('import'); }}>导入本机记录</button><button ref={logoutButton} type="button" className="button" disabled={!!busy} onClick={() => { shouldFocus.current = true; setConfirm('logout'); }}>退出红果账号</button></div>
       {importSummary && <p className="account-note account-import-result" role="status">{importSummary}</p>}
       {confirm && <div className="account-confirm" role="group" aria-label={confirm === 'logout' ? '确认退出红果账号' : '确认导入本机记录'}><p>{confirm === 'logout' ? '退出后显示原本机记录；当前账号的本机库和待同步操作保留。' : '只在确认后合并登录前的本机收藏和观看记录；原本机库保留，云端同步可能随后写入这些记录。'}</p><div className="account-actions"><button ref={cancelButton} type="button" className="button" onClick={() => setConfirm('')}>取消</button><button type="button" className="button" onClick={() => perform(confirm === 'logout' ? 'officialLogout' : 'officialImportGuest')}>{confirm === 'logout' ? '确认退出' : '确认导入'}</button></div></div>}
-    </> : <>
-      {((phase === 'phone' && !receivedCodeAllowed) || phase === 'sending') && <form className="account-form" onSubmit={send}><label htmlFor="official-phone">中国大陆手机号（+86）<input ref={phoneInput} id="official-phone" type="tel" inputMode="tel" autoComplete="off" maxLength={16} value={phone} disabled={!!busy} onChange={event => setPhone(event.target.value)} required /></label><p className="account-note">点击后向红果官方请求短信验证码。手机号、验证码和会话不会发送到自建服务器。</p><div className="account-actions"><button type="submit" className="button primary" disabled={!!busy || !phone.trim() || !!account?.retryAfter}>{account?.retryAfter ? `${account.retryAfter}秒后可重试` : '获取短信验证码'}</button></div></form>}
-      {receivedCodeAllowed && <form className="account-form" onSubmit={login}>{account?.smsState === 'uncertain' && <p className="account-note">发码结果尚未确认；如果已收到短信，可直接输入验证码，无需再次发送。</p>}<label htmlFor="official-code">短信验证码<input ref={codeInput} id="official-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code} disabled={!!busy} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} required /></label><div className="account-actions"><button type="submit" className="button primary" disabled={!!busy || !code}>登录红果</button><button type="button" className="button" disabled={!!busy || !!account?.retryAfter} onClick={() => perform('officialSendCode')}>{account?.retryAfter ? `${account.retryAfter}秒后可重发` : '重新获取验证码'}</button></div></form>}
-      {(phase === 'mfa' || phase === 'mfa_waiting') && <div className="account-confirm" role="group" aria-label="红果追加短信验证"><p>请使用 {account?.maskedPhone || '登录手机号'} 向以下号码发送指定短信：</p><dl className="account-details"><div><dt>收件号码</dt><dd>{account?.smsNumber}</dd></div><div><dt>短信内容</dt><dd style={{ overflowWrap: 'anywhere' }}>{account?.smsContent}</dd></div></dl><p className="account-note">短信由你在手机上手动发送；发完后点击下面按钮。本机验证最多等待90秒，可取消。</p><p className="account-note">无法手动发送这条短信时，请改用下方「官网扫码登录」——用手机红果 App 扫二维码确认即可，不需要追加短信。</p><div className="account-actions"><button ref={verifyButton} type="button" className="button primary" disabled={!!busy} onClick={() => perform('officialVerifyMFA')}>我已发送短信，开始验证</button></div></div>}
-      {(phase !== 'phone' || receivedCodeAllowed || busy || account?.retryAfter > 0) && <div className="account-actions"><button ref={cancelButton} type="button" className="button" onClick={cancel}>{busy ? '取消登录' : '换手机号 / 取消'}</button></div>}
     </>}
     {account?.web?.available && <div className="account-web">
-      <h3 className="account-web-title">官网扫码登录</h3>
+      <h3 className="account-web-title">{signedIn ? '官网扫码登录' : '扫码登录'}</h3>
       {account.web.authenticated ? <>
-        <p className="account-note">已通过官网扫码登录红果官方账号：{account.web.user?.name} {account.web.user?.idSuffix}。这是与短信验证码登录相互独立的官方会话。</p>
+        <p className="account-note">已通过官网扫码登录红果官方账号：{account.web.user?.name} {account.web.user?.idSuffix}。</p>
         <div className="account-actions"><button type="button" className="button" disabled={!!busy} onClick={webLogout}>退出官网账号</button></div>
       </> : <>
-        <p className="account-note">用手机红果 App 扫描二维码并在手机上确认即可登录官方账号：不需要短信验证码，也不会要求追加短信验证。</p>
         {qrImage && <div className="account-qr"><img src={qrImage} alt="红果官网登录二维码" /></div>}
         {webPhase === 'scanned' && <p className="account-note">已扫描，请在手机红果 App 中确认登录。</p>}
         {webPhase === 'qrcode' && qrImage && <p className="account-note">等待扫码（{account.web.expiresIn} 秒后过期）…</p>}
@@ -137,7 +117,7 @@ export default function AccountPanel({ focusRequest }) {
         <div className="account-actions">
           {qrImage
             ? <button type="button" className="button" disabled={!!busy} onClick={cancelQr}>取消扫码</button>
-            : <button type="button" className="button primary" disabled={!!busy} onClick={startQr}>获取二维码</button>}
+            : <button ref={qrButton} type="button" className="button primary" disabled={!!busy} onClick={startQr}>获取二维码</button>}
         </div>
       </>}
     </div>}
