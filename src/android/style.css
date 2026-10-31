@@ -242,6 +242,17 @@
 .heading-buttons{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
 .heading-actions{flex-wrap:wrap}
 .heading-actions>div{min-width:0;flex:1}
+/* Batch download and same-series merge controls. */
+.batch-toggle{padding:6px 12px;min-height:44px}
+.batch-panel{margin:14px 0;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
+.batch-range{display:flex;gap:16px;flex-wrap:wrap}
+.batch-range label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+.batch-range input{width:110px;min-height:44px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:7px;background:var(--surface);font-size:15px}
+.batch-progress p{margin:8px 0}
+.batch-progress progress{width:100%;height:6px;accent-color:var(--primary)}
+.merge-bar{margin-bottom:18px;display:flex;flex-direction:column;gap:8px}
+.merge-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border:1px solid var(--accent-border);border-radius:9px;background:var(--accent-soft);flex-wrap:wrap}
+.merge-row span{color:var(--text);font-size:14px;overflow-wrap:anywhere}
 .tv-layout .account-form{max-width:720px}
 .tv-layout .account-form>label{font-size:18px}
 .tv-layout .account-form input{min-height:56px;font-size:19px}

@@ -37,7 +37,7 @@ export const createSource=()=>({
 function installMock() {
   const sid='1234567890123456789';
   const episodes=Array.from({length:137},(_,i)=>({vid:String(2345678901234567890n+BigInt(i)),index:i+1,webAvailable:i<3,availability:i<3?'available':'unknown'}));
-  window.__mobileFixture={series:{seriesId:sid,title:'MOCK 长剧移动布局',episodeCount:137,description:"这是一段用于验证简介展开与收起的合成剧情。".repeat(20),episodes},calls:[],sources:[],searches:[],searchKeywords:[],sourcePlans:[],optionPlans:[],playPlans:[],options:{quality:'1080p',speed:1.5},activePlay:0,maxActivePlay:0,notes:[]};
+  window.__mobileFixture={series:{seriesId:sid,title:'MOCK 长剧移动布局',episodeCount:137,description:"这是一段用于验证简介展开与收起的合成剧情。".repeat(20),episodes},calls:[],sources:[],searches:[],searchKeywords:[],sourcePlans:[],optionPlans:[],playPlans:[],options:{quality:'1080p',speed:1.5},activePlay:0,maxActivePlay:0,notes:[],downloaded:[],merged:[]};
   const f=window.__mobileFixture;
   window.AndroidBridge={postMessage(raw){
     const m=JSON.parse(raw); f.calls.push(m);let result,error,delay=1;
@@ -46,8 +46,9 @@ function installMock() {
     else if(m.method==='getPlaybackOptions'){const plan=f.optionPlans.shift()||{};delay=plan.delay||1;error=plan.error;result=plan.options||{...f.options};}
     else if(m.method==='setPlaybackOptions'){f.options={...f.options,...m.params};result={...f.options};}
     else if(m.method==='play'){const plan=f.playPlans.shift()||{};delay=plan.delay||1;error=plan.error;f.activePlay++;f.maxActivePlay=Math.max(f.maxActivePlay,f.activePlay);result={started:true};}
-    else if(m.method==='download')result={id:1};
-    else if(m.method==='getDownloads')result=[{id:17,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',index:137,downloadedBytes:1234567,totalBytes:1234567}];
+    else if(m.method==='download'){f.downloaded=f.downloaded||[];f.downloaded.push(m.params.episode&&m.params.episode.index);result={id:1};}
+    else if(m.method==='getDownloads')result=[{id:17,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:137,downloadedBytes:1234567,totalBytes:1234567},{id:18,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:136,downloadedBytes:1234567,totalBytes:1234567}];
+    else if(m.method==='mergeDownloads'){f.merged=f.merged||[];f.merged.push(m.params.seriesId);result={exported:true,episodes:2,location:'Movies/Hongguo/合并.mp4'};}
     else if(m.method==='playDownload')result={started:true};
     else if(m.method==='getPlaybackCache')result={files:0,bytes:0};
     else if(m.method==='clearPlaybackCache')result={removed:0,bytes:0};
@@ -201,6 +202,23 @@ try {
     check(lightBody!==darkBody,'the light background actually differs');
     await noOverflow();await touchTargets();await screenshot('phone-discover-dark.png');
     await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'light'}]});await sleep(40);
+  });
+  await group('BATCH download panel queues a range serially and reports progress',async()=>{
+    await reset();await button('批量下载');await wait('document.querySelector(".batch-panel")');
+    check(await evaluate('document.querySelector("#batch-start").value==="1"&&document.querySelector("#batch-end").value==="137"'),'the range defaults to the whole directory');
+    const field=(id,value)=>evaluate(`(()=>{const e=document.getElementById(${JSON.stringify(id)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    await field('batch-end','3');await button('开始下载 3 集');
+    await wait('window.__mobileFixture.downloaded.length===3');
+    check((await evaluate('window.__mobileFixture.downloaded')).join(',')==='1,2,3','episodes are enqueued in ascending order');
+    await wait('document.querySelector(".toast")?.textContent.includes("批量下载完成：3 集已全部入队")','the batch completion is reported once');
+  });
+  await group('MERGE completed same-series downloads offer a one-tap lossless merge',async()=>{
+    await reset();await button('下载');await sleep(60);
+    check(await evaluate('!!document.querySelector(".merge-row")'),'the merge bar lists the series with two completed episodes');
+    check(await evaluate('document.querySelector(".merge-row span").textContent.includes("已完成 2 集")'),'the completed count is shown');
+    await button('合并本剧');await wait('window.__mobileFixture.merged.length===1');
+    eq(await evaluate('window.__mobileFixture.merged[0]'),'1234567890123456789','the merge request carries the exact series id');
+    await wait('document.querySelector(".toast")?.textContent.includes("已合并 2 集")','the export location is reported');
   });
   await group('ISOLATION no browser exceptions or external source/media requests',async()=>{eq(report.externalRequests,[],'zero external requests');eq(report.pageErrors,[],'zero runtime exceptions');});
   await call('Page.close');ws.close();ws=null;

@@ -31,7 +31,7 @@ final class NativeBridge {
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases"));
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "mergeDownloads"));
     NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
@@ -205,6 +205,15 @@ final class NativeBridge {
             return new JSONObject().put("items", NewReleaseCatalog.fetch(client, pages, deadline));
         }
     }
+    private final java.util.concurrent.atomic.AtomicBoolean mergeBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static String seriesTitle(JSONArray records, String seriesId) {
+        for (int at = 0; at < records.length(); at++) {
+            JSONObject row = records.optJSONObject(at);
+            JSONObject series = row == null ? null : row.optJSONObject("series");
+            if (series != null && seriesId.equals(series.optString("seriesId")) && !row.optString("title", "").isEmpty()) return row.optString("title");
+        }
+        return "短剧 " + seriesId;
+    }
     private void handle(Object id, String method, JSONObject params) throws Exception { handle(id, method, params, null, null); }
     private void handle(Object id, String method, JSONObject params, LibraryStore favoriteStore, AccountSync.Selection favoriteSelection) throws Exception {
         if (closed) return;
@@ -237,6 +246,32 @@ final class NativeBridge {
             case "getSeriesHistory": respond(id, currentSeriesHistory(params), null); break;
             case "toggleFavorite": AccountSync.get().requireCurrent(favoriteSelection); if (favoriteStore == null) throw new JSONException("收藏操作缺少账号归属"); favoriteStore.toggle(LibraryStore.series(params.getJSONObject("series"))); respond(id, currentLibrary(), null); break;
             case "getDownloads": respond(id, downloadRows(), null); break;
+            case "mergeDownloads": {
+                final String seriesId = LibraryStore.text(params, "seriesId", 30);
+                if (!seriesId.matches("\\d{1,30}")) throw new Exception("剧集编号无效");
+                if (!mergeBusy.compareAndSet(false, true)) { respond(id, null, "已有一次合并正在进行，请等待完成"); break; }
+                final JSONArray records = store.downloads();
+                worker.execute(() -> {
+                    File merged = null;
+                    try {
+                        java.util.List<MergeDownloads.Source> sources = MergeDownloads.collect(activity, records, seriesId);
+                        File directory = activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                        if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new Exception("下载目录尚未准备");
+                        merged = File.createTempFile("merge-", ".mp4", directory);
+                        Mp4Concat.concat(sources.stream().map(source -> source.file).collect(java.util.stream.Collectors.toList()), merged);
+                        String title = sources.get(0).file.getName().startsWith(seriesId) ? seriesTitle(records, seriesId) : seriesTitle(records, seriesId);
+                        MergeDownloads.Export export = MergeDownloads.export(activity, merged, MergeDownloads.outputName(seriesTitle(records, seriesId), seriesId));
+                        merged = null;
+                        respond(id, new JSONObject().put("exported", true).put("episodes", sources.size()).put("location", export.location).put("uri", export.uri.toString()), null);
+                    } catch (Exception error) {
+                        respond(id, null, error.getMessage() == null ? "合并未完成，请重试" : error.getMessage());
+                    } finally {
+                        mergeBusy.set(false);
+                        if (merged != null && merged.exists() && !merged.delete()) { /* A stale temporary is cleaned up by the next merge. */ }
+                    }
+                });
+                break;
+            }
             case "deleteDownload": {
                 DownloadDeletion.confirmedId(params);
                 Object owner=new Object();
@@ -453,7 +488,7 @@ final class NativeBridge {
                     }
                 } catch(Exception ignored) {status="failed";reason=DownloadManager.ERROR_FILE_ERROR;}
             }
-            result.put(new JSONObject().put("id", id).put("title", row.optString("title")).put("index", row.optInt("index")).put("status", status).put("downloadedBytes", current).put("totalBytes", total).put("reason", reason));
+            result.put(new JSONObject().put("id", id).put("title", row.optString("title")).put("index", row.optInt("index")).put("seriesId", row.optJSONObject("series")==null?"":row.optJSONObject("series").optString("seriesId")).put("status", status).put("downloadedBytes", current).put("totalBytes", total).put("reason", reason));
         }
         return result;
     }

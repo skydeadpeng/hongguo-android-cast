@@ -429,6 +429,24 @@ function Downloads({ notify }) {
   const statuses = { pending: '等待下载', running: '正在下载', paused: '已暂停', success: '下载完成', failed: '下载失败' };
   const activeDownload = item => ['pending', 'running', 'paused'].includes(item.status);
   const locked = !!confirm || deleting !== null || opening !== null;
+  // Same-series merge: every completed episode of one series, offered per group.
+  const [merging, setMerging] = useState('');
+  const groups = {};
+  for (const item of state.items) {
+    if (item.status !== 'success' || !item.seriesId) continue;
+    const group = groups[item.seriesId] || (groups[item.seriesId] = { seriesId: item.seriesId, title: item.title || '短剧', count: 0 });
+    group.count++;
+  }
+  const mergeable = Object.values(groups).filter(group => group.count >= 2);
+  const merge = async group => {
+    if (merging) return;
+    setMerging(group.seriesId);
+    try {
+      const result = await nativeCall('mergeDownloads', { seriesId: group.seriesId }, 600000);
+      if (alive.current) notify(`已合并 ${result.episodes} 集为完整视频，保存在 ${result.location}`);
+    } catch (error) { if (alive.current) notify(errorText(error)); }
+    finally { if (alive.current) setMerging(''); }
+  };
   return <>
     <header className="page-heading heading-actions"><div><h1>下载</h1><p>系统下载任务与设备上的离线视频。</p></div><button ref={refreshButton} className="button" onClick={() => refresh(true)} disabled={state.busy || locked} aria-label="刷新下载列表"><RefreshCw /><span>刷新</span></button></header>
     {confirm && <div className="download-confirm" role="group" aria-label="确认删除下载">
@@ -439,6 +457,7 @@ function Downloads({ notify }) {
       <div className="download-confirm-actions"><button ref={cancelButton} type="button" className="button" onClick={cancelConfirmation} disabled={deleting !== null}>取消</button><button type="button" className="button download-destructive" onClick={remove} disabled={deleting !== null}>{deleting !== null ? '删除中…' : '确认删除'}</button></div>
     </div>}
     <Status busy={state.busy} error={state.error} preserve={!!state.items.length} onRetry={() => refresh(true)} empty={!state.items.length && { title: '还没有下载任务', text: '在短剧详情中选择一集，再点击「下载本集」。' }}>
+      {!!mergeable.length && <div className="merge-bar" role="group" aria-label="合并整剧">{mergeable.map(group => <div key={group.seriesId} className="merge-row"><span>{group.title} · 已完成 {group.count} 集</span><button type="button" className="button" disabled={locked || merging !== ''} onClick={() => merge(group)}>{merging === group.seriesId ? '合并中…（可能需要几分钟）' : '合并本剧'}</button></div>)}</div>}
       <div className="download-list" ref={list}>{state.items.map((item, index) => {
         const percent = item.totalBytes > 0 ? Math.min(100, Math.max(0, Math.round(item.downloadedBytes / item.totalBytes * 100))) : null;
         return <article className="download-row" key={item.id}><div className="download-icon"><Download size={24} /></div><div className="download-info"><h2>{item.title || '短剧'} · 第 {item.index} 集</h2><p className={item.status === 'failed' ? 'text-error' : ''}>{statuses[item.status] || item.status}{percent !== null && item.status !== 'success' ? ` · ${percent}%` : ''} · {byteText(item.downloadedBytes)}{item.totalBytes > 0 ? ` / ${byteText(item.totalBytes)}` : ''}</p>{item.status === 'running' && <progress value={percent ?? undefined} max="100" aria-label={`${item.title}下载进度`} />}{item.reason && item.status !== 'success' ? <p className="download-reason">{item.reason}</p> : null}</div><div className="download-actions">{item.status === 'success' && <button type="button" className="button" onClick={() => open(item.id)} disabled={locked}><Play />{opening === item.id ? '打开中…' : '播放'}</button>}<button type="button" className="button download-delete" aria-label={`${activeDownload(item) ? '取消并删除' : '删除'} ${item.title || '短剧'} 第 ${item.index} 集`} onClick={() => askDelete(item, index)} disabled={locked}>{activeDownload(item) ? '取消并删除' : '删除'}</button></div></article>;
@@ -688,6 +707,13 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
   const favoritePending = useRef(false);
   const [preferences, setPreferences] = useState(getPlaybackPreferences);
   const [mediaOptions, setMediaOptions] = useState({ quality: 'auto', speed: 1 });
+  // Batch download: one serial JS queue, page-local by design — the system download
+  // queue keeps everything already enqueued, the page only drives the remaining items.
+  const [batch, setBatch] = useState(null);
+  const [batchPanel, setBatchPanel] = useState(false);
+  const [batchStart, setBatchStart] = useState('1');
+  const [batchEnd, setBatchEnd] = useState('1');
+  const batchStop = useRef(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaError, setMediaError] = useState('');
   const [episodeGroup, setEpisodeGroup] = useState(0);
@@ -785,6 +811,10 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
   }, [state.busy, item.description, isTv]);
   const lastWatchedVid = library.history.find((entry) => sameSeries(entry, item))?.vid || (pointEntry?.__owner === library.owner && pointEntry?.seriesId === item.seriesId ? pointEntry.vid : null);
   const episodes = state.item?.episodes || [];
+  // Batch range derives from the loaded directory; the inputs reset when it changes.
+  const batchCount = Math.max(0, Math.min(Number(batchEnd) || 0, episodes.length) - Math.max(1, Number(batchStart) || 1) + 1);
+  const batchRangeValid = batchCount > 0 && Number(batchStart) >= 1 && Number(batchEnd) <= episodes.length;
+  useEffect(() => { if (!batch?.running) { setBatchStart('1'); setBatchEnd(String(episodes.length || 1)); } }, [episodes.length]);
   const selectedPosition = episodes.findIndex((entry) => String(entry.vid) === String(selectedVid));
   const grouped = !isTv && episodes.length > 30;
   const groupCount = Math.ceil(episodes.length / 30);
@@ -815,6 +845,31 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
     try { const result = await nativeCall('toggleFavorite', { series: compactSeries(item) }); if (mounted.current && owner === libraryRef.current.owner && (result.owner === undefined || result.owner === owner)) { setPointEntry(null); onLibrary(result); } }
     catch (error) { if (mounted.current && owner === libraryRef.current.owner) setFavoriteError(errorText(error)); }
     finally { favoritePending.current = false; if (mounted.current) setFavoriteBusy(false); }
+  };
+  const startBatch = async (start, end) => {
+    if (batch?.running || !isSeasonCurrent() || mediaBusy) return;
+    const list = episodes.filter(entry => entry.index >= start && entry.index <= end);
+    if (!list.length) { notify('这个范围内没有剧集'); return; }
+    batchStop.current = false;
+    setBatch({ running: true, total: list.length, done: 0, failed: [], start, end });
+    let failed = [];
+    for (const target of list) {
+      if (batchStop.current || !mounted.current || !isSeasonCurrent()) { setBatch(previous => previous && { ...previous, running: false, stopped: true }); return; }
+      try {
+        const options = await nativeCall('getPlaybackOptions');
+        if (batchStop.current || !mounted.current) { setBatch(previous => previous && { ...previous, running: false, stopped: true }); return; }
+        const video = await source.playback(item.seriesId, target.vid, { quality: options.quality });
+        if (batchStop.current || !mounted.current) { setBatch(previous => previous && { ...previous, running: false, stopped: true }); return; }
+        const playInfo = { ...video, contentKey: video.contentKey ?? null, source: video.source || 'web', codec: video.codec || '', userAgent: video.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36', referer: video.referer ?? (['app', 'api'].includes(video.source) ? '' : 'https://hongguoduanju.com/'), vid: target.vid };
+        await nativeCall('download', { series: compactSeries(item), episode: compactEpisode(target), quality: options.quality, speed: options.speed, url: playInfo.url, playInfo }, 90000);
+        setBatch(previous => previous && { ...previous, done: previous.done + 1 });
+      } catch (error) {
+        failed = [...failed, { index: target.index, reason: errorText(error) }];
+        setBatch(previous => previous && { ...previous, done: previous.done + 1, failed });
+      }
+    }
+    setBatch(previous => previous && { ...previous, running: false });
+    notify(failed.length ? `批量下载完成：${list.length - failed.length} 集入队，${failed.length} 集失败` : `批量下载完成：${list.length} 集已全部入队`);
   };
   const run = async (action, target = episode) => {
     if (!isSeasonCurrent() || !target || mediaBusy || dispatchedPlay.current || activeOperation.current?.action === 'download') return;
@@ -875,7 +930,21 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
     {resumeError && <p className="resume-error" role="alert">{resumeError}</p>}
     <Status busy={state.busy} error={state.error} onRetry={() => setReload((n) => n + 1)}>
       <section className="detail-summary"><div className="detail-cover">{item.coverUrl ? <img src={item.coverUrl} alt="" /> : <Film size={48} />}</div><div className="detail-copy"><h1>{item.title}</h1><p className="detail-meta">{item.episodeLabel || (item.episodeCount ? `全 ${item.episodeCount} 集` : '剧集详情')}{item.tags?.length ? ` · ${item.tags.join(' / ')}` : ''}</p><p ref={description} id="detail-description" className={`detail-description${!isTv && !descriptionExpanded ? ' description-collapsed' : ''}`}>{item.description || '暂无剧情简介。'}</p>{!isTv && descriptionOverflow && <button className="description-toggle" type="button" aria-expanded={descriptionExpanded} aria-controls="detail-description" onClick={() => setDescriptionExpanded((value) => !value)}>{descriptionExpanded ? '收起简介' : '展开简介'}</button>}<button className={`button ${isFavorite ? 'saved' : ''}`} onClick={favorite} disabled={favoriteBusy || pointError || pointBusy}><Heart />{favoriteBusy ? '保存中…' : isFavorite ? '已加入追剧' : '加入追剧'}</button>{favoriteError && <p className="text-error" role="alert">{favoriteError} {pointError ? <button type="button" className="button" onClick={() => setReload(n => n + 1)}>重试剧集状态</button> : "点击追剧按钮重试。"}</p>}</div></section>
-      <section className="episode-section"><header><h2>选集</h2><p>共 {state.item?.episodes?.length || 0} 集</p></header><p className="episode-note">点击集数直接播放；电视方向键移动、确认键播放。网页 → App 自动取源，逐集点击时核验。</p><div className="episode-browser" hidden={!grouped}><label htmlFor="episode-range">分集范围<select id="episode-range" aria-label="分集范围" value={episodeGroup} onChange={(event) => setEpisodeGroup(Number(event.target.value))}>{Array.from({ length: groupCount }, (_, group) => <option key={group} value={group}>第 {group * 30 + 1}–{Math.min((group + 1) * 30, episodes.length)} 集</option>)}</select></label><button className="button" type="button" disabled={!episode} onClick={locateEpisode}>定位第 {episode?.index || '—'} 集</button></div><div ref={episodeGrid} className="episode-grid" role="group" aria-label="选择剧集">{visibleEpisodes.map((entry) => <button key={`${entry.index}-${entry.vid}`} disabled={operation === 'download' || mediaBusy || playDispatched} title={`播放第 ${entry.index} 集${entry.webAvailable ? '' : '，网页与 App 自动取源'}`} aria-label={`播放第 ${entry.index} 集${entry.webAvailable ? '' : '，自动取源'}`} aria-pressed={String(entry.vid) === String(selectedVid)} onClick={() => playEpisode(entry)}><span>{entry.index}</span>{!entry.webAvailable && <span className="episode-status">自动取源</span>}</button>)}</div>{!state.item?.episodes?.length && <p className="empty-episodes">当前没有剧集。</p>}</section>
+      <section className="episode-section"><header><h2>选集</h2><p>共 {state.item?.episodes?.length || 0} 集</p><button className="button batch-toggle" type="button" disabled={!!batch?.running || mediaBusy} onClick={() => setBatchPanel(value => !value)}>{batchPanel ? '收起批量下载' : '批量下载'}</button></header><p className="episode-note">点击集数直接播放；电视方向键移动、确认键播放。网页 → App 自动取源，逐集点击时核验。</p>
+      {batchPanel && <div className="batch-panel" role="group" aria-label="批量下载">
+        <div className="batch-range">
+          <label htmlFor="batch-start">起始集<input id="batch-start" type="number" min={1} max={episodes.length} value={batchStart} onChange={(event) => setBatchStart(event.target.value)} /></label>
+          <label htmlFor="batch-end">结束集<input id="batch-end" type="number" min={1} max={episodes.length} value={batchEnd} onChange={(event) => setBatchEnd(event.target.value)} /></label>
+        </div>
+        <p className="account-note">逐集自动取源并加入系统下载队列（清晰度沿用播放设置）；失败会跳过并继续。任务在本页进行，离开详情页将停止后续取源，已入队的下载不受影响。</p>
+        {batch?.running ? <div className="batch-progress" role="status">
+          <p>批量下载中：已完成 {batch.done} / {batch.total}{batch.failed.length ? ` · 失败 ${batch.failed.length}` : ''}</p>
+          <progress value={batch.done} max={batch.total} aria-label="批量下载进度" />
+          <div className="about-links"><button type="button" className="button" onClick={() => { batchStop.current = true; }}>停止后续取源</button></div>
+          {!!batch.failed.length && <p className="text-error">{batch.failed.map(failure => `第 ${failure.index} 集：${failure.reason}`).join('；')}</p>}
+        </div> : <div className="about-links"><button type="button" className="button primary" disabled={!batchRangeValid} onClick={() => startBatch(Number(batchStart), Number(batchEnd))}>开始下载 {batchCount} 集</button></div>}
+      </div>}
+      <div className="episode-browser" hidden={!grouped}><label htmlFor="episode-range">分集范围<select id="episode-range" aria-label="分集范围" value={episodeGroup} onChange={(event) => setEpisodeGroup(Number(event.target.value))}>{Array.from({ length: groupCount }, (_, group) => <option key={group} value={group}>第 {group * 30 + 1}–{Math.min((group + 1) * 30, episodes.length)} 集</option>)}</select></label><button className="button" type="button" disabled={!episode} onClick={locateEpisode}>定位第 {episode?.index || '—'} 集</button></div><div ref={episodeGrid} className="episode-grid" role="group" aria-label="选择剧集">{visibleEpisodes.map((entry) => <button key={`${entry.index}-${entry.vid}`} disabled={operation === 'download' || mediaBusy || playDispatched} title={`播放第 ${entry.index} 集${entry.webAvailable ? '' : '，网页与 App 自动取源'}`} aria-label={`播放第 ${entry.index} 集${entry.webAvailable ? '' : '，自动取源'}`} aria-pressed={String(entry.vid) === String(selectedVid)} onClick={() => playEpisode(entry)}><span>{entry.index}</span>{!entry.webAvailable && <span className="episode-status">自动取源</span>}</button>)}</div>{!state.item?.episodes?.length && <p className="empty-episodes">当前没有剧集。</p>}</section>
       <section className="playback-settings" aria-label="清晰度与倍速">
         <div className="playback-setting"><div><h2>清晰度</h2><p>播放失败先自动重新取源，再按真实分辨率尝试较低档（720p / 480p / 360p），保留本集进度、暂停和倍速；降档仅影响当前播放，不覆盖首选。手动下载严格使用所选清晰度。</p></div><select aria-label="清晰度" value={mediaOptions.quality} disabled={!!operation || mediaBusy} onChange={event => changeMediaOption('quality', event.target.value)}><option value="auto">自动</option><option value="720p">720p 及以上</option><option value="1080p">1080p 及以上</option></select></div>
         <div className="playback-setting"><div><h2>播放倍速</h2><p>播放器内也可切换，连播沿用设置；下载文件保持原速度。</p></div><select aria-label="播放倍速" value={mediaOptions.speed} disabled={!!operation || mediaBusy} onChange={event => changeMediaOption('speed', Number(event.target.value))}>{[0.75, 1, 1.25, 1.5, 2].map(speed => <option key={speed} value={speed}>{speed}×</option>)}</select></div>
