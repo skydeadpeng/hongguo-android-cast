@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 45,
-  "versionName": "0.12.22",
+  "versionCode": 46,
+  "versionName": "0.12.23",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.22/Hongguo-0.12.22-phone-release-compatible.apk",
-  "size": 628336,
-  "sha256": "40b4bc18804c6c4be1ba215465a433562d91bafa827f98c00c45490f5ac575d2",
-  "notes": "官网扫码登录的云端同步改用桌面版同款 72232 签名通道（上游已用真实账号验证的路径），并保留多指纹回退；扫码后云端验证与收藏/历史同步应可正常工作。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-10-31T08:30:40.685Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.23/Hongguo-0.12.23-phone-release-compatible.apk",
+  "size": 632212,
+  "sha256": "da526910c5182c862685c91c4ee9b5d6090ff5b79e72b1d35245baf277bcb0dc",
+  "notes": "官网扫码登录的云端同步改用真实登记的设备身份签名（与桌面版完全一致的注册接口与签名通道），修复此前云端验证不通过的问题：扫码登录后即可同步收藏、观看历史与进度。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-10-31T11:18:03.753Z"
 }
