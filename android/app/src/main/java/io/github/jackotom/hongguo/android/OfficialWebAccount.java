@@ -38,6 +38,7 @@ final class OfficialWebAccount {
     private boolean cloudReady;
     private long cloudGeneration;
     private String cloudLane="passport_full";
+    private UpstreamDeviceRegister.Identity upstreamIdentity;
 
     OfficialWebAccount(Store store,Gateway gateway,Clock clock)throws Exception {
         this.store=store;this.gateway=gateway;this.clock=clock;
@@ -138,7 +139,7 @@ final class OfficialWebAccount {
         synchronized(lock){
             profile=null;token="";image="";scanState="";phase=PHASE_IDLE;error="";diagnostic="";
             jar=new OfficialWebPassport.CookieJar();
-            dropCloud();
+            dropCloud();upstreamIdentity=null;
             try{store.clear();}catch(Exception failure){AccountLog.error("official_web_session_clear_failed:"+failure.getClass().getSimpleName());}
             return status();
         }
@@ -231,23 +232,27 @@ final class OfficialWebAccount {
      * The verified desktop lane: the 72232 hongguoTV signer over the web cookie. This is the
      * path the upstream release actually validates cloud reads with, tried first.
      */
+    /** The upstream lane's two network operations; injectable for offline tests. */
+    interface UpstreamTransport {
+        UpstreamDeviceRegister.Identity register() throws Exception;
+        String call(String url, String method, java.util.Map<String, String> headers, String body, long deadlineNanos) throws Exception;
+    }
+    private static final UpstreamTransport DEFAULT_UPSTREAM = new UpstreamTransport() {
+        @Override public UpstreamDeviceRegister.Identity register() throws Exception { return UpstreamDeviceRegister.register(); }
+        @Override public String call(String url, String method, java.util.Map<String, String> headers, String body, long deadlineNanos) throws Exception { return AppTransport.accountCall(url, method, headers, body, deadlineNanos); }
+    };
+    private static volatile UpstreamTransport upstreamTransport = DEFAULT_UPSTREAM;
+    static void setUpstreamTransport(UpstreamTransport value) { upstreamTransport = value == null ? DEFAULT_UPSTREAM : value; }
+
+
     private boolean probeUpstreamLane() throws Exception {
-        String deviceId, iid, cdid, cookie;
+        String cookie; UpstreamDeviceRegister.Identity identity;
         synchronized(lock){
             if(profile==null)throw new IOException("官网会话未登录");
-            deviceId=String.valueOf(1000000000000000L+(long)(Math.random()*281474976710655L));
-            iid=String.valueOf(1000000000000000L+(long)(Math.random()*281474976710655L));
-            cdid=java.util.UUID.randomUUID().toString();
             cookie=jar.header();
         }
-        long now=System.currentTimeMillis();
-        java.security.SecureRandom random=new java.security.SecureRandom();
-        int[] randoms=new int[7];
-        for(int at=0;at<7;at++)randoms[at]=random.nextInt();
-        AccountSigner.Signed signed=AccountSigner.request("/reading/user/info/v1/",new java.util.LinkedHashMap<>(),deviceId,iid,cdid,now,"AXYQOS6n2m60x1fVZHIrH3iol",now-60000,randoms);
-        signed.headers.put("Cookie",cookie);
-        String raw=AppTransport.accountTextRequest(signed.url,signed.headers,System.nanoTime()+8_000_000_000L);
-        org.json.JSONObject reply=new org.json.JSONObject(raw);
+        identity=upstreamIdentity();
+        JSONObject reply=upstreamCall("/reading/user/info/v1/",new java.util.LinkedHashMap<>(),null,identity,cookie);
         JSONObject data=reply.optJSONObject("data");
         String answered=data==null?"":data.optString("user_id_str",data.optString("user_id",""));
         if(!answered.isEmpty()&&answered.equals(uid())){
@@ -255,6 +260,41 @@ final class OfficialWebAccount {
         }
         AccountLog.warn("official_web_cloud_lane_mismatch:lane=upstream_72232 answered="+(answered.isEmpty()?"none":answered.equals(uid())?"match":"different"));
         return false;
+    }
+    /** The registered 72232 identity for this web session, created once and reused. */
+    private UpstreamDeviceRegister.Identity upstreamIdentity() throws Exception {
+        synchronized(lock){
+            if(upstreamIdentity!=null)return upstreamIdentity;
+        }
+        UpstreamDeviceRegister.Identity fresh=upstreamTransport.register();
+        synchronized(lock){upstreamIdentity=fresh;return fresh;}
+    }
+    /** One signed cloud call on the verified upstream lane. */
+    private JSONObject upstreamCall(String path, java.util.Map<String,String> values, byte[] body, UpstreamDeviceRegister.Identity identity, String cookie) throws Exception {
+        long now=System.currentTimeMillis();
+        java.security.SecureRandom random=new java.security.SecureRandom();
+        int[] randoms=new int[7];
+        for(int at=0;at<7;at++)randoms[at]=random.nextInt();
+        AccountSigner.Signed signed=AccountSigner.request(path,values,identity.deviceId,identity.iid,identity.cdid,now,"AXYQOS6n2m60x1fVZHIrH3iol",now-60000,randoms,body);
+        signed.headers.put("Cookie",cookie);
+        String raw=upstreamTransport.call(signed.url,body==null?"GET":"POST",signed.headers,body==null?null:new String(body,java.nio.charset.StandardCharsets.UTF_8),System.nanoTime()+15_000_000_000L);
+        return new org.json.JSONObject(raw);
+    }
+    /** The web lane's cloud adapter: every /reading call signed the verified upstream way. */
+    OfficialLibrary.Api cloudApi() throws Exception {
+        String cookie; UpstreamDeviceRegister.Identity identity;
+        synchronized(lock){
+            if(profile==null)throw new IOException("官网会话未登录");
+            cookie=jar.header();
+        }
+        identity=upstreamIdentity();
+        final String cookieFinal=cookie; final UpstreamDeviceRegister.Identity identityFinal=identity;
+        return (path,method,query,body,gzip)->{
+            java.util.LinkedHashMap<String,String> values=new java.util.LinkedHashMap<>();
+            if(query!=null)for(java.util.Iterator<String> keys=query.keys();keys.hasNext();){String key=keys.next();Object value=query.opt(key);if(value instanceof String||value instanceof Number||value instanceof Boolean)values.put(key,String.valueOf(value));}
+            byte[] payload=body==null?null:body.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            return upstreamCall(path,values,payload,identityFinal,cookieFinal);
+        };
     }
 
     /** Marks the web lane dead after a 401 from a cloud call; the session itself stays until re-login. */

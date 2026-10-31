@@ -10,7 +10,7 @@ import org.json.*;
 
 /** Fixed-domain App JSON transport. Never forwards a signed POST to a redirect destination. */
 final class AppTransport {
-    private static final Set<String> HEADERS = new HashSet<>(Arrays.asList("user-agent", "accept", "content-type", "x-xs-from-web", "x-ss-req-ticket", "x-tt-request-tag", "sdk-version", "passport-sdk-version", "x-vc-bdturing-sdk-version", "x-ss-stub", "x-gorgon", "x-khronos", "x-ladon", "x-argus", "x-helios", "x-medusa", "x-tt-dt", "cookie"));
+    private static final Set<String> HEADERS = new HashSet<>(Arrays.asList("user-agent", "accept", "content-type", "x-xs-from-web", "x-ss-req-ticket", "x-tt-request-tag", "sdk-version", "passport-sdk-version", "x-vc-bdturing-sdk-version", "x-ss-stub", "x-gorgon", "x-khronos", "x-ladon", "x-argus", "x-helios", "x-medusa", "x-tt-dt", "cookie", "log-encode-type", "x-ss-dp", "x-neptune", "lc"));
     // Also bounds legacy NetworkGuard implementations/test doubles that expose only publicAddresses(URI).
     private static final ExecutorService SEARCH_DNS = new ThreadPoolExecutor(0,2,30,TimeUnit.SECONDS,new SynchronousQueue<Runnable>(), runnable -> {Thread thread=new Thread(runnable,"hongguo-app-dns");thread.setDaemon(true);return thread;},new ThreadPoolExecutor.AbortPolicy());
     /** One daemon timer closes stalled TCP/TLS/write/read operations on deadline or owner cancellation. */
@@ -111,6 +111,20 @@ final class AppTransport {
             if(!HEADERS.contains(name)||text==null||text.length()>16384||text.indexOf('\r')>=0||text.indexOf('\n')>=0)throw new IOException("搜索请求头无效");
         }
         return execute(value, method, headers, body, false, true, deadline);
+    }
+    /** The upstream registration endpoint, host-locked; binary body, text reply. */
+    static String upstreamRegisterPost(String url, Map<String, String> headers, byte[] body, long deadline) throws Exception {
+        URI uri = NetworkGuard.validate(url, false);
+        if (!"log5-applog-lf.fqnovel.com".equals(uri.getHost()) || !"/service/2/device_register/".equals(uri.getRawPath())) throw new IOException("上游登记地址无效");
+        JSONObject reply = execute(url, "POST", headers, body, false, false, deadline);
+        return reply.optString("body", "");
+    }
+    /** Signed account call on the 72232 host; returns the raw body text for the caller to parse. */
+    static String accountCall(String url, String method, Map<String, String> headers, String body, long deadline) throws Exception {
+        URI uri = NetworkGuard.validate(url, false);
+        if (!"api5-normal-sinfonlinea.fqnovel.com".equals(uri.getHost()) || uri.getRawPath() == null || !uri.getRawPath().matches("/reading/[A-Za-z0-9/_-]{1,240}") || uri.getRawPath().contains("//")) throw new IOException("账号云端地址无效");
+        JSONObject reply = execute(url, method, headers, body == null ? new byte[0] : body.getBytes(StandardCharsets.UTF_8), false, false, deadline);
+        return reply.optString("body", "");
     }
     /** Signed account GET on the 72232 host; returns the raw body text for the caller to parse. */
     static String accountTextRequest(String url, Map<String, String> headers, long deadline) throws Exception {

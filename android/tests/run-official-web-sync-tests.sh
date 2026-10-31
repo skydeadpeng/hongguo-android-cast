@@ -27,6 +27,7 @@ cat > "$TMP/io/github/jackotom/hongguo/android/OfficialApiClient.java" <<'STUB'
 package io.github.jackotom.hongguo.android;
 import org.json.JSONObject;
 final class OfficialApiClient implements AutoCloseable {
+    static final int MAX_BYTES=4*1024*1024;
     static final class HTTPError extends java.io.IOException { final int status,retryAfter; HTTPError(int status,int retry){this.status=status;this.retryAfter=retry;} }
     interface Cloud { JSONObject call(String path,String method,JSONObject query,JSONObject body) throws Exception; }
     static volatile Cloud global;
@@ -56,8 +57,8 @@ SRC="$ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
   "$TMP/stubs/android/content/Context.java" "$TMP/stubs/android/content/SharedPreferences.java" "$TMP/stubs/android/os/Environment.java" \
   "$TMP/stubs/android/util/Base64.java" "$TMP/stubs/android/security/keystore/KeyProperties.java" "$TMP/stubs/android/security/keystore/KeyGenParameterSpec.java" \
   "$TMP/io/github/jackotom/hongguo/android/OfficialApiClient.java" "$TMP/io/github/jackotom/hongguo/android/OfficialSessionStore.java" \
-  "$SRC/AccountLog.java" "$SRC/AccountSigner.java" "$SRC/LibraryStore.java" "$SRC/OfficialLibrary.java" "$SRC/OfficialAccountFlow.java" \
+  "$SRC/AccountLog.java" "$SRC/AccountSigner.java" "$SRC/UpstreamDeviceRegister.java" "$SRC/LibraryStore.java" "$SRC/OfficialLibrary.java" "$SRC/OfficialAccountFlow.java" \
   "$SRC/OfficialWebPassport.java" "$SRC/OfficialWebGateway.java" "$SRC/OfficialWebAccount.java" "$SRC/OfficialWebSessionStore.java" "$SRC/OfficialAccountVault.java" \
-  "$SRC/AccountSync.java" "$SRC/AppTransport.java" "$SRC/NetworkGuard.java" "$SRC/DanmakuSigner.java" \
+  "$SRC/AccountSync.java" "$SRC/AppTransport.java" "$SRC/NetworkGuard.java" "$SRC/DanmakuSigner.java" "$SRC/PassportDevice.java" "$SRC/PassportSigner.java" "$SRC/PassportConstants.java" "$SRC/PassportJson.java" "$SRC/SearchProtocol.java" \
   "$ROOT/android/tests/OfficialWebSyncTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.OfficialWebSyncTest

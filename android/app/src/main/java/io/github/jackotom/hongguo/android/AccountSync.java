@@ -147,9 +147,15 @@ final class AccountSync {
         final BooleanSupplier current=()->operation==syncGeneration&&epoch==cloudEpoch()&&uid.equals(cloudUid())&&libraryReady&&uid.equals(selectedUid);
         notifyChanged();OfficialApiClient client=null;boolean sessionSaveAttempted=false;
         try {
-            client=webLane?web.cloudClient():cloudClients.create(flow.session());syncClient=client;
-            library.sync(client,uid,current);if(current.getAsBoolean()&&!webLane){sessionSaveAttempted=true;flow.refreshedSession(client.session(),epoch,uid);}
-            if(current.getAsBoolean())syncError="";
+            if(webLane){
+                // Every cloud call is signed the verified upstream way with the web cookie.
+                library.sync(web.cloudApi(),uid,current);
+                if(current.getAsBoolean())syncError="";
+            }else{
+                client=cloudClients.create(flow.session());syncClient=client;
+                library.sync(client,uid,current);
+                if(current.getAsBoolean()){sessionSaveAttempted=true;flow.refreshedSession(client.session(),epoch,uid);syncError="";}
+            }
         }catch(Exception failure){if(current.getAsBoolean()){
             boolean expired=failure instanceof OfficialLibrary.AuthExpiredException||failure instanceof OfficialApiClient.HTTPError&&((OfficialApiClient.HTTPError)failure).status==401;
             if(expired){

@@ -558,6 +558,10 @@ final class AccountSigner {
         return out.toByteArray();
     }
     static Signed request(String apiPath, Map<String, String> values, String deviceId, String iid, String cdid, long now, String processNonce, long processStarted, int[] randoms) throws Exception {
+        return request(apiPath, values, deviceId, iid, cdid, now, processNonce, processStarted, randoms, null);
+    }
+    /** The same signer over an optional JSON body; reads stay GET, writes become POST. */
+    static Signed request(String apiPath, Map<String, String> values, String deviceId, String iid, String cdid, long now, String processNonce, long processStarted, int[] randoms, byte[] body) throws Exception {
         Map<String, String> device = new LinkedHashMap<>();
         device.put("ac", "wifi"); device.put("channel", "update_64"); device.put("aid", "8662"); device.put("app_name", "novelread");
         device.put("version_code", "72232"); device.put("version_name", "7.2.2.32"); device.put("device_platform", "android"); device.put("os", "android");
@@ -578,7 +582,7 @@ final class AccountSigner {
             merged.put("_rticket", String.valueOf(requestTicket));
             query = pythonUrlEncode(merged);
             url = HOST + apiPath + "?" + query;
-            if (branchOf(url, null, khronos) == 0) break;
+            if (branchOf(url, body, khronos) == 0) break;
             if (n == 127) throw new IllegalStateException("无法生成账号请求签名");
         }
         Map<String, String> headers = new LinkedHashMap<>();
@@ -592,11 +596,12 @@ final class AccountSigner {
         headers.put("x-khronos", String.valueOf(khronos));
         headers.put("x-ladon", java.util.Base64.getEncoder().encodeToString(be32(khronos)));
         headers.put("x-argus", java.util.Base64.getEncoder().encodeToString(le32(khronos)));
-        headers.put("x-gorgon", xGorgon(query, null, khronos, randoms[0] >>> 16));
+        headers.put("x-gorgon", xGorgon(query, body, khronos, randoms[0] >>> 16));
         headers.put("x-helios", helios(khronos, randoms[1]));
-        byte[] medusa = buildMedusa(url, null, khronos, deviceId, "7.2.2.32", processNonce, processStarted, randoms);
+        byte[] medusa = buildMedusa(url, body, khronos, deviceId, "7.2.2.32", processNonce, processStarted, randoms);
         headers.put("x-medusa", java.util.Base64.getEncoder().encodeToString(medusa));
         headers.put("x-tt-dt", "");
+        if (body != null) headers.put("Content-Type", "application/json; charset=utf-8");
         return new Signed(url, headers);
     }
     static final class Signed { final String url; final Map<String, String> headers; Signed(String url, Map<String, String> headers) { this.url = url; this.headers = headers; } }
