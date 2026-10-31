@@ -192,6 +192,16 @@ try {
     await button('全部');await sleep(60);check(await firstTitle()==='MOCK 批次 1','switching back resumes the remembered position');
     await noOverflow();await screenshot('phone-discover-next-batch.png');
   });
+  await group('DARK the dark scheme restyles the page without overflowing',async()=>{
+    await reset();await button('发现');await sleep(60);
+    const lightBody=await evaluate('getComputedStyle(document.body).backgroundColor');
+    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});await sleep(60);
+    const darkBody=await evaluate('getComputedStyle(document.body).backgroundColor');
+    check(darkBody==='rgb(19, 21, 22)','the dark background comes from the dark variable group '+darkBody);
+    check(lightBody!==darkBody,'the light background actually differs');
+    await noOverflow();await touchTargets();await screenshot('phone-discover-dark.png');
+    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'light'}]});await sleep(40);
+  });
   await group('ISOLATION no browser exceptions or external source/media requests',async()=>{eq(report.externalRequests,[],'zero external requests');eq(report.pageErrors,[],'zero runtime exceptions');});
   await call('Page.close');ws.close();ws=null;
 } catch(error) {
