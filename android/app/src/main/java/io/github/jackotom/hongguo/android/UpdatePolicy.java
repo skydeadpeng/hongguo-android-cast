@@ -13,7 +13,7 @@ final class UpdatePolicy {
     static final String REPOSITORY = "skydeadpeng/hongguo-android-cast";
     static final long CHECK_INTERVAL = 24L * 60 * 60 * 1000;
     static final long MAX_APK_BYTES = 150L * 1024 * 1024;
-    private static final String[] PROXY_HOSTS={"gh-proxy.com","v4.gh-proxy.org","gh-proxy.org","ghfast.top"};
+    static final String[] PROXY_HOSTS={"gh-proxy.com","v4.gh-proxy.org","gh-proxy.org","ghfast.top"};
     private static final Set<String> ASSET_HOSTS = new HashSet<>(Arrays.asList("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com", "github-releases.githubusercontent.com"));
     static String manifestUrl(String flavor) {
         if (!flavor.equals("phone") && !flavor.equals("tv") && !flavor.equals("tvnative")) throw new IllegalArgumentException("更新渠道无效");
