@@ -24,8 +24,8 @@ android {
         applicationId 'io.github.jackotom.hongguo.android'
         minSdk 26
         targetSdk 35
-        versionCode 43
-        versionName '0.12.20'
+        versionCode 44
+        versionName '0.12.21'
     }
     flavorDimensions 'device'
     productFlavors {

@@ -37,6 +37,7 @@ final class OfficialWebAccount {
     private boolean busy;
     private boolean cloudReady;
     private long cloudGeneration;
+    private String cloudLane="passport_full";
 
     OfficialWebAccount(Store store,Gateway gateway,Clock clock)throws Exception {
         this.store=store;this.gateway=gateway;this.clock=clock;
@@ -156,20 +157,22 @@ final class OfficialWebAccount {
     /**
      * Builds a signed cloud client that carries the web session cookie. The identity is a
      * fresh anonymous registration; the cookie is what binds the request to the account.
-     * The client is sealed before any error can leak it and never stores the cookie twice.
+     * The winning probe lane decides the user-agent and cookie shape of every later call.
      */
     OfficialApiClient cloudClient()throws Exception{
         JSONObject session;
+        String lane;
         synchronized(lock){
             if(profile==null)throw new IOException("官网会话未登录");
+            lane=cloudLane;
             session=OfficialApiClient.newSession();
-            String header=jar.header();
+            String header=cookieFor(lane);
             for(String pair:header.split("; ")){
                 int at=pair.indexOf('=');
                 if(at>0)session.getJSONObject("cookies").put(pair.substring(0,at),pair.substring(at+1));
             }
         }
-        OfficialApiClient client=new OfficialApiClient(session);
+        OfficialApiClient client=new OfficialApiClient(session,laneUserAgent(lane));
         boolean registered=false;
         try{
             client.deadlineNanos(System.nanoTime()+60_000_000_000L);
@@ -179,28 +182,49 @@ final class OfficialWebAccount {
         return client;
     }
 
+    /** Probe lanes: the same signed request under the profiles other clients have proven. */
+    private static final String LANE_FULL="passport_full",LANE_MINIMAL="passport_minimal",LANE_UPSTREAM_UA="passport_upstream_ua";
+    private static final String UPSTREAM_UA="com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)";
+    private String cookieFor(String lane){
+        String header=jar.header();
+        if(!LANE_MINIMAL.equals(lane))return header;
+        // Some endpoints bind the account only from the session cookies themselves.
+        StringBuilder minimal=new StringBuilder();
+        for(String pair:header.split("; ")){
+            String name=pair.contains("=")?pair.substring(0,pair.indexOf('=')):pair;
+            if(name.equals("sessionid")||name.equals("sessionid_ss")||name.equals("sid_tt")){if(minimal.length()>0)minimal.append("; ");minimal.append(pair);}
+        }
+        return minimal.length()>0?minimal.toString():header;
+    }
+    private static String laneUserAgent(String lane){return LANE_UPSTREAM_UA.equals(lane)?UPSTREAM_UA:null;}
+
     /**
      * Proves the web cookie opens the signed cloud APIs: the profile request must answer
-     * with this exact account id. An anonymous acceptance never counts as a pass.
+     * with this exact account id. Every lane is tried; the winning lane is remembered.
      */
     boolean probeCloud(){
-        OfficialApiClient client=null;
-        try{
-            client=cloudClient();
-            JSONObject reply=client.cloud("/reading/user/info/v1/","GET",new JSONObject(),null,false);
-            JSONObject data=reply.optJSONObject("data");
-            String answered=data==null?"":data.optString("user_id_str",data.optString("user_id",""));
-            synchronized(lock){
-                if(profile!=null&&uid().equals(answered)&&!answered.isEmpty()){cloudReady=true;AccountLog.warn("official_web_cloud_ready");return true;}
-                cloudReady=false;cloudGeneration++;diagnostic="cloud_probe_rejected";
-                AccountLog.warn("official_web_cloud_probe_rejected");
-                return false;
-            }
-        }catch(Exception failure){
-            synchronized(lock){cloudReady=false;cloudGeneration++;diagnostic="cloud_probe_failed";}
-            AccountLog.warn("official_web_cloud_probe_failed:"+failure.getClass().getSimpleName());
-            return false;
-        }finally{if(client!=null)client.close();}
+        String[] lanes={LANE_FULL,LANE_MINIMAL,LANE_UPSTREAM_UA};
+        for(String lane:lanes){
+            OfficialApiClient client=null;
+            try{
+                synchronized(lock){cloudLane=lane;}
+                client=cloudClient();
+                JSONObject reply=client.cloud("/reading/user/info/v1/","GET",new JSONObject(),null,false);
+                JSONObject data=reply.optJSONObject("data");
+                String answered=data==null?"":data.optString("user_id_str",data.optString("user_id",""));
+                if(!answered.isEmpty()){
+                    synchronized(lock){
+                        if(profile!=null&&uid().equals(answered)){cloudReady=true;AccountLog.warn("official_web_cloud_ready:lane="+lane);return true;}
+                    }
+                    AccountLog.warn("official_web_cloud_lane_mismatch:lane="+lane+" answered="+(answered.isEmpty()?"none":"different"));
+                }
+            }catch(Exception failure){
+                AccountLog.warn("official_web_cloud_lane_failed:lane="+lane+" "+failure.getClass().getSimpleName());
+            }finally{if(client!=null)client.close();}
+        }
+        synchronized(lock){cloudReady=false;cloudGeneration++;diagnostic="cloud_probe_rejected";}
+        AccountLog.warn("official_web_cloud_probe_rejected");
+        return false;
     }
 
     /** Marks the web lane dead after a 401 from a cloud call; the session itself stays until re-login. */

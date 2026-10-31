@@ -34,6 +34,7 @@ final class OfficialApiClient implements AutoCloseable {
     OfficialApiClient(Cloud cloud,JSONObject state){this.cloud=cloud;this.state=state;}
     OfficialApiClient(JSONObject state,Cloud cloud){this(cloud,state);}
     OfficialApiClient(JSONObject state){this(state,global);}
+    OfficialApiClient(JSONObject state,String userAgent){this(state,global);}
     static JSONObject newSession() throws Exception { return new JSONObject().put("cookies", new JSONObject()); }
     JSONObject session() throws Exception { return new JSONObject(state.toString()); }
     void registerDevice() throws Exception { }
