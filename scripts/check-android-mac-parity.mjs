@@ -99,6 +99,7 @@ await group('FUNCTION real Detail uses native play preparation and complete stri
     // only needs them to be callable. Panels render nothing without their effects.
     if (name === './seasons.mjs') return { createSeasonLookup: () => ({}), parseSeasonTitle: () => ({ base: '', season: 0 }), seasonCandidates: seed => [seed] };
     if (name === './announcements.mjs') return { announcementLink: () => '', createAnnouncements: () => ({}) };
+    if (name === './history-view.mjs') return { completedEpisode: () => false, filterHistory: rows => rows, withHistoryHints: () => ({ hints: [], decorate: row => row }) };
     if (name === './season-playback.mjs') return { latestSeasonHistory: () => [], assertPlaybackRequestSize() {} };
     if (name === './official-series.mjs') return { createOfficialSeasonLookup: () => ({}), requestOfficialSeries: async () => [] };
     if (name === './AccountPanel.jsx' || name === './UpdatePanel.jsx') return { __esModule: true, default: () => null };

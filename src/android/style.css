@@ -234,6 +234,9 @@
 .announcement-switches{display:flex;flex-direction:column;gap:10px;margin:12px 0;color:var(--text)}
 .announcement-switches label{display:flex;align-items:center;gap:10px;min-height:44px}
 .announcement-manual{margin-top:16px;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
+
+/* Watch-history states: completed rows and same-series hints are captions, not actions. */
+.poster-hint{display:block;margin-top:4px;font-size:.78rem;line-height:1.5;color:var(--muted);text-align:left;overflow-wrap:anywhere}
 .tv-layout .account-form{max-width:720px}
 .tv-layout .account-form>label{font-size:18px}
 .tv-layout .account-form input{min-height:56px;font-size:19px}

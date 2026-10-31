@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Home, Search, Bookmark, Download, Settings, Play, Heart, Clock, ChevronRight, ExternalLink, RefreshCw, Film, Radio } from '../components/icons.jsx';
 import { getPlaybackPreferences, nativeCall, requestHtml, setPlaybackPreference } from './bridge.mjs';
 import { CATEGORIES, createSource } from './source.mjs';
@@ -10,6 +10,7 @@ import AccountPanel from './AccountPanel.jsx';
 import UpdatePanel from './UpdatePanel.jsx';
 import { createOfficialSeasonLookup, requestOfficialSeries } from './official-series.mjs';
 import { announcementLink, createAnnouncements } from './announcements.mjs';
+import { completedEpisode, filterHistory, withHistoryHints } from './history-view.mjs';
 
 const source = createSource(requestHtml, { fallback: fetchAppPlayUrl,
   searchPage: params => nativeCall('searchQuery', params, 60000),
@@ -73,6 +74,7 @@ function Poster({ item, onOpen, history }) {
     </span>
     <strong>{item.title || '未命名短剧'}</strong>
     {history ? <span className="poster-caption">看到第 {history.index} 集 · {timeText(history.positionMs)}</span> : item.tags?.length ? <span className="poster-caption">{item.tags.slice(0, 2).join(' / ')}</span> : null}
+    {history?.hint ? <span className="poster-hint">{history.hint}</span> : null}
   </button>;
 }
 
@@ -284,12 +286,25 @@ function SearchPage({ onOpen }) {
 
 function Library({ library, error, busy, onRetry, onOpen, onAccount }) {
   const [view, setView] = useState('favorites');
+  const [historyView, setHistoryView] = useState('all');
   const items = library[view] || [];
+  // Completed means the last episode played near its end; hints only inform, never hide.
+  const rows = useMemo(() => {
+    const { decorate } = withHistoryHints(library.history || []);
+    return (library.history || []).map(decorate);
+  }, [library.history]);
+  const shown = view === 'history' ? filterHistory(rows, historyView) : items;
+  const completedCount = useMemo(() => (library.history || []).filter(row => completedEpisode(row)).length, [library.history]);
   return <>
     <header className="page-heading heading-actions"><div><h1>我的追剧</h1><p>本机保留记录；登录红果官方账号后同步收藏、历史和进度。</p></div><button type="button" className="button" onClick={onAccount}>账号</button></header>
     <div className="section-tabs" role="group" aria-label="我的内容"><button aria-pressed={view === 'favorites'} onClick={() => setView('favorites')}><Heart />追剧 ({library.favorites.length})</button><button aria-pressed={view === 'history'} onClick={() => setView('history')}><Clock />观看历史 ({library.history.length})</button></div>
+    {view === 'history' && <div className="section-tabs" role="group" aria-label="观看状态">
+      <button aria-pressed={historyView === 'all'} onClick={() => setHistoryView('all')}>全部 ({(library.history || []).length})</button>
+      <button aria-pressed={historyView === 'watching'} onClick={() => setHistoryView('watching')}>未看完 ({(library.history || []).length - completedCount})</button>
+      <button aria-pressed={historyView === 'completed'} onClick={() => setHistoryView('completed')}>已看完 ({completedCount})</button>
+    </div>}
     {library.projection?.[view === 'favorites' ? 'favoritesHasMore' : 'historyHasMore'] && <p className="account-note" role="status">当前展示最近 {items.length} 项；完整记录已保存在账号库，较早剧集的原生播放进度仍保留。</p>}
-    <Status busy={busy} error={error} preserve={!!items.length} onRetry={onRetry} empty={!items.length && { title: view === 'favorites' ? '还没有追剧' : '还没有观看记录', text: view === 'favorites' ? '打开短剧详情，点击「加入追剧」。' : '播放短剧后，进度会自动记录。' }}><PosterGrid items={items} onOpen={onOpen} history={view === 'history'} /></Status>
+    <Status busy={busy} error={error} preserve={!!shown.length} onRetry={onRetry} empty={!shown.length && { title: view === 'favorites' ? '还没有追剧' : historyView === 'completed' ? '还没有看完的短剧' : historyView === 'watching' ? '没有正在观看的短剧' : '还没有观看记录', text: view === 'favorites' ? '打开短剧详情，点击「加入追剧」。' : '播放短剧后，进度会自动记录。' }}><PosterGrid items={shown} onOpen={onOpen} history={view === 'history'} /></Status>
   </>;
 }
 
