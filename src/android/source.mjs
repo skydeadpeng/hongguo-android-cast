@@ -202,10 +202,11 @@ export function parsePlayback(html, seriesId, vid) {
 }
 
 /** Inject Android's native HTML request; never requires a Mac/local server. */
-export function createSource(request, { fallback, webFallback = !!fallback, searchPage } = {}) {
+export function createSource(request, { fallback, webFallback = !!fallback, searchPage, newReleases } = {}) {
   if (typeof request !== 'function') throw error('需要提供页面请求函数', 'INVALID_INPUT');
   if (fallback !== undefined && typeof fallback !== 'function') throw error('片源回退必须是请求函数', 'INVALID_INPUT');
-  const pagedSearch = searchPage === undefined ? null : createFallbackSearch(searchPage, request);
+  if (newReleases !== undefined && typeof newReleases !== 'function') throw error('上新补搜必须是请求函数', 'INVALID_INPUT');
+  const pagedSearch = searchPage === undefined ? null : createFallbackSearch(searchPage, request, { newReleases });
   const cache = new Map(), pending = new Map();
   const cachedLoad = (key, execute, { refresh = false } = {}) => {
     if (refresh) cache.delete(key);

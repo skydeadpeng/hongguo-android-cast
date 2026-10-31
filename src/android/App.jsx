@@ -12,7 +12,8 @@ import { createOfficialSeasonLookup, requestOfficialSeries } from './official-se
 import { announcementLink, createAnnouncements } from './announcements.mjs';
 
 const source = createSource(requestHtml, { fallback: fetchAppPlayUrl,
-  searchPage: params => nativeCall('searchQuery', params, 60000) });
+  searchPage: params => nativeCall('searchQuery', params, 60000),
+  newReleases: params => nativeCall('searchNewReleases', params, 30000) });
 const seasonLookup = createOfficialSeasonLookup(requestOfficialSeries, createSeasonLookup((keyword, page) => source.search(keyword, page)));
 const EMPTY_LIBRARY = { favorites: [], history: [] };
 const NAV = [

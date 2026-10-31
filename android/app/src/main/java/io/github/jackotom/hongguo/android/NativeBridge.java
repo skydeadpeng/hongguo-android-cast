@@ -31,7 +31,7 @@ final class NativeBridge {
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements"));
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases"));
     NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
@@ -74,7 +74,7 @@ final class NativeBridge {
                     AccountSync.get().requireCurrent(favoriteSelection);
                 } catch (Exception error) { respond(id, null, "账号正在切换，请稍后重试收藏"); return; }
             } else { favoriteSelection = null; favoriteStore = null; }
-            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") ? searchWorker : method.equals("download") ? downloadWorker : worker;
+            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") ? searchWorker : method.equals("download") ? downloadWorker : worker;
             try { executor.execute(() -> { try (AutoCloseable updateLease = (method.equals("download") || method.equals("playDownload")) ? UpdateInstallCheckpoint.operation() : null) { handle(id, method, params, favoriteStore, favoriteSelection); } catch (Exception error) { respond(id, null, error.getMessage() == null ? "操作未成功，请重试" : error.getMessage()); } }); }
             catch (RejectedExecutionException error) { respond(id, null, "请求较多，请稍后重试"); }
         });
@@ -195,6 +195,16 @@ final class NativeBridge {
         if (!before.equals(AccountSync.get().ownerStamp())) throw new JSONException("账号已切换，请重新读取记录");
         return result.put("owner", before);
     }
+    /** One fresh anonymous identity per lookup; the new-release endpoint needs no account. */
+    private JSONObject newReleases(JSONObject params) throws Exception {
+        int pages = Math.max(1, Math.min(2, params == null ? 1 : params.optInt("pages", 1)));
+        long deadline = System.nanoTime() + 20_000_000_000L;
+        try (OfficialApiClient client = new OfficialApiClient(OfficialApiClient.newSession())) {
+            client.deadlineNanos(deadline);
+            client.registerDevice();
+            return new JSONObject().put("items", NewReleaseCatalog.fetch(client, pages, deadline));
+        }
+    }
     private void handle(Object id, String method, JSONObject params) throws Exception { handle(id, method, params, null, null); }
     private void handle(Object id, String method, JSONObject params, LibraryStore favoriteStore, AccountSync.Selection favoriteSelection) throws Exception {
         if (closed) return;
@@ -211,6 +221,7 @@ final class NativeBridge {
             case "officialWebLogout": respond(id, AccountSync.get().webLogout(), null); break;
             case "officialWebCancel": respond(id, AccountSync.get().webCancel(), null); break;
             case "getAnnouncements": respond(id, AnnouncementClient.fetch(), null); break;
+            case "searchNewReleases": respond(id, newReleases(params), null); break;
             case "getPlaybackOptions": respond(id, PlayerOptions.read(activity), null); break;
             case "setPlaybackOptions": respond(id, PlayerOptions.update(activity, params), null); break;
             case "getSearchHistory": respond(id, store.searchHistory(), null); break;

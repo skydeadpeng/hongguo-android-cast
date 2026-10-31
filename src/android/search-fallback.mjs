@@ -1,5 +1,6 @@
 /** Metadata search: choose one channel at the first page, never splice cursor chains. */
 import { createSearchPager } from './search.mjs';
+import { mergeNewReleases, needsBackfill, parseNewReleases } from './new-releases.mjs';
 const SESSION_MS = 5 * 60_000, MAX_QUERIES = 8, MAX_CACHED_PAGES = 120, TOTAL_MS = 20_000, APP_MS = 12_000;
 const fail = (message, code = 'SEARCH_INVALID') => Object.assign(new Error(message), { code });
 const cancelled = () => fail('搜索已取消', 'ERR_CANCELED');
@@ -76,8 +77,9 @@ function waitFor(value, deadline, signal) {
   });
 }
 
-export function createFallbackSearch(requestPage, requestHtml) {
+export function createFallbackSearch(requestPage, requestHtml, { newReleases } = {}) {
   if (typeof requestPage !== 'function' || typeof requestHtml !== 'function') throw fail('需要提供 App 与官网搜索请求函数', 'INVALID_INPUT');
+  if (newReleases !== undefined && typeof newReleases !== 'function') throw fail('上新补搜必须是请求函数', 'INVALID_INPUT');
   const sessions = new Map();
   const discard = (key, session) => { session.controller.abort(); if (sessions.get(key) === session) sessions.delete(key); };
   function createSession() {
@@ -142,6 +144,14 @@ export function createFallbackSearch(requestPage, requestHtml) {
         for (const [number, value] of session.pages) if (number < page) seen.push(...value.items.map(item => item.seriesId));
         result = parseOfficialSearch(body, { page, seen });
         result = { ...result, channel: 'web', notice: `App 搜索未成功，当前使用官网搜索。${result.notice || ''}` };
+      }
+      // Same-day titles are missing from both indexes: the App's online-time directory
+      // fills the gap on the first page only. A backfill failure never fails the search.
+      if (page === 1 && newReleases && needsBackfill(result.items, keyword) && deadline - Date.now() > 3000) {
+        try {
+          const catalog = parseNewReleases(await waitFor(Promise.resolve().then(() => newReleases({ pages: 2 })), deadline, controller.signal));
+          result = mergeNewReleases(result, catalog, keyword);
+        } catch { /* The normal channels' answer stands on its own. */ }
       }
       live();
       const frozen = Object.freeze(result);
