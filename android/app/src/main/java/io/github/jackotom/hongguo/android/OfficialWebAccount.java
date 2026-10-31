@@ -35,6 +35,8 @@ final class OfficialWebAccount {
     private long expiresAt;
     private long lastVerified;
     private boolean busy;
+    private boolean cloudReady;
+    private long cloudGeneration;
 
     OfficialWebAccount(Store store,Gateway gateway,Clock clock)throws Exception {
         this.store=store;this.gateway=gateway;this.clock=clock;
@@ -117,7 +119,7 @@ final class OfficialWebAccount {
             JSONObject next=readProfile(data(gateway.profile(jar)));
             synchronized(lock){profile=next;phase=PHASE_LOGGED_IN;diagnostic="";}
         }catch(Exception failure){
-            synchronized(lock){profile=null;jar=new OfficialWebPassport.CookieJar();phase=PHASE_IDLE;diagnostic="session_expired";}
+            synchronized(lock){profile=null;jar=new OfficialWebPassport.CookieJar();phase=PHASE_IDLE;diagnostic="session_expired";dropCloud();}
             try{store.clear();}catch(Exception ignored){}
             AccountLog.warn("official_web_session_expired:"+failure.getClass().getSimpleName());
         }finally{synchronized(lock){busy=false;}}
@@ -135,16 +137,84 @@ final class OfficialWebAccount {
         synchronized(lock){
             profile=null;token="";image="";scanState="";phase=PHASE_IDLE;error="";diagnostic="";
             jar=new OfficialWebPassport.CookieJar();
+            dropCloud();
             try{store.clear();}catch(Exception failure){AccountLog.error("official_web_session_clear_failed:"+failure.getClass().getSimpleName());}
             return status();
         }
+    }
+
+    /** The account id of the confirmed web session; empty when logged out. */
+    String uid(){
+        synchronized(lock){return profile==null?"":profile.optString("uid","");}
+    }
+
+    /** Whether the web cookie has been proven to open the signed cloud APIs. */
+    boolean cloudReady(){synchronized(lock){return profile!=null&&cloudReady;}}
+    long cloudGeneration(){synchronized(lock){return cloudGeneration;}}
+    private void dropCloud(){cloudReady=false;cloudGeneration++;}
+
+    /**
+     * Builds a signed cloud client that carries the web session cookie. The identity is a
+     * fresh anonymous registration; the cookie is what binds the request to the account.
+     * The client is sealed before any error can leak it and never stores the cookie twice.
+     */
+    OfficialApiClient cloudClient()throws Exception{
+        JSONObject session;
+        synchronized(lock){
+            if(profile==null)throw new IOException("官网会话未登录");
+            session=OfficialApiClient.newSession();
+            String header=jar.header();
+            for(String pair:header.split("; ")){
+                int at=pair.indexOf('=');
+                if(at>0)session.getJSONObject("cookies").put(pair.substring(0,at),pair.substring(at+1));
+            }
+        }
+        OfficialApiClient client=new OfficialApiClient(session);
+        boolean registered=false;
+        try{
+            client.deadlineNanos(System.nanoTime()+60_000_000_000L);
+            client.registerDevice();
+            registered=true;
+        }finally{if(!registered)client.close();}
+        return client;
+    }
+
+    /**
+     * Proves the web cookie opens the signed cloud APIs: the profile request must answer
+     * with this exact account id. An anonymous acceptance never counts as a pass.
+     */
+    boolean probeCloud(){
+        OfficialApiClient client=null;
+        try{
+            client=cloudClient();
+            JSONObject reply=client.cloud("/reading/user/info/v1/","GET",new JSONObject(),null,false);
+            JSONObject data=reply.optJSONObject("data");
+            String answered=data==null?"":data.optString("user_id_str",data.optString("user_id",""));
+            synchronized(lock){
+                if(profile!=null&&uid().equals(answered)&&!answered.isEmpty()){cloudReady=true;AccountLog.warn("official_web_cloud_ready");return true;}
+                cloudReady=false;cloudGeneration++;diagnostic="cloud_probe_rejected";
+                AccountLog.warn("official_web_cloud_probe_rejected");
+                return false;
+            }
+        }catch(Exception failure){
+            synchronized(lock){cloudReady=false;cloudGeneration++;diagnostic="cloud_probe_failed";}
+            AccountLog.warn("official_web_cloud_probe_failed:"+failure.getClass().getSimpleName());
+            return false;
+        }finally{if(client!=null)client.close();}
+    }
+
+    /** Marks the web lane dead after a 401 from a cloud call; the session itself stays until re-login. */
+    void cloudExpired(){
+        synchronized(lock){cloudReady=false;cloudGeneration++;diagnostic="cloud_session_expired";}
+        AccountLog.warn("official_web_cloud_expired");
     }
 
     /** Public projection: the cookie, the token and the raw account id never appear here. */
     JSONObject status()throws JSONException{
         synchronized(lock){
             JSONObject result=new JSONObject().put("provider","hongguo_web").put("phase",phase).put("busy",busy).put("authenticated",profile!=null)
-                .put("error",error).put("diagnostic",diagnostic).put("scanState",scanState).put("expiresIn",Math.max(0,(expiresAt-clock.now()+999)/1000));
+                .put("error",error).put("diagnostic",diagnostic).put("scanState",scanState).put("expiresIn",Math.max(0,(expiresAt-clock.now()+999)/1000))
+                .put("cloudReady",cloudReady);
             if(profile!=null)result.put("user",new JSONObject().put("name",profile.optString("name","红果用户")).put("idSuffix",profile.optString("uid","").length()>4?"尾号 "+profile.optString("uid","").substring(profile.optString("uid","").length()-4):""));
             return result;
         }

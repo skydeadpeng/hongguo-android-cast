@@ -26,6 +26,8 @@ export function accountView(value) {
       phase: ['idle', 'qrcode', 'scanned', 'logged_in'].includes(web.phase) ? web.phase : 'idle',
       authenticated: web.authenticated === true,
       busy: web.busy === true,
+      // The web cookie has proven itself on the signed cloud APIs (user/info answers the same id).
+      cloudReady: web.cloudReady === true,
       error: text(web.error),
       diagnostic: /^[a-z_]{1,40}$/.test(web.diagnostic || '') ? web.diagnostic : '',
       expiresIn: Math.min(600, count(web.expiresIn)),
