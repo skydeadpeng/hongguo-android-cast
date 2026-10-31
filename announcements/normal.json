@@ -1,0 +1,6 @@
+{
+  "id": "android-placeholder-20261031",
+  "title": "公告通道已就绪",
+  "body": "此文件用于向已安装的 Android 客户端发布普通公告。发布新公告时替换 id、标题与正文并把 active 设为 true；撤下时把 active 设为 false。正文支持换行与 https 链接。",
+  "active": false
+}
