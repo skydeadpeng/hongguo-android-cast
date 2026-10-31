@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 46,
-  "versionName": "0.12.23",
+  "versionCode": 47,
+  "versionName": "0.12.24",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.23/Hongguo-0.12.23-phone-release-compatible.apk",
-  "size": 632212,
-  "sha256": "da526910c5182c862685c91c4ee9b5d6090ff5b79e72b1d35245baf277bcb0dc",
-  "notes": "官网扫码登录的云端同步改用真实登记的设备身份签名（与桌面版完全一致的注册接口与签名通道），修复此前云端验证不通过的问题：扫码登录后即可同步收藏、观看历史与进度。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-10-31T11:18:03.753Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.24/Hongguo-0.12.24-phone-release-compatible.apk",
+  "size": 633312,
+  "sha256": "7d34e07b3fa84bb5b056c516d288f96e61fd574a65d9f3474843af323ad07f5d",
+  "notes": "剧集详情页全新设计（手机/TV 网页版与原生 TV 三端统一）：封面模糊光晕背景、大圆角海报、集数与题材标签胶囊、追剧胶囊按钮；选集改为大圆角磁贴、当前集红色高亮；底部改为「立即播放」主按钮与「缓存」次按钮；移除界面内的操作说明文字。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-10-31T11:52:37.149Z"
 }
