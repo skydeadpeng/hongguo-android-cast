@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 50,
-  "versionName": "0.12.27",
+  "versionCode": 51,
+  "versionName": "0.12.28",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.27/Hongguo-0.12.27-phone-release-compatible.apk",
-  "size": 633548,
-  "sha256": "2980980bb76a348696bf94d028e9bbfc486ca02dc235f3529bdebad3fcdc0acd",
-  "notes": "主页返回键改为最小化到后台（视频 App 标准行为），不再弹退出确认；应用保留在最近任务，随时切回，需要退出时从最近任务划掉即可。播放器内返回仍是退出播放回主页。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-01T03:13:07.092Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.28/Hongguo-0.12.28-phone-release-compatible.apk",
+  "size": 634024,
+  "sha256": "485052c05979f5444ef010b439641327ac32bd574601a3eba196db755a09b2e6",
+  "notes": "下载页改为按剧分组：每部剧一个可展开的分组头（剧名 · 完成集数/总集数 · 总大小），分集在组内列出，「合并本剧」移入组头一键可用；多部剧默认收起、首部展开。系统下载通知改为仅下载中显示，批量缓存多集不再每集留一条常驻通知。批量下载入口不变（详情页「批量下载」选起止集）。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T03:38:19.321Z"
 }
