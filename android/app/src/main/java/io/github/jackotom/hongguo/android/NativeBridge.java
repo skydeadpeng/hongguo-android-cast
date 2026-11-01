@@ -4,9 +4,11 @@ import android.app.DownloadManager;
 import android.content.*;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
 import android.webkit.JavascriptInterface;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.util.*;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +34,7 @@ final class NativeBridge {
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo"));
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo"));
     NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
@@ -75,7 +77,7 @@ final class NativeBridge {
                     AccountSync.get().requireCurrent(favoriteSelection);
                 } catch (Exception error) { respond(id, null, "账号正在切换，请稍后重试收藏"); return; }
             } else { favoriteSelection = null; favoriteStore = null; }
-            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") ? searchWorker : method.equals("download") ? downloadWorker : worker;
+            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") || method.equals("homeFeed") ? searchWorker : method.equals("download") ? downloadWorker : worker;
             try { executor.execute(() -> { try (AutoCloseable updateLease = (method.equals("download") || method.equals("playDownload")) ? UpdateInstallCheckpoint.operation() : null) { handle(id, method, params, favoriteStore, favoriteSelection); } catch (Exception error) { respond(id, null, error.getMessage() == null ? "操作未成功，请重试" : error.getMessage()); } }); }
             catch (RejectedExecutionException error) { respond(id, null, "请求较多，请稍后重试"); }
         });
@@ -206,6 +208,68 @@ final class NativeBridge {
             return new JSONObject().put("items", NewReleaseCatalog.fetch(client, pages, deadline));
         }
     }
+    private static final String[] COVER_HOSTS = {".fqnovelpic.com", ".byteimg.com", ".fqnovelstatic.com"};
+    /**
+     * The official home covers are HEIC, which the WebView cannot decode. Each cover is
+     * fetched, decoded by the platform HEIF decoder, downscaled and inlined as a JPEG
+     * data URL; any failure keeps an empty cover and the poster falls back to its icon.
+     */
+    private static void inlineFeedCovers(org.json.JSONArray items, long deadline) {
+        if (items == null || items.length() == 0 || Build.VERSION.SDK_INT < 28) return;
+        java.util.List<java.util.concurrent.Callable<Boolean>> jobs = new ArrayList<>();
+        for (int index = 0; index < items.length(); index++) {
+            JSONObject item = items.optJSONObject(index);
+            if (item == null) continue;
+            String url = item.optString("cover", "");
+            if (!url.startsWith("https://")) continue;
+            jobs.add(() -> { coverDataUrl(url, item); return true; });
+        }
+        if (jobs.isEmpty()) return;
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(Math.min(6, jobs.size()));
+        try { pool.invokeAll(jobs, Math.max(2, (deadline - System.nanoTime()) / 1_000_000_000L - 1), java.util.concurrent.TimeUnit.SECONDS); }
+        catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+        finally { pool.shutdownNow(); }
+    }
+    private static void coverDataUrl(String url, JSONObject item) {
+        String data = coverDataUrl(url);
+        try { item.put("cover", data == null ? "" : data); } catch (org.json.JSONException ignored) { }
+    }
+    private static String coverDataUrl(String url) {
+        try {
+            java.net.URI uri = new java.net.URI(url);
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(java.util.Locale.ROOT);
+            boolean trusted = false;
+            for (String suffix : COVER_HOSTS) if (host.endsWith(suffix)) { trusted = true; break; }
+            if (!trusted) return null;
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) uri.toURL().openConnection();
+            connection.setConnectTimeout(4000);
+            connection.setReadTimeout(4000);
+            connection.setRequestProperty("User-Agent", NetworkGuard.UA);
+            int status = connection.getResponseCode();
+            if (status != 200) return null;
+            java.io.InputStream input = connection.getInputStream();
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            byte[] buffer = new byte[16384];
+            int read;
+            while ((read = input.read(buffer)) > 0) {
+                if (bytes.size() + read > 3_000_000) return null;
+                bytes.write(buffer, 0, read);
+            }
+            input.close();
+            connection.disconnect();
+            android.graphics.Bitmap bitmap = android.graphics.ImageDecoder.decodeBitmap(
+                android.graphics.ImageDecoder.createSource(bytes.toByteArray()),
+                (decoder, info, source) -> {
+                    int width = info.getSize().getWidth();
+                    if (width > 480) decoder.setTargetSampleSize(Math.max(1, width / 480));
+                });
+            if (bitmap == null) return null;
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 78, out);
+            bitmap.recycle();
+            return "data:image/jpeg;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP);
+        } catch (Exception ignored) { return null; }
+    }
     private final java.util.concurrent.atomic.AtomicBoolean mergeBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
     private static JSONObject rowById(JSONArray records, long downloadId) {
         for (int at = 0; at < records.length(); at++) {
@@ -231,6 +295,19 @@ final class NativeBridge {
             case "officialWebCancel": respond(id, AccountSync.get().webCancel(), null); break;
             case "getAnnouncements": respond(id, AnnouncementClient.fetch(), null); break;
             case "searchNewReleases": respond(id, newReleases(params), null); break;
+            case "homeFeed": {
+                int offset = params == null ? 0 : Math.max(0, params.optInt("offset", 0));
+                String sessionId = params == null ? "" : LibraryStore.text(params, "sessionId", 128);
+                long deadline = System.nanoTime() + 20_000_000_000L;
+                try (OfficialApiClient client = new OfficialApiClient(OfficialApiClient.newSession())) {
+                    client.deadlineNanos(deadline);
+                    client.registerDevice();
+                    JSONObject result = NewReleaseCatalog.feed(client, offset, sessionId);
+                    inlineFeedCovers(result.optJSONArray("items"), deadline);
+                    respond(id, result, null);
+                }
+                break;
+            }
             case "getPlaybackOptions": respond(id, PlayerOptions.read(activity), null); break;
             case "setPlaybackOptions": respond(id, PlayerOptions.update(activity, params), null); break;
             case "getSearchHistory": respond(id, store.searchHistory(), null); break;

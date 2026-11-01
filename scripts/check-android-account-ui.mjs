@@ -168,6 +168,7 @@ function installMock() {
       const file = localStorage.getItem('hongguo:announcements:fixture');
       result = { normal: file, emergency: null };
     }
+    else if (m.method === 'homeFeed') { error = 'HOMEFEED_DOWN'; } // The home page falls back to its catalog without leaving an unexpected RPC.
     else { error = 'UNEXPECTED_RPC_' + m.method; f.notes.push(error); }
     delay = plan.delay || delay; error = plan.error || error;
     setTimeout(() => {

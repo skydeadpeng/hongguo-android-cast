@@ -19,7 +19,7 @@ function checkConfig() {
   assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
   assert.equal(pkg.dependencies['electron-updater'], '6.8.9');
-  assert.deepEqual(pkg.build.publish, { provider: 'github', owner: 'jackotom', repo: 'hongguo-drama' });
+  assert.deepEqual(pkg.build.publish, { provider: 'github', owner: 'skydeadpeng', repo: 'hongguo-android-cast' });
   assert.equal(pkg.build.nsis.artifactName.replace('${version}', pkg.version).replace('${ext}', 'exe'), setupName);
   assert.equal(pkg.build.portable.artifactName.replace('${version}', pkg.version), '${productName}-' + releaseVersion + '-便携版.${ext}');
   assert(pkg.build.mac.target.some(target => target.target === 'zip' && target.arch.includes('arm64') && target.arch.includes('x64')));

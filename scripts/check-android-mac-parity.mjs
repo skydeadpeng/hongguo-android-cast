@@ -106,6 +106,7 @@ await group('FUNCTION real Detail uses native play preparation and complete stri
     if (name === './bridge.mjs') return { requestHtml: async () => { throw new Error('HTTP 404'); },
       nativeCall: async (method, params) => { calls.push({ method, params }); return method === 'getPlaybackOptions' ? { quality: 'auto', speed: 1 } : { started: true }; },
       getPlaybackPreferences: () => ({ autoplay: true, cleanupPlaybackCache: true, keepPreviousEpisodes: 1 }), setPlaybackPreference() {} };
+    if (name === './update-bridge.mjs') return { updateCall: async () => ({ state: 'idle' }), updateProgress: () => 0 };
     if (name.includes('LICENSE')) return '';
     throw new Error(`unexpected UI import ${name}`);
   } }, { filename: 'App.mac-parity-gate.cjs' });

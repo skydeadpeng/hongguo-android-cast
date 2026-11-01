@@ -36,7 +36,10 @@ export default function UpdatePanel() {
     <p className="account-note">当前版本 {value?.installedVersion || '读取中…'}{value?.flavor === 'tv' ? ' · TV版' : value?.flavor === 'phone' ? ' · 手机版' : ''}</p>
     <p role="status" aria-live="polite">{value?.message || '正在读取更新状态…'}</p>
     {error && <p className="account-error" role="alert">{error}</p>}
-    {value?.versionName && value.versionCode > value.installedCode && <p className="account-note">新版本 {value.versionName}{value.notes ? `：${value.notes}` : ''}</p>}
+    {value?.versionName && value.versionCode > value.installedCode && <div className="update-available" role="status">
+      <strong>新版本 {value.versionName} 可下载</strong>
+      {value.notes && <p>{value.notes}</p>}
+    </div>}
     {['downloading', 'verifying'].includes(value?.state) && <div><progress aria-label="更新下载进度" max="100" value={updateProgress(value)} /><span> {updateProgress(value)}%</span></div>}
     <div className="account-actions">
       <button ref={checkButton} type="button" className="button" disabled={!!busy || value?.state === 'unsupported'} onClick={() => perform('check')}>检查更新</button>
@@ -44,6 +47,6 @@ export default function UpdatePanel() {
       {canInstall && <button ref={installButton} type="button" className="button primary" disabled={!!busy} onClick={() => perform('install')}>安装更新</button>}
       {busy && ['checking', 'downloading', 'verifying'].includes(value?.state) && <button ref={cancelButton} type="button" className="button" disabled={sending} onClick={() => perform('cancel')}>取消</button>}
     </div>
-    <p className="account-note">每天自动检查一次，不打断播放；下载需确认，安装由系统确认。手机与TV使用各自的更新包。检查和下载自动尝试内置加速线路，失败后回退 GitHub；每条线路都校验完整安装包。</p>
+    <details className="update-details"><summary>更新机制说明</summary><p>每天自动检查一次，不打断播放；下载需确认，安装由系统确认。手机与TV使用各自的更新包。检查和下载自动尝试内置加速线路，失败后回退 GitHub；每条线路都校验完整安装包。</p></details>
   </section>;
 }

@@ -47,6 +47,14 @@ function installMock() {
     else if(m.method==='setPlaybackOptions'){f.options={...f.options,...m.params};result={...f.options};}
     else if(m.method==='play'){const plan=f.playPlans.shift()||{};delay=plan.delay||1;error=plan.error;f.activePlay++;f.maxActivePlay=Math.max(f.maxActivePlay,f.activePlay);result={started:true};}
     else if(m.method==='download'){f.downloaded=f.downloaded||[];f.downloaded.push(m.params.episode&&m.params.episode.index);result={id:1};}
+    else if(m.method==='homeFeed'){
+      if(f.feedFail||window.name==='feedfail'){error='HOMEFEED_DOWN';}
+      else{const pageN=f.feedPage||0;f.feedPage=pageN+1;const base=pageN*2;
+        const rows=pageN===0?[{series_id:sid,title:'MOCK 长剧移动布局',cover:'',episode_count:137,description:'',tags:['都市']},{series_id:String(9000000000000000001n),title:'MOCK 推荐 2',cover:'',episode_count:48,description:'',tags:['逆袭']}]
+          :[{series_id:String(9000000000000000000n+BigInt(base+1)),title:'MOCK 推荐 '+(base+1),cover:'',episode_count:60,description:'',tags:['都市']},
+            {series_id:String(9000000000000000000n+BigInt(base+2)),title:'MOCK 推荐 '+(base+2),cover:'',episode_count:48,description:'',tags:['逆袭']}];
+        result={items:rows,hasMore:pageN===0,offset:20*(pageN+1),sessionId:'s'+pageN};}
+    }
     else if(m.method==='getDownloads')result=[{id:17,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:137,downloadedBytes:1234567,totalBytes:1234567},{id:18,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:136,downloadedBytes:1234567,totalBytes:1234567}].filter(x=>!(f.deleted||[]).includes(x.id));
     else if(m.method==='getMergedVideos')result=[...(f.mergedRows||[])];
     else if(m.method==='mergeDownloads'){f.merged=f.merged||[];f.merged.push(m.params.seriesId);f.mergedRows=f.mergedRows||[];f.mergedRows.push({id:91+f.mergedRows.length,title:'MOCK 下载名称较长的短剧用于移动布局检查 · 合并版',seriesId:m.params.seriesId,episodes:2,bytes:2469134,status:'success'});result={merged:true,episodes:2,title:'MOCK 下载名称较长的短剧用于移动布局检查'};}
@@ -205,18 +213,25 @@ try {
     const bounds=await evaluate('({input:document.querySelector("#search-keyword").getBoundingClientRect().toJSON(),submit:document.querySelector(".search-controls button").getBoundingClientRect().toJSON(),main:document.querySelector(".main-content").getBoundingClientRect().toJSON(),nav:document.querySelector(".app-nav").getBoundingClientRect().toJSON()})');check(bounds.input.top>=bounds.main.top-1&&bounds.input.bottom<=bounds.nav.top+1,'focused input fits above native IME-sized viewport');check(bounds.submit.top>=bounds.main.top-1&&bounds.submit.bottom<=bounds.nav.top+1,'search submit remains reachable beside input');await call('Input.insertText',{text:'键盘复测'});eq(await evaluate('document.querySelector("#search-keyword").value'),'键盘复测','text entry reaches focused real React input');await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:bounds.submit.x+bounds.submit.width/2,y:bounds.submit.y+bounds.submit.height/2,radiusX:5,radiusY:5,force:1,id:1}]});await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await wait('window.__mobileFixture.searches.includes("键盘复测")');eq(await evaluate('window.__mobileFixture.searchKeywords'),['键盘复测'],'IME-sized submit keeps native history path');
     const nav=await evaluate('[...document.querySelectorAll(".app-nav button")].map(b=>b.getBoundingClientRect().toJSON())');check(nav.every(r=>r.top>=0&&r.bottom<=300&&r.left>=0&&r.right<=320),'all five navigation targets remain within reduced viewport');await screenshot('phone-320-ime-inset-search.png');await call('Emulation.setDeviceMetricsOverride',{width:320,height:844,deviceScaleFactor:1,mobile:true});await sleep(40);eq(await evaluate('document.querySelector("#search-keyword").value'),'键盘复测','restoring viewport preserves entered query');await noOverflow();await screenshot('phone-320-ime-restored-search.png');
   });
-  await group('DISCOVER 换一批 advances the real next page, wraps at the end and remembers each category position',async()=>{
+  await group('DISCOVER home feed renders official rows and appends the next batch',async()=>{
     await reset();await button('发现');await sleep(60);
     const firstTitle=()=>evaluate('document.querySelector(".poster strong").textContent');
-    check(await firstTitle()==='MOCK 批次 1','the first batch opens at page 1');
-    eq(await evaluate('window.__mobileFixture.catalogPages'),[{category:'all',page:1}],'one catalog request for the first page');
-    await button('换一批');await sleep(60);check(await firstTitle()==='MOCK 批次 2','换一批 advances to the real next page');
-    await button('换一批');await sleep(60);check(await firstTitle()==='MOCK 批次 3','the third batch follows');
-    await button('换一批');await sleep(60);check(await firstTitle()==='MOCK 批次 1','the batch wraps to the start at the last page');
-    await button('真人剧');await sleep(60);check(await firstTitle()==='MOCK 批次 1','another category starts at its own first batch');
-    await button('换一批');await sleep(60);check(await firstTitle()==='MOCK 批次 2','the second category advances independently');
-    await button('全部');await sleep(60);check(await firstTitle()==='MOCK 批次 1','switching back resumes the remembered position');
-    await noOverflow();await screenshot('phone-discover-next-batch.png');
+    check(await firstTitle()==='MOCK 长剧移动布局','the official feed renders the series rows');
+    check(await evaluate('!!document.querySelector(".home-search")'),'the search pill sits on the home page');
+    await button('加载更多推荐');await sleep(60);
+    check(await evaluate('document.querySelectorAll(".poster-grid .poster").length')===4,'加载更多 appends the next official batch');
+    await wait('document.querySelector(".home-more-note")?.textContent.includes("刷到底")','the feed reports its end');
+    await noOverflow();await screenshot('phone-discover-home-feed.png');
+  });
+  await group('DISCOVER fallback keeps the web catalog paging when the feed is down',async()=>{
+    await call('Page.navigate',{url:base});await sleep(30);
+    await evaluate('window.name="feedfail"');
+    await call('Page.navigate',{url:base});await wait('document.querySelector(".poster")');await sleep(60);
+    const firstTitle=()=>evaluate('document.querySelector(".poster strong").textContent');
+    check(await firstTitle()==='MOCK 批次 1','the web catalog takes over when the feed fails');
+    check(await evaluate('!!document.querySelector(".category-tabs")'),'categories return in the fallback');
+    await button('换一批');await sleep(60);check(await firstTitle()==='MOCK 批次 2','换一批 still advances the catalog');
+    await noOverflow();await screenshot('phone-discover-fallback.png');
   });
   await group('DARK the dark scheme restyles the page without overflowing',async()=>{
     await reset();await button('发现');await sleep(60);

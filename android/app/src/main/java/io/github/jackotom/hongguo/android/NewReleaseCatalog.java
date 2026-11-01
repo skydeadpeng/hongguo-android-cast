@@ -55,6 +55,29 @@ final class NewReleaseCatalog {
     }
 
     /**
+     * The official home recommendation feed: the same landpage endpoint without the
+     * new-only filters, so the reply is the app's default catalog stream. Rows reuse
+     * the same parser; paging rides offset + session_id exactly like the new list.
+     */
+    static JSONObject feed(OfficialApiClient client, int offset, String sessionId) throws Exception {
+        if (client == null || offset < 0 || sessionId == null || sessionId.length() > 128) throw new IOException("红果首页推荐未就绪");
+        JSONObject reply = request(client, "default", "short_play", offset, sessionId);
+        if (reply.optInt("code", -1) != 0) throw new IOException("红果首页推荐未就绪，请重试");
+        JSONObject data = reply.optJSONObject("data");
+        JSONArray rows = data == null ? null : data.optJSONArray("video_data");
+        JSONArray items = new JSONArray();
+        for (int index = 0; rows != null && index < rows.length() && items.length() < PAGE_LIMIT; index++) {
+            JSONObject item = row(rows.optJSONObject(index));
+            if (item != null) items.put(item);
+        }
+        if (items.length() == 0) throw new IOException("红果首页推荐暂无内容，请重试");
+        return new JSONObject().put("items", items)
+            .put("hasMore", data.optBoolean("has_more", false))
+            .put("offset", Math.max(offset, data.optInt("next_offset", offset)))
+            .put("sessionId", data.optString("session_id", ""));
+    }
+
+    /**
      * Reads both genres up to {@code pages} pages each and returns the merged, deduped
      * new-release rows. One failing genre keeps the other's results.
      */
@@ -142,6 +165,14 @@ final class NewReleaseCatalog {
 
     private static String cover(String value) {
         if (value == null || value.length() > 2048) return "";
+        // Official covers arrive http:// on known image CDNs; upgrade in place for the web view.
+        if (value.startsWith("http://")) {
+            java.net.URI uri;
+            try { uri = new java.net.URI(value); } catch (Exception invalid) { return ""; }
+            String host = uri.getHost() == null ? "" : uri.getHost();
+            if (!host.endsWith(".fqnovelpic.com") && !host.endsWith(".byteimg.com") && !host.endsWith(".fqnovelstatic.com")) return "";
+            value = "https://" + value.substring("http://".length());
+        }
         if (!value.startsWith("https://")) return "";
         return value.indexOf(' ') >= 0 || value.indexOf('\\') >= 0 ? "" : value;
     }

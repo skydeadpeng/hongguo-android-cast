@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Home, Search, Bookmark, Download, Settings, Play, Heart, Clock, ChevronRight, ExternalLink, RefreshCw, Film, Radio } from '../components/icons.jsx';
 import { getPlaybackPreferences, nativeCall, requestHtml, setPlaybackPreference } from './bridge.mjs';
+import { updateCall } from './update-bridge.mjs';
 import { CATEGORIES, createSource } from './source.mjs';
 import { createSeasonLookup, parseSeasonTitle, seasonCandidates } from './seasons.mjs';
 import { latestSeasonHistory, assertPlaybackRequestSize } from './season-playback.mjs';
@@ -82,15 +83,55 @@ function PosterGrid({ items, onOpen, history = false }) {
   return <div className="poster-grid">{items.map((item, index) => <Poster key={`${item.seriesId}-${index}`} item={item} onOpen={onOpen} history={history ? item : null} />)}</div>;
 }
 
-function Discover({ onOpen }) {
+function Discover({ onOpen, library, onSearch, onUpdates }) {
   const [category, setCategory] = useState(CATEGORIES[0]?.id || 'all');
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
   const [state, setState] = useState({ busy: true, items: [], category, page: 1 });
+  const [update, setUpdate] = useState(null);
   const generation = useRef(0), fetching = useRef(false), refreshCatalog = useRef(false);
   // Per-category positions: switching back resumes the last browsed batch.
   const positions = useRef({});
+  // A slim home banner when a newer build is published; taps jump to the updater.
   useEffect(() => {
+    let alive = true;
+    const receive = value => { if (alive && value && typeof value.state === 'string') setUpdate(value.versionCode > value.installedCode && ['available', 'ready'].includes(value.state) ? value : null); };
+    updateCall('status').then(receive).catch(() => { });
+    const changed = event => receive(event.detail);
+    window.addEventListener('androidupdateschanged', changed);
+    return () => { alive = false; window.removeEventListener('androidupdateschanged', changed); };
+  }, []);
+  // The official app recommendation feed drives the home grid; the web catalog
+  // categories stay as the visible fallback when the feed cannot be reached.
+  const [feed, setFeed] = useState(null);
+  const [feedError, setFeedError] = useState(false);
+  const feedGen = useRef(0);
+  const loadFeed = (offset, sessionId, append) => {
+    const current = ++feedGen.current;
+    setFeed(previous => append && previous?.items?.length ? { ...previous, busy: true } : { busy: true, items: [] });
+    nativeCall('homeFeed', { offset, sessionId }).then(result => {
+      if (feedGen.current !== current) return;
+      const rows = Array.isArray(result?.items) ? result.items : [];
+      const items = rows.map(row => ({
+        seriesId: String(row?.series_id || ''), title: String(row?.title || ''),
+        coverUrl: String(row?.cover || ''), description: String(row?.description || ''),
+        episodeCount: Number(row?.episode_count) || 0, tags: Array.isArray(row?.tags) ? row.tags.slice(0, 4) : [],
+      })).filter(row => /^\d{1,30}$/.test(row.seriesId) && row.title);
+      if (!items.length) throw new Error('红果首页推荐暂无内容');
+      setFeed(previous => {
+        const base = append && previous?.items?.length ? previous.items : [];
+        const seen = new Set(base.map(row => row.seriesId));
+        const merged = base.concat(items.filter(row => !seen.has(row.seriesId)));
+        return { busy: false, items: merged, offset: Number(result.offset) || 0, sessionId: String(result.sessionId || ''), hasMore: result.hasMore === true, error: '' };
+      });
+    }).catch(() => {
+      if (feedGen.current !== current) return;
+      setFeed(null); setFeedError(true);
+    });
+  };
+  useEffect(() => { loadFeed(0, '', false); }, []);
+  useEffect(() => {
+    if (!feedError) return;
     const current = ++generation.current;
     fetching.current = true;
     const previous = state.category === category ? state : { items: [], category, page: 1 };
@@ -111,7 +152,7 @@ function Discover({ onOpen }) {
       setState({ ...previous, busy: false, error: errorText(error), requestedPage: page });
     });
     return () => { generation.current++; };
-  }, [category, page, reload]);
+  }, [category, page, reload, feedError]);
   // A changed query never renders the previous query's cards or page controls,
   // including the render before its effect has started.
   const shown = state.category === category ? state : { busy: true, items: [], page: 1 };
@@ -135,13 +176,40 @@ function Discover({ onOpen }) {
     const next = shown.totalPages ? (visiblePage >= shown.totalPages ? 1 : visiblePage + 1) : visiblePage + 1;
     loadPage(next);
   };
+  // 红果-style home: search pill, continue-watching rail, dense feed grid.
+  const continueRows = useMemo(() => (library?.history || [])
+    .filter(row => (row.positionMs || 0) > 30_000 && !completedEpisode(row))
+    .slice(0, 12), [library?.history]);
+  const feedMode = feed !== null;
   return <>
-    <header className="page-heading heading-actions"><div><h1>发现短剧</h1><p>按分类浏览，选择喜欢的故事。</p></div><div className="heading-buttons"><button type="button" className="button" disabled={shown.busy} aria-label="换一批片单" onClick={nextBatch}><RefreshCw /><span>换一批</span></button><button type="button" className="button" disabled={shown.busy} aria-label="刷新片单" onClick={() => loadPage(visiblePage, true)}><RefreshCw /><span>刷新</span></button></div></header>
-    <div className="category-tabs" role="group" aria-label="短剧分类">{CATEGORIES.map((item) => <button key={item.id} aria-pressed={item.id === category} onClick={() => changeCategory(item.id)}>{item.label}</button>)}</div>
-    <Status busy={shown.busy} error={shown.error} preserve={!!shown.items.length} onRetry={() => loadPage(shown.requestedPage || page, true)} empty={!shown.items.length && { title: '这个分类暂时没有内容', text: '试试其他分类，或稍后回来查看。' }}>
-      <PosterGrid items={shown.items} onOpen={onOpen} />
-    </Status>
-    {(!!shown.items.length || !shown.busy && !shown.error) && <div className="pagination" aria-label="分页"><button className="button" disabled={shown.busy || visiblePage <= 1} onClick={() => loadPage(visiblePage - 1)}>上一页</button><span>第 {visiblePage} 页{shown.totalPages ? ` / ${shown.totalPages}` : ''}{shown.busy ? ' · 读取中' : shown.error && shown.requestedPage !== visiblePage ? ` · 第 ${shown.requestedPage} 页未加载` : ''}</span><button className="button" disabled={shown.busy || !!shown.error || (shown.totalPages ? visiblePage >= shown.totalPages : !shown.items.length)} onClick={() => loadPage(visiblePage + 1)}>下一页</button></div>}
+    <h1 className="visually-hidden">发现短剧</h1>
+    {update && <button type="button" className="home-update" onClick={onUpdates}><RefreshCw size={16} /><span>新版本 {update.versionName} 已发布 · 查看更新</span></button>}
+    <button type="button" className="home-search" onClick={onSearch}><Search size={17} /><span>搜索短剧名称</span></button>
+    {feedError && <div className="category-tabs" role="group" aria-label="短剧分类">{CATEGORIES.map((item) => <button key={item.id} aria-pressed={item.id === category} onClick={() => changeCategory(item.id)}>{item.label}</button>)}</div>}
+    {!!continueRows.length && <section className="home-continue" aria-label="继续观看">
+      <h2>继续观看</h2>
+      <div className="home-continue-row"><PosterGrid items={continueRows} onOpen={onOpen} history /></div>
+    </section>}
+    {feedMode ? <>
+      <div className="home-section-head"><h2>为你推荐</h2></div>
+      <Status busy={!!feed.busy && !feed.items.length} error={feed.error || ''} preserve={!!feed.items.length} onRetry={() => loadFeed(0, '', false)} empty={!feed.items.length && { title: '暂时没有推荐内容', text: '稍后再来看看，或用搜索找到想看的短剧。' }}>
+        <PosterGrid items={feed.items} onOpen={onOpen} />
+      </Status>
+      {!!feed.items.length && <div className="home-more">
+        {feed.busy ? <span className="home-more-note">正在加载…</span>
+          : feed.hasMore ? <button type="button" className="button" onClick={() => loadFeed(feed.offset, feed.sessionId, true)}>加载更多推荐</button>
+            : <span className="home-more-note">推荐已经刷到底了 · 点上方分类搜索更多</span>}
+      </div>}
+    </> : <>
+      <div className="home-section-head">
+        <h2>为你推荐</h2>
+        <button type="button" className="home-next" disabled={shown.busy} aria-label="换一批片单" onClick={nextBatch}><RefreshCw size={15} /><span>换一批</span></button>
+      </div>
+      <Status busy={shown.busy} error={shown.error} preserve={!!shown.items.length} onRetry={() => loadPage(shown.requestedPage || page, true)} empty={!shown.items.length && { title: '这个分类暂时没有内容', text: '试试其他分类，或稍后回来查看。' }}>
+        <PosterGrid items={shown.items} onOpen={onOpen} />
+      </Status>
+      {(!!shown.items.length || !shown.busy && !shown.error) && <div className="pagination" aria-label="分页"><button className="button" disabled={shown.busy || visiblePage <= 1} onClick={() => loadPage(visiblePage - 1)}>上一页</button><span>第 {visiblePage} 页{shown.totalPages ? ` / ${shown.totalPages}` : ''}{shown.busy ? ' · 读取中' : shown.error && shown.requestedPage !== visiblePage ? ` · 第 ${shown.requestedPage} 页未加载` : ''}</span><button className="button" disabled={shown.busy || !!shown.error || (shown.totalPages ? visiblePage >= shown.totalPages : !shown.items.length)} onClick={() => loadPage(visiblePage + 1)}>下一页</button></div>}
+    </>}
   </>;
 }
 
@@ -1291,7 +1359,7 @@ export default function App() {
     <div className="content-shell"><div className="phone-brand"><span><Play size={18} /></span><strong>红果短剧</strong><button className="brand-search" type="button" aria-label="搜索短剧" onClick={() => navigate('search')}><Search size={20} /></button></div>{infoError && <div className="environment-error" role="alert"><span>{infoError}</span><button onClick={loadInfo}>重试连接</button></div>}<main ref={content} className={`main-content${detail ? ' detail-open' : ''}`} id="main-content">
       {detail && <SeasonDetails key={detail.seed.seriesId} {...detail} library={library} onBack={closeDetail} onLibrary={replaceLibrary} notify={notify} isTv={!!info.isTv} />}
       <div className="page-slot" hidden={!!detail}>
-        {tab === 'discover' && <Discover onOpen={openDetail} />}
+        {tab === 'discover' && <Discover onOpen={openDetail} library={library} onSearch={() => navigate('search')} onUpdates={() => navigate('about')} />}
         {tab === 'search' && <SearchPage onOpen={openDetail} />}
         {tab === 'library' && <Library library={library} error={libraryError} busy={libraryBusy} onRetry={loadLibrary} onOpen={openDetail} onAccount={() => { navigate('about'); setAccountFocus(value => value + 1); }} />}
         {tab === 'downloads' && !detail && <Downloads notify={notify} />}
