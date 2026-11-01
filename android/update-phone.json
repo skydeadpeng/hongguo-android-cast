@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 51,
-  "versionName": "0.12.28",
+  "versionCode": 52,
+  "versionName": "0.12.29",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.28/Hongguo-0.12.28-phone-release-compatible.apk",
-  "size": 634024,
-  "sha256": "485052c05979f5444ef010b439641327ac32bd574601a3eba196db755a09b2e6",
-  "notes": "下载页改为按剧分组：每部剧一个可展开的分组头（剧名 · 完成集数/总集数 · 总大小），分集在组内列出，「合并本剧」移入组头一键可用；多部剧默认收起、首部展开。系统下载通知改为仅下载中显示，批量缓存多集不再每集留一条常驻通知。批量下载入口不变（详情页「批量下载」选起止集）。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-01T03:38:19.321Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.29/Hongguo-0.12.29-phone-release-compatible.apk",
+  "size": 635476,
+  "sha256": "be336c4dbf7a14c598c0ad85da2659c935dd33327281a6ba49ee4164e0338320",
+  "notes": "合并结果不再只留一个「Movies/Hongguo/xxx.mp4」的路径提示：合并完成的整部视频直接回到下载页该剧的分组里，显示为「合并版 · N 集」，可就地播放、也可单独删除；提示文案改为「已合并 N 集 · 合并版已加入本剧分组，可直接播放」。合并文件保存在应用自己的下载目录，卸载或清理相册不会再出现找不到的「编辑」条目。\n下载页每个剧分组新增「删除整部」：一次删除本剧全部单集下载（含未完成任务）与合并版文件，删除前会明确说明范围，收藏和观看历史保留；单集「删除」保持原样。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T05:45:29.959Z"
 }
