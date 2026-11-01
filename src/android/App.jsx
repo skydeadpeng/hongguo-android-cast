@@ -438,6 +438,26 @@ function Downloads({ notify }) {
     group.count++;
   }
   const mergeable = Object.values(groups).filter(group => group.count >= 2);
+  // Group every download row under its series header, video-app style.
+  const [openGroups, setOpenGroups] = useState(null);
+  const seriesGroups = [];
+  const bySeries = new Map();
+  state.items.forEach(item => {
+    const key = item.seriesId || `single-${item.id}`;
+    let group = bySeries.get(key);
+    if (!group) { group = { seriesId: key, title: item.title || '短剧', items: [], done: 0, bytes: 0 }; bySeries.set(key, group); seriesGroups.push(group); }
+    group.items.push(item);
+    if (item.status === 'success') group.done++;
+    group.bytes += item.downloadedBytes || 0;
+  });
+  const groupOpen = group => openGroups === null ? seriesGroups.length <= 1 || group === seriesGroups[0] : openGroups.has(group.seriesId);
+  const toggleGroup = group => {
+    setOpenGroups(previous => {
+      const base = previous === null ? new Set(seriesGroups.filter(entry => groupOpen(entry)).map(entry => entry.seriesId)) : new Set(previous);
+      if (base.has(group.seriesId)) base.delete(group.seriesId); else base.add(group.seriesId);
+      return base;
+    });
+  };
   const merge = async group => {
     if (merging) return;
     setMerging(group.seriesId);
@@ -457,10 +477,20 @@ function Downloads({ notify }) {
       <div className="download-confirm-actions"><button ref={cancelButton} type="button" className="button" onClick={cancelConfirmation} disabled={deleting !== null}>取消</button><button type="button" className="button download-destructive" onClick={remove} disabled={deleting !== null}>{deleting !== null ? '删除中…' : '确认删除'}</button></div>
     </div>}
     <Status busy={state.busy} error={state.error} preserve={!!state.items.length} onRetry={() => refresh(true)} empty={!state.items.length && { title: '还没有下载任务', text: '在短剧详情中选择一集，点「下载」；或多集用「批量下载」。' }}>
-      {!!mergeable.length && <div className="merge-bar" role="group" aria-label="合并整剧">{mergeable.map(group => <div key={group.seriesId} className="merge-row"><span>{group.title} · 已完成 {group.count} 集</span><button type="button" className="button" disabled={locked || merging !== ''} onClick={() => merge(group)}>{merging === group.seriesId ? '合并中…（可能需要几分钟）' : '合并本剧'}</button></div>)}</div>}
-      <div className="download-list" ref={list}>{state.items.map((item, index) => {
-        const percent = item.totalBytes > 0 ? Math.min(100, Math.max(0, Math.round(item.downloadedBytes / item.totalBytes * 100))) : null;
-        return <article className="download-row" key={item.id}><div className="download-icon"><Download size={24} /></div><div className="download-info"><h2>{item.title || '短剧'} · 第 {item.index} 集</h2><p className={item.status === 'failed' ? 'text-error' : ''}>{statuses[item.status] || item.status}{percent !== null && item.status !== 'success' ? ` · ${percent}%` : ''} · {byteText(item.downloadedBytes)}{item.totalBytes > 0 ? ` / ${byteText(item.totalBytes)}` : ''}</p>{item.status === 'running' && <progress value={percent ?? undefined} max="100" aria-label={`${item.title}下载进度`} />}{item.reason && item.status !== 'success' ? <p className="download-reason">{item.reason}</p> : null}</div><div className="download-actions">{item.status === 'success' && <button type="button" className="button" onClick={() => open(item.id)} disabled={locked}><Play />{opening === item.id ? '打开中…' : '播放'}</button>}<button type="button" className="button download-delete" aria-label={`${activeDownload(item) ? '取消并删除' : '删除'} ${item.title || '短剧'} 第 ${item.index} 集`} onClick={() => askDelete(item, index)} disabled={locked}>{activeDownload(item) ? '取消并删除' : '删除'}</button></div></article>;
+      <div className="download-list" ref={list}>{seriesGroups.map(group => {
+        const expanded = groupOpen(group);
+        const doneLabel = group.done >= group.items.length ? `${group.items.length} 集` : `${group.done}/${group.items.length} 集`;
+        const mergeInfo = mergeable.find(entry => entry.seriesId === group.seriesId);
+        return <div className="download-group" key={group.seriesId}>
+          <div className="download-group-header">
+            <button type="button" className="download-group-toggle" onClick={() => toggleGroup(group)} disabled={locked} aria-expanded={expanded}><strong>{group.title}</strong><span className="download-group-meta">{doneLabel} · {byteText(group.bytes)}</span><span className="download-group-chev">{expanded ? '收起' : '展开'}</span></button>
+            {mergeInfo && <button type="button" className="button download-group-merge" disabled={locked || merging !== ''} onClick={() => merge(mergeInfo)}>{merging === group.seriesId ? '合并中…' : '合并本剧'}</button>}
+          </div>
+          {expanded && group.items.map(item => {
+            const percent = item.totalBytes > 0 ? Math.min(100, Math.max(0, Math.round(item.downloadedBytes / item.totalBytes * 100))) : null;
+            return <article className="download-row" key={item.id}><div className="download-icon"><Download size={24} /></div><div className="download-info"><h2>第 {item.index} 集</h2><p className={item.status === 'failed' ? 'text-error' : ''}>{statuses[item.status] || item.status}{percent !== null && item.status !== 'success' ? ` · ${percent}%` : ''} · {byteText(item.downloadedBytes)}{item.totalBytes > 0 ? ` / ${byteText(item.totalBytes)}` : ''}</p>{item.status === 'running' && <progress value={percent ?? undefined} max="100" aria-label={`${group.title}第 ${item.index} 集下载进度`} />}{item.reason && item.status !== 'success' ? <p className="download-reason">{item.reason}</p> : null}</div><div className="download-actions">{item.status === 'success' && <button type="button" className="button" onClick={() => open(item.id)} disabled={locked}><Play />{opening === item.id ? '打开中…' : '播放'}</button>}<button type="button" className="button download-delete" aria-label={`${activeDownload(item) ? '取消并删除' : '删除'} ${group.title} 第 ${item.index} 集`} onClick={() => askDelete(item, group.items.indexOf(item))} disabled={locked}>{activeDownload(item) ? '取消并删除' : '删除'}</button></div></article>;
+          })}
+        </div>;
       })}</div>
     </Status>
   </>;

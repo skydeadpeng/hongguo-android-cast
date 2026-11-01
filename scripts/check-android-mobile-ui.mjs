@@ -236,8 +236,9 @@ try {
   });
   await group('MERGE completed same-series downloads offer a one-tap lossless merge',async()=>{
     await reset();await button('下载');await sleep(60);
-    check(await evaluate('!!document.querySelector(".merge-row")'),'the merge bar lists the series with two completed episodes');
-    check(await evaluate('document.querySelector(".merge-row span").textContent.includes("已完成 2 集")'),'the completed count is shown');
+    check(await evaluate('!!document.querySelector(".download-group")'),'downloads group under one series header');
+    check(await evaluate('document.querySelector(".download-group-toggle").textContent.includes("2 集")'),'the completed count is shown in the header');
+    check(await evaluate('[...document.querySelectorAll(".download-group .download-row")].length===2'),'both episodes list under the group header');
     await button('合并本剧');await wait('window.__mobileFixture.merged.length===1');
     eq(await evaluate('window.__mobileFixture.merged[0]'),'1234567890123456789','the merge request carries the exact series id');
     await wait('document.querySelector(".toast")?.textContent.includes("已合并 2 集")','the export location is reported');

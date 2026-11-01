@@ -431,3 +431,18 @@
 @media(prefers-reduced-motion:reduce){
   .detail-settings>summary svg,.phone-layout .episode-grid>button{transition:none}
 }
+
+/* Downloads grouped by series: one header per 剧, episodes listed beneath. */
+.download-group{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;background:var(--surface)}
+.download-group-header{display:flex;align-items:center;gap:8px;padding:0 10px 0 0;min-height:56px}
+.download-group-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 12px;border:0;background:transparent;text-align:left}
+.download-group-toggle strong{flex:1;min-width:0;font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.download-group-meta{color:var(--faint);font-size:12px;flex-shrink:0}
+.download-group-chev{color:var(--accent);font-size:13px;font-weight:600;flex-shrink:0;min-width:32px;text-align:right}
+.download-group-merge{flex-shrink:0;min-height:44px}
+.download-group .download-row{padding:12px 12px 12px 16px;border-top:1px solid var(--border)}
+.download-group .download-row:last-child{border-bottom:0}
+@media(max-width:599px){.download-group-header{flex-wrap:wrap;padding-top:6px;padding-bottom:6px}.download-group-merge{width:100%;justify-content:center}}
+.tv-layout .download-group-toggle strong{font-size:20px}
+.tv-layout .download-group-meta{font-size:16px}
+.tv-layout .download-group-toggle{min-height:64px}

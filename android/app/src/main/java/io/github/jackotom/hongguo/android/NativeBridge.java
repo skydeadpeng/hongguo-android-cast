@@ -362,9 +362,10 @@ final class NativeBridge {
                 if (closed) return;
                 String title = series.getString("title") + " · 第 " + episode.getInt("index") + " 集";
                 String downloadFilename=series.getString("seriesId") + "_" + episode.getInt("index") + "_" + System.currentTimeMillis() + ".mp4";
+                // Batch downloads of one series must not leave one standing notification per episode.
                 DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url)).setTitle(title).setDescription("红果 · 视频下载")
                     .addRequestHeader("User-Agent", plan.userAgent).addRequestHeader("Referer", plan.referer)
-                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
                     .setAllowedOverMetered(true).setAllowedOverRoaming(false)
                     .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_DOWNLOADS, downloadFilename);
                 long downloadId = downloads.enqueue(request);
