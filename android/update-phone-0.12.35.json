@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 58,
+  "versionName": "0.12.35",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.35/Hongguo-0.12.35-phone-release-compatible.apk",
+  "size": 638220,
+  "sha256": "418e26110112959f10b521ecceaf59c21a6aa01325304bd2d1a087ae895a01ed",
+  "notes": "修复登录后「我的追剧」一直提示“红果账号本机收藏/记录尚未就绪”：上一版修好云端验证后，账号库的读取门槛仍在用短信登录流程的账号编号做比对，扫码登录的会话永远无法通过（这是模拟器里用真实账号扫码完整走完 登录→同步→导入→看库 全流程时定位的第二个问题）。现在读取门槛与选库逻辑使用同一账号编号，扫码登录后收藏与观看历史正常显示。已用真实账号端到端验证：扫码登录、云端同步、导入本机记录、库浏览全部可用（8 部追剧、181 条历史完整显示）。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T14:25:12.328Z"
+}
