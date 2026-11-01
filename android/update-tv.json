@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 58,
-  "versionName": "0.12.35",
+  "versionCode": 59,
+  "versionName": "0.12.36",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.35/Hongguo-0.12.35-tv-release-compatible.apk",
-  "size": 636384,
-  "sha256": "4c8adc20de8a437ebc5284a01cf0b39b6e8c7868b350b562654ed1dfba255357",
-  "notes": "修复登录后「我的追剧」一直提示“红果账号本机收藏/记录尚未就绪”：上一版修好云端验证后，账号库的读取门槛仍在用短信登录流程的账号编号做比对，扫码登录的会话永远无法通过（这是模拟器里用真实账号扫码完整走完 登录→同步→导入→看库 全流程时定位的第二个问题）。现在读取门槛与选库逻辑使用同一账号编号，扫码登录后收藏与观看历史正常显示。已用真实账号端到端验证：扫码登录、云端同步、导入本机记录、库浏览全部可用（8 部追剧、181 条历史完整显示）。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-01T14:25:12.622Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.36/Hongguo-0.12.36-tv-release-compatible.apk",
+  "size": 639632,
+  "sha256": "b25e8391c59d7354b22474850d7e68880b3b793a64a7ef9dfcd363677b1653c4",
+  "notes": "「发现」首页全新改版（对标红果官方 App 首页）：数据源切换为官方 App 的推荐接口——首页直接呈现官方正在推荐的真实剧集（含红果首发与热度），按官方排序滚动加载“加载更多推荐” infinitely；顶部新增搜索条，登录后首页显示「继续观看」横滑栏（带看到第 N 集与进度），官方封面由原生解码（HEIC 自动转 JPEG 内嵌展示）。官方接口不可用时自动回退原网页分类目录，分类标签在回退模式下保留。版本更新体验优化：有新版本时首页出现横幅直达更新，「版本更新」面板完整展示更新说明，机制说明收起为折叠项。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T15:05:28.587Z"
 }
