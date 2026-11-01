@@ -45,12 +45,13 @@ final class AccountSync {
         flow.setListener(this::notifyChanged);library.setOnDirty(()->schedule(2000));
         selectLibrary();
         LibraryStore.setHistoryFactory(()->{
-            String owner=flow.uid();
+            // Web (scan) logins have no passport uid: the owner is the cloud uid that selected the library.
+            String owner=cloudUid();
             if(!libraryReady||!owner.equals(selectedUid))return unavailableHistory();
             LibraryStore.HistoryAccess captured=library.openHistory();
             // UID can change while a library handle is captured. Never substitute
             // guest/old-account access for the account that the caller observed.
-            return libraryReady&&owner.equals(selectedUid)&&owner.equals(flow.uid())?captured:unavailableHistory();
+            return libraryReady&&owner.equals(selectedUid)&&owner.equals(cloudUid())?captured:unavailableHistory();
         });
         if(periodic)syncWorker.scheduleWithFixedDelay(()->schedule(0),90,90,TimeUnit.SECONDS);
     }
