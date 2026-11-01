@@ -84,8 +84,12 @@ function installMock() {
         const sid = u.pathname.split('/')[2], item = entries[sid];
         f.detailReads.push(sid); plan = f.detailPlans[sid]?.shift() || {};
         result = item ? { status: 200, body: pageHtml({ 'player_(series_id)/page': { series_id: sid, seriesDetail: raw(item) } }) } : { status: 404, body: '' };
+      } else if (u.pathname === '/detail') {
+        result = { status: 404, body: '' };
       } else { error = 'UNEXPECTED_HTTP_' + u.pathname; f.notes.push(error); }
     } else if (m.method === 'searchQuery') { f.searches.push(m.params); plan = f.searchPlans.shift() || {}; result = searchResponse(m.params.keyword, m.params.offset); }
+    else if (m.method === 'cancelHttp') result = { cancelled: true };
+    else if (m.method === 'getAnnouncements') result = { items: [] };
     else if (m.method === 'getPlaybackOptions') { plan = f.optionPlans.shift() || {}; result = plan.options || { ...f.options }; }
     else if (m.method === 'setPlaybackOptions') { f.options = { ...f.options, ...m.params }; result = { ...f.options }; }
     else if (m.method === 'play') { plan = f.playPlans.shift() || {}; result = { started: true }; }
@@ -206,7 +210,7 @@ try {
       eq(await evaluate('window.__seasonFixture.searches.length'),searches,'play does not add season searches');
       eq(await evaluate('window.__seasonFixture.detailReads'),[SID[0]],'play does not read later-season details');
       eq(await evaluate('document.querySelectorAll(".season-preparation,.season-play-notice").length'),0,'obsolete next-season preparation/status removed');
-      check(await evaluate('document.querySelector("[aria-label=播放设置]").textContent.includes("本季播完后停止")'),'autoplay setting explains the current-season boundary');
+      check(await evaluate('document.querySelector("[aria-label=播放设置]").textContent.includes("不跨季")'),'autoplay setting explains the current-season boundary');
       eq(await evaluate('window.__seasonFixture.resolves.length'),0,'no JS media preflight');
       await screenshot(tv?'tv-current-season-only.png':'phone-current-season-only.png');
     }
@@ -260,8 +264,9 @@ try {
   await group('HISTORY continue follows latest actual updatedAt and resumes exact season+vid, not higher ordinal',async()=>{
     await reset();eq((await plays()).length,0,'banner display is non-playing');await evaluate('document.querySelector("[data-season-action=resume]").click()');await ready(SID[1]);await idle();
     let p=(await plays())[0];eq([p.series.seriesId,p.episode.vid,p.episode.index],[SID[1],'8000000000000010008',9],'continue uses exact second-season recorded vid');check(!('positionMs' in p),'native owner/vid history controls resume offset, no forced zero');eq(typeof p.playlist,'undefined','manual historical resume does not append later seasons');eq(p.episodes.length,43,'second-season history resumes within its own 43-episode queue');
-    await reset();await evaluate(`window.__seasonFixture.library.history[0].updatedAt=9000;window.__seasonFixture.library.history[0].positionMs=19000;window.dispatchEvent(new Event('androidresume'))`);await wait('document.querySelector(".season-history").textContent.includes("0:19")');
-    await evaluate('document.querySelector("[data-season-action=resume]").click()');await idle();p=(await plays())[0];eq([p.series.seriesId,p.episode.index],[SID[0],32],'newer first-season progress wins over second-season ordinal');
+    await reset();await evaluate(`window.__seasonFixture.library.history[0].updatedAt=9000;window.__seasonFixture.library.history[0].positionMs=19000;window.dispatchEvent(new Event('androidresume'))`);await wait('!document.querySelector(".season-history")');
+    check(await evaluate('document.querySelector(".dock-play").textContent.includes("继续播放 · 第 32 集")'),'same-season history is represented by the exact dock action, not a second banner');
+    await evaluate('document.querySelector(".dock-play").click()');await idle();p=(await plays())[0];eq([p.series.seriesId,p.episode.index],[SID[0],32],'newer first-season progress wins over second-season ordinal');
   });
   await group('HISTORY invalid recorded vid and failed target detail never silently play episode one',async()=>{
     await reset();await evaluate('window.__seasonFixture.library.history[1].vid="8999999999999999999";window.__seasonFixture.library.history[1].updatedAt=9000;window.dispatchEvent(new Event("androidresume"))');await sleep(30);
@@ -275,7 +280,7 @@ try {
   });
   await group('LIBRARY latest-wins prevents older resume response from overwriting newer cross-season history',async()=>{
     await reset();await evaluate('window.__seasonFixture.libraryPlans=[{delay:250},{delay:5}];window.dispatchEvent(new Event("androidresume"));window.__seasonFixture.library.history[0].updatedAt=10000;window.__seasonFixture.library.history[0].positionMs=25000;window.dispatchEvent(new Event("androidresume"))');
-    await wait('document.querySelector(".season-history").textContent.includes("0:25")');await sleep(300);check(await evaluate('document.querySelector(".season-history").textContent.includes("0:25")'),'late old library read cannot rewind new progress');eq((await plays()).length,0,'library refresh does not start a player');
+    await wait('!document.querySelector(".season-history")');await sleep(300);check(await evaluate('!document.querySelector(".season-history")'),'late old library read cannot restore stale cross-season progress');eq((await plays()).length,0,'library refresh does not start a player');
   });
   await group('LAYOUT history and per-season progress remain usable on 320/390 large text and TV',async()=>{
     for(const opts of [{width:320,height:844,large:true},{width:390,height:844,large:true},{tv:true}]){
@@ -284,7 +289,7 @@ try {
       for(const [id,episode] of [[SID[0],32],[SID[1],9]]){
         check(await evaluate(`document.querySelector(${q(selector(id))}).getAttribute('aria-label').includes('第 ${episode} 集')`),'each watched tab exposes its own progress in its accessible label');
         await choose(id);await ready(id);
-        const progress=await evaluate(`(()=>{const e=document.querySelector('.season-current .season-progress');return e&&{text:e.innerText,display:getComputedStyle(e).display,width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height};})()`);
+        const progress=await evaluate(`(()=>{const e=document.querySelector('.dock-play');return e&&{text:e.innerText,display:getComputedStyle(e).display,width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height};})()`);
         check(progress&&progress.text.includes(`第 ${episode} 集`)&&progress.display!=='none'&&progress.width>0&&progress.height>0,'selected season shows its own visible local episode progress');
         eq(await selectedEpisode(),episode,'selected-season remembered episode preserved');
       }
@@ -294,7 +299,7 @@ try {
   });
   await group('ISOLATION real source/search parsing stays inside synthetic native boundary',async()=>{eq(report.externalRequests,[],'zero external requests');eq(report.pageErrors,[],'zero browser exceptions');eq(await evaluate('window.__seasonFixture.notes'),[],'zero unexpected native RPCs');});
 
-  await call('Page.close');ws.close();ws=null;
+  ws.close();ws=null;
 } catch(error) {
   if(!failed){failed++;report.tests.push({name:'runner',result:'FAIL',error:error.stack});console.error(error.stack);}
 } finally {

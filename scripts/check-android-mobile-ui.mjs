@@ -125,6 +125,27 @@ try {
     const small=await evaluate(`(()=>{const main=document.querySelector('.detail-scroll')||document.querySelector('.main-content');return [...document.querySelectorAll('button,input,select')].filter(e=>e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden').filter(e=>{const label=e.closest('label');return !(label&&label.getBoundingClientRect().height>=43.5)}).map(e=>({label:e.getAttribute('aria-label')||e.textContent.trim().slice(0,30),w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height})).filter(r=>r.w<43.5||r.h<43.5)})()`);
     assert.deepEqual(small,[],'all rendered interactive controls have at least 44px touch targets: '+JSON.stringify(small));
   };
+  await group('DESIGN portrait prioritizes episodes and one exact resume action without technical clutter',async()=>{
+    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'light'}]});
+    await reset();
+    eq(await evaluate('!!document.querySelector(".season-selector")'),false,'same-series history must not create a redundant season panel');
+    eq(await evaluate('document.querySelectorAll(".episode-status").length'),0,'episode tiles are numbers, not repeated resolver messages');
+    eq(await evaluate('document.querySelector(".play-actions .primary").textContent.trim()'),'继续播放 · 第 92 集','resume action names the exact remembered episode');
+    eq(await evaluate('document.querySelector(".detail-settings")?.open'),false,'secondary settings start collapsed');
+    const visible=await evaluate(`(()=>{const scroll=document.querySelector('.detail-scroll').getBoundingClientRect();return [...document.querySelectorAll('.episode-grid button')].filter(e=>{const r=e.getBoundingClientRect();return r.top>=scroll.top&&r.bottom<=scroll.bottom}).length;})()`);
+    check(visible>=18,'at least three six-column episode rows fit the initial 390px portrait viewport; got '+visible);
+    await screenshot('phone-390-redesign-light.png');
+    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
+    await sleep(200);
+    await screenshot('phone-390-redesign-dark.png');
+    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'light'}]});
+    await evaluate('document.querySelector(".detail-settings summary").click()');
+    eq(await evaluate('document.querySelector(".detail-settings").open'),true,'settings can be expanded');
+    await evaluate('document.querySelector(".setting-switch").click()');
+    eq(await evaluate('document.querySelector(".setting-switch").getAttribute("aria-checked")'),'false','expanded settings remain interactive');
+    eq((await plays()).length,0,'expanding and changing preferences never starts playback');
+    await evaluate('document.querySelector(".setting-switch").click()');
+  });
   await group('FUNCTION remembered long-series episode opens its 30-item group without playing',async()=>{
     await reset();eq(await evaluate('document.querySelectorAll(".episode-grid button").length'),30,'phone only renders active 30-episode range');eq(await evaluate('document.querySelector("#episode-range").value'),'3','remembered episode 92 reveals 91–120');eq(await evaluate('document.querySelector(".episode-grid button[aria-pressed=true]").querySelector("span").textContent'),'92','remembered selection retained');eq((await plays()).length,0,'opening remembered detail never starts video');await dockVisible();await screenshot('phone-390-initial.png');
     await chooseRange(0);eq((await plays()).length,0,'range selection is browse only');eq(await evaluate('document.querySelector(".play-actions").textContent.includes("第 92 集")'),true,'range browse keeps exact playback selection');await button('定位第 92 集');await wait('document.querySelector("#episode-range").value==="3"');await wait('document.activeElement.matches(".episode-grid button[aria-pressed=true]")');eq((await plays()).length,0,'locate changes range and focus, never plays');
@@ -136,14 +157,14 @@ try {
   await group('LAYOUT phone 320, 360, 390 and low-height landscape keep actions visible and touch targets usable',async()=>{
     for(const [width,height] of [[320,640],[360,740],[390,844],[844,390]]){
       await reset(false,width,height);check(await evaluate('!!document.querySelector(".detail-scroll")'),'phone detail has independent content scroll area');await noOverflow();await dockVisible();await touchTargets();
-      await evaluate('document.querySelector(".detail-scroll").scrollTop=999999');await sleep(30);await dockVisible();await noOverflow();
+      await evaluate('document.querySelector(".detail-settings").open=true;document.querySelector(".detail-scroll").scrollTop=999999');await sleep(30);await dockVisible();await noOverflow();await touchTargets();
       const bounds=await evaluate('({last:document.querySelectorAll(".playback-settings .setting-switch")[1].getBoundingClientRect().bottom,dock:document.querySelector(".play-actions").getBoundingClientRect().top})');check(bounds.last<=bounds.dock,'last setting is not hidden behind action dock '+JSON.stringify(bounds));
       await screenshot(`phone-${width}x${height}-settings.png`);
     }
   });
   await group('LAYOUT 160 percent text at 320 and 390 wraps controls without horizontal overflow or overlap',async()=>{
     for(const width of [320,390]){
-      await reset(false,width,844,true);eq(await evaluate('getComputedStyle(document.querySelector(".playback-setting h2")).fontSize'),'24px','phone setting text scales with root text size');await noOverflow();await dockVisible();await touchTargets();
+      await reset(false,width,844,true);await evaluate('document.querySelector(".detail-settings").open=true');eq(await evaluate('getComputedStyle(document.querySelector(".playback-setting h2")).fontSize'),'24px','phone setting text scales with root text size');await noOverflow();await dockVisible();await touchTargets();
       await evaluate('document.querySelector(".detail-scroll").scrollTop=999999');await sleep(20);await noOverflow();await dockVisible();await screenshot(`phone-${width}-large-text-settings.png`);
       await evaluate('document.querySelector(".episode-section").scrollIntoView({block:"start"})');await screenshot(`phone-${width}-large-text-episodes.png`);
     }
@@ -222,7 +243,7 @@ try {
     await wait('document.querySelector(".toast")?.textContent.includes("已合并 2 集")','the export location is reported');
   });
   await group('ISOLATION no browser exceptions or external source/media requests',async()=>{eq(report.externalRequests,[],'zero external requests');eq(report.pageErrors,[],'zero runtime exceptions');});
-  await call('Page.close');ws.close();ws=null;
+  ws.close();ws=null;
 } catch(error) {
   if(!failed){failed++;report.tests.push({name:'runner',result:'FAIL',error:error.stack});console.error(error.stack);}
 } finally {
