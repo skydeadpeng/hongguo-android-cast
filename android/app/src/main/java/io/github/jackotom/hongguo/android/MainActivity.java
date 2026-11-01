@@ -324,9 +324,10 @@ public final class MainActivity extends Activity {
     }
     @Override public void onBackPressed() {
         if (manualDiagnostics) { closeManualDiagnostics(); return; }
-        if (!startup.isReady() || !trusted()) { confirmExit(); return; }
-        web.evaluateJavascript("Boolean(window.__androidBack && window.__androidBack())", result -> { if (!"true".equals(result)) confirmExit(); });
+        if (!startup.isReady() || !trusted()) { minimize(); return; }
+        web.evaluateJavascript("Boolean(window.__androidBack && window.__androidBack())", result -> { if (!"true".equals(result)) minimize(); });
     }
-    private void confirmExit() { new AlertDialog.Builder(this).setTitle("退出红果？").setMessage("收藏、观看进度和下载记录会保留在本机。").setNegativeButton("继续使用", null).setPositiveButton("退出", (dialog, which) -> finish()).show(); }
+    /** Video-app back behavior: root back minimizes to the recents stack instead of exiting. */
+    private void minimize() { moveTaskToBack(true); }
     @Override protected void onDestroy() { if (updates != null) updates.destroy(); AccountSync.get().clearListener(accountChanged); cancelStartupTimeout(); startup.destroy(); PlaybackSources.detach(this); destroyWebView(); super.onDestroy(); }
 }
