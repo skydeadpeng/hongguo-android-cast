@@ -240,6 +240,46 @@ final class LibraryStore {
             if (!preferences.edit().putString("downloads", next.toString()).commit()) throw new JSONException("下载记录保存未成功");
         }
     }
+    /** Merged whole-series videos are app-managed beside downloads, outside the episode-keyed machinery. */
+    JSONArray mergedVideos() { synchronized (LibraryStore.class) { return read("merged_videos_v1"); } }
+    JSONObject mergedVideo(long id) throws JSONException {
+        synchronized (LibraryStore.class) {
+            JSONArray rows=read("merged_videos_v1");JSONObject found=null;int matches=0;
+            for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&row.optLong("id",-1)==id){found=row;matches++;}}
+            if(matches>1)throw new JSONException("合并记录身份重复");
+            return found;
+        }
+    }
+    void addMergedVideo(long id,JSONObject series,JSONObject episode,int episodes,String filename) throws JSONException {
+        synchronized (LibraryStore.class) {
+            JSONArray rows=read("merged_videos_v1"),next=new JSONArray().put(new JSONObject()
+                .put("id",id).put("seriesId",series.getString("seriesId")).put("title",series.getString("title"))
+                .put("episodes",Math.max(2,Math.min(100,episodes))).put("mergedFile",filename)
+                .put("series",series).put("episode",episode));
+            for(int i=0;i<rows.length()&&next.length()<100;i++){JSONObject row=rows.optJSONObject(i);if(row==null||row.optLong("id",-1)==id)continue;next.put(rows.get(i));}
+            if(!preferences.edit().putString("merged_videos_v1",next.toString()).commit())throw new JSONException("合并记录保存未成功");
+        }
+    }
+    void finishMergedVideo(long id) throws IOException, JSONException {
+        synchronized (LibraryStore.class) {
+            JSONArray rows=read("merged_videos_v1"),next=new JSONArray();int matches=0;
+            for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&row.optLong("id",-1)==id)matches++;else next.put(rows.get(i));}
+            if(matches!=1)throw new IOException("合并记录已变化，请重新读取后重试");
+            if(!preferences.edit().putString("merged_videos_v1",next.toString()).commit())throw new IOException("合并记录删除未成功，请重试");
+        }
+    }
+    /** A merged file this app wrote itself: strict <seriesId>_merged_<uuid>.mp4 inside the downloads directory. */
+    static File mergedFile(File directory,JSONObject row) {
+        try {
+            if(directory==null||row==null||!(row.opt("mergedFile") instanceof String))return null;
+            String seriesId=row.optString("seriesId"),name=row.getString("mergedFile");
+            if(!seriesId.matches("[0-9]{6,30}")||!name.matches(java.util.regex.Pattern.quote(seriesId)+"_merged_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.mp4"))return null;
+            if(Files.isSymbolicLink(directory.toPath())||!directory.isDirectory())return null;
+            File file=new File(directory,name);
+            if(Files.isSymbolicLink(file.toPath())||!directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile())||!file.isFile()||!file.canRead())return null;
+            return file;
+        }catch(Exception ignored){return null;}
+    }
     /** Upgrade only the requested legacy prepared record; never rename/delete a user's file. */
     JSONObject bindPreparedDownload(long id,File directory,File target) throws Exception {
         synchronized(LibraryStore.class) {

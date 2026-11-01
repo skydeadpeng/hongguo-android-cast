@@ -1,11 +1,7 @@
 package io.github.jackotom.hongguo.android;
 
-import android.content.ContentValues;
 import android.content.Context;
-import android.net.Uri;
-import android.os.Build;
 import android.os.Environment;
-import android.provider.MediaStore;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -14,13 +10,14 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
  * Same-series lossless merge of completed downloads. Collection filters strictly and the
- * export lands where the user can reach it; an incompatible mix keeps its typed message
- * from Mp4Concat instead of ever attempting a transcoding fallback.
+ * result stays in the app's downloads directory as an in-app entry; an incompatible mix
+ * keeps its typed message from Mp4Concat instead of ever attempting a transcoding fallback.
  */
 final class MergeDownloads {
     static final int MAX_EPISODES = 100;
@@ -76,64 +73,22 @@ final class MergeDownloads {
         return null;
     }
 
-    /** A filesystem-safe merged name; collisions are resolved at export time. */
-    static String outputName(String seriesTitle, String seriesId) {
-        String base = String.valueOf(seriesTitle == null ? "" : seriesTitle).replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", " ").replaceAll("\\s+", " ").trim();
-        if (base.isEmpty()) base = "短剧 " + seriesId;
-        if (base.length() > 80) base = base.substring(0, 80).trim();
-        return base + "_合并.mp4";
-    }
-
     /**
-     * Publishes the merged file: MediaStore Movies/Hongguo on API 29+, the app's own
-     * downloads directory below that. Returns a user-presentable location string.
+     * Keeps the merged video inside the app's downloads directory under a strict
+     * <seriesId>_merged_<uuid>.mp4 name so it stays playable and deletable in-app;
+     * ROM galleries no longer receive a copy they may list confusingly.
      */
-    static Export export(Context context, File merged, String name) throws IOException {
+    static File relocate(File directory, File merged, String seriesId) throws IOException {
         if (merged == null || !merged.isFile() || merged.length() <= 0) throw new IOException("合并输出不存在");
-        if (Build.VERSION.SDK_INT >= 29) {
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.Video.Media.DISPLAY_NAME, name);
-            values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
-            values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Hongguo");
-            values.put(MediaStore.Video.Media.IS_PENDING, 1);
-            Uri target = context.getContentResolver().insert(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
-            if (target == null) throw new IOException("合并结果写入系统媒体库未成功");
-            try (java.io.OutputStream output = context.getContentResolver().openOutputStream(target)) {
-                if (output == null) throw new IOException("合并结果写入系统媒体库未成功");
-                java.nio.file.Files.copy(merged.toPath(), output);
-            }
-            values.clear();
-            values.put(MediaStore.Video.Media.IS_PENDING, 0);
-            context.getContentResolver().update(target, values, null, null);
-            return new Export(target, "Movies/Hongguo/" + name);
-        }
-        File directory = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "merged");
-        if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("无法创建合并输出目录");
-        File target = new File(directory, uniqueName(directory, name));
+        if (seriesId == null || !seriesId.matches("\\d{1,30}")) throw new IOException("剧集编号无效");
+        if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new IOException("下载目录尚未准备");
+        File target = new File(directory, seriesId + "_merged_" + UUID.randomUUID() + ".mp4");
         if (!merged.renameTo(target)) {
-            if (!target.delete() || !merged.renameTo(target)) {
-                try { java.nio.file.Files.copy(merged.toPath(), target.toPath()); } catch (IOException error) { throw new IOException("合并结果落盘失败", error); }
-                if (!merged.delete()) { /* The temporary copy is cleaned up by the caller. */ }
-            }
+            try { java.nio.file.Files.copy(merged.toPath(), target.toPath()); }
+            catch (IOException error) { target.delete(); throw new IOException("合并结果落盘失败", error); }
+            if (!merged.delete()) { /* The temporary copy is cleaned up by the caller. */ }
         }
-        return new Export(Uri.fromFile(target), target.getAbsolutePath());
-    }
-
-    private static String uniqueName(File directory, String name) {
-        File candidate = new File(directory, name);
-        if (!candidate.isFile()) return name;
-        String base = name.endsWith(".mp4") ? name.substring(0, name.length() - 4) : name;
-        for (int at = 1; at < 1000; at++) {
-            File numbered = new File(directory, base + " (" + at + ").mp4");
-            if (!numbered.isFile()) return numbered.getName();
-        }
-        return base + " " + System.currentTimeMillis() + ".mp4";
-    }
-
-    /** Where the merged file landed and how to describe it to the user. */
-    static final class Export {
-        final Uri uri;final String location;
-        Export(Uri uri,String location){this.uri=uri;this.location=location;}
+        return target;
     }
 
     /** Orders a mixed id list by the projected episode index; ids are validated by the caller. */

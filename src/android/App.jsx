@@ -318,7 +318,7 @@ function Library({ library, error, busy, onRetry, onOpen, onAccount }) {
 }
 
 function Downloads({ notify }) {
-  const [state, setState] = useState({ busy: true, items: [] });
+  const [state, setState] = useState({ busy: true, items: [], merged: [] });
   const [opening, setOpening] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -330,6 +330,7 @@ function Downloads({ notify }) {
   const readEpoch = useRef(0);
   const operation = useRef(null);
   const deletedIds = useRef(new Set());
+  const deletedMergedIds = useRef(new Set());
   const list = useRef(null);
   const refreshButton = useRef(null);
   const cancelButton = useRef(null);
@@ -344,9 +345,9 @@ function Downloads({ notify }) {
     const epoch = ++readEpoch.current;
     setState(previous => ({ ...previous, busy: true, error: '' }));
     try {
-      const result = await nativeCall('getDownloads');
+      const [result, merged] = await Promise.all([nativeCall('getDownloads'), nativeCall('getMergedVideos').catch(() => [])]);
       if (alive.current && epoch === readEpoch.current) {
-        setState({ busy: false, items: (Array.isArray(result) ? result : []).filter(item => !deletedIds.current.has(item.id)) });
+        setState({ busy: false, items: (Array.isArray(result) ? result : []).filter(item => !deletedIds.current.has(item.id)), merged: (Array.isArray(merged) ? merged : []).filter(entry => !deletedMergedIds.current.has(entry.id)) });
         loaded.current = true;
       }
     } catch (error) {
@@ -377,9 +378,9 @@ function Downloads({ notify }) {
   }, [refresh]);
   useEffect(() => {
     const back = event => {
-      if (!['confirm', 'delete'].includes(operation.current?.kind)) return;
-      event.preventDefault();
-      cancelConfirmation();
+      const kind = operation.current?.kind;
+      if (['confirm', 'delete'].includes(kind)) { event.preventDefault(); cancelConfirmation(); return; }
+      if (kind === 'group-delete') event.preventDefault();
     };
     window.addEventListener('androiddownloadback', back);
     return () => window.removeEventListener('androiddownloadback', back);
@@ -394,27 +395,87 @@ function Downloads({ notify }) {
 
   const askDelete = (item, index) => {
     if (operation.current) return;
-    operation.current = { kind: 'confirm', id: item.id };
+    operation.current = { kind: 'confirm', key: String(item.id) };
     readEpoch.current++; restoreIndex.current = index;
     setState(previous => ({ ...previous, busy: false }));
-    setDeleteError(''); setConfirm({ ...item });
+    setDeleteError(''); setConfirm({ kind: 'episode', key: String(item.id), ...item });
+  };
+  const askDeleteMerged = (entry, group) => {
+    if (operation.current) return;
+    operation.current = { kind: 'confirm', key: `m${entry.id}` };
+    readEpoch.current++;
+    setState(previous => ({ ...previous, busy: false }));
+    setDeleteError(''); setConfirm({ kind: 'merged', key: `m${entry.id}`, groupTitle: group.title, ...entry });
+  };
+  const askDeleteGroup = (group, mergedCount) => {
+    if (operation.current) return;
+    operation.current = { kind: 'confirm', key: `g${group.seriesId}` };
+    readEpoch.current++;
+    setState(previous => ({ ...previous, busy: false }));
+    setDeleteError('');
+    setConfirm({ kind: 'group', key: `g${group.seriesId}`, seriesId: group.seriesId, title: group.title, count: group.items.length, mergedCount, active: group.items.some(activeDownload) });
   };
   const remove = async () => {
     const selected = operation.current;
-    if (selected?.kind !== 'confirm' || !confirm || selected.id !== confirm.id) return;
-    const id = selected.id;
-    operation.current = { kind: 'delete', id };
-    readEpoch.current++; setDeleting(id); setDeleteError('');
+    if (selected?.kind !== 'confirm' || !confirm || selected.key !== confirm.key) return;
+    if (confirm.kind === 'group') { await removeGroup(); return; }
+    const deletingMerged = confirm.kind === 'merged';
+    const id = confirm.id;
+    operation.current = { kind: 'delete', key: selected.key };
+    readEpoch.current++; setDeleting(deletingMerged ? `m${id}` : id); setDeleteError('');
     try {
-      const result = await nativeCall('deleteDownload', { id, confirmed: true });
+      const result = deletingMerged
+        ? await nativeCall('deleteMergedVideo', { id, confirmed: true })
+        : await nativeCall('deleteDownload', { id, confirmed: true });
       if (!alive.current) return;
       if (result?.deleted !== true || result.id !== id) throw new Error('删除结果未确认，请重试。');
-      deletedIds.current.add(id);
-      setState(previous => ({ ...previous, busy: false, items: previous.items.filter(item => item.id !== id) }));
+      if (deletingMerged) {
+        deletedMergedIds.current.add(id);
+        setState(previous => ({ ...previous, busy: false, merged: previous.merged.filter(entry => entry.id !== id) }));
+      } else {
+        deletedIds.current.add(id);
+        setState(previous => ({ ...previous, busy: false, items: previous.items.filter(item => item.id !== id) }));
+      }
       setConfirm(null); operation.current = null;
       refresh(true);
     } catch (error) {
-      if (alive.current) { operation.current = { kind: 'confirm', id }; setDeleteError(errorText(error)); }
+      if (alive.current) { operation.current = { kind: 'confirm', key: selected.key }; setDeleteError(errorText(error)); }
+    } finally {
+      if (alive.current) setDeleting(null);
+    }
+  };
+  const removeGroup = async () => {
+    const group = confirm;
+    operation.current = { kind: 'group-delete', seriesId: group.seriesId };
+    readEpoch.current++; setDeleting(group.key); setDeleteError('');
+    try {
+      for (const item of state.items) {
+        if ((item.seriesId || `single-${item.id}`) !== group.seriesId) continue;
+        const result = await nativeCall('deleteDownload', { id: item.id, confirmed: true });
+        if (result?.deleted !== true || result.id !== item.id) throw new Error('删除结果未确认，请重试。');
+        deletedIds.current.add(item.id);
+      }
+      for (const entry of state.merged) {
+        if (entry.seriesId !== group.seriesId) continue;
+        const result = await nativeCall('deleteMergedVideo', { id: entry.id, confirmed: true });
+        if (result?.deleted !== true || result.id !== entry.id) throw new Error('删除结果未确认，请重试。');
+        deletedMergedIds.current.add(entry.id);
+      }
+      if (!alive.current) return;
+      setState(previous => ({ ...previous, busy: false,
+        items: previous.items.filter(item => (item.seriesId || `single-${item.id}`) !== group.seriesId),
+        merged: previous.merged.filter(entry => entry.seriesId !== group.seriesId) }));
+      setConfirm(null); operation.current = null;
+      notify(`已删除整部《${group.title}》`);
+      refresh(true);
+    } catch (error) {
+      if (alive.current) {
+        setState(previous => ({ ...previous, busy: false,
+          items: previous.items.filter(item => !deletedIds.current.has(item.id)),
+          merged: previous.merged.filter(entry => !deletedMergedIds.current.has(entry.id)) }));
+        operation.current = { kind: 'confirm', key: group.key };
+        setDeleteError(errorText(error));
+      }
     } finally {
       if (alive.current) setDeleting(null);
     }
@@ -423,6 +484,13 @@ function Downloads({ notify }) {
     if (operation.current) return;
     operation.current = { kind: 'open', id }; setOpening(id);
     try { await nativeCall('playDownload', { id, ...getPlaybackPreferences() }); }
+    catch (error) { if (alive.current) notify(errorText(error)); }
+    finally { if (alive.current) { operation.current = null; setOpening(null); } }
+  };
+  const openMerged = async id => {
+    if (operation.current) return;
+    operation.current = { kind: 'open', id: `m${id}` }; setOpening(`m${id}`);
+    try { await nativeCall('playMergedVideo', { id, ...getPlaybackPreferences() }); }
     catch (error) { if (alive.current) notify(errorText(error)); }
     finally { if (alive.current) { operation.current = null; setOpening(null); } }
   };
@@ -450,6 +518,12 @@ function Downloads({ notify }) {
     if (item.status === 'success') group.done++;
     group.bytes += item.downloadedBytes || 0;
   });
+  // A merged video outlives the episodes it was built from: keep its group visible.
+  (state.merged || []).forEach(entry => {
+    if (!entry.seriesId || bySeries.has(entry.seriesId)) return;
+    const group = { seriesId: entry.seriesId, title: entry.title || '短剧', items: [], done: 0, bytes: 0 };
+    bySeries.set(entry.seriesId, group); seriesGroups.push(group);
+  });
   const groupOpen = group => openGroups === null ? seriesGroups.length <= 1 || group === seriesGroups[0] : openGroups.has(group.seriesId);
   const toggleGroup = group => {
     setOpenGroups(previous => {
@@ -463,33 +537,54 @@ function Downloads({ notify }) {
     setMerging(group.seriesId);
     try {
       const result = await nativeCall('mergeDownloads', { seriesId: group.seriesId }, 600000);
-      if (alive.current) notify(`已合并 ${result.episodes} 集为完整视频，保存在 ${result.location}`);
+      if (alive.current) notify(`已合并 ${result.episodes} 集 · 合并版已加入本剧分组，可直接播放`);
+      refresh(true);
     } catch (error) { if (alive.current) notify(errorText(error)); }
     finally { if (alive.current) setMerging(''); }
   };
+  const mergedOf = seriesId => (state.merged || []).filter(entry => entry.seriesId === seriesId);
   return <>
     <header className="page-heading heading-actions"><div><h1>下载</h1><p>系统下载任务与设备上的离线视频。</p></div><button ref={refreshButton} className="button" onClick={() => refresh(true)} disabled={state.busy || locked} aria-label="刷新下载列表"><RefreshCw /><span>刷新</span></button></header>
     {confirm && <div className="download-confirm" role="group" aria-label="确认删除下载">
-      <h2>{activeDownload(confirm) ? '取消并删除这个下载？' : '删除这个下载？'}</h2>
-      <p>{confirm.title || '短剧'} · 第 {confirm.index} 集</p>
-      <p>{activeDownload(confirm) ? '将取消下载，并删除本机视频文件和下载记录。' : '将删除本机视频文件和下载记录。'}收藏和观看历史会保留。</p>
+      {confirm.kind === 'episode' && <>
+        <h2>{activeDownload(confirm) ? '取消并删除这个下载？' : '删除这个下载？'}</h2>
+        <p>{confirm.title || '短剧'} · 第 {confirm.index} 集</p>
+        <p>{activeDownload(confirm) ? '将取消下载，并删除本机视频文件和下载记录。' : '将删除本机视频文件和下载记录。'}收藏和观看历史会保留。</p>
+      </>}
+      {confirm.kind === 'merged' && <>
+        <h2>删除这个合并版视频？</h2>
+        <p>{confirm.groupTitle || confirm.title || '短剧'} · 合并版 · {confirm.episodes} 集</p>
+        <p>将删除合并后的完整视频文件和记录，各单集下载不受影响。收藏和观看历史会保留。</p>
+      </>}
+      {confirm.kind === 'group' && <>
+        <h2>{confirm.active ? '取消并删除整部下载？' : '删除整部下载？'}</h2>
+        <p>{confirm.title} · {confirm.count} 集{confirm.mergedCount > 0 ? ` · 合并版 × ${confirm.mergedCount}` : ''}</p>
+        <p>将删除本剧全部离线视频（含未完成任务与合并版）及下载记录。收藏和观看历史会保留。</p>
+      </>}
       {deleteError && <p className="download-delete-error" role="alert">{deleteError}</p>}
       <div className="download-confirm-actions"><button ref={cancelButton} type="button" className="button" onClick={cancelConfirmation} disabled={deleting !== null}>取消</button><button type="button" className="button download-destructive" onClick={remove} disabled={deleting !== null}>{deleting !== null ? '删除中…' : '确认删除'}</button></div>
     </div>}
-    <Status busy={state.busy} error={state.error} preserve={!!state.items.length} onRetry={() => refresh(true)} empty={!state.items.length && { title: '还没有下载任务', text: '在短剧详情中选择一集，点「下载」；或多集用「批量下载」。' }}>
+    <Status busy={state.busy} error={state.error} preserve={!!state.items.length || !!(state.merged || []).length} onRetry={() => refresh(true)} empty={!state.items.length && !(state.merged || []).length && { title: '还没有下载任务', text: '在短剧详情中选择一集，点「下载」；或多集用「批量下载」。' }}>
       <div className="download-list" ref={list}>{seriesGroups.map(group => {
         const expanded = groupOpen(group);
         const doneLabel = group.done >= group.items.length ? `${group.items.length} 集` : `${group.done}/${group.items.length} 集`;
         const mergeInfo = mergeable.find(entry => entry.seriesId === group.seriesId);
+        const groupMerged = mergedOf(group.seriesId);
         return <div className="download-group" key={group.seriesId}>
           <div className="download-group-header">
             <button type="button" className="download-group-toggle" onClick={() => toggleGroup(group)} disabled={locked} aria-expanded={expanded}><strong>{group.title}</strong><span className="download-group-meta">{doneLabel} · {byteText(group.bytes)}</span><span className="download-group-chev">{expanded ? '收起' : '展开'}</span></button>
             {mergeInfo && <button type="button" className="button download-group-merge" disabled={locked || merging !== ''} onClick={() => merge(mergeInfo)}>{merging === group.seriesId ? '合并中…' : '合并本剧'}</button>}
+            <button type="button" className="button download-group-delete" aria-label={`删除整部 ${group.title}`} disabled={locked} onClick={() => askDeleteGroup(group, groupMerged.length)}>删除整部</button>
           </div>
           {expanded && group.items.map(item => {
             const percent = item.totalBytes > 0 ? Math.min(100, Math.max(0, Math.round(item.downloadedBytes / item.totalBytes * 100))) : null;
             return <article className="download-row" key={item.id}><div className="download-icon"><Download size={24} /></div><div className="download-info"><h2>第 {item.index} 集</h2><p className={item.status === 'failed' ? 'text-error' : ''}>{statuses[item.status] || item.status}{percent !== null && item.status !== 'success' ? ` · ${percent}%` : ''} · {byteText(item.downloadedBytes)}{item.totalBytes > 0 ? ` / ${byteText(item.totalBytes)}` : ''}</p>{item.status === 'running' && <progress value={percent ?? undefined} max="100" aria-label={`${group.title}第 ${item.index} 集下载进度`} />}{item.reason && item.status !== 'success' ? <p className="download-reason">{item.reason}</p> : null}</div><div className="download-actions">{item.status === 'success' && <button type="button" className="button" onClick={() => open(item.id)} disabled={locked}><Play />{opening === item.id ? '打开中…' : '播放'}</button>}<button type="button" className="button download-delete" aria-label={`${activeDownload(item) ? '取消并删除' : '删除'} ${group.title} 第 ${item.index} 集`} onClick={() => askDelete(item, group.items.indexOf(item))} disabled={locked}>{activeDownload(item) ? '取消并删除' : '删除'}</button></div></article>;
           })}
+          {expanded && groupMerged.map(entry => <article className="download-row merged-row" key={`m${entry.id}`}>
+            <div className="download-icon"><Film size={24} /></div>
+            <div className="download-info"><h2>合并版 · {entry.episodes} 集</h2><p className={entry.status === 'missing' ? 'text-error' : ''}>{entry.status === 'missing' ? '文件缺失 · 请重新合并' : `下载完成 · ${byteText(entry.bytes)}`}</p></div>
+            <div className="download-actions">{entry.status === 'success' && <button type="button" className="button" onClick={() => openMerged(entry.id)} disabled={locked}><Play />{opening === `m${entry.id}` ? '打开中…' : '播放'}</button>}<button type="button" className="button download-delete" aria-label={`删除 ${group.title} 合并版`} onClick={() => askDeleteMerged(entry, group)} disabled={locked}>删除</button></div>
+          </article>)}
         </div>;
       })}</div>
     </Status>

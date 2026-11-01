@@ -442,7 +442,12 @@
 .download-group-merge{flex-shrink:0;min-height:44px}
 .download-group .download-row{padding:12px 12px 12px 16px;border-top:1px solid var(--border)}
 .download-group .download-row:last-child{border-bottom:0}
-@media(max-width:599px){.download-group-header{flex-wrap:wrap;padding-top:6px;padding-bottom:6px}.download-group-merge{width:100%;justify-content:center}}
+@media(max-width:599px){.download-group-header{flex-wrap:wrap;padding-top:6px;padding-bottom:6px}.download-group-header .button{width:100%;justify-content:center}}
 .tv-layout .download-group-toggle strong{font-size:20px}
 .tv-layout .download-group-meta{font-size:16px}
 .tv-layout .download-group-toggle{min-height:64px}
+
+/* Whole-series delete + merged-video rows inside the downloads groups. */
+.download-group-delete{flex-shrink:0;min-height:44px}
+.merged-row .download-icon{color:var(--accent)}
+.merged-row .download-info h2{color:var(--accent)}

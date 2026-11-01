@@ -37,7 +37,7 @@ export const createSource=()=>({
 function installMock() {
   const sid='1234567890123456789';
   const episodes=Array.from({length:137},(_,i)=>({vid:String(2345678901234567890n+BigInt(i)),index:i+1,webAvailable:i<3,availability:i<3?'available':'unknown'}));
-  window.__mobileFixture={series:{seriesId:sid,title:'MOCK 长剧移动布局',episodeCount:137,description:"这是一段用于验证简介展开与收起的合成剧情。".repeat(20),episodes},calls:[],sources:[],searches:[],searchKeywords:[],sourcePlans:[],optionPlans:[],playPlans:[],options:{quality:'1080p',speed:1.5},activePlay:0,maxActivePlay:0,notes:[],downloaded:[],merged:[]};
+  window.__mobileFixture={series:{seriesId:sid,title:'MOCK 长剧移动布局',episodeCount:137,description:"这是一段用于验证简介展开与收起的合成剧情。".repeat(20),episodes},calls:[],sources:[],searches:[],searchKeywords:[],sourcePlans:[],optionPlans:[],playPlans:[],options:{quality:'1080p',speed:1.5},activePlay:0,maxActivePlay:0,notes:[],downloaded:[],merged:[],mergedRows:[],deleted:[]};
   const f=window.__mobileFixture;
   window.AndroidBridge={postMessage(raw){
     const m=JSON.parse(raw); f.calls.push(m);let result,error,delay=1;
@@ -47,8 +47,12 @@ function installMock() {
     else if(m.method==='setPlaybackOptions'){f.options={...f.options,...m.params};result={...f.options};}
     else if(m.method==='play'){const plan=f.playPlans.shift()||{};delay=plan.delay||1;error=plan.error;f.activePlay++;f.maxActivePlay=Math.max(f.maxActivePlay,f.activePlay);result={started:true};}
     else if(m.method==='download'){f.downloaded=f.downloaded||[];f.downloaded.push(m.params.episode&&m.params.episode.index);result={id:1};}
-    else if(m.method==='getDownloads')result=[{id:17,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:137,downloadedBytes:1234567,totalBytes:1234567},{id:18,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:136,downloadedBytes:1234567,totalBytes:1234567}];
-    else if(m.method==='mergeDownloads'){f.merged=f.merged||[];f.merged.push(m.params.seriesId);result={exported:true,episodes:2,location:'Movies/Hongguo/合并.mp4'};}
+    else if(m.method==='getDownloads')result=[{id:17,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:137,downloadedBytes:1234567,totalBytes:1234567},{id:18,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:136,downloadedBytes:1234567,totalBytes:1234567}].filter(x=>!(f.deleted||[]).includes(x.id));
+    else if(m.method==='getMergedVideos')result=[...(f.mergedRows||[])];
+    else if(m.method==='mergeDownloads'){f.merged=f.merged||[];f.merged.push(m.params.seriesId);f.mergedRows=f.mergedRows||[];f.mergedRows.push({id:91+f.mergedRows.length,title:'MOCK 下载名称较长的短剧用于移动布局检查 · 合并版',seriesId:m.params.seriesId,episodes:2,bytes:2469134,status:'success'});result={merged:true,episodes:2,title:'MOCK 下载名称较长的短剧用于移动布局检查'};}
+    else if(m.method==='deleteDownload'){f.deleted=f.deleted||[];f.deleted.push(m.params.id);result={id:m.params.id,deleted:true};}
+    else if(m.method==='deleteMergedVideo'){f.mergedRows=(f.mergedRows||[]).filter(x=>x.id!==m.params.id);result={id:m.params.id,deleted:true};}
+    else if(m.method==='playMergedVideo')result={started:true};
     else if(m.method==='playDownload')result={started:true};
     else if(m.method==='getPlaybackCache')result={files:0,bytes:0};
     else if(m.method==='clearPlaybackCache')result={removed:0,bytes:0};
@@ -241,7 +245,24 @@ try {
     check(await evaluate('[...document.querySelectorAll(".download-group .download-row")].length===2'),'both episodes list under the group header');
     await button('合并本剧');await wait('window.__mobileFixture.merged.length===1');
     eq(await evaluate('window.__mobileFixture.merged[0]'),'1234567890123456789','the merge request carries the exact series id');
-    await wait('document.querySelector(".toast")?.textContent.includes("已合并 2 集")','the export location is reported');
+    await wait('document.querySelector(".toast")?.textContent.includes("已合并 2 集")','the in-app placement is reported');
+    await wait('!!document.querySelector(".merged-row")','the merged video joins its series group');
+    check(await evaluate('document.querySelector(".merged-row h2").textContent.includes("合并版 · 2 集")'),'the merged row shows its episode span');
+    check(await evaluate('!![...document.querySelectorAll(".merged-row button")].find(b=>b.textContent.trim()==="播放")'),'the merged video is playable in place');
+  });
+  await group('GROUP-DELETE a whole series removes every episode and merged video',async()=>{
+    await reset();await button('下载');await sleep(60);
+    await button('合并本剧');await wait('(window.__mobileFixture.mergedRows||[]).length===1');
+    await wait('!!document.querySelector(".merged-row")');
+    check(await evaluate('document.querySelectorAll(".download-group .download-row").length===3'),'two episodes plus the merged row are listed');
+    await button('删除整部');
+    await wait('document.querySelector(".download-confirm")?.textContent.includes("删除整部下载？")','the whole-series confirm states its scope');
+    check(await evaluate('document.querySelector(".download-confirm").textContent.includes("合并版 × 1")'),'the confirm mentions the merged copy');
+    await button('确认删除');
+    await wait('(window.__mobileFixture.deleted||[]).length===2','both episode records are deleted');
+    await wait('(window.__mobileFixture.mergedRows||[]).length===0','the merged record is deleted too');
+    await wait('document.querySelector(".toast")?.textContent.includes("已删除整部《")','the completion is reported');
+    await wait('!document.querySelector(".download-group")','the group disappears from the list');
   });
   await group('ISOLATION no browser exceptions or external source/media requests',async()=>{eq(report.externalRequests,[],'zero external requests');eq(report.pageErrors,[],'zero runtime exceptions');});
   ws.close();ws=null;

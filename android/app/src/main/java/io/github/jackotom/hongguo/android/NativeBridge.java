@@ -32,7 +32,7 @@ final class NativeBridge {
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "mergeDownloads"));
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo"));
     NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
@@ -207,13 +207,12 @@ final class NativeBridge {
         }
     }
     private final java.util.concurrent.atomic.AtomicBoolean mergeBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
-    private static String seriesTitle(JSONArray records, String seriesId) {
+    private static JSONObject rowById(JSONArray records, long downloadId) {
         for (int at = 0; at < records.length(); at++) {
             JSONObject row = records.optJSONObject(at);
-            JSONObject series = row == null ? null : row.optJSONObject("series");
-            if (series != null && seriesId.equals(series.optString("seriesId")) && !row.optString("title", "").isEmpty()) return row.optString("title");
+            if (row != null && row.optLong("id", -1) == downloadId) return row;
         }
-        return "短剧 " + seriesId;
+        return null;
     }
     private void handle(Object id, String method, JSONObject params) throws Exception { handle(id, method, params, null, null); }
     private void handle(Object id, String method, JSONObject params, LibraryStore favoriteStore, AccountSync.Selection favoriteSelection) throws Exception {
@@ -254,23 +253,63 @@ final class NativeBridge {
                 final JSONArray records = store.downloads();
                 worker.execute(() -> {
                     File merged = null;
+                    File target = null;
                     try {
                         java.util.List<MergeDownloads.Source> sources = MergeDownloads.collect(activity, records, seriesId);
                         File directory = activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
                         if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new Exception("下载目录尚未准备");
                         merged = File.createTempFile("merge-", ".mp4", directory);
                         Mp4Concat.concat(sources.stream().map(source -> source.file).collect(java.util.stream.Collectors.toList()), merged);
-                        String title = sources.get(0).file.getName().startsWith(seriesId) ? seriesTitle(records, seriesId) : seriesTitle(records, seriesId);
-                        MergeDownloads.Export export = MergeDownloads.export(activity, merged, MergeDownloads.outputName(seriesTitle(records, seriesId), seriesId));
+                        JSONObject sourceRow = rowById(records, sources.get(0).id);
+                        if (sourceRow == null) throw new Exception("合并来源记录缺失，请刷新后重试");
+                        JSONObject series = LibraryStore.series(sourceRow.getJSONObject("series"));
+                        JSONObject episode = LibraryStore.episode(sourceRow.getJSONObject("episode"));
+                        target = MergeDownloads.relocate(directory, merged, seriesId);
                         merged = null;
-                        respond(id, new JSONObject().put("exported", true).put("episodes", sources.size()).put("location", export.location).put("uri", export.uri.toString()), null);
+                        long recordId = System.currentTimeMillis();
+                        while (store.mergedVideo(recordId) != null) recordId++;
+                        store.addMergedVideo(recordId, series, episode, sources.size(), target.getName());
+                        target = null;
+                        respond(id, new JSONObject().put("merged", true).put("id", recordId).put("episodes", sources.size()).put("title", series.getString("title")), null);
                     } catch (Exception error) {
+                        if (target != null && target.exists() && !target.delete()) { /* The orphan is ignored; its record was never written. */ }
                         respond(id, null, error.getMessage() == null ? "合并未完成，请重试" : error.getMessage());
                     } finally {
                         mergeBusy.set(false);
                         if (merged != null && merged.exists() && !merged.delete()) { /* A stale temporary is cleaned up by the next merge. */ }
                     }
                 });
+                break;
+            }
+            case "getMergedVideos": {
+                JSONArray rows = store.mergedVideos(), listing = new JSONArray();
+                java.io.File directory = activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                for (int i = 0; i < rows.length(); i++) {
+                    JSONObject row = rows.optJSONObject(i); if (row == null) continue;
+                    java.io.File file = LibraryStore.mergedFile(directory, row);
+                    listing.put(new JSONObject().put("id", row.getLong("id")).put("title", row.optString("title")).put("seriesId", row.optString("seriesId"))
+                        .put("episodes", row.optInt("episodes")).put("status", file == null ? "missing" : "success").put("bytes", file == null ? 0 : file.length()));
+                }
+                respond(id, listing, null); break;
+            }
+            case "deleteMergedVideo": {
+                long mergedId = DownloadDeletion.confirmedId(params);
+                JSONObject row = store.mergedVideo(mergedId);
+                if (row == null) throw new Exception("合并记录不存在，请刷新后重试");
+                java.io.File target = LibraryStore.mergedFile(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), row);
+                if (target != null && !java.nio.file.Files.deleteIfExists(target.toPath()))
+                    throw new Exception("合并视频文件删除未完成，请重试");
+                store.finishMergedVideo(mergedId);
+                respond(id, new JSONObject().put("id", mergedId).put("deleted", true), null); break;
+            }
+            case "playMergedVideo": {
+                long mergedId = params.optLong("id", -1);
+                JSONObject row = store.mergedVideo(mergedId);
+                if (row == null) throw new Exception("合并记录不存在，请刷新后重试");
+                java.io.File file = LibraryStore.mergedFile(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), row);
+                if (file == null) throw new Exception("合并视频文件已被移除");
+                JSONObject series = LibraryStore.series(row.getJSONObject("series")), episode = LibraryStore.episode(row.getJSONObject("episode"));
+                play(id, series, episode, new JSONArray().put(episode), Uri.fromFile(file).toString(), true, params);
                 break;
             }
             case "deleteDownload": {
