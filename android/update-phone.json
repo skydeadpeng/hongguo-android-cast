@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 55,
-  "versionName": "0.12.32",
+  "versionCode": 56,
+  "versionName": "0.12.33",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.32/Hongguo-0.12.32-phone-release-compatible.apk",
-  "size": 637740,
-  "sha256": "8cc5f434df8feb29d78aa8044c1dbd540754e324dac94879e2d0d29c939f7e08",
-  "notes": "播放界面新增上下滑动换集：在画面上向上滑切换下一集、向下滑切换上一集，与竖屏短剧的操作习惯一致；到头时会提示「已经是第一集 / 最后一集」。横着拖动或轻点不会误触换集，点按显示控制栏、拖进度条等原有操作不受影响。投屏时滑动同样切换投屏的分集。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-01T11:56:38.995Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.33/Hongguo-0.12.33-phone-release-compatible.apk",
+  "size": 638100,
+  "sha256": "393cdfea7563b6e0e621195a2bd9d2c8eb1fee719ff50b3cb8ebbf86e2b7e099",
+  "notes": "登录诊断与扫码指引更新：官网扫码验证的提示文案近期已改为“请使用「抖音 APP」扫码验证”，登录页现在会原样显示官网返回的扫码提示，按提示用对应 App 扫码即可；二维码下方也改为跟随官网指引。若扫码仍失败，错误信息后会附诊断码（如 qrcode_failed / poll_failed / qrcode_expired），向开发者反馈时提供该码可直接定位失败环节。服务端各登录环节（二维码获取、扫码轮询、设备登记、签名调用）已逐一实测可用。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T13:28:41.181Z"
 }
