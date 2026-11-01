@@ -71,6 +71,30 @@ public final class PlayerHudActivityTest {
         PlayerHudHarness dead = ready(); dead.onDestroy(); dead.main.advance(10000);
         check(dead.destroyed && dead.main.jobs.isEmpty() && dead.video.stops == 1 && dead.resolver.shutdown && dead.cacheWorker.shutdown, "destroy cleans timer plus existing playback workers");
         dead.showControls(); dead.sync(); check(dead.main.jobs.isEmpty(), "post-destroy callback cannot re-arm HUD");
-        System.out.println("PASS PlayerHudActivityTest checks=" + checks + " actualActivityMethods=true topAndBottomTogether=true phoneTouch=true tvWake=true lifecycle=true mediaInfo=true noNetwork=true deviceUntouched=true");
+        // Vertical swipes switch episodes; horizontal drags and short moves never do.
+        PlayerHudHarness swipes = ready(); swipes.current = 1;
+        for (int i = 0; i < 3; i++) swipes.queue.add(new JSONObject());
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_DOWN, 100, 400));
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_UP, 96, 200));
+        check(swipes.moveCalls == 1 && swipes.lastMove == 1 && swipes.current == 2, "an upward swipe advances to the next episode");
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_DOWN, 100, 200));
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_UP, 100, 430));
+        check(swipes.moveCalls == 2 && swipes.lastMove == -1 && swipes.current == 1, "a downward swipe returns to the previous episode");
+        int moves = swipes.moveCalls;
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_DOWN, 100, 200));
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_UP, 320, 210));
+        check(swipes.moveCalls == moves && Toast.messages.isEmpty(), "a horizontal drag never switches episodes");
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_DOWN, 100, 200));
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_UP, 100, 230));
+        check(swipes.moveCalls == moves && Toast.messages.isEmpty(), "a short vertical drag is ignored");
+        swipes.current = 0;
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_DOWN, 100, 200));
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_UP, 100, 440));
+        check(swipes.moveCalls == moves && Toast.messages.size() == 1 && Toast.messages.get(0).equals("已经是第一集"), "the first episode reports the boundary instead of moving");
+        swipes.current = 2;
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_DOWN, 100, 400));
+        swipes.video.touch.touch(swipes.video, new MotionEvent(MotionEvent.ACTION_UP, 100, 180));
+        check(swipes.moveCalls == moves && Toast.messages.size() == 2 && Toast.messages.get(1).equals("已经是最后一集"), "the last episode reports the boundary instead of moving");
+        System.out.println("PASS PlayerHudActivityTest checks=" + checks + " actualActivityMethods=true topAndBottomTogether=true phoneTouch=true swipeEpisode=true tvWake=true lifecycle=true mediaInfo=true noNetwork=true deviceUntouched=true");
     }
 }

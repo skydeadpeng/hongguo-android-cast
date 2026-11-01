@@ -329,7 +329,21 @@ public final class PlayerActivity extends Activity {
     }
     private void installVideoTouch(VideoView view) {
         // Consume the reveal tap so it never also pauses/seeks or activates a newly shown button.
-        view.setOnTouchListener((target, event) -> true);
+        // A vertical swipe switches episodes: up for next, down for previous, short-drama style.
+        final float[] down = new float[2];
+        view.setOnTouchListener((target, event) -> {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) { down[0] = event.getX(); down[1] = event.getY(); return true; }
+            if (action == MotionEvent.ACTION_UP) {
+                float dx = event.getX() - down[0], dy = event.getY() - down[1];
+                if (Math.abs(dy) >= dp(72) && Math.abs(dy) >= Math.abs(dx) * 2) {
+                    if (dy < 0 && current + 1 < queue.size()) { move(1); return true; }
+                    if (dy > 0 && current > 0) { move(-1); return true; }
+                    Toast.makeText(this, dy < 0 ? "已经是最后一集" : "已经是第一集", Toast.LENGTH_SHORT).show();
+                }
+            }
+            return true;
+        });
     }
     private boolean canHideControls() {
         if (casting()) return false;

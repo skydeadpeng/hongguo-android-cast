@@ -63,7 +63,14 @@ final class KeyEvent {
  final int action,key; KeyEvent(int action,int key){this.action=action;this.key=key;} int getAction(){return action;}int getKeyCode(){return key;}
 }
 final class MotionEvent {
- static final int ACTION_DOWN=0,ACTION_UP=1,ACTION_CANCEL=3;final int action;MotionEvent(int action){this.action=action;}int getAction(){return action;}int getActionMasked(){return action;}
+ static final int ACTION_DOWN=0,ACTION_UP=1,ACTION_CANCEL=3;final int action;final float x,y;
+ MotionEvent(int action){this(action,0,0);}MotionEvent(int action,float x,float y){this.action=action;this.x=x;this.y=y;}
+ int getAction(){return action;}int getActionMasked(){return action;}float getX(){return x;}float getY(){return y;}
+}
+final class Toast {
+ static final int LENGTH_SHORT=0,LENGTH_LONG=1;static final List<String> messages=new ArrayList<>();
+ static Toast makeText(Object context,String text,int duration){Toast toast=new Toast();messages.add(text);return toast;}
+ void show(){}
 }
 class View {
  static final int VISIBLE=0,GONE=8;static View focused; int visibility=VISIBLE;boolean enabled=true;
@@ -110,7 +117,11 @@ final class PlayerHudHarness extends HudActivityBase {
  // Source recovery is outside the HUD boundary, separately exercised by PlaybackFailureActivityTest.
  void failCurrentMedia(int token,String reason,boolean unsupported){}
  void saveProgress(){saves++;}void releaseCurrent(){}void cancelQualitySwitch(){}void discardPendingMedia(){}
- void togglePlayback(){toggleCalls++;video.playing=!video.playing;userPaused=!video.playing;sync();}void move(int delta){}void updateButtons(){sync();}void seekBy(int delta){seekCalls++;}
+ void togglePlayback(){toggleCalls++;video.playing=!video.playing;userPaused=!video.playing;sync();}
+ int current;final List<JSONObject> queue=new ArrayList<>();int moveCalls,lastMove;
+ void move(int delta){moveCalls++;lastMove=delta;current+=delta;}
+ void updateButtons(){sync();}void seekBy(int delta){seekCalls++;}
+ int dp(int n){return n;}
  ACTIVITY_METHODS
 }
 '''
