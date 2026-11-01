@@ -28,6 +28,11 @@ final class UpstreamDeviceRegister {
     private UpstreamDeviceRegister() { }
 
     static Identity register() throws Exception {
+        return register(null);
+    }
+
+    /** Registers with an optional web-session Cookie header so the identity may bind to the account. */
+    static Identity register(String cookieHeader) throws Exception {
         long now = System.currentTimeMillis();
         String cdid = UUID.randomUUID().toString();
         JSONObject custom = new JSONObject()
@@ -67,6 +72,7 @@ final class UpstreamDeviceRegister {
         headers.put("passport-sdk-version", "5051452");
         headers.put("x-neptune", "-8|50:51:59:30:40:47:49:39");
         headers.put("x-ss-stub", DanmakuSigner.hex(DanmakuSigner.md5(body)).toUpperCase(java.util.Locale.ROOT));
+        if (cookieHeader != null && !cookieHeader.isEmpty()) headers.put("Cookie", cookieHeader);
         String raw = AppTransport.upstreamRegisterPost(URL, headers, body, System.nanoTime() + 10_000_000_000L);
         JSONObject reply;
         try { reply = new JSONObject(raw); }

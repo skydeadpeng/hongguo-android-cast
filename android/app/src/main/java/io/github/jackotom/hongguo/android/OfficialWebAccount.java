@@ -213,7 +213,7 @@ final class OfficialWebAccount {
                 client=cloudClient();
                 JSONObject reply=client.cloud("/reading/user/info/v1/","GET",new JSONObject(),null,false);
                 JSONObject data=reply.optJSONObject("data");
-                String answered=data==null?"":data.optString("user_id_str",data.optString("user_id",""));
+                String answered=answeredAccount(data,uid());
                 if(!answered.isEmpty()){
                     synchronized(lock){
                         if(profile!=null&&uid().equals(answered)){cloudReady=true;AccountLog.warn("official_web_cloud_ready:lane="+lane);return true;}
@@ -254,12 +254,25 @@ final class OfficialWebAccount {
         identity=upstreamIdentity();
         JSONObject reply=upstreamCall("/reading/user/info/v1/",new java.util.LinkedHashMap<>(),null,identity,cookie);
         JSONObject data=reply.optJSONObject("data");
-        String answered=data==null?"":data.optString("user_id_str",data.optString("user_id",""));
+        String answered=answeredAccount(data,uid());
         if(!answered.isEmpty()&&answered.equals(uid())){
             synchronized(lock){cloudReady=true;cloudLane=LANE_UPSTREAM;AccountLog.warn("official_web_cloud_ready:lane=upstream_72232");return true;}
         }
         AccountLog.warn("official_web_cloud_lane_mismatch:lane=upstream_72232 answered="+(answered.isEmpty()?"none":answered.equals(uid())?"match":"different"));
         return false;
+    }
+    /**
+     * The account id an answered profile names. Newer responses carry an obfuscated
+     * user_id_str and put the numeric id at the head of req_id; both spellings count.
+     */
+    private static String answeredAccount(JSONObject data,String expectedUid){
+        if(data==null)return "";
+        String answered=data.optString("user_id_str",data.optString("user_id","")).trim();
+        if(answered.matches("\\d{6,30}"))return answered;
+        long reqId=data.optLong("req_id",0);
+        if(reqId<=0||expectedUid==null||expectedUid.length()<10)return "";
+        String digits=String.valueOf(reqId);
+        return digits.startsWith(expectedUid)?digits:"";
     }
     /** The registered 72232 identity for this web session, created once and reused. */
     private UpstreamDeviceRegister.Identity upstreamIdentity() throws Exception {
