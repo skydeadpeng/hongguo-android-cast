@@ -1,6 +1,6 @@
-# 红果 Android Cast
+# 红果 Android Cast（红果短剧 Hongguo Drama）
 
-**手机选剧，电视接着看。** 面向 Android 手机与 Android TV 的独立客户端，支持局域网 DLNA 视频投屏：手机选电视、选集控播，同季自动连播，提前缓存后 5 集，看过的临时缓存自动清理。
+**红果短剧的 Android 客户端：手机选剧，电视接着看。** 面向 Android 手机与 Android TV，看红果短剧（免费短剧平台）的独立客户端，支持局域网 DLNA 视频投屏：手机选电视、选集控播，同季自动连播，提前缓存后 5 集，看过的临时缓存自动清理。支持按剧分组下载、整部无损合并导出、扫码登录后云同步收藏与观看进度。
 
 [下载手机 / TV 版](https://github.com/skydeadpeng/hongguo-android-cast/releases) · [Android 详细说明](ANDROID.md) · [应用内更新](docs/ANDROID-UPDATES.md) · [上游项目](https://github.com/jackotom/hongguo-drama)
 

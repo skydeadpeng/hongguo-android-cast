@@ -4,12 +4,16 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/**
- * Sample-level MP4 concatenation for casting windows. This is a remux, never a
- * transcode: files merge only when every input declares byte-identical sample
- * descriptions per track and identical timescales, mirroring the desktop merge's
- * copy-vs-encode gate. Anything incompatible is rejected, not silently degraded.
- */
+    /**
+     * Sample-level MP4 concatenation for casting windows. This is a remux, never a
+     * transcode: files merge only when every input declares byte-identical sample
+     * descriptions per track and identical timescales, mirroring the desktop merge's
+     * copy-vs-encode gate. Anything incompatible is rejected, not silently degraded.
+     *
+     * Edit lists are chained rather than dropped: an encoder's priming trim (the usual
+     * {@code media_time=1024}) must stay in front of every episode, otherwise the first
+     * frames of each input would leak into the merged presentation.
+     */
 public final class Mp4Concat {
     private Mp4Concat() {}
 
@@ -46,7 +50,40 @@ public final class Mp4Concat {
     }
     private static long u32(byte[] data,long offset){ return ((data[(int)offset]&0xffL)<<24)|((data[(int)offset+1]&0xffL)<<16)|((data[(int)offset+2]&0xffL)<<8)|(data[(int)offset+3]&0xffL); }
     private static long u64(byte[] data,long offset){ return (u32(data,offset)<<32)|u32(data,offset+4); }
+    private static int u16(byte[] data,long offset){ return ((data[(int)offset]&0xff)<<8)|(data[(int)offset+1]&0xff); }
     private static int fullBoxVersion(byte[] body){ return body[0]&0xff; }
+
+    /**
+     * Reads a track's edit list. The list maps the presentation timeline onto the media
+     * timeline: every entry names a segment duration in movie timescale and the media time
+     * it starts at, where -1 marks an empty (gap) segment. Encoder priming offsets such as
+     * AAC's leading 1024 samples live here, so the list must survive a merge instead of
+     * being dropped.
+     */
+    private static void readEdits(Box edts,Track track) throws IOException {
+        Box elst=child(edts.body,0,edts.body.length,"elst");
+        if (elst==null) throw new IOException("编辑列表缺少 elst");
+        byte[] body=elst.body;
+        if (body.length<8) throw new IOException("编辑列表无效");
+        int version=fullBoxVersion(body);
+        if (version!=0&&version!=1) throw new IOException("编辑列表版本不支持");
+        long count=u32(body,4);
+        if (count>16) throw new IOException("编辑列表条目过多");
+        int size=version==1?20:12;
+        if (body.length<8+count*size) throw new IOException("编辑列表无效");
+        long[] durations=new long[(int)count],mediaTimes=new long[(int)count];
+        for (int i=0;i<count;i++) {
+            int at=8+i*size;
+            long duration=version==1?u64(body,at):u32(body,at);
+            long mediaTime=version==1?u64(body,at+8):(long)(int)u32(body,at+4);
+            int rateInteger=(short)u16(body,at+(version==1?16:8));
+            int rateFraction=(short)u16(body,at+(version==1?18:10));
+            if (rateInteger!=1||rateFraction!=0) throw new IOException("编辑列表变速，不支持合并");
+            durations[i]=duration; mediaTimes[i]=mediaTime;
+        }
+        if (count==0) return; // An empty list edits nothing.
+        track.editDurations=durations; track.editMediaTimes=mediaTimes; track.hasEdits=true;
+    }
 
     /** Parsed sample tables of one input file. */
     private static final class Track {
@@ -54,11 +91,23 @@ public final class Mp4Concat {
         List<long[]> stts=new ArrayList<>(); List<long[]> ctts=null; boolean hasCtts;
         long[] stscFirstChunk, stscSamples, stscDescription; long[] stszSizes; long stszFixed; int cttsVersion;
         long[] chunkOffsets; boolean co64; long[] stss; boolean hasStss;
+        long decodeDuration; long[] editDurations, editMediaTimes; boolean hasEdits;
         long sampleCount() { return stszFixed>0?stszFixed:stszSizes.length; }
+        /** Presentation length of this track in movie timescale. */
+        long presentationDuration() {
+            if (!hasEdits) return tkhdDuration;
+            long total=0; for (long duration: editDurations) total+=duration;
+            return total;
+        }
     }
     private static final class Input {
         File file; byte[] ftyp, moov; long mvhdTimescale, mvhdDuration; final List<Track> tracks=new ArrayList<>();
         long dataStart=Long.MAX_VALUE, dataEnd=Long.MIN_VALUE;
+    }
+    /** A track's merged edit list plus the presentation length it covers, in movie timescale. */
+    private static final class MergedEdits {
+        final byte[] elst; final long duration;
+        MergedEdits(byte[] elst,long duration){this.elst=elst;this.duration=duration;}
     }
 
     private static Input parse(File file) throws IOException {
@@ -86,7 +135,8 @@ public final class Mp4Concat {
             track.tkhdDuration=tkVersion==0?u32(tkhd.body,20):u64(tkhd.body,28);
             Box mdia=child(item.body,0,item.body.length,"mdia");
             if (mdia==null) throw new IOException("缺少 mdia");
-            if (child(item.body,0,item.body.length,"edts")!=null) throw new IOException("包含编辑列表，不支持合并");
+            Box edts=child(item.body,0,item.body.length,"edts");
+            if (edts!=null) readEdits(edts,track);
             Box mdhd=child(mdia.body,0,mdia.body.length,"mdhd");
             if (mdhd==null) throw new IOException("缺少 mdhd");
             int mdVersion=fullBoxVersion(mdhd.body);
@@ -118,7 +168,7 @@ public final class Mp4Concat {
                 }
                 case "stts": {
                     long count=u32(b,4);
-                    for (long i=0;i<count;i++) track.stts.add(new long[]{u32(b,8+i*8),u32(b,12+i*8)});
+                    for (long i=0;i<count;i++) { long samples=u32(b,8+i*8),delta=u32(b,12+i*8); track.stts.add(new long[]{samples,delta}); track.decodeDuration+=samples*delta; }
                     declared+=track.stts.stream().mapToLong(e->e[0]).sum();
                     break;
                 }
@@ -200,6 +250,9 @@ public final class Mp4Concat {
                 if (a.hasStss!=b.hasStss) throw new IOException(INCOMPATIBLE_PREFIX+"关键帧表不同");
                 if ((a.stszFixed>0)!=(b.stszFixed>0)) throw new IOException(INCOMPATIBLE_PREFIX+"样本大小表形式不同");
                 if (a.co64!=b.co64) { /* offsets widen freely; tables stay valid */ }
+                // Every input must present the same way, or the merged timeline would drift.
+                if (a.hasEdits!=b.hasEdits) throw new IOException(INCOMPATIBLE_PREFIX+"编辑列表配置不同");
+                if (a.hasEdits&&a.editDurations.length!=b.editDurations.length) throw new IOException(INCOMPATIBLE_PREFIX+"编辑列表条目数不同");
             }
         }
         // Pass 1: build tables with zero offsets to learn the moov size, then pass 2 with real offsets.
@@ -240,6 +293,52 @@ public final class Mp4Concat {
         }
         return timings;
     }
+
+    /**
+     * Chains the per-input edit lists into one list for the merged track. Every input's
+     * media times are shifted by the media already written for the preceding inputs, so an
+     * encoder's priming trim stays in front of each episode instead of only the first:
+     * without it the first 1024 samples of every episode would be played out loud.
+     *
+     * A leading empty edit (media time -1) is the file's own start padding. Only the first
+     * episode keeps it; repeating it would insert a gap between every pair of episodes.
+     */
+    private static MergedEdits mergedEdits(int index,List<Input> inputs) throws IOException {
+        Track first=inputs.get(0).tracks.get(index);
+        if (!first.hasEdits) return new MergedEdits(null,0);
+        List<Long> durations=new ArrayList<>(),mediaTimes=new ArrayList<>();
+        long offset=0;
+        for (int i=0;i<inputs.size();i++) {
+            Track track=inputs.get(i).tracks.get(index);
+            int start=0;
+            while (i>0&&start<track.editDurations.length&&track.editMediaTimes[start]<0) start++; // drop a repeated lead-in gap
+            for (int e=start;e<track.editDurations.length;e++) {
+                durations.add(track.editDurations[e]);
+                mediaTimes.add(track.editMediaTimes[e]<0?-1:track.editMediaTimes[e]+offset);
+            }
+            // The next input's media starts where this one ended on the merged timeline.
+            offset+=track.decodeDuration;
+        }
+        long total=0; for (long duration: durations) total+=duration;
+        return new MergedEdits(editList(durations,mediaTimes),total);
+    }
+
+    /** Builds an elst box: version 0 with 32-bit entries, version 1 when values overflow. */
+    private static byte[] editList(List<Long> durations,List<Long> mediaTimes) throws IOException {
+        boolean wide=false;
+        for (int i=0;i<durations.size();i++) if (durations.get(i)>0xFFFFFFFFL||mediaTimes.get(i)>Integer.MAX_VALUE||mediaTimes.get(i)<Integer.MIN_VALUE) wide=true;
+        ByteArrayOutputStream body=new ByteArrayOutputStream();
+        body.write(wide?1:0); // version
+        body.write(0); body.write(0); body.write(0); // flags
+        writeU32(body,durations.size());
+        for (int i=0;i<durations.size();i++) {
+            if (wide) { writeU64(body,durations.get(i)); writeU64(body,mediaTimes.get(i)); }
+            else { writeU32(body,durations.get(i)); writeU32(body,mediaTimes.get(i)); }
+            body.write(0); body.write(1); // media_rate_integer 1
+            body.write(0); body.write(0); // media_rate_fraction 0
+        }
+        return box("elst",body.toByteArray());
+    }
     private static boolean needsCo64(List<Input> inputs) {
         long total=0;
         for (Input input: inputs) total+=input.dataEnd-input.dataStart;
@@ -247,16 +346,23 @@ public final class Mp4Concat {
     }
     private static byte[] buildMoov(List<Input> inputs,boolean co64,long base) throws IOException {
         Input first=inputs.get(0);
+        // A track's movie duration is its presentation length; the movie is the longest track.
+        long[] trackTotals=new long[first.tracks.size()];
+        for (int t=0;t<trackTotals.length;t++) {
+            long sum=0; for (Input input: inputs) sum+=input.tracks.get(t).presentationDuration();
+            trackTotals[t]=sum;
+        }
+        long mvhdTotal=0;
+        for (long total: trackTotals) mvhdTotal=Math.max(mvhdTotal,total);
         // Walk the first moov, splicing replaced boxes.
         ByteArrayOutputStream out=new ByteArrayOutputStream();
         for (Box top: children(first.moov,8,first.moov.length)) {
-            if (top.type.equals("mvhd")) { out.write(box("mvhd",replaceMvhdDuration(top.body,total(inputs,i->i.mvhdDuration)))); continue; }
+            if (top.type.equals("mvhd")) { out.write(box("mvhd",replaceMvhdDuration(top.body,mvhdTotal))); continue; }
             if (!top.type.equals("trak")) { out.write(slice(first.moov,top)); continue; }
             int index=trakIndex(first,top.start);
-            Track reference=first.tracks.get(index);
-            long mdhdTotal=0, tkhdTotal=0;
-            for (Input input: inputs) { mdhdTotal+=input.tracks.get(index).mdhdDuration; tkhdTotal+=input.tracks.get(index).tkhdDuration; }
-            out.write(box("trak",rebuildTrak(first,top,index,inputs,co64,base,mdhdTotal,tkhdTotal)));
+            long mdhdTotal=0;
+            for (Input input: inputs) mdhdTotal+=input.tracks.get(index).mdhdDuration;
+            out.write(box("trak",rebuildTrak(first,top,index,inputs,co64,base,mdhdTotal,trackTotals[index])));
         }
         return box("moov",out.toByteArray());
     }
@@ -268,8 +374,11 @@ public final class Mp4Concat {
     private static byte[] slice(byte[] source,Box box) { return Arrays.copyOfRange(source,(int)box.start,(int)box.end); }
     private static byte[] rebuildTrak(Input first,Box trak,int index,List<Input> inputs,boolean co64,long base,long mdhdTotal,long tkhdTotal) throws IOException {
         ByteArrayOutputStream out=new ByteArrayOutputStream();
+        MergedEdits edits=mergedEdits(index,inputs);
         for (Box item: children(trak.body,0,trak.body.length)) {
             if (item.type.equals("tkhd")) { out.write(box("tkhd",replaceTkhdDuration(item.body,tkhdTotal))); continue; }
+            // The source edit list describes its own media times; the merged one is rebuilt.
+            if (item.type.equals("edts")) { if (edits.elst!=null) out.write(box("edts",edits.elst)); continue; }
             if (!item.type.equals("mdia")) { out.write(slice(trak.body,item)); continue; }
             ByteArrayOutputStream mdia=new ByteArrayOutputStream();
             for (Box part: children(item.body,0,item.body.length)) {
@@ -301,8 +410,6 @@ public final class Mp4Concat {
         }
         return out.toByteArray();
     }
-    private interface LongOf { long value(Input input); }
-    private static long total(List<Input> inputs,LongOf picker) { long sum=0; for (Input input: inputs) sum+=picker.value(input); return sum; }
     private static byte[] replaceMvhdDuration(byte[] body,long duration) {
         byte[] copy=body.clone();
         int version=fullBoxVersion(copy);
