@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 52,
-  "versionName": "0.12.29",
+  "versionCode": 53,
+  "versionName": "0.12.30",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.29/Hongguo-0.12.29-tv-release-compatible.apk",
-  "size": 633480,
-  "sha256": "220f7f8809bf0d44af2689f8cf938be7f2cdfb9039336a0415c28391c370ee05",
-  "notes": "合并结果不再只留一个「Movies/Hongguo/xxx.mp4」的路径提示：合并完成的整部视频直接回到下载页该剧的分组里，显示为「合并版 · N 集」，可就地播放、也可单独删除；提示文案改为「已合并 N 集 · 合并版已加入本剧分组，可直接播放」。合并文件保存在应用自己的下载目录，卸载或清理相册不会再出现找不到的「编辑」条目。\n下载页每个剧分组新增「删除整部」：一次删除本剧全部单集下载（含未完成任务）与合并版文件，删除前会明确说明范围，收藏和观看历史保留；单集「删除」保持原样。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-01T05:45:30.494Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.30/Hongguo-0.12.30-tv-release-compatible.apk",
+  "size": 634724,
+  "sha256": "d9bdba0a0e6f93b8249c8acc4c34a0464942121857420a0a9bf4dbafa76e0bc6",
+  "notes": "修复「合并本剧」报错“包含编辑列表，不支持合并”：上一版合并器遇到带编辑列表（edts/elst）的 MP4 会直接拒绝，而实际下载的分集几乎都带（编码器音频对齐标记），导致真机合并必然失败。现在合并器改为正确处理编辑列表：每集的音频对齐修剪在合并后逐集保留，输出经过真实 ffmpeg 生成文件的对拍验证（视频逐帧一致、整段可解码），时长与换集点不受影响。\n仓库介绍补充“红果短剧”说明与关键词，搜索“红果”即可找到本项目。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T10:58:12.307Z"
 }
