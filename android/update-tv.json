@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 54,
-  "versionName": "0.12.31",
+  "versionCode": 55,
+  "versionName": "0.12.32",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.31/Hongguo-0.12.31-tv-release-compatible.apk",
-  "size": 635528,
-  "sha256": "d8951e17e9e2b5d1f7c384dd9b6bf4f975d72c03b97d5331a10cb375845725be",
-  "notes": "修复「合并本剧」提示“分集编码参数不一致，无法无损合并：编码配置不同/音轨参数不同”的问题：之前各分集只要编码参数有一处不同（清晰度、码率、音轨配置、关键帧表、编辑列表差异）整批就拒绝合并。现在合并器改为保留每集自己的编码参数再拼接：不同清晰度/码率的分集可以合并，输出按集切换解码配置；音频修剪、关键帧表、样本大小表差异自动归一。仅当编码类型本身不同（如 H.264 混 H.265）或轨道缺失时才拒绝。已用真实 ffmpeg 生成的不同分辨率文件对拍验证：混合参数合并成功、全片可解码、相同参数合并逐帧一致。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-01T11:38:36.570Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.32/Hongguo-0.12.32-tv-release-compatible.apk",
+  "size": 635916,
+  "sha256": "34bd11788b7cb49b926f7fe35fe2a7fa8f3e3f9449db1bea181abffb520f29db",
+  "notes": "播放界面新增上下滑动换集：在画面上向上滑切换下一集、向下滑切换上一集，与竖屏短剧的操作习惯一致；到头时会提示「已经是第一集 / 最后一集」。横着拖动或轻点不会误触换集，点按显示控制栏、拖进度条等原有操作不受影响。投屏时滑动同样切换投屏的分集。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T11:56:39.520Z"
 }
