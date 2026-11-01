@@ -244,15 +244,12 @@ public final class Mp4Concat {
             for (int t=0;t<first.tracks.size();t++) {
                 Track a=first.tracks.get(t), b=input.tracks.get(t);
                 if (!a.handler.equals(b.handler)) throw new IOException(INCOMPATIBLE_PREFIX+"轨道类型不同");
-                if (!Arrays.equals(a.stsd,b.stsd)) throw new IOException(INCOMPATIBLE_PREFIX+"第"+(t+1)+"轨编码配置不同");
+                // Different encoder settings stay mergeable: every input keeps its own sample
+                // description, so only the codec family itself must agree.
+                if (!entryType(a.stsd).equals(entryType(b.stsd))) throw new IOException(INCOMPATIBLE_PREFIX+"第"+(t+1)+"轨编码类型不同");
                 if (a.mdhdTimescale!=b.mdhdTimescale) throw new IOException(INCOMPATIBLE_PREFIX+"轨道时间标度不同");
-                if (a.hasCtts!=b.hasCtts) throw new IOException(INCOMPATIBLE_PREFIX+"ctts 配置不同");
-                if (a.hasStss!=b.hasStss) throw new IOException(INCOMPATIBLE_PREFIX+"关键帧表不同");
-                if ((a.stszFixed>0)!=(b.stszFixed>0)) throw new IOException(INCOMPATIBLE_PREFIX+"样本大小表形式不同");
                 if (a.co64!=b.co64) { /* offsets widen freely; tables stay valid */ }
-                // Every input must present the same way, or the merged timeline would drift.
-                if (a.hasEdits!=b.hasEdits) throw new IOException(INCOMPATIBLE_PREFIX+"编辑列表配置不同");
-                if (a.hasEdits&&a.editDurations.length!=b.editDurations.length) throw new IOException(INCOMPATIBLE_PREFIX+"编辑列表条目数不同");
+                // ctts, stss, stsz form and edit-list differences are all normalized while merging.
             }
         }
         // Pass 1: build tables with zero offsets to learn the moov size, then pass 2 with real offsets.
@@ -304,21 +301,26 @@ public final class Mp4Concat {
      * episode keeps it; repeating it would insert a gap between every pair of episodes.
      */
     private static MergedEdits mergedEdits(int index,List<Input> inputs) throws IOException {
-        Track first=inputs.get(0).tracks.get(index);
-        if (!first.hasEdits) return new MergedEdits(null,0);
+        boolean any=false;
+        for (Input input: inputs) if (input.tracks.get(index).hasEdits) { any=true; break; }
+        if (!any) return new MergedEdits(null,0);
         List<Long> durations=new ArrayList<>(),mediaTimes=new ArrayList<>();
         long offset=0;
         for (int i=0;i<inputs.size();i++) {
             Track track=inputs.get(i).tracks.get(index);
+            // An episode without an edit list needs no segment; its media presents in order.
             int start=0;
-            while (i>0&&start<track.editDurations.length&&track.editMediaTimes[start]<0) start++; // drop a repeated lead-in gap
-            for (int e=start;e<track.editDurations.length;e++) {
-                durations.add(track.editDurations[e]);
-                mediaTimes.add(track.editMediaTimes[e]<0?-1:track.editMediaTimes[e]+offset);
+            if (track.hasEdits) {
+                while (i>0&&start<track.editDurations.length&&track.editMediaTimes[start]<0) start++; // drop a repeated lead-in gap
+                for (int e=start;e<track.editDurations.length;e++) {
+                    durations.add(track.editDurations[e]);
+                    mediaTimes.add(track.editMediaTimes[e]<0?-1:track.editMediaTimes[e]+offset);
+                }
             }
             // The next input's media starts where this one ended on the merged timeline.
             offset+=track.decodeDuration;
         }
+        if (durations.isEmpty()) return new MergedEdits(null,0);
         long total=0; for (long duration: durations) total+=duration;
         return new MergedEdits(editList(durations,mediaTimes),total);
     }
@@ -375,10 +377,15 @@ public final class Mp4Concat {
     private static byte[] rebuildTrak(Input first,Box trak,int index,List<Input> inputs,boolean co64,long base,long mdhdTotal,long tkhdTotal) throws IOException {
         ByteArrayOutputStream out=new ByteArrayOutputStream();
         MergedEdits edits=mergedEdits(index,inputs);
+        boolean editsWritten=false;
         for (Box item: children(trak.body,0,trak.body.length)) {
             if (item.type.equals("tkhd")) { out.write(box("tkhd",replaceTkhdDuration(item.body,tkhdTotal))); continue; }
             // The source edit list describes its own media times; the merged one is rebuilt.
-            if (item.type.equals("edts")) { if (edits.elst!=null) out.write(box("edts",edits.elst)); continue; }
+            if (item.type.equals("edts")) { editsWritten=true; if (edits.elst!=null) out.write(box("edts",edits.elst)); continue; }
+            if (item.type.equals("mdia")&&edits.elst!=null&&!editsWritten) {
+                // The first episode had no edits but later ones do: add the box before mdia.
+                out.write(box("edts",edits.elst)); editsWritten=true;
+            }
             if (!item.type.equals("mdia")) { out.write(slice(trak.body,item)); continue; }
             ByteArrayOutputStream mdia=new ByteArrayOutputStream();
             for (Box part: children(item.body,0,item.body.length)) {
@@ -396,19 +403,57 @@ public final class Mp4Concat {
         return out.toByteArray();
     }
     private static byte[] rebuildStbl(int index,List<Input> inputs,boolean co64,long base,Box original) throws IOException {
+        // One sample description per input keeps every episode's own encoder settings.
+        byte[] firstStsd=inputs.get(0).tracks.get(index).stsd;
+        boolean identicalStsd=true;
+        int[] descriptionBases=new int[inputs.size()];
+        int running=0;
+        for (int i=0;i<inputs.size();i++) {
+            byte[] stsd=inputs.get(i).tracks.get(index).stsd;
+            if (!Arrays.equals(firstStsd,stsd)) identicalStsd=false;
+            descriptionBases[i]=running;
+            running+=stsd.length>=8?(int)u32(stsd,4):1;
+        }
+        boolean anyCtts=false;
+        for (Input input: inputs) if (input.tracks.get(index).hasCtts) anyCtts=true;
         ByteArrayOutputStream out=new ByteArrayOutputStream();
         for (Box table: children(original.body,0,original.body.length)) {
             switch (table.type) {
+                case "stsd": out.write(box("stsd",mergedStsd(index,inputs,identicalStsd))); break;
                 case "stts": out.write(box("stts",mergedStts(index,inputs))); break;
                 case "ctts": out.write(box("ctts",mergedCtts(index,inputs))); break;
-                case "stsc": out.write(box("stsc",mergedStsc(index,inputs))); break;
+                case "stsc": out.write(box("stsc",mergedStsc(index,inputs,identicalStsd,descriptionBases))); break;
                 case "stsz": out.write(box("stsz",mergedStsz(index,inputs))); break;
                 case "stco": case "co64": out.write(box(co64?"co64":"stco",mergedOffsets(index,inputs,co64,base))); break;
-                case "stss": out.write(box("stss",mergedStss(index,inputs))); break;
+                case "stss": { byte[] stss=mergedStss(index,inputs); if (stss!=null) out.write(box("stss",stss)); break; }
                 default: out.write(slice(original.body,table)); break;
             }
         }
+        // First episode had no ctts but later ones do: add the zero-based table.
+        if (!inputs.get(0).tracks.get(index).hasCtts&&anyCtts) out.write(box("ctts",mergedCtts(index,inputs)));
         return out.toByteArray();
+    }
+    /** The four-character format of an stsd's first entry, e.g. avc1 or mp4a. */
+    private static String entryType(byte[] stsd) {
+        return stsd.length>=16?new String(Arrays.copyOfRange(stsd,12,16),StandardCharsets.US_ASCII):"";
+    }
+    /** Byte-identical configs share one description; otherwise every input contributes its own. */
+    private static byte[] mergedStsd(int index,List<Input> inputs,boolean identical) throws IOException {
+        byte[] firstStsd=inputs.get(0).tracks.get(index).stsd;
+        if (identical) return firstStsd;
+        ByteArrayOutputStream entries=new ByteArrayOutputStream();
+        int count=0;
+        for (Input input: inputs) {
+            byte[] stsd=input.tracks.get(index).stsd;
+            if (stsd.length<8) throw new IOException("stsd 无效");
+            entries.write(stsd,8,stsd.length-8);
+            count+=(int)u32(stsd,4);
+        }
+        ByteArrayOutputStream body=new ByteArrayOutputStream();
+        body.write(firstStsd,0,4); // version and flags
+        writeU32(body,count);
+        body.write(entries.toByteArray());
+        return body.toByteArray();
     }
     private static byte[] replaceMvhdDuration(byte[] body,long duration) {
         byte[] copy=body.clone();
@@ -437,35 +482,52 @@ public final class Mp4Concat {
     private static byte[] mergedCtts(int index,List<Input> inputs) throws IOException {
         ByteArrayOutputStream entries=new ByteArrayOutputStream();
         long count=0;
-        for (Input input: inputs) for (long[] entry: input.tracks.get(index).ctts) { writeU32(entries,entry[0]); writeU32(entries,entry[1]); count++; }
-        // Preserve the source version: v1 deltas are signed and must not be re-read as v0.
-        ByteArrayOutputStream box=new ByteArrayOutputStream(); writeU32(box,inputs.get(0).tracks.get(index).cttsVersion&0xffffffffL); writeU32(box,count); box.write(entries.toByteArray()); return box.toByteArray();
-    }
-    private static byte[] mergedStsc(int index,List<Input> inputs) throws IOException {
-        ByteArrayOutputStream entries=new ByteArrayOutputStream();
-        long chunk=1,count=0,lastSamples=-1;
         for (Input input: inputs) {
             Track track=input.tracks.get(index);
+            if (track.ctts==null) { // No composition offsets: emit zeros so the table stays aligned.
+                writeU32(entries,track.sampleCount()); writeU32(entries,0); count++;
+                continue;
+            }
+            for (long[] entry: track.ctts) { writeU32(entries,entry[0]); writeU32(entries,entry[1]); count++; }
+        }
+        Track first=inputs.get(0).tracks.get(index);
+        int version=first.hasCtts?first.cttsVersion:0;
+        if (!first.hasCtts) for (Input input: inputs) if (input.tracks.get(index).hasCtts) version=Math.max(version,input.tracks.get(index).cttsVersion);
+        // Preserve the source version: v1 deltas are signed and must not be re-read as v0.
+        ByteArrayOutputStream box=new ByteArrayOutputStream(); writeU32(box,version&0xffffffffL); writeU32(box,count); box.write(entries.toByteArray()); return box.toByteArray();
+    }
+    private static byte[] mergedStsc(int index,List<Input> inputs,boolean identicalStsd,int[] descriptionBases) throws IOException {
+        ByteArrayOutputStream entries=new ByteArrayOutputStream();
+        long chunk=1,count=0,lastSamples=-1,lastDescription=-1;
+        for (int i=0;i<inputs.size();i++) {
+            Track track=inputs.get(i).tracks.get(index);
+            long description=identicalStsd?1:descriptionBases[i]+1;
             int total=track.chunkOffsets.length, run=0;
             for (long c=1;c<=total;c++) {
                 while (run+1<track.stscFirstChunk.length&&track.stscFirstChunk[run+1]<=c) run++;
                 long samples=track.stscSamples[run];
-                if (samples!=lastSamples) { writeU32(entries,chunk); writeU32(entries,samples); writeU32(entries,1); count++; lastSamples=samples; }
+                if (samples!=lastSamples||description!=lastDescription) { writeU32(entries,chunk); writeU32(entries,samples); writeU32(entries,description); count++; lastSamples=samples; lastDescription=description; }
                 chunk++;
             }
         }
         ByteArrayOutputStream box=new ByteArrayOutputStream(); writeU32(box,0); writeU32(box,count); box.write(entries.toByteArray()); return box.toByteArray();
     }
     private static byte[] mergedStsz(int index,List<Input> inputs) throws IOException {
-        Track first=inputs.get(0).tracks.get(index);
+        boolean anyVariable=false;
+        for (Input input: inputs) if (input.tracks.get(index).stszFixed<=0) anyVariable=true;
         ByteArrayOutputStream box=new ByteArrayOutputStream(); writeU32(box,0);
-        if (first.stszFixed>0) {
+        if (!anyVariable) {
             long total=0; for (Input input: inputs) total+=input.tracks.get(index).sampleCount();
-            writeU32(box,first.stszFixed); writeU32(box,total);
+            writeU32(box,inputs.get(0).tracks.get(index).stszFixed); writeU32(box,total);
             return box.toByteArray();
         }
+        // Fixed-size inputs expand into the shared per-sample table.
         ByteArrayOutputStream sizes=new ByteArrayOutputStream(); long total=0;
-        for (Input input: inputs) for (long size: input.tracks.get(index).stszSizes) { writeU32(sizes,size); total++; }
+        for (Input input: inputs) {
+            Track track=input.tracks.get(index);
+            if (track.stszFixed>0) { for (long i=0;i<track.sampleCount();i++) { writeU32(sizes,track.stszFixed); total++; } }
+            else for (long size: track.stszSizes) { writeU32(sizes,size); total++; }
+        }
         writeU32(box,0); writeU32(box,total); box.write(sizes.toByteArray());
         return box.toByteArray();
     }
@@ -484,6 +546,8 @@ public final class Mp4Concat {
         ByteArrayOutputStream box=new ByteArrayOutputStream(); writeU32(box,0); writeU32(box,count); box.write(entries.toByteArray()); return box.toByteArray();
     }
     private static byte[] mergedStss(int index,List<Input> inputs) throws IOException {
+        // An input without stss marks every sample sync: the merged track must too.
+        for (Input input: inputs) if (!input.tracks.get(index).hasStss) return null;
         ByteArrayOutputStream entries=new ByteArrayOutputStream(); long count=0, shift=0;
         for (Input input: inputs) {
             for (long sample: input.tracks.get(index).stss) { writeU32(entries,shift+sample); count++; }
