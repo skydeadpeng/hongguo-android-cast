@@ -706,6 +706,7 @@ function SeasonDetails({ seed, initialVid, ...props }) {
   const lookupEpoch = useRef(0);
   const seasonAbort = useRef(null);
   const fetching = useRef(false);
+  const autoRetry = useRef(-1);
   const directoryRef = useRef(directory);
   const currentSelection = useRef(selection);
   const selectionGuard = useRef(null);
@@ -714,7 +715,7 @@ function SeasonDetails({ seed, initialVid, ...props }) {
   const [focusedSeasonId, setFocusedSeasonId] = useState(seed.seriesId);
   directoryRef.current = directory;
   currentSelection.current = selection;
-  const loadSeasons = useCallback(async (page = 1) => {
+  const loadSeasons = useCallback(async (page = 1, isRetry = false) => {
     if (fetching.current) return;
     const generation = ++lookupEpoch.current;
     const controller = new AbortController(); seasonAbort.current = controller;
@@ -746,6 +747,14 @@ function SeasonDetails({ seed, initialVid, ...props }) {
       setDirectory({ ...result, items, busy: false, searched: true, error: '', errorCode: '', failedPage: null });
     } catch (error) {
       if (!mounted.current || generation !== lookupEpoch.current) return;
+      // The app-API resolution occasionally refuses the first cold request and
+      // succeeds on an immediate retry, so each load silently retries once
+      // before the error is allowed to reach the screen.
+      if (autoRetry.current !== generation && !isRetry) {
+        autoRetry.current = generation;
+        setTimeout(() => { if (mounted.current && generation === lookupEpoch.current) loadSeasons(page, true); }, 900);
+        return;
+      }
       setDirectory(value => ({ ...value, busy: false, error: errorText(error), errorCode: error?.code || '', failedPage: page }));
     } finally {
       if (mounted.current && generation === lookupEpoch.current) {
