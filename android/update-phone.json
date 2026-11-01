@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 49,
-  "versionName": "0.12.26",
+  "versionCode": 50,
+  "versionName": "0.12.27",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.26/Hongguo-0.12.26-phone-release-compatible.apk",
-  "size": 633788,
-  "sha256": "c15290356e70205d97406db0292ef42e96a963b2269faec43096d9b8faf8bca3",
-  "notes": "剧集页按视频 App 习惯重排：分季区移到简介之下、单季不再显示；播放设置收纳为可展开区块；磁贴去掉「自动取源」角标、说明文字全面精简；返回/间距进一步收紧，首屏可见选集更多。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-01T00:45:47.816Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.27/Hongguo-0.12.27-phone-release-compatible.apk",
+  "size": 633548,
+  "sha256": "2980980bb76a348696bf94d028e9bbfc486ca02dc235f3529bdebad3fcdc0acd",
+  "notes": "主页返回键改为最小化到后台（视频 App 标准行为），不再弹退出确认；应用保留在最近任务，随时切回，需要退出时从最近任务划掉即可。播放器内返回仍是退出播放回主页。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T03:13:07.092Z"
 }
