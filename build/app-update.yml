@@ -1,4 +1,4 @@
 provider: github
-owner: jackotom
-repo: hongguo-drama
+owner: skydeadpeng
+repo: hongguo-android-cast
 updaterCacheDirName: hongguo-downloader-updater

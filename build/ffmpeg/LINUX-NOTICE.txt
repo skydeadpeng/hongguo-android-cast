@@ -1,0 +1,15 @@
+LINUX ffmpeg / ffprobe 来源说明
+================================
+
+文件: build/ffmpeg/linux-x64/ffmpeg, build/ffmpeg/linux-x64/ffprobe
+来源: https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+版本: ffmpeg 7.0.2 静态构建（johnvansickle.com 发布版，GPL v3）
+校验: 官方 md5 7fa72b652e19bf84c9461e332ea1cdf3 与下载文件一致（2026-11-01 获取）
+
+说明: 与 macOS / Windows 版从固定源码自编译的 ffmpeg 9.0.2 不同，Linux 版使用
+上游作者发布的静态官方构建，随应用分发的许可证文本见 GPLv3.txt（已复制为
+LINUX-GPLv3.txt）。两个平台的功能面一致：合并导出（concat 流复制）与兼容格式
+转码均可用。
+
+七位哈希:
+  ffmpeg  edfa98c6c76982e3c1e0bf47fa06c97212951b21

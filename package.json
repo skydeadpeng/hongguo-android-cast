@@ -187,10 +187,60 @@
         "Contents/Resources/bin/ffprobe"
       ]
     },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Video",
+      "icon": "build/icon.png",
+      "maintainer": "skydeadpeng",
+      "extraResources": [
+        {
+          "from": "build/ffmpeg/linux-x64",
+          "to": "bin",
+          "filter": [
+            "ffmpeg",
+            "ffprobe"
+          ]
+        },
+        {
+          "from": "build/ffmpeg",
+          "to": "bin",
+          "filter": [
+            "FFMPEG-NOTICE.txt",
+            "COPYING.GPLv3",
+            "LICENSE.md"
+          ]
+        },
+        {
+          "from": "LICENSE",
+          "to": "LICENSE.txt"
+        },
+        {
+          "from": "NOTICE",
+          "to": "NOTICE.txt"
+        },
+        {
+          "from": "THIRD-PARTY-NOTICES.md",
+          "to": "THIRD-PARTY-NOTICES.md"
+        }
+      ]
+    },
     "publish": {
       "provider": "github",
-      "owner": "jackotom",
-      "repo": "hongguo-drama"
+      "owner": "skydeadpeng",
+      "repo": "hongguo-android-cast"
     }
   },
   "engines": {
