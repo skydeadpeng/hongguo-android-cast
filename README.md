@@ -1,6 +1,9 @@
-# 红果 Android Cast
+# 红果 Android Cast（红果短剧 Hongguo Drama）
 
-**手机选剧，电视接着看。** 面向 Android 手机与 Android TV 的独立客户端，支持局域网 DLNA 视频投屏：手机选电视、选集控播，同季自动连播，提前缓存后 5 集，看过的临时缓存自动清理。
+> **红果短剧多端客户端** —— 已发布：📱 Android 手机 · 📺 Android TV（WebView / 原生双版本）· 💻 Windows · 🍎 macOS · 🐧 Linux ·
+> 开发中：🔵 webOS（LG 电视）· 🍎tv Apple TV（tvOS）。全部客户端见 [客户端总览与下载](docs/CLIENTS.md) 或 [Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases)。
+
+**红果短剧的 Android 客户端：手机选剧，电视接着看。** 面向 Android 手机与 Android TV，看红果短剧（免费短剧平台）的独立客户端，支持局域网 DLNA 视频投屏：手机选电视、选集控播，同季自动连播，提前缓存后 5 集，看过的临时缓存自动清理。支持按剧分组下载、整部无损合并导出、扫码登录后云同步收藏与观看进度。
 
 [下载手机 / TV 版](https://github.com/skydeadpeng/hongguo-android-cast/releases) · [Android 详细说明](ANDROID.md) · [应用内更新](docs/ANDROID-UPDATES.md) · [上游项目](https://github.com/jackotom/hongguo-drama)
 
@@ -17,18 +20,21 @@
 
 ## 下载与安装
 
-手机 / TV WebView 当前版本：**0.12.18 / code41**，见 [v0.12.18 Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.18)。独立原生 TV 当前版本：**0.1.2 / code3**，见 [v0.1.2 Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.2)。本地构建输出位于 `dist/android/`。
+全部客户端都发布在 [Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases)，按设备选对应安装包：
 
-| 版本 | 文件名 | 用途 |
-| --- | --- | --- |
-| 手机 WebView | `Hongguo-0.12.18-phone-release-compatible.apk` | 手机触控、本机播放、DLNA / 浏览器投屏 |
-| TV WebView | `Hongguo-0.12.18-tv-release-compatible.apk` | 系统 WebView 界面，电视遥控与原生播放 |
-| 独立原生 TV | `HongguoNative-0.1.2-tvNative-release-compatible.apk` | 全原生电视界面与 Java 取源，不依赖系统 WebView |
+| 客户端 | 最新版本 | 安装包 | 适用设备 |
+| --- | --- | --- | --- |
+| Android 手机 | 0.12.32 | `Hongguo-0.12.32-phone-release-compatible.apk` | Android 8.0+ 手机 |
+| Android TV（WebView 界面） | 0.12.32 | `Hongguo-0.12.32-tv-release-compatible.apk` | Android TV 盒子 / 电视 |
+| Android 原生 TV | 0.1.2 | `HongguoNative-0.1.2-tvNative-release-compatible.apk` | 不依赖系统 WebView 的电视环境 |
+| 桌面 macOS | 2.3.0 | `hongguo-downloader-2.3-mac-arm64.dmg` / `.zip`（Apple Silicon）、`-mac-x64-`（Intel） | macOS 13.0+ |
+| 桌面 Windows | 2.3.0 | `hongguo-downloader-2.3-win-x64-setup.exe` | Windows 10/11 x64 |
+| 桌面 Linux | 2.3.0 | `hongguo-downloader-2.3-linux-x86_64.AppImage` / `hongguo-downloader-2.3-linux-x64.tar.gz` | x64 发行版 |
 
-- 三种安装包均要求 Android **8.0+**（API 26），使用原生视频解码器；只有手机 / TV WebView 版的界面依赖系统 WebView。
-- 手机与 TV 使用不同应用 ID。TV 版是独立播放器，安装 TV APK 不会自动把电视变成 DLNA 接收器。
+- Android 三种安装包要求 Android **8.0+**（API 26），使用原生视频解码器；只有手机 / TV WebView 版的界面依赖系统 WebView。手机与 TV 使用不同应用 ID，TV 版是独立播放器。
 - `release-compatible` 为非调试 release 构建，但沿用既有安装证书，方便旧用户覆盖安装保留记录；不是独立生产签名。自行构建时，只有使用同一证书才能覆盖原包。
-- [桌面版原说明](README.desktop.md)与 Electron 桌面源码仍保留，当前基线为 2.3.0；Android 手机 / TV WebView 版本号为 0.12.18，原生 TV 使用独立的 0.1.x 版本线，只按需借鉴上游改进，未整体升级为桌面 3.8。
+- 桌面版内置 ffmpeg/ffprobe（合并导出、转码所需），随包分发、不依赖系统安装。桌面版未做公证/签名：macOS 首次打开需右键 →「打开」，Windows SmartScreen 提示选择「仍要运行」，Linux AppImage 直接执行即可。桌面版应用内更新已指向本仓库 Releases。
+- [桌面版原说明](README.desktop.md)与 Electron 桌面源码保留，当前基线为 2.3.0；Android 手机 / TV WebView 版本线为 0.12.x，原生 TV 为 0.1.x，只按需借鉴上游改进，未整体升级为桌面 3.8。
 - 0.12.12 接入官方短信登录/MFA、官方云同步、官方系列剧目录及完整账号隔离。游客记录仅显式确认后导入；较大账号库采用有界UI投影和原生单剧进度点查。
 - 0.12.11 移除自建同步账号功能，新增本机只读时间轴弹幕与应用内更新器；首个更新器版本需手动安装，稳定更新清单需随自己的 Release 发布。官方短信登录尚未接入。
 - 0.12.10 对 App 取源的 HTTP 200 空数据增加一次同集、同画质的有界重签恢复，区分空响应与无效格式；不把空响应当作高清缺失，不自动跳集。
