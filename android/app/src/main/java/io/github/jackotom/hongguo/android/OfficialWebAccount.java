@@ -31,7 +31,7 @@ final class OfficialWebAccount {
     private final Clock clock;
     private OfficialWebPassport.CookieJar jar=new OfficialWebPassport.CookieJar();
     private JSONObject profile;
-    private String token="",image="",phase=PHASE_IDLE,error="",diagnostic="",scanState="";
+    private String token="",image="",phase=PHASE_IDLE,error="",diagnostic="",scanState="",scanHint="";
     private long expiresAt;
     private long lastVerified;
     private boolean busy;
@@ -72,7 +72,7 @@ final class OfficialWebAccount {
                 if(image.length()>MAX_IMAGE_BYTES)throw new IOException("红果登录二维码过大");
                 long raw=data.optLong("expire_time",0);
                 int expiresIn=raw>1000000000L?(int)Math.max(0,Math.min(600,raw-clock.now()/1000)):(int)Math.max(0,Math.min(600,raw>0?raw:180));
-                token=sessionToken;this.image=image;expiresAt=clock.now()+expiresIn*1000L;phase=PHASE_QRCODE;scanState="";
+                token=sessionToken;this.image=image;expiresAt=clock.now()+expiresIn*1000L;phase=PHASE_QRCODE;scanState="";scanHint=scanHint(data);
                 AccountLog.warn("official_web_qrcode_started");
                 return status().put("image",image).put("expiresIn",expiresIn);
             }catch(Exception failure){token="";image="";scanState="";phase=PHASE_IDLE;error=reason(failure);diagnostic="qrcode_failed";AccountLog.warn("official_web_qrcode_failed:"+failure.getClass().getSimpleName());throw failure;}
@@ -307,7 +307,7 @@ final class OfficialWebAccount {
     JSONObject status()throws JSONException{
         synchronized(lock){
             JSONObject result=new JSONObject().put("provider","hongguo_web").put("phase",phase).put("busy",busy).put("authenticated",profile!=null)
-                .put("error",error).put("diagnostic",diagnostic).put("scanState",scanState).put("expiresIn",Math.max(0,(expiresAt-clock.now()+999)/1000))
+                .put("error",error).put("diagnostic",diagnostic).put("scanState",scanState).put("scanHint",scanHint).put("expiresIn",Math.max(0,(expiresAt-clock.now()+999)/1000))
                 .put("cloudReady",cloudReady);
             if(profile!=null)result.put("user",new JSONObject().put("name",profile.optString("name","红果用户")).put("idSuffix",profile.optString("uid","").length()>4?"尾号 "+profile.optString("uid","").substring(profile.optString("uid","").length()-4):""));
             return result;
@@ -316,6 +316,22 @@ final class OfficialWebAccount {
 
     private static boolean confirmed(String state){
         return "3".equals(state)||"3confirmed".equalsIgnoreCase(state)||"confirmed".equalsIgnoreCase(state);
+    }
+    /** The official scanner instruction, e.g. which phone app must scan; shown verbatim under the QR. */
+    private static String scanHint(JSONObject data){
+        try{
+            JSONObject copy=data.optJSONObject("copywriting");
+            if(copy==null){
+                String raw=data.optString("copywriting","").trim();
+                if(raw.startsWith("{"))copy=new JSONObject(raw);
+            }
+            if(copy==null)return "";
+            String desc=copy.optString("desc","").trim();
+            desc=desc.replaceAll("\\[/?color[^\\]]*\\]","").replaceAll("\\[/]","").trim();
+            String title=copy.optString("title","").trim();
+            if(desc.isEmpty())return title;
+            return title.isEmpty()?desc:title+"："+desc;
+        }catch(Exception ignored){return "";}
     }
     private static boolean scanned(String state){return "2".equals(state)||"2scanned".equalsIgnoreCase(state)||"scanned".equalsIgnoreCase(state);}
     private static boolean expired(String state){return "5".equals(state)||"5expired".equalsIgnoreCase(state)||"expired".equalsIgnoreCase(state)||"4".equals(state)||"4change".equalsIgnoreCase(state);}

@@ -99,7 +99,7 @@ export default function AccountPanel({ focusRequest }) {
   return <section ref={section} className="about-section account-section" aria-labelledby="account-title" aria-busy={!!busy}>
     <h2 id="account-title">红果账号</h2>
     <p className="account-status" role="status" aria-live="polite">{accountStatus(account)}</p>
-    <p className="account-note">用手机红果 App 扫码登录官方账号，同步收藏、历史与进度。未登录也可继续观看，本机记录不会自动上传或合并。</p>
+    <p className="account-note">扫码登录官方账号（按官网提示，用手机上对应的 App 扫码），同步收藏、历史与进度。未登录也可继续观看，本机记录不会自动上传或合并。</p>
     {visibleError && <p className="account-error" role="alert">{visibleError}</p>}
     {signedIn && <>
       <dl className="account-details"><div><dt>当前账号</dt><dd>{(passportIn ? account.user?.name : account.web.user?.name) || '红果用户'} {passportIn ? account.user?.maskedPhone || account.user?.idSuffix : account.web.user?.idSuffix}</dd></div><div><dt>待同步</dt><dd>{account.sync.pendingCount} 条</dd></div></dl>
@@ -110,10 +110,11 @@ export default function AccountPanel({ focusRequest }) {
     {account?.web?.available && (passportIn || !webIn) && <div className="account-web">
       <h3 className="account-web-title">扫码登录</h3>
       {!account.web.authenticated && <>
+        {account.web.scanHint && webPhase !== 'idle' && <p className="account-note account-scan-hint">官网提示：{account.web.scanHint}</p>}
         {qrImage && <div className="account-qr"><img src={qrImage} alt="红果官网登录二维码" /></div>}
-        {webPhase === 'scanned' && <p className="account-note">已扫描，请在手机红果 App 中确认登录。</p>}
+        {webPhase === 'scanned' && <p className="account-note">已扫描，请在手机上确认登录。</p>}
         {webPhase === 'qrcode' && qrImage && <p className="account-note">等待扫码（{account.web.expiresIn} 秒后过期）…</p>}
-        {qrError && <p className="account-error" role="alert">{qrError}</p>}
+        {qrError && <p className="account-error" role="alert">{qrError}{account.web.diagnostic ? `（诊断码 ${account.web.diagnostic}）` : ''}</p>}
         <div className="account-actions">
           {qrImage
             ? <button type="button" className="button" disabled={!!busy} onClick={cancelQr}>取消扫码</button>
