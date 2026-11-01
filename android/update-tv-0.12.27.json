@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 50,
+  "versionName": "0.12.27",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.27/Hongguo-0.12.27-tv-release-compatible.apk",
+  "size": 631556,
+  "sha256": "7c7e196237e1a0afb687c2b4e4420b8edf8a1285c14e0debd679f3b74b71f042",
+  "notes": "主页返回键改为最小化到后台（视频 App 标准行为），不再弹退出确认；应用保留在最近任务，随时切回，需要退出时从最近任务划掉即可。播放器内返回仍是退出播放回主页。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T03:13:07.348Z"
+}
