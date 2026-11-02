@@ -224,7 +224,7 @@
 .tv-layout .account-qr img{width:min(360px,60vw)}
 
 /* Remote announcements share the dialog pattern and never block scrolling underneath. */
-.announcement-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
+.announcement-overlay{position:fixed;top:0;right:0;bottom:0;left:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
 .announcement-card{width:min(560px,92vw);max-height:82vh;overflow:auto;padding:20px;border:1px solid var(--border);border-radius:12px;background:var(--background)}
 .announcement-card h2{margin:8px 0;font-size:1.1rem;color:var(--text)}
 .announcement-tag{display:inline-block;margin:0;padding:3px 10px;border-radius:999px;background:var(--surface);font-size:.8rem;color:var(--muted)}
@@ -270,9 +270,9 @@
    Streaming-app layout: blurred cover backdrop, tag chips, chip favorite,
    episode tiles with the current one filled, one strong dock action. */
 .detail-summary{position:relative;display:grid;grid-template-columns:118px minmax(0,1fr);gap:18px;padding:14px 0 20px;overflow:hidden}
-.detail-hero{position:absolute;left:-24%;right:-24%;top:-56px;height:280px;z-index:0;pointer-events:none;filter:blur(30px) saturate(1.15);opacity:.55}
+.detail-hero{position:absolute;left:-24%;right:-24%;top:-56px;height:280px;z-index:0;pointer-events:none;filter:blur(30px) saturate(1.15);-webkit-filter:blur(30px) saturate(1.15);opacity:.55}
 .detail-hero img{width:100%;height:100%;object-fit:cover}
-.detail-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,var(--bg) 82%)}
+.detail-hero::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(180deg,transparent 0%,var(--bg) 82%)}
 .detail-summary>*{position:relative;z-index:1}
 .detail-cover{aspect-ratio:3/4;border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.22)}
 .detail-copy{min-width:0}
