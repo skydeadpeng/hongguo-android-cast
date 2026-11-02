@@ -66,11 +66,20 @@ function Status({ busy, error, onRetry, empty, children, preserve = false, error
   return children;
 }
 
+// Byte-CDN covers deliver HEIC when addressed by their original ".image"/".heic"
+// extension; the same template serves a WebView-safe webp twin. Used as the last
+// resort when the native inline transcode left the raw URL in place (old TVs).
+const webpCover = url => typeof url === 'string' && url.length > 6 && url.slice(-5).toLowerCase() === '.heic' ? url.slice(0, -5) + '.webp'
+  : typeof url === 'string' && url.length > 7 && url.slice(-6).toLowerCase() === '.image' ? url.slice(0, -6) + '.webp' : null;
+
 function Poster({ item, onOpen, history }) {
   const [failed, setFailed] = useState(false);
+  const [src, setSrc] = useState(item.coverUrl);
+  useEffect(() => { setSrc(item.coverUrl); setFailed(false); }, [item.coverUrl]);
+  const coverError = () => { const twin = webpCover(src); if (twin) setSrc(twin); else setFailed(true); };
   return <button className="poster" onClick={() => onOpen(item, history?.vid)} aria-label={`打开${item.title}`}>
     <span className="poster-art">
-      {item.coverUrl && !failed ? <img src={item.coverUrl} alt="" loading="lazy" onError={() => setFailed(true)} /> : <span className="poster-fallback"><Film size={32} /><span>暂无封面</span></span>}
+      {src && !failed ? <img src={src} alt="" loading="lazy" onError={coverError} /> : <span className="poster-fallback"><Film size={32} /><span>暂无封面</span></span>}
       {item.episodeLabel || item.episodeCount ? <span className="poster-label">{item.episodeLabel || `${item.episodeCount} 集`}</span> : null}
     </span>
     <strong>{item.title || '未命名短剧'}</strong>

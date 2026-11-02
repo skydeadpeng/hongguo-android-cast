@@ -211,11 +211,14 @@ final class NativeBridge {
     private static final String[] COVER_HOSTS = {".fqnovelpic.com", ".byteimg.com", ".fqnovelstatic.com"};
     /**
      * The official home covers are HEIC, which the WebView cannot decode. Each cover is
-     * fetched, decoded by the platform HEIF decoder, downscaled and inlined as a JPEG
-     * data URL; any failure keeps an empty cover and the poster falls back to its icon.
+     * fetched, decoded, downscaled and inlined as a JPEG data URL; a HEIC template can
+     * also be re-fetched from the CDN as its webp twin, which is the only format old
+     * (pre-28) devices can decode at all. Any failure keeps the original URL: the web
+     * layer retries the webp twin itself, and a blank cover would hide a poster that
+     * might still load.
      */
     private static void inlineFeedCovers(org.json.JSONArray items, long deadline) {
-        if (items == null || items.length() == 0 || Build.VERSION.SDK_INT < 28) return;
+        if (items == null || items.length() == 0) return;
         java.util.List<java.util.concurrent.Callable<Boolean>> jobs = new ArrayList<>();
         for (int index = 0; index < items.length(); index++) {
             JSONObject item = items.optJSONObject(index);
@@ -232,9 +235,28 @@ final class NativeBridge {
     }
     private static void coverDataUrl(String url, JSONObject item) {
         String data = coverDataUrl(url);
-        try { item.put("cover", data == null ? "" : data); } catch (org.json.JSONException ignored) { }
+        if (data == null) return;
+        try { item.put("cover", data); } catch (org.json.JSONException ignored) { }
     }
     private static String coverDataUrl(String url) {
+        try {
+            byte[] bytes = downloadCover(url);
+            android.graphics.Bitmap bitmap = bytes == null ? null : decodeCover(bytes);
+            if (bitmap == null) {
+                String twin = CoverVariants.webp(url);
+                if (twin != null) {
+                    byte[] retry = downloadCover(twin);
+                    bitmap = retry == null ? null : decodeCover(retry);
+                }
+            }
+            if (bitmap == null) return null;
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 78, out);
+            bitmap.recycle();
+            return "data:image/jpeg;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP);
+        } catch (Exception ignored) { return null; }
+    }
+    private static byte[] downloadCover(String url) {
         try {
             java.net.URI uri = new java.net.URI(url);
             String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(java.util.Locale.ROOT);
@@ -257,18 +279,29 @@ final class NativeBridge {
             }
             input.close();
             connection.disconnect();
-            android.graphics.Bitmap bitmap = android.graphics.ImageDecoder.decodeBitmap(
-                android.graphics.ImageDecoder.createSource(bytes.toByteArray()),
-                (decoder, info, source) -> {
-                    int width = info.getSize().getWidth();
-                    if (width > 480) decoder.setTargetSampleSize(Math.max(1, width / 480));
-                });
-            if (bitmap == null) return null;
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 78, out);
-            bitmap.recycle();
-            return "data:image/jpeg;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP);
+            return bytes.toByteArray();
         } catch (Exception ignored) { return null; }
+    }
+    /** HEIF needs ImageDecoder (API 28+); older devices decode the CDN's webp twin with BitmapFactory. */
+    private static android.graphics.Bitmap decodeCover(byte[] bytes) {
+        if (Build.VERSION.SDK_INT >= 28) {
+            try {
+                return android.graphics.ImageDecoder.decodeBitmap(
+                    android.graphics.ImageDecoder.createSource(bytes),
+                    (decoder, info, source) -> {
+                        int width = info.getSize().getWidth();
+                        if (width > 480) decoder.setTargetSampleSize(Math.max(1, width / 480));
+                    });
+            } catch (Exception ignored) { return null; }
+        }
+        android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+        int sample = 1;
+        while (bounds.outWidth / (sample * 2) >= 480) sample *= 2;
+        android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
+        options.inSampleSize = sample;
+        return android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
     }
     private final java.util.concurrent.atomic.AtomicBoolean mergeBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
     private static JSONObject rowById(JSONArray records, long downloadId) {
