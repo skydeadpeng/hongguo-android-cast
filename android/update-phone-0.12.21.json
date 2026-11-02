@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 44,
+  "versionName": "0.12.21",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.21/Hongguo-0.12.21-phone-release-compatible.apk",
+  "size": 618388,
+  "sha256": "e5ff701a95b3af472fd87a2d1223dd996a8fe7d0048fcb93aad3b350388ce615",
+  "notes": "修复官网扫码会话的云端绑定：同一登录会话现在会依次尝试多种已验证的客户端指纹与凭据形态，直到服务端确认账号身份；尝试结果会记录到设备日志（tag HongguoAccount），云端验证不通过时状态页会明确提示。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-10-31T06:45:19.158Z"
+}

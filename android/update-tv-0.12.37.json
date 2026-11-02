@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 60,
+  "versionName": "0.12.37",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.37/Hongguo-0.12.37-tv-release-compatible.apk",
+  "size": 639632,
+  "sha256": "3e2e226d19735cf3b7c69deff25597b42ecf8ca770ced502e2be1871eb37ec75",
+  "notes": "缓解“点进剧集中偶尔加载失败”：分集解析通道偶发冷启动拒绝（第一次请求被拒、紧接着重试即成功），详情页现在会在失败后自动静默重试一次再显示错误，减少手动点「重新加载」的次数。真实失败仍会明确提示并可手动重试。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T22:24:18.877Z"
+}

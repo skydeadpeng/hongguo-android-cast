@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 42,
+  "versionName": "0.12.19",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.19/Hongguo-0.12.19-phone-release-compatible.apk",
+  "size": 617644,
+  "sha256": "e4dd65c76b811609ae3786bd461fdd658f14f33e3604a3e71e711d47616cda1d",
+  "notes": "新增官网扫码登录（手机/TV/原生 TV 三端）：用手机红果 App 扫码确认即可登录，同步收藏、历史与进度；短信验证码登录入口已移除。\n取源改为登记身份优先并接受内联片源列表；分集解析双路由短预算加双超时对冲重试，挂死的官网边缘不再拖满等待；支持从分享链接直接打开剧集。\n新增远程公告（普通/紧急双通道，关于页可关）与发现页「换一批」（每分类记住浏览位置）；搜索在官网与 App 尚未收录时自动从近 7 天上新补入，带「今日上新」标签。\n观看历史新增已看完/未看完筛选与疑似同剧提示；界面跟随系统深色模式；官方页解析增加可信 DoH 竞速，VPN 环境不再卡死。\n新增批量下载（选集范围逐集自动取源入队）与合并整剧（同剧已完成分集无损合并为一个视频，保存到系统图库 Movies/Hongguo）。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-10-31T05:00:17.019Z"
+}

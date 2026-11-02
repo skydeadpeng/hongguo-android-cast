@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 49,
+  "versionName": "0.12.26",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.26/Hongguo-0.12.26-tv-release-compatible.apk",
+  "size": 631740,
+  "sha256": "ccb6e2069b181b5fa786161289c171c7455635b050b2e9c7886823aac3577d71",
+  "notes": "剧集页按视频 App 习惯重排：分季区移到简介之下、单季不再显示；播放设置收纳为可展开区块；磁贴去掉「自动取源」角标、说明文字全面精简；返回/间距进一步收紧，首屏可见选集更多。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T00:45:48.058Z"
+}
