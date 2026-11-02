@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 60,
-  "versionName": "0.12.37",
+  "versionCode": 61,
+  "versionName": "0.12.38",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.37/Hongguo-0.12.37-phone-release-compatible.apk",
-  "size": 641212,
-  "sha256": "7c1ed81306e5cbd743669ec783b4ad1b08235d5206a2d45570a9e907151f11c1",
-  "notes": "缓解“点进剧集中偶尔加载失败”：分集解析通道偶发冷启动拒绝（第一次请求被拒、紧接着重试即成功），详情页现在会在失败后自动静默重试一次再显示错误，减少手动点「重新加载」的次数。真实失败仍会明确提示并可手动重试。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-01T22:24:18.100Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.38/Hongguo-0.12.38-phone-release-compatible.apk",
+  "size": 642212,
+  "sha256": "a1ec562f9ca17a3ba746982e953a83d2585310297cbc55dd3ebd6ab251b285ce",
+  "notes": "首页恢复官方分类筛选：上一版首页切到官方推荐流后，真人剧/漫剧/AI剧的分类标签消失了（手机和 TV 都受影响）。现在分类标签回归首页，且直接来自官方筛选面板的真实频道（点击即按官方频道重新拉取推荐流）；TV 版首页同步生效。详情页分集解析偶发失败时自动重试一次的机制保持不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T00:00:23.126Z"
 }
