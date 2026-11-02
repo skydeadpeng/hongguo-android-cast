@@ -14,8 +14,11 @@ final class NetworkGuard {
     static final int LIMIT = 8 * 1024 * 1024;
     private static final Set<String> OFFICIAL = new HashSet<>(Arrays.asList("hongguoduanju.com", "www.hongguoduanju.com"));
     private static final Set<String> EXTERNAL = new HashSet<>(Arrays.asList("hongguoduanju.com", "www.hongguoduanju.com", "github.com", "www.github.com"));
-    // Uninterruptible platform DNS may retain at most two workers; no queued lookups.
-    private static final ExecutorService DNS = new ThreadPoolExecutor(0, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), runnable -> { Thread thread = new Thread(runnable, "hongguo-source-dns"); thread.setDaemon(true); return thread; }, new ThreadPoolExecutor.AbortPolicy());
+    // Official lookups race two lanes each (system + DoH), so the pool must hold more
+    // than one concurrent resolution; two workers rejected every second parallel
+    // request with "域名解析繁忙" whenever the first DoH lane was slow. No queue: a
+    // saturated pool still aborts instead of building an unbounded resolver backlog.
+    private static final ExecutorService DNS = new ThreadPoolExecutor(0, 8, 30, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), runnable -> { Thread thread = new Thread(runnable, "hongguo-source-dns"); thread.setDaemon(true); return thread; }, new ThreadPoolExecutor.AbortPolicy());
     /** One daemon timer closes stalled TCP/TLS/write/read operations on deadline or owner cancellation. */
     private static final ScheduledThreadPoolExecutor SOCKET_TIMEOUT = socketTimer();
     private static ScheduledThreadPoolExecutor socketTimer() {

@@ -270,9 +270,6 @@
    Streaming-app layout: blurred cover backdrop, tag chips, chip favorite,
    episode tiles with the current one filled, one strong dock action. */
 .detail-summary{position:relative;display:grid;grid-template-columns:118px minmax(0,1fr);gap:18px;padding:14px 0 20px;overflow:hidden}
-.detail-hero{position:absolute;left:-24%;right:-24%;top:-56px;height:280px;z-index:0;pointer-events:none;filter:blur(30px) saturate(1.15);-webkit-filter:blur(30px) saturate(1.15);opacity:.55}
-.detail-hero img{width:100%;height:100%;object-fit:cover}
-.detail-hero::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(180deg,transparent 0%,var(--bg) 82%)}
 .detail-summary>*{position:relative;z-index:1}
 .detail-cover{aspect-ratio:3/4;border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.22)}
 .detail-copy{min-width:0}
@@ -308,7 +305,6 @@
   .episode-grid>button{height:52px;font-size:16px}
 }
 .tv-layout .detail-summary{grid-template-columns:210px minmax(0,1fr);gap:30px;padding-top:22px}
-.tv-layout .detail-hero{top:-70px;height:340px;opacity:.6}
 .tv-layout .detail-cover{border-radius:14px}
 .tv-layout .detail-copy h1{font-size:32px}
 .tv-layout .chip{font-size:15px;padding:5px 14px}
@@ -337,7 +333,6 @@
 .season-selector{margin:0 0 8px;padding:0 0 8px;border-bottom:0}
 .season-selector>header{margin-bottom:6px}
 .detail-summary{grid-template-columns:96px minmax(0,1fr);gap:14px;padding:6px 0 8px}
-.detail-hero{top:-32px;height:180px;filter:blur(24px) saturate(1.15);opacity:.5}
 .detail-cover{border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.18)}
 .title-clamp{font-size:19px;line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .detail-chips{margin-top:8px;gap:6px}
@@ -388,7 +383,6 @@
 .phone-layout .detail-summary{grid-template-columns:72px minmax(0,1fr);gap:14px;padding:4px 0 16px;overflow:visible}
 .phone-layout .detail-cover{border-radius:8px;box-shadow:none}
 .phone-layout .detail-copy h1{font-size:1.18rem;line-height:1.4;letter-spacing:0}
-.phone-layout .detail-hero{display:none}
 .phone-layout .detail-chips{align-items:center;gap:4px 8px;margin-top:4px}
 .phone-layout .chip{background:none;border-radius:0;padding:0;font-size:.75rem;color:var(--muted)}
 .phone-layout .chip-strong{color:var(--muted);font-weight:400}
