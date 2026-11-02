@@ -106,10 +106,10 @@ function Discover({ onOpen, library, onSearch, onUpdates }) {
   const [feed, setFeed] = useState(null);
   const [feedError, setFeedError] = useState(false);
   const feedGen = useRef(0);
-  const loadFeed = (offset, sessionId, append) => {
+  const loadFeed = (offset, sessionId, append, genre) => {
     const current = ++feedGen.current;
-    setFeed(previous => append && previous?.items?.length ? { ...previous, busy: true } : { busy: true, items: [] });
-    nativeCall('homeFeed', { offset, sessionId }).then(result => {
+    setFeed(previous => append && previous?.items?.length ? { ...previous, busy: true } : { busy: true, items: [], genres: previous?.genres || [] });
+    nativeCall('homeFeed', { offset, sessionId, genre: genre || 'short_play' }).then(result => {
       if (feedGen.current !== current) return;
       const rows = Array.isArray(result?.items) ? result.items : [];
       const items = rows.map(row => ({
@@ -118,18 +118,23 @@ function Discover({ onOpen, library, onSearch, onUpdates }) {
         episodeCount: Number(row?.episode_count) || 0, tags: Array.isArray(row?.tags) ? row.tags.slice(0, 4) : [],
       })).filter(row => /^\d{1,30}$/.test(row.seriesId) && row.title);
       if (!items.length) throw new Error('红果首页推荐暂无内容');
+      const genres = Array.isArray(result?.genres) && result.genres.length >= 2
+        ? result.genres.map(chip => ({ id: String(chip?.id || ''), label: String(chip?.label || '') })).filter(chip => /^[a-z_]{1,30}$/.test(chip.id) && chip.label)
+        : [];
       setFeed(previous => {
         const base = append && previous?.items?.length ? previous.items : [];
         const seen = new Set(base.map(row => row.seriesId));
         const merged = base.concat(items.filter(row => !seen.has(row.seriesId)));
-        return { busy: false, items: merged, offset: Number(result.offset) || 0, sessionId: String(result.sessionId || ''), hasMore: result.hasMore === true, error: '' };
+        return { busy: false, items: merged, offset: Number(result.offset) || 0, sessionId: String(result.sessionId || ''), hasMore: result.hasMore === true, error: '', genres: genres.length ? genres : previous?.genres || [], genre: genre || 'short_play' };
       });
     }).catch(() => {
       if (feedGen.current !== current) return;
       setFeed(null); setFeedError(true);
     });
   };
-  useEffect(() => { loadFeed(0, '', false); }, []);
+  useEffect(() => { loadFeed(0, '', false, 'short_play'); }, []);
+  const feedChips = feed?.genres?.length ? feed.genres
+    : [{ id: 'short_play', label: '真人剧' }, { id: 'comic_series', label: '漫剧' }, { id: 'ai_series', label: 'AI剧' }];
   useEffect(() => {
     if (!feedError) return;
     const current = ++generation.current;
@@ -185,6 +190,7 @@ function Discover({ onOpen, library, onSearch, onUpdates }) {
     <h1 className="visually-hidden">发现短剧</h1>
     {update && <button type="button" className="home-update" onClick={onUpdates}><RefreshCw size={16} /><span>新版本 {update.versionName} 已发布 · 查看更新</span></button>}
     <button type="button" className="home-search" onClick={onSearch}><Search size={17} /><span>搜索短剧名称</span></button>
+    {feedMode && <div className="category-tabs" role="group" aria-label="短剧分类">{feedChips.map(chip => <button key={chip.id} aria-pressed={feed.genre === chip.id} disabled={!!feed.busy} onClick={() => loadFeed(0, '', false, chip.id)}>{chip.label}</button>)}</div>}
     {feedError && <div className="category-tabs" role="group" aria-label="短剧分类">{CATEGORIES.map((item) => <button key={item.id} aria-pressed={item.id === category} onClick={() => changeCategory(item.id)}>{item.label}</button>)}</div>}
     {!!continueRows.length && <section className="home-continue" aria-label="继续观看">
       <h2>继续观看</h2>
@@ -192,12 +198,12 @@ function Discover({ onOpen, library, onSearch, onUpdates }) {
     </section>}
     {feedMode ? <>
       <div className="home-section-head"><h2>为你推荐</h2></div>
-      <Status busy={!!feed.busy && !feed.items.length} error={feed.error || ''} preserve={!!feed.items.length} onRetry={() => loadFeed(0, '', false)} empty={!feed.items.length && { title: '暂时没有推荐内容', text: '稍后再来看看，或用搜索找到想看的短剧。' }}>
+      <Status busy={!!feed.busy && !feed.items.length} error={feed.error || ''} preserve={!!feed.items.length} onRetry={() => loadFeed(0, '', false, feed.genre)} empty={!feed.items.length && { title: '暂时没有推荐内容', text: '稍后再来看看，或用搜索找到想看的短剧。' }}>
         <PosterGrid items={feed.items} onOpen={onOpen} />
       </Status>
       {!!feed.items.length && <div className="home-more">
         {feed.busy ? <span className="home-more-note">正在加载…</span>
-          : feed.hasMore ? <button type="button" className="button" onClick={() => loadFeed(feed.offset, feed.sessionId, true)}>加载更多推荐</button>
+          : feed.hasMore ? <button type="button" className="button" onClick={() => loadFeed(feed.offset, feed.sessionId, true, feed.genre)}>加载更多推荐</button>
             : <span className="home-more-note">推荐已经刷到底了 · 点上方分类搜索更多</span>}
       </div>}
     </> : <>

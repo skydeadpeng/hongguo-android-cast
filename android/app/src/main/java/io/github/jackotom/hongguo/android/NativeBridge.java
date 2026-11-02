@@ -298,11 +298,13 @@ final class NativeBridge {
             case "homeFeed": {
                 int offset = params == null ? 0 : Math.max(0, params.optInt("offset", 0));
                 String sessionId = params == null ? "" : LibraryStore.text(params, "sessionId", 128);
+                String genre = params == null ? "short_play" : params.optString("genre", "short_play");
+                if (!genre.matches("[a-z_]{1,30}")) genre = "short_play";
                 long deadline = System.nanoTime() + 20_000_000_000L;
                 try (OfficialApiClient client = new OfficialApiClient(OfficialApiClient.newSession())) {
                     client.deadlineNanos(deadline);
                     client.registerDevice();
-                    JSONObject result = NewReleaseCatalog.feed(client, offset, sessionId);
+                    JSONObject result = NewReleaseCatalog.feed(client, offset, sessionId, genre);
                     inlineFeedCovers(result.optJSONArray("items"), deadline);
                     respond(id, result, null);
                 }

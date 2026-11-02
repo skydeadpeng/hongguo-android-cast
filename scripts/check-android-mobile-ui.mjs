@@ -50,10 +50,13 @@ function installMock() {
     else if(m.method==='homeFeed'){
       if(f.feedFail||window.name==='feedfail'){error='HOMEFEED_DOWN';}
       else{const pageN=f.feedPage||0;f.feedPage=pageN+1;const base=pageN*2;
+        const genre=(m.params&&m.params.genre)||'short_play';
+        f.feedGenres=f.feedGenres||[];if(!f.feedGenres.includes(genre))f.feedGenres.push(genre);
         const rows=pageN===0?[{series_id:sid,title:'MOCK 长剧移动布局',cover:'',episode_count:137,description:'',tags:['都市']},{series_id:String(9000000000000000001n),title:'MOCK 推荐 2',cover:'',episode_count:48,description:'',tags:['逆袭']}]
           :[{series_id:String(9000000000000000000n+BigInt(base+1)),title:'MOCK 推荐 '+(base+1),cover:'',episode_count:60,description:'',tags:['都市']},
             {series_id:String(9000000000000000000n+BigInt(base+2)),title:'MOCK 推荐 '+(base+2),cover:'',episode_count:48,description:'',tags:['逆袭']}];
-        result={items:rows,hasMore:pageN===0,offset:20*(pageN+1),sessionId:'s'+pageN};}
+        result={items:rows,hasMore:pageN===0,offset:20*(pageN+1),sessionId:'s'+pageN,
+                genres:[{id:'short_play',label:'真人剧'},{id:'comic_series',label:'漫剧'},{id:'ai_series',label:'AI剧'}]};}
     }
     else if(m.method==='getDownloads')result=[{id:17,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:137,downloadedBytes:1234567,totalBytes:1234567},{id:18,status:'success',title:'MOCK 下载名称较长的短剧用于移动布局检查',seriesId:sid,index:136,downloadedBytes:1234567,totalBytes:1234567}].filter(x=>!(f.deleted||[]).includes(x.id));
     else if(m.method==='getMergedVideos')result=[...(f.mergedRows||[])];
@@ -192,6 +195,20 @@ try {
     await reset();const repeated=await evaluate('Number(document.querySelectorAll(".episode-grid button")[1].querySelector("span").textContent)');await evaluate('window.__mobileFixture.optionPlans=[{delay:120}];const b=document.querySelectorAll(".episode-grid button")[1];b.click();b.click();b.click()');await sleep(180);eq((await plays()).map(p=>p.episode.index),[repeated],'same-event repeated confirms open only one player');
     await reset();const latest=await evaluate('Number(document.querySelectorAll(".episode-grid button")[5].querySelector("span").textContent)');await evaluate('window.__mobileFixture.optionPlans=[{delay:150},{delay:5}];document.querySelectorAll(".episode-grid button")[1].click();document.querySelectorAll(".episode-grid button")[5].click()');await sleep(200);eq((await plays()).map(p=>p.episode.index),[latest],'late previous options never open wrong episode');
   });
+  await group('TVHOME the tv home renders the official feed with tv layout and focusable cards',async()=>{
+    await call('Emulation.setDeviceMetricsOverride',{width:1280,height:720,deviceScaleFactor:1,mobile:false});await call('Emulation.setTouchEmulationEnabled',{enabled:false});
+    await call('Page.navigate',{url:base+'?tv=1'});await wait('document.querySelector(".poster")');await sleep(60);
+    check(await evaluate('document.querySelector(".android-app").classList.contains("tv-layout")'),'tv layout applies');
+    check(await evaluate('!!document.querySelector(".home-search")'),'the search pill renders on tv home');
+    check(await evaluate('document.querySelector(".poster strong").textContent')==='MOCK 长剧移动布局','the official feed drives the tv home grid');
+    check(await evaluate('document.querySelectorAll(".poster").length')>=2,'the feed grid is populated');
+    await evaluate('document.querySelector(".home-search").focus()');
+    check(await evaluate('document.activeElement===document.querySelector(".home-search")'),'the search pill is focusable for D-pad');
+    await noOverflow();await screenshot('tv-home-feed.png');
+    await evaluate('document.querySelector(".poster").click()');await sleep(40);
+    eq(await evaluate('document.querySelectorAll(".episode-grid button").length'),137,'a feed card opens the complete tv directory');
+    await screenshot('tv-feed-detail.png');
+  });
   await group('REGRESSION TV retains all 137 episodes and D-pad focus alone never starts playback',async()=>{
     await reset(true);eq(await evaluate('document.querySelectorAll(".episode-grid button").length'),137,'TV retains complete directory');eq(await evaluate('!document.querySelector(".episode-browser")||document.querySelector(".episode-browser").hidden'),true,'mobile range controls do not participate in TV focus');eq(await evaluate('document.querySelector(".description-toggle")===null'),true,'TV retains full synopsis');await evaluate('document.querySelectorAll(".episode-grid button")[91].focus()');await call('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});await call('Input.dispatchKeyEvent',{type:'keyUp',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});await sleep(30);eq((await plays()).length,0,'D-pad focus is browse only');check(await evaluate('document.activeElement.matches(".episode-grid button")'),'D-pad remains within directory');const index=await evaluate('Number(document.activeElement.querySelector("span").textContent)');await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});await idle();eq((await plays()).map(p=>p.episode.index),[index],'Enter directly plays focused exact episode once');await screenshot('tv-full-directory.png');
   });
@@ -217,10 +234,14 @@ try {
     await reset();await button('发现');await sleep(60);
     const firstTitle=()=>evaluate('document.querySelector(".poster strong").textContent');
     check(await firstTitle()==='MOCK 长剧移动布局','the official feed renders the series rows');
-    check(await evaluate('!!document.querySelector(".home-search")'),'the search pill sits on the home page');
+    check(await evaluate('[...document.querySelectorAll(".category-tabs button")].map(b=>b.textContent).join("|")')==='真人剧|漫剧|AI剧','the official genre chips render');
     await button('加载更多推荐');await sleep(60);
     check(await evaluate('document.querySelectorAll(".poster-grid .poster").length')===4,'加载更多 appends the next official batch');
-    await wait('document.querySelector(".home-more-note")?.textContent.includes("刷到底")','the feed reports its end');
+    await button('漫剧');await sleep(60);
+    check(await evaluate('window.__mobileFixture.feedGenres.includes("comic_series")'),'a genre chip reloads the feed with the official id');
+    check(await firstTitle()==='MOCK 推荐 5','the genre switch refreshes the grid from the official feed');
+    check(await evaluate('document.querySelector(".category-tabs button[aria-pressed=\\"true\\"]").textContent')==='漫剧','the chosen genre chip is selected');
+    check(await evaluate('!!document.querySelector(".home-search")'),'the search pill sits on the home page');
     await noOverflow();await screenshot('phone-discover-home-feed.png');
   });
   await group('DISCOVER fallback keeps the web catalog paging when the feed is down',async()=>{

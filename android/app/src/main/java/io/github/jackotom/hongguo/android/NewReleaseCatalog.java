@@ -58,10 +58,12 @@ final class NewReleaseCatalog {
      * The official home recommendation feed: the same landpage endpoint without the
      * new-only filters, so the reply is the app's default catalog stream. Rows reuse
      * the same parser; paging rides offset + session_id exactly like the new list.
+     * The first page also carries the official genre chips from the selector panel.
      */
-    static JSONObject feed(OfficialApiClient client, int offset, String sessionId) throws Exception {
+    static JSONObject feed(OfficialApiClient client, int offset, String sessionId, String genre) throws Exception {
         if (client == null || offset < 0 || sessionId == null || sessionId.length() > 128) throw new IOException("红果首页推荐未就绪");
-        JSONObject reply = request(client, "default", "short_play", offset, sessionId);
+        if (genre == null || !genre.matches("[a-z_]{1,30}")) genre = "short_play";
+        JSONObject reply = request(client, "default", genre, offset, sessionId);
         if (reply.optInt("code", -1) != 0) throw new IOException("红果首页推荐未就绪，请重试");
         JSONObject data = reply.optJSONObject("data");
         JSONArray rows = data == null ? null : data.optJSONArray("video_data");
@@ -71,10 +73,52 @@ final class NewReleaseCatalog {
             if (item != null) items.put(item);
         }
         if (items.length() == 0) throw new IOException("红果首页推荐暂无内容，请重试");
-        return new JSONObject().put("items", items)
+        JSONObject result = new JSONObject().put("items", items)
             .put("hasMore", data.optBoolean("has_more", false))
             .put("offset", Math.max(offset, data.optInt("next_offset", offset)))
             .put("sessionId", data.optString("session_id", ""));
+        if (offset == 0) {
+            JSONArray genres = genreChips(client);
+            if (genres.length() > 0) result.put("genres", genres);
+        }
+        return result;
+    }
+    private static volatile JSONArray cachedGenres;
+    /** The official genre row of the selector panel, cached for the process lifetime. */
+    private static JSONArray genreChips(OfficialApiClient client) {
+        JSONArray cached = cachedGenres;
+        if (cached != null) return cached;
+        try {
+            JSONObject body = new JSONObject()
+                .put("filter_ids", "").put("req_scene", "default").put("offset", 0)
+                .put("need_selector_panel", true).put("limit", 1)
+                .put("select_items", new JSONObject()
+                    .put("genre", new JSONArray().put("short_play"))
+                    .put("sort", new JSONArray())
+                    .put("category_dim_theme", new JSONArray()).put("category_dim_role", new JSONArray())
+                    .put("category_dim_epoch", new JSONArray()).put("gender", new JSONArray())
+                    .put("online_time", new JSONArray()).put("creation_status", new JSONArray()))
+                .put("session_id", "").put("req_type", "default").put("client_req_type", 1);
+            JSONObject reply = client.cloud(CATEGORY_API, "POST", null, body, false);
+            JSONObject data = reply.optJSONObject("data");
+            JSONArray rows = data == null ? null : data.optJSONArray("selector_rows");
+            JSONArray out = new JSONArray();
+            for (int index = 0; rows != null && index < rows.length(); index++) {
+                JSONObject row = rows.optJSONObject(index);
+                if (row == null || !"genre".equals(row.optString("type"))) continue;
+                JSONArray items = row.optJSONArray("items");
+                for (int at = 0; items != null && at < items.length(); at++) {
+                    JSONObject item = items.optJSONObject(at);
+                    String id = item == null ? "" : item.optString("selector_item_id", "");
+                    String label = item == null ? "" : item.optString("show_name", "");
+                    if (id.matches("[a-z_]{1,30}") && !label.isEmpty() && label.length() <= 12) {
+                        out.put(new JSONObject().put("id", id).put("label", label));
+                    }
+                }
+            }
+            if (out.length() >= 2) cachedGenres = out;
+        } catch (Exception ignored) { }
+        return cachedGenres == null ? new JSONArray() : cachedGenres;
     }
 
     /**
