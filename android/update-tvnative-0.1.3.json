@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 4,
+  "versionName": "0.1.3",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.3/HongguoNative-0.1.3-tvNative-release-compatible.apk",
+  "size": 641664,
+  "sha256": "4f0e022dad302b11df0d7e4d102df399b42e30d0e863ae3129ea2f6ee44cf4e8",
+  "notes": "修复 TV 盒子首页封面不显示：上一版首页封面改用官方 HEIC 原图，且只在较新的系统（Android 9+）上转码内联，老电视/盒子会整页「暂无封面」。现在封面在任何受支持的系统上都先转成通用格式内联显示；无法内联时自动改用官方 CDN 的 webp 同图，网页层还有一道自动重试兜底，转码失败也不再把封面清空。手机版同样受益；0.12.38 的首页官方分类（真人剧/漫剧/AI剧）保持不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T12:21:18.075Z"
+}
