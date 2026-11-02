@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 3,
-  "versionName": "0.1.2",
+  "versionCode": 4,
+  "versionName": "0.1.3",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.2/HongguoNative-0.1.2-tvNative-release-compatible.apk",
-  "size": 585968,
-  "sha256": "a100945a2f7919beeb38d39717e6bc740dfb26fbb47c8544eeedaa61580be269",
-  "notes": "红果原生 TV 0.1.2（独立原生版，不是手机/TV WebView 包）\n\n- 默认开启自动检查更新：启动、返回前台与前台定期检查；成功间隔24小时，失败15分钟后重试。\n- 设置新增自动检查开关、最近检查时间；发现新版或更新就绪时显示顶部入口。\n- 保留下载、安装确认；播放期间不弹窗，返回后继续；更新前校验大小、SHA-256、包名、版本与现有签名，并保存本机记录。\n- 包含0.1.1的原生海报首页、遥控焦点、观看历史、账号入口、下载/离线播放与滚动设置。\n\n已安装原生版可在设置中检查更新；安装包与原有手机/TV WebView包独立共存。升级保留收藏、观看进度、下载与设置。\n\n本发行只更新原生TV渠道，不修改手机/TV WebView稳定清单或Latest标记。签名兼容安装包、对应源码、清单与SHA256校验和见附件。\n",
-  "publishedAt": "2026-10-28T07:47:54.679Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.3/HongguoNative-0.1.3-tvNative-release-compatible.apk",
+  "size": 641664,
+  "sha256": "4f0e022dad302b11df0d7e4d102df399b42e30d0e863ae3129ea2f6ee44cf4e8",
+  "notes": "修复 TV 盒子首页封面不显示：上一版首页封面改用官方 HEIC 原图，且只在较新的系统（Android 9+）上转码内联，老电视/盒子会整页「暂无封面」。现在封面在任何受支持的系统上都先转成通用格式内联显示；无法内联时自动改用官方 CDN 的 webp 同图，网页层还有一道自动重试兜底，转码失败也不再把封面清空。手机版同样受益；0.12.38 的首页官方分类（真人剧/漫剧/AI剧）保持不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T12:21:18.075Z"
 }
