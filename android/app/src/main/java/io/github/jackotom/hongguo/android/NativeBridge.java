@@ -254,7 +254,7 @@ final class NativeBridge {
             bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 78, out);
             bitmap.recycle();
             return "data:image/jpeg;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP);
-        } catch (Exception ignored) { return null; }
+        } catch (Throwable ignored) { return null; }
     }
     private static byte[] downloadCover(String url) {
         try {
@@ -282,17 +282,20 @@ final class NativeBridge {
             return bytes.toByteArray();
         } catch (Exception ignored) { return null; }
     }
-    /** HEIF needs ImageDecoder (API 28+); older devices decode the CDN's webp twin with BitmapFactory. */
+    /** HEIF needs ImageDecoder (API 28+), but some tv ROMs deny it via hidden-api enforcement
+     *  (linking throws NoSuchMethodError, an Error, not an Exception). Every failure — including
+     *  those — falls back to BitmapFactory, which decodes the CDN's webp twin on any API level. */
     private static android.graphics.Bitmap decodeCover(byte[] bytes) {
         if (Build.VERSION.SDK_INT >= 28) {
             try {
-                return android.graphics.ImageDecoder.decodeBitmap(
+                android.graphics.Bitmap bitmap = android.graphics.ImageDecoder.decodeBitmap(
                     android.graphics.ImageDecoder.createSource(bytes),
                     (decoder, info, source) -> {
                         int width = info.getSize().getWidth();
                         if (width > 480) decoder.setTargetSampleSize(Math.max(1, width / 480));
                     });
-            } catch (Exception ignored) { return null; }
+                if (bitmap != null) return bitmap;
+            } catch (Throwable ignored) { /* fall through to BitmapFactory */ }
         }
         android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
