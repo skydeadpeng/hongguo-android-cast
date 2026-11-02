@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 62,
-  "versionName": "0.12.39",
+  "versionCode": 63,
+  "versionName": "0.12.40",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.39/Hongguo-0.12.39-phone-release-compatible.apk",
-  "size": 642756,
-  "sha256": "60d3807dc84a35c6ffaef9de051b0a2a9fb1072e7593cebf16ef97bb57534ddd",
-  "notes": "修复 TV 盒子首页封面不显示：上一版首页封面改用官方 HEIC 原图，且只在较新的系统（Android 9+）上转码内联，老电视/盒子会整页「暂无封面」。现在封面在任何受支持的系统上都先转成通用格式内联显示；无法内联时自动改用官方 CDN 的 webp 同图，网页层还有一道自动重试兜底，转码失败也不再把封面清空。手机版同样受益；0.12.38 的首页官方分类（真人剧/漫剧/AI剧）保持不变。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-02T11:55:16.967Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.40/Hongguo-0.12.40-phone-release-compatible.apk",
+  "size": 643172,
+  "sha256": "5d80f130ab72bbaed8078e69fa61e3f87cf9e868f7a19ebb27b2145862d62ac6",
+  "notes": "修复点开剧集后第一集加载慢、缓存慢的问题：应用内域名解析的并发通道只有两个名额，首页推荐、分类、详情页同时发起的解析会互相挤占，被挤掉的请求立刻报「域名解析繁忙」，表现为分集加载失败或反复重试、首次播放和下载等待变长。现在解析通道扩容，多请求并行不再互相拒绝。\n同时移除详情页顶部的装饰性模糊大图：旧电视/盒子的网页内核不支持它的模糊与渐变效果，会显示成一张清晰巨图挤乱布局；移除后详情页更干净，各机型一致。\n原生 TV 版（0.1.4）同步获得解析通道扩容。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T13:28:23.865Z"
 }
