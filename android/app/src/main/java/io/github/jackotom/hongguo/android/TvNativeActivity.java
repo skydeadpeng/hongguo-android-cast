@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.*;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 /** WebView-free TV library. Navigation, category selection and remote focus are separate states. */
@@ -32,6 +33,8 @@ public class TvNativeActivity extends Activity {
     private String mode = "catalog", category = "real-drama", libraryView = "favorites";
     private int page = 1, totalPages = 1, generation;
     private boolean loading, foreground, destroyed, hasResumed, downloadError;
+    private int feedOffset;
+    private String feedSession = "";
     private String libraryOwnerStamp = "";
     private LinearLayout secondary, stateRow, emptyPanel, pagePanel;
     private FrameLayout content;
@@ -164,6 +167,7 @@ public class TvNativeActivity extends Activity {
     }
     private void select(String nextMode, String nextCategory) {
         invalidateLoad(); mode = nextMode; category = nextCategory; page = totalPages = 1; downloadError = false;
+        feedOffset = 0; feedSession = "";
         items.clear(); adapter.notifyDataSetChanged(); more.setVisibility(View.GONE);
         pageScroll.setVisibility(View.GONE); emptyPanel.setVisibility(View.GONE); grid.setVisibility(View.VISIBLE);
         pagePanel.removeAllViews(); pageScroll.scrollTo(0, 0);
@@ -231,7 +235,7 @@ public class TvNativeActivity extends Activity {
         secondary.addView(view, params);
     }
     private void reload() {
-        if (mode.equals("catalog")) { invalidateLoad(); page = totalPages = 1; loadCatalog(false); }
+        if (mode.equals("catalog")) { invalidateLoad(); page = totalPages = 1; feedOffset = 0; feedSession = ""; loadCatalog(false); }
         else if (mode.equals("library")) { invalidateLoad(); loadLibrary(); }
         else if (mode.equals("downloads")) { invalidateLoad(); downloadError = false; loadDownloads(true); }
     }
@@ -259,11 +263,26 @@ public class TvNativeActivity extends Activity {
         try { loadTask = worker.submit(action); }
         catch (RejectedExecutionException rejected) { if (alive(ticket)) { loading = false; state("操作正在完成，请重试。", false, this::reload); } }
     }
+    /** Native categories keep their own labels; the official feed is keyed by genre ids. */
+    private static String genre(String category) {
+        return category.equals("comic-drama") ? "comic_series" : category.equals("ai-drama") ? "ai_series" : "short_play";
+    }
+    private static JSONObject nativeRow(JSONObject row) throws JSONException {
+        String id = row.optString("series_id", "");
+        if (!id.matches("[0-9]{1,30}") || row.optString("title", "").isEmpty()) return null;
+        return new JSONObject().put("seriesId", id).put("title", row.optString("title"))
+            .put("coverUrl", EpisodeResolver.publicHttpsUrl(row.optString("cover", "")))
+            .put("description", row.optString("description", ""))
+            .put("episodeCount", row.optInt("episode_count", 0))
+            .put("tags", row.optJSONArray("tags") == null ? new JSONArray() : row.optJSONArray("tags"));
+    }
     private void loadCatalog(boolean append) {
         if (!mode.equals("catalog") || loading || append && page >= totalPages) return;
         final int ticket = ++generation;
         final int target = append ? page + 1 : 1;
         final String targetCategory = category;
+        final int requestOffset = append ? feedOffset : 0;
+        final String requestSession = append ? feedSession : "";
         final int selection = grid.getSelectedItemPosition(), first = grid.getFirstVisiblePosition();
         final int previousCount = items.size();
         final boolean focusMore = more.hasFocus();
@@ -272,26 +291,43 @@ public class TvNativeActivity extends Activity {
         state(append ? "正在加载下一页…" : "正在读取片单…", true, null);
         submit(ticket, () -> {
             try {
-                JSONObject result = SiteCatalog.loadCatalog(targetCategory, target);
+                // The same official recommendation feed that drives the WebView home:
+                // genre chips in the sidebar map onto the official selector ids.
+                JSONObject result;
+                try (OfficialApiClient client = new OfficialApiClient(OfficialApiClient.newSession())) {
+                    client.deadlineNanos(System.nanoTime() + 20_000_000_000L);
+                    client.registerDevice();
+                    result = NewReleaseCatalog.feed(client, requestOffset, requestSession, genre(targetCategory));
+                }
                 JSONArray rows = result.getJSONArray("items");
+                JSONArray converted = new JSONArray();
+                for (int i = 0; i < rows.length(); i++) {
+                    JSONObject row = rows.optJSONObject(i);
+                    if (row != null) { JSONObject mapped = nativeRow(row); if (mapped != null) converted.put(mapped); }
+                }
+                final boolean hasMore = result.optBoolean("hasMore", false);
+                final int nextOffset = result.optInt("offset", requestOffset);
+                final String nextSession = result.optString("sessionId", requestSession);
                 runOnUiThread(() -> {
                     if (!alive(ticket) || !mode.equals("catalog") || !targetCategory.equals(category)) return;
                     loading = false; more.setEnabled(true); more.setText("加载更多");
-                    if (!append) items.clear();
+                    if (!append) { items.clear(); feedOffset = 0; feedSession = ""; }
                     Set<String> seen = new HashSet<>();
                     for (JSONObject row : items) seen.add(row.optString("seriesId"));
-                    for (int i = 0; i < rows.length(); i++) {
-                        JSONObject row = rows.optJSONObject(i);
+                    for (int i = 0; i < converted.length(); i++) {
+                        JSONObject row = converted.optJSONObject(i);
                         if (row != null && seen.add(row.optString("seriesId"))) items.add(row);
                     }
-                    page = result.optInt("page", target); totalPages = Math.max(page, result.optInt("totalPages", page));
+                    page = target;
+                    totalPages = hasMore ? page + 1 : page;
+                    feedOffset = nextOffset; feedSession = nextSession;
                     adapter.notifyDataSetChanged();
                     if (append) {
                         grid.setSelection(Math.max(0, focusMore ? Math.min(previousCount, items.size() - 1) : selection >= 0 ? selection : first));
                         if (focusMore && !items.isEmpty()) grid.requestFocus();
                     }
                     more.setVisibility(page < totalPages ? View.VISIBLE : View.GONE);
-                    pageSummary.setText("第 " + page + " 页 · " + items.size() + " 部");
+                    pageSummary.setText("第 " + page + " 批 · " + items.size() + " 部");
                     refreshRecentHistory();
                     state("", false, null);
                     if (items.isEmpty()) empty("这个分类暂时没有短剧", "可以刷新片单，或切换其他分类。", "重新加载", () -> loadCatalog(false));

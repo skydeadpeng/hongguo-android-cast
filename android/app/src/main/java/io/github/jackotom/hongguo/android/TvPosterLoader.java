@@ -51,7 +51,10 @@ final class TvPosterLoader {
         ScheduledFuture<?> timeout = TIMER.schedule(owner::interrupt, 8, TimeUnit.SECONDS);
         try {
             temporary = File.createTempFile("tv-poster-", ".image", context.getCacheDir());
-            NetworkGuard.download(url, temporary, 3 * 1024 * 1024);
+            // Official covers are HEIC templates; pre-28 devices cannot decode HEIF,
+            // so fetch the CDN's webp twin of the same picture (a no-op for others).
+            String fetch = CoverVariants.webp(url);
+            NetworkGuard.download(fetch == null ? url : fetch, temporary, 3 * 1024 * 1024);
             BitmapFactory.Options options = new BitmapFactory.Options(); options.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(temporary.getPath(), options);
             if (options.outWidth < 1 || options.outHeight < 1 || (long)options.outWidth * options.outHeight > 40_000_000L) return;
