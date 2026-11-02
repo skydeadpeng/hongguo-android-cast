@@ -1,0 +1,52 @@
+/* 红果 webOS 客户端 —— 10 英尺电视界面，遥控 D-pad focus 导航。 */
+*{box-sizing:border-box;margin:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#131516;color:#f2f2f2;
+  font-family:"LG Smart UI",system-ui,"PingFang SC","Microsoft YaHei",sans-serif;font-size:16px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.app{display:flex;height:100%}
+.sidebar{width:230px;flex-shrink:0;padding:34px 18px;border-right:1px solid #2e3134;display:flex;flex-direction:column}
+.brand{font-size:24px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:36px}
+.brand-mark{width:38px;height:38px;background:#e8503a;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff}
+.nav{display:flex;flex-direction:column;gap:8px}
+.nav button,.sidebar-foot{width:100%;text-align:left;padding:13px 16px;border-radius:10px;color:#a9adb1;font-size:18px}
+.nav button:focus{outline:none;background:#3a211e;color:#ef5a45;font-weight:600}
+.nav button.active{color:#ef5a45}
+.sidebar-foot{margin-top:auto;font-size:13px;color:#6e7278}
+.main{flex:1;overflow-y:auto;padding:34px 40px 60px}
+.main:focus{outline:none}
+h1{font-size:30px;margin-bottom:22px}
+.chips{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}
+.chips button{padding:10px 22px;border:1px solid #2e3134;border-radius:999px;color:#a9adb1;font-size:16px}
+.chips button:focus{outline:none;border-color:#ef5a45;color:#ef5a45;font-weight:600}
+.chips button.active{border-color:#ef5a45;color:#ef5a45}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:30px 22px}
+.card{border-radius:12px;text-align:left}
+.card:focus{outline:none}
+.card .art{position:relative;width:100%;padding-top:133%;border-radius:12px;overflow:hidden;background:#191b1d}
+.card .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.card strong{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+  font-size:17px;line-height:1.5;margin-top:10px;font-weight:600;min-height:50px}
+.card:focus .art{box-shadow:0 0 0 4px #ef5a45}
+.card .eps{position:absolute;right:8px;bottom:8px;background:rgba(20,20,26,.72);color:#fff;font-size:13px;padding:2px 9px;border-radius:999px}
+.state{padding:90px 30px;text-align:center;color:#a9adb1;font-size:18px;line-height:1.8}
+.state.err{color:#ef6a5b}
+.detail-head{display:flex;gap:30px;margin-bottom:30px}
+.detail-head img{width:190px;border-radius:12px;flex-shrink:0}
+.detail-info h1{font-size:28px;margin-bottom:12px}
+.detail-info p{color:#a9adb1;line-height:1.8;font-size:15px;max-width:70ch;white-space:pre-line}
+.detail-info .tags{display:flex;gap:10px;margin:14px 0}
+.detail-info .tags span{border:1px solid #2e3134;border-radius:999px;padding:4px 14px;font-size:13px;color:#a9adb1}
+.episodes{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:14px;margin-top:8px}
+.episodes button{height:60px;background:#202325;border:1px solid #2e3134;border-radius:9px;font-size:20px}
+.episodes button:focus{outline:none;border-color:#ef5a45;color:#ef5a45;font-weight:700}
+.episodes button.dim{color:#6e7278}
+.player{position:fixed;inset:0;background:#000;z-index:50;display:none}
+.player.open{display:block}
+.player video{width:100%;height:100%;background:#000}
+.player .back{position:fixed;top:26px;left:26px;z-index:51;background:rgba(20,20,26,.66);color:#fff;
+  padding:12px 22px;border-radius:999px;font-size:16px}
+.player .back:focus{outline:none;box-shadow:0 0 0 3px #ef5a45}
+.toast{position:fixed;left:50%;bottom:46px;transform:translateX(-50%);background:#26262b;color:#fff;
+  padding:14px 24px;border-radius:999px;font-size:16px;z-index:60}
+.spinner{width:44px;height:44px;margin:0 auto 18px;border:4px solid #2e3134;border-top-color:#ef5a45;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
