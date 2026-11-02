@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 63,
-  "versionName": "0.12.40",
+  "versionCode": 64,
+  "versionName": "0.12.41",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.40/Hongguo-0.12.40-tv-release-compatible.apk",
-  "size": 641348,
-  "sha256": "f03e8d397865b9aaa65fab0da6ca39b43ac5a62e231da7885e936a50b0391d68",
-  "notes": "修复点开剧集后第一集加载慢、缓存慢的问题：应用内域名解析的并发通道只有两个名额，首页推荐、分类、详情页同时发起的解析会互相挤占，被挤掉的请求立刻报「域名解析繁忙」，表现为分集加载失败或反复重试、首次播放和下载等待变长。现在解析通道扩容，多请求并行不再互相拒绝。\n同时移除详情页顶部的装饰性模糊大图：旧电视/盒子的网页内核不支持它的模糊与渐变效果，会显示成一张清晰巨图挤乱布局；移除后详情页更干净，各机型一致。\n原生 TV 版（0.1.4）同步获得解析通道扩容。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-02T13:28:24.141Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.41/Hongguo-0.12.41-tv-release-compatible.apk",
+  "size": 641344,
+  "sha256": "6dd369d3dd622619f338f8671c2b2978110c060d8bdc14d1ccf9858d9b1e5773",
+  "notes": "修复部分电视/盒子上首页封面全部「暂无封面」：个别电视系统（如 tc8000 方案）把系统图片解码接口列入限制名单，封面转码在解码第一步就静默失败。现在解码失败自动改用兼容路径处理 CDN 的 webp 同图，受限电视上封面恢复显示。详情页解析通道扩容（0.12.40）保持不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T13:55:15.172Z"
 }
