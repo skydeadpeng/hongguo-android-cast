@@ -268,8 +268,12 @@ async function fetchPlayUrlFromWeb(vid, sid, onFailure) {
       const matchesPlayer = value => {
         try {
           const target = new URL(value);
+          // The official page binds VideoObject.url to the series (/player/{sid}) since
+          // late 2026; older pages carry /player/{sid}/{vid}. The per-episode binding is
+          // already enforced above by the router data (data.vid === requested vid and
+          // publicVideoSeo.itemId/seriesId), so the URL check only pins origin + series.
           return target.origin === SITE_ORIGIN && !target.username && !target.password &&
-            target.pathname === `/player/${actualSid}/${String(vid)}`;
+            (target.pathname === `/player/${actualSid}/${String(vid)}` || target.pathname === `/player/${actualSid}`);
         } catch (_) { return false; }
       };
       for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
