@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 61,
+  "versionName": "0.12.38",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.38/Hongguo-0.12.38-phone-release-compatible.apk",
+  "size": 642212,
+  "sha256": "a1ec562f9ca17a3ba746982e953a83d2585310297cbc55dd3ebd6ab251b285ce",
+  "notes": "首页恢复官方分类筛选：上一版首页切到官方推荐流后，真人剧/漫剧/AI剧的分类标签消失了（手机和 TV 都受影响）。现在分类标签回归首页，且直接来自官方筛选面板的真实频道（点击即按官方频道重新拉取推荐流）；TV 版首页同步生效。详情页分集解析偶发失败时自动重试一次的机制保持不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T00:00:23.396Z"
+}
