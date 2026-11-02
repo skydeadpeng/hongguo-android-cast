@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 61,
-  "versionName": "0.12.38",
+  "versionCode": 62,
+  "versionName": "0.12.39",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.38/Hongguo-0.12.38-tv-release-compatible.apk",
-  "size": 640300,
-  "sha256": "5b512f8c93b73e5827519e6d983566864f86902bd57493550a0d9903e3471471",
-  "notes": "首页恢复官方分类筛选：上一版首页切到官方推荐流后，真人剧/漫剧/AI剧的分类标签消失了（手机和 TV 都受影响）。现在分类标签回归首页，且直接来自官方筛选面板的真实频道（点击即按官方频道重新拉取推荐流）；TV 版首页同步生效。详情页分集解析偶发失败时自动重试一次的机制保持不变。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-02T00:23:17.975Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.39/Hongguo-0.12.39-tv-release-compatible.apk",
+  "size": 640832,
+  "sha256": "9e119b89f5d23a2728fe6a58203f77537ce134ceabf67f1495125f5ae6eb3dfd",
+  "notes": "修复 TV 盒子首页封面不显示：上一版首页封面改用官方 HEIC 原图，且只在较新的系统（Android 9+）上转码内联，老电视/盒子会整页「暂无封面」。现在封面在任何受支持的系统上都先转成通用格式内联显示；无法内联时自动改用官方 CDN 的 webp 同图，网页层还有一道自动重试兜底，转码失败也不再把封面清空。手机版同样受益；0.12.38 的首页官方分类（真人剧/漫剧/AI剧）保持不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T11:55:17.299Z"
 }
