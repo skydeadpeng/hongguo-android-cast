@@ -9,6 +9,9 @@ const crypto = require('node:crypto');
 const sm3 = require('./sm3');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
 const localId = () => String(1000000000000000n + BigInt('0x' + crypto.randomBytes(6).toString('hex')));
+// 已登记设备身份（device_register 之后由桥接层注入）；未登记时保持合成身份。
+let registeredIdentity = null;
+function setDeviceIdentity(identity) { registeredIdentity = identity; }
 const PROCESS_NONCE = crypto.randomBytes(18).toString('base64url');
 const PROCESS_STARTED = Date.now();
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
@@ -127,7 +130,7 @@ function branchOf(url, body, khronos) { const bodyMd5 = body ? crypto.createHash
 /** Signed POST against any endpoint of the app's API family (the model feed, the catalog landpage, search). */
 function signedAppRequest(api, payload) {
     // Keep the request's synthetic identity consistent across URL and signature.
-    const device = { ...DEVICE, iid: localId(), device_id: localId() };
+    const device = { ...DEVICE, iid: registeredIdentity ? registeredIdentity.iid : localId(), device_id: registeredIdentity ? registeredIdentity.device_id : localId() };
     const khronos = Math.floor(Date.now() / 1000); const body = Buffer.from(payload); const ticketBase = Date.now(); let requestTicket = ticketBase; let query = ''; let url = '';
     // branch 1 的签名变体服务端不认：抖动 _rticket 找一个可用的 branch（最多试 32 秒偏移）
     for (let offset = 0; offset < 32; offset += 1) { requestTicket = ticketBase + offset; const values = { ...device, ts: String(khronos), _rticket: String(requestTicket) }; query = pythonUrlEncode(values); url = `${api}?${query}`; if (branchOf(url, body, khronos) !== 1) break; }
@@ -418,4 +421,4 @@ async function fetchAppPlayUrl(vid, options = {}) {
         : Object.assign(new Error('本集片源地址或密钥无法解析'), { code: 'INVALID_RESPONSE' });
 }
 
-module.exports = { fetchAppPlayUrl, signedAppRequest, API_HOSTS: [new URL(VIDEO_API).host] };
+module.exports = { fetchAppPlayUrl, signedAppRequest, setDeviceIdentity, API_HOSTS: [new URL(VIDEO_API).host] };

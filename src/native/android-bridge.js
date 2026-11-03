@@ -6,10 +6,12 @@
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const { fetchAppPlayUrl, signedAppRequest } = require('./app-source');
+const { fetchAppPlayUrl, signedAppRequest, setDeviceIdentity } = require('./app-source');
+const passport = require('./passport-register.cjs');
 const hongguo = require('./hongguo');
 
 const CATALOG_API = 'https://api5-normal-lq.fqnovel.com/reading/distribution/category/landpage/v/';
+const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
 const PAGE_LIMIT = 20;
 const GENRE = {
   '真人剧': 'short_play', 'short_play': 'short_play',
@@ -186,6 +188,25 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
   const prefs = new KeyValue(path.join(userDataDir, 'android-prefs.json'));
   const say = message => { if (log) log(message); };
   const UNSUPPORTED = name => { throw new Error(`${name}将在桌面版后续版本开放`); };
+  const identityFile = path.join(userDataDir, 'passport-device.json');
+  let identityPromise = null;
+  // 设备注册一次并持久化；失败不落盘，下次重试。
+  function ensureRegisteredDevice() {
+    if (!identityPromise) {
+      identityPromise = (async () => {
+        try {
+          const saved = JSON.parse(fs.readFileSync(identityFile, 'utf8'));
+          if (saved && /^[1-9][0-9]{0,29}$/.test(saved.deviceId) && /^[1-9][0-9]{0,29}$/.test(saved.installId)) return saved;
+        } catch { }
+        const identity = await passport.registerDevice({ axios });
+        try { fs.writeFileSync(identityFile, JSON.stringify(identity)); } catch { }
+        say('设备注册成功 device_id=' + identity.deviceId);
+        return identity;
+      })();
+      identityPromise.catch(() => { }).finally(() => { identityPromise = null; });
+    }
+    return identityPromise;
+  }
 
   return {
     async handle(method, params) {
@@ -245,7 +266,30 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
         case 'mergeDownloads': UNSUPPORTED('合并导出'); break;
         case 'deleteMergedVideo': return { deleted: false };
         case 'playMergedVideo': UNSUPPORTED('合并版播放'); break;
-        case 'appRegisteredModel': throw new Error('桌面版未登记设备模型'); // 渲染进程自动回落到签名直连
+        case 'appRegisteredModel': {
+          // 已登记设备模型（安卓 RegisteredPlaybackModel 同构）：确保设备注册后按已登记身份取单集模型。
+          const vid = String(params && params.vid || '');
+          if (!/^\d{1,30}$/.test(vid)) throw new Error('App 分集请求参数无效');
+          const identity = await ensureRegisteredDevice();
+          setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
+          try {
+            const payload = JSON.stringify({
+              biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
+              mixed_video_id_map: { '1004': [vid] },
+            });
+            const signed = signedAppRequest(VIDEO_API, payload);
+            const response = await axios.post(signed.url, signed.body, { headers: signed.headers, timeout: 15000, responseType: 'text', validateStatus: () => true });
+            console.log('[RegisteredModel] status=' + response.status + ' head=' + String(response.data || '').slice(0, 160));
+            const text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+            let body;
+            try { body = JSON.parse(text); } catch { throw Object.assign(new Error('App 已登记模型响应无效'), { code: 'APP_INVALID_RESPONSE' }); }
+            if (Number(body.Code ?? body.code ?? -1) !== 0) throw Object.assign(new Error('App 已登记模型请求未通过'), { code: 'BUSINESS_REJECTED' });
+            const entry = body.data && body.data[vid];
+            const model = entry ? (typeof entry.video_model === 'string' ? JSON.parse(entry.video_model) : entry.video_model) : null;
+            if (!model || typeof model !== 'object') throw Object.assign(new Error('App 已登记模型未返回本集'), { code: 'APP_EMPTY_RESPONSE' });
+            return { vid, video_model: model };
+          } finally { setDeviceIdentity(null); }
+        }
         case 'appRequest': return appRequest(params);
         case 'appResolveResult': if (onResolveResult) onResolveResult(params || {}); return { accepted: true };
         // 播放器窗口回写进度
