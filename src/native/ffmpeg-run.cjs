@@ -9,11 +9,13 @@ const path = require('path');
 function ffmpegExecutable() {
   const roots = process.resourcesPath ? [process.resourcesPath] : [path.join(__dirname, '..', '..')];
   for (const root of roots) {
-    for (const arch of [process.arch, 'arm64', 'x64']) {
-      const candidate = path.join(root, 'ffmpeg', `darwin-${arch}`, 'ffmpeg');
+    // 打包布局：build/ffmpeg/darwin-<arch> → resources/bin/ffmpeg；开发布局：build/ffmpeg/...
+    for (const candidate of [path.join(root, 'bin', 'ffmpeg'), path.join(root, 'bin', 'ffmpeg.exe'), path.join(root, 'ffmpeg', 'ffmpeg')]) {
       if (fs.existsSync(candidate)) return candidate;
-      const candidate2 = path.join(root, 'build', 'ffmpeg', `darwin-${arch}`, 'ffmpeg');
-      if (fs.existsSync(candidate2)) return candidate2;
+    }
+    for (const arch of [process.arch, 'arm64', 'x64']) {
+      const candidate = path.join(root, 'build', 'ffmpeg', `darwin-${arch}`, 'ffmpeg');
+      if (fs.existsSync(candidate)) return candidate;
     }
   }
   return 'ffmpeg';

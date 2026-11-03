@@ -169,7 +169,7 @@ function openPlayer(payload) {
         if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.webContents.send('android-resume'); mainWindow.show(); }
       });
     }).catch(error => {
-      console.log('[Play] 失败:', error.message);
+      console.log('[Play] 失败:', error && error.message || error);
     });
 }
 

@@ -10,6 +10,7 @@ const sm3 = require('./sm3');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
 const localId = () => String(1000000000000000n + BigInt('0x' + crypto.randomBytes(6).toString('hex')));
 // 已登记设备身份（device_register 之后由桥接层注入）；未登记时保持合成身份。
+// identity 可带完整档案字段（version_code 等）与 ua，会整体覆盖合成档案。
 let registeredIdentity = null;
 function setDeviceIdentity(identity) { registeredIdentity = identity; }
 const PROCESS_NONCE = crypto.randomBytes(18).toString('base64url');
@@ -130,12 +131,14 @@ function branchOf(url, body, khronos) { const bodyMd5 = body ? crypto.createHash
 /** Signed POST against any endpoint of the app's API family (the model feed, the catalog landpage, search). */
 function signedAppRequest(api, payload) {
     // Keep the request's synthetic identity consistent across URL and signature.
-    const device = { ...DEVICE, iid: registeredIdentity ? registeredIdentity.iid : localId(), device_id: registeredIdentity ? registeredIdentity.device_id : localId() };
+    const overrides = registeredIdentity ? { ...registeredIdentity.profile, ua: registeredIdentity.ua, iid: registeredIdentity.iid, device_id: registeredIdentity.device_id } : null;
+    const device = overrides ? { ...DEVICE, ...overrides } : { ...DEVICE, iid: localId(), device_id: localId() };
+    const userAgent = overrides && overrides.ua ? overrides.ua : VIDEO_UA;
     const khronos = Math.floor(Date.now() / 1000); const body = Buffer.from(payload); const ticketBase = Date.now(); let requestTicket = ticketBase; let query = ''; let url = '';
     // branch 1 的签名变体服务端不认：抖动 _rticket 找一个可用的 branch（最多试 32 秒偏移）
     for (let offset = 0; offset < 32; offset += 1) { requestTicket = ticketBase + offset; const values = { ...device, ts: String(khronos), _rticket: String(requestTicket) }; query = pythonUrlEncode(values); url = `${api}?${query}`; if (branchOf(url, body, khronos) !== 1) break; }
     const random = Math.floor(Math.random() * 65536); const headers = {
-        'User-Agent': VIDEO_UA, Accept: 'application/json; charset=utf-8,application/x-protobuf', 'Content-Type': 'application/json; charset=UTF-8',
+        'User-Agent': userAgent, Accept: 'application/json; charset=utf-8,application/x-protobuf', 'Content-Type': 'application/json; charset=UTF-8',
         'x-xs-from-web': '0', 'x-ss-req-ticket': String(requestTicket), 'x-tt-request-tag': 't=0;n=0', 'sdk-version': '2', 'passport-sdk-version': '50561',
         'x-vc-bdturing-sdk-version': '3.7.2.cn', 'x-ss-stub': md5(body), 'x-gorgon': xGorgon(query, body, khronos, random),
         'x-khronos': String(khronos), 'x-ladon': be32(khronos).toString('base64'), 'x-argus': le32(khronos).toString('base64'),

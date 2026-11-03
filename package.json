@@ -1,8 +1,8 @@
 {
   "name": "hongguo-downloader",
-  "version": "2.3.1",
+  "version": "3.0.0",
   "description": "红果短剧播放与下载",
-  "main": "main.js",
+  "main": "main-android.js",
   "license": "GPL-3.0",
   "scripts": {
     "start": "electron .",
@@ -65,14 +65,16 @@
       "output": "dist"
     },
     "files": [
-      "main.js",
-      "preload.js",
-      "dist-react/**/*",
+      "main-android.js",
+      "preload-android.js",
+      "desktop-android-player/**/*",
+      "dist-react-android/**/*",
+      "src/android/**/*",
       "src/native/**/*",
       "src/store.js"
     ],
     "asar": true,
-    "artifactName": "hongguo-downloader-2.3-${os}-${arch}.${ext}",
+    "artifactName": "hongguo-downloader-3.0-${os}-${arch}.${ext}",
     "win": {
       "target": [
         {

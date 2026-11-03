@@ -131,11 +131,11 @@ function gorgon(query, body, ts, nonce) {
   return hex(join(Buffer.from([0x84, 4, nonce & 255, (nonce >>> 8) & 255, 0x40, 1]), data));
 }
 function helios(ts, nonce) {
-  const raw = hex(md5(join(le32Buffer(nonce), Buffer.from('8662'))));
-  const rawBytes = unhex(raw);
-  let left = BigInt.asIntN(64, rawBytes.readBigUInt64LE(0));
-  let right = BigInt.asIntN(64, rawBytes.readBigUInt64LE(8));
-  const queue = [BigInt.asIntN(64, rawBytes.readBigUInt64LE(16)), BigInt.asIntN(64, rawBytes.readBigUInt64LE(24))];
+  // Java: bytes(hex(md5(...))) 保留 hex 字符串的 ASCII 字节（32 字节），不是摘要二进制。
+  const raw = Buffer.from(hex(md5(join(le32Buffer(nonce), Buffer.from('8662')))), 'ascii');
+  let left = BigInt.asIntN(64, raw.readBigUInt64LE(0));
+  let right = BigInt.asIntN(64, raw.readBigUInt64LE(8));
+  const queue = [BigInt.asIntN(64, raw.readBigUInt64LE(16)), BigInt.asIntN(64, raw.readBigUInt64LE(24))];
   const rotateRight64 = (value, n) => BigInt.asIntN(64, (BigInt.asUintN(64, value) >> BigInt(n)) | (BigInt.asUintN(64, value) << BigInt(64 - n)));
   const rotateLeft64 = (value, n) => BigInt.asIntN(64, (BigInt.asUintN(64, value) << BigInt(n)) | (BigInt.asUintN(64, value) >> BigInt(64 - n)));
   const rounds = new Array(34);
@@ -203,7 +203,7 @@ function f13(branch, ts) {
 }
 function protoBuilder() {
   const chunks = [];
-  const raw = n => { let value = BigInt(n); while (value & ~127n) { chunks.push(Number(value & 127n) | 128); value >>= 7n; } chunks.push(Number(value)); };
+  const raw = n => { let value = BigInt(n); while (value & ~127n) { chunks.push(Buffer.from([Number(value & 127n) | 128])); value >>= 7n; } chunks.push(Buffer.from([Number(value)])); };
   const sint = (field, n) => { raw(BigInt(field) * 8n); raw(BigInt.asIntN(64, BigInt(n)) << 1n ^ BigInt.asIntN(64, BigInt(n)) >> 63n); };
   const blob = (field, bytes) => { if (bytes.length === 0) return; raw(BigInt(field) * 8n + 2n); raw(BigInt(bytes.length)); chunks.push(Buffer.from(bytes)); };
   const text = (field, value) => blob(field, Buffer.from(String(value), 'utf8'));
@@ -429,6 +429,42 @@ function baseQuery(device) {
     version_name: '7.3.5.32', cdid: device.cdid, openudid: device.openudid,
   };
 }
+
+/**
+ * 已登记设备的业务请求（安卓 cloud() 同构）：
+ * baseQuery + PassportSigner 完整签名（Gorgon/Helios/Medusa）+ 安卓同款头与 Cookie。
+ * 注意：desktop app-source 的 xGorgon 变体只服务于未登记的合成身份；
+ * 已登记身份必须走本函数这套完整签名，服务端才返回模型数据。
+ */
+async function registeredCloudRequest({ axios, path, body, identity, cookie }) {
+  const payload = Buffer.from(body || '', 'utf8');
+  const stamp = Date.now();
+  const ts = (stamp / 1000) | 0;
+  const random = [crypto.randomBytes(2).readUInt16LE(0), crypto.randomBytes(2).readUInt16LE(0), crypto.randomBytes(2).readUInt16LE(0), crypto.randomBytes(2).readUInt16LE(0)];
+  const query = { ...baseQuery(identity.device), device_id: identity.deviceId, iid: identity.installId };
+  const signed = signQuery(query, payload, stamp, identity.deviceId, random);
+  const headers = {
+    ...signed.headers,
+    'User-Agent': UA,
+    'Accept': 'application/json',
+    'X-XS-From-Web': '0',
+    'Sdk-Version': '2',
+    'Passport-Sdk-Version': '6031190',
+    'X-SS-DP': '8662',
+    'X-Tt-Store-Region': 'cn',
+    'X-Tt-Store-Region-Src': 'did',
+    'Content-Type': 'application/json; charset=utf-8',
+  };
+  const cookieParts = [];
+  if (cookie) cookieParts.push(cookie);
+  if (identity.deviceToken) cookieParts.push('device_token=' + identity.deviceToken);
+  cookieParts.push('install_id=' + identity.installId);
+  headers.Cookie = cookieParts.join('; ');
+  const response = await axios.post('https://api5-normal-lq.fqnovel.com' + path + '?' + signed.query, payload, {
+    headers, timeout: 15000, responseType: 'text', validateStatus: () => true, maxContentLength: 8 * 1024 * 1024,
+  });
+  return response;
+}
 async function registerDevice({ axios }) {
   const device = createDevice();
   const stamp = Date.now();
@@ -463,11 +499,14 @@ async function registerDevice({ axios }) {
   };
   const response = await axios.post(REGISTER + '?' + raw, body, { headers, timeout: 20000, responseType: 'arraybuffer', validateStatus: () => true });
   if (response.status !== 200) throw new Error('设备注册响应 HTTP ' + response.status);
+  // 注册下发的会话凭据（Set-Cookie）与 device_token 必须在后续模型请求里带上，
+  // 否则服务端按未登记设备处理并返回空响应（安卓版 saveCookies 同义）。
+  const setCookie = response.headers['set-cookie'];
+  const cookie = Array.isArray(setCookie) ? setCookie.map(item => item.split(';')[0]).join('; ') : String(setCookie || '').split(';')[0];
   let wire = Buffer.from(response.data);
   if (response.headers['content-encoding'] === 'gzip') wire = zlib.gunzipSync(wire);
   if (wire.subarray(0, 6).equals(MAGIC)) wire = decryptDeviceResponse(wire);
   const text = wire.toString('utf8');
-  console.log('[Register] 解密响应前 400 字节:', text.slice(0, 400));
   const pick = key => {
     const strMatch = new RegExp('"' + key + '_str"\\s*:\\s*"([1-9][0-9]{0,29})"').exec(text);
     if (strMatch) return strMatch[1];
@@ -476,7 +515,9 @@ async function registerDevice({ axios }) {
   };
   const deviceId = pick('device_id'), installId = pick('install_id');
   if (!deviceId || !installId) throw new Error('设备注册未返回有效身份');
-  return { deviceId, installId, device };
+  const tokenMatch = /"device_token"\s*:\s*"([^"]+)"/.exec(text);
+  const deviceToken = tokenMatch ? tokenMatch[1] : '';
+  return { deviceId, installId, device, cookie, deviceToken };
 }
 
-module.exports = { registerDevice, signQuery, sm3, gorgon, hex };
+module.exports = { registerDevice, signQuery, registeredCloudRequest, sm3, gorgon, hex };

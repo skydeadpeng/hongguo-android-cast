@@ -207,6 +207,34 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
     }
     return identityPromise;
   }
+  // 强制重新注册（会话失效/服务端拒绝后的恢复路径）。
+  async function reRegisterDevice() {
+    try { fs.rmSync(identityFile, { force: true }); } catch { }
+    const identity = await passport.registerDevice({ axios });
+    try { fs.writeFileSync(identityFile, JSON.stringify(identity)); } catch { }
+    say('设备重新注册 device_id=' + identity.deviceId);
+    return identity;
+  }
+  // 已登记身份（尽力而为：注册未完成时返回 null，调用方保持合成身份）。
+  function registeredIdentityOrNull() {
+    try {
+      const saved = JSON.parse(fs.readFileSync(identityFile, 'utf8'));
+      if (saved && /^[1-9][0-9]{0,29}$/.test(saved.deviceId) && /^[1-9][0-9]{0,29}$/.test(saved.installId)) return saved;
+    } catch { }
+    return null;
+  }
+  // App 家族请求统一改写为已登记设备身份（安卓同构：原生层所有请求共用登记身份）。
+  function withRegisteredIdentity(url) {
+    const identity = registeredIdentityOrNull();
+    if (!identity) return url;
+    try {
+      const target = new URL(url);
+      if (!target.hostname.endsWith('fqnovel.com')) return url;
+      target.searchParams.set('device_id', identity.deviceId);
+      target.searchParams.set('iid', identity.installId);
+      return target.toString();
+    } catch { return url; }
+  }
 
   return {
     async handle(method, params) {
@@ -267,27 +295,48 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
         case 'deleteMergedVideo': return { deleted: false };
         case 'playMergedVideo': UNSUPPORTED('合并版播放'); break;
         case 'appRegisteredModel': {
-          // 已登记设备模型（安卓 RegisteredPlaybackModel 同构）：确保设备注册后按已登记身份取单集模型。
+          // 已登记设备模型（安卓 RegisteredPlaybackModel 同构）。模型接口间歇返回空体
+          // （安卓同样带重试语义）：最多 4 次，命中即回。
           const vid = String(params && params.vid || '');
           if (!/^\d{1,30}$/.test(vid)) throw new Error('App 分集请求参数无效');
-          const identity = await ensureRegisteredDevice();
+          let identity = await ensureRegisteredDevice();
+          // 已登记身份：只覆盖 device_id/iid（档案版本保持 71332 族——模型接口按此档案签发）。
           setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
-          try {
-            const payload = JSON.stringify({
+          try {            const payload = JSON.stringify({
               biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
               mixed_video_id_map: { '1004': [vid] },
             });
-            const signed = signedAppRequest(VIDEO_API, payload);
-            const response = await axios.post(signed.url, signed.body, { headers: signed.headers, timeout: 15000, responseType: 'text', validateStatus: () => true });
-            console.log('[RegisteredModel] status=' + response.status + ' head=' + String(response.data || '').slice(0, 160));
-            const text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-            let body;
-            try { body = JSON.parse(text); } catch { throw Object.assign(new Error('App 已登记模型响应无效'), { code: 'APP_INVALID_RESPONSE' }); }
-            if (Number(body.Code ?? body.code ?? -1) !== 0) throw Object.assign(new Error('App 已登记模型请求未通过'), { code: 'BUSINESS_REJECTED' });
-            const entry = body.data && body.data[vid];
-            const model = entry ? (typeof entry.video_model === 'string' ? JSON.parse(entry.video_model) : entry.video_model) : null;
-            if (!model || typeof model !== 'object') throw Object.assign(new Error('App 已登记模型未返回本集'), { code: 'APP_EMPTY_RESPONSE' });
-            return { vid, video_model: model };
+            let lastError = null;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              if (attempt > 0) {
+                // 空响应＝会话失效或短期拒绝：重新注册一个新身份再试（与服务端的新鲜会话语义一致）。
+                await new Promise(resolve => setTimeout(resolve, 800 + attempt * 700));
+                await reRegisterDevice();
+                const fresh = registeredIdentityOrNull();
+                if (fresh) { identity.deviceId = fresh.deviceId; identity.installId = fresh.installId; identity.cookie = fresh.cookie; identity.deviceToken = fresh.deviceToken; }
+                setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
+              }
+              const signed = signedAppRequest(VIDEO_API, payload);
+              const cookieParts = [];
+              if (identity.cookie) cookieParts.push(identity.cookie);
+              if (identity.deviceToken) cookieParts.push('device_token=' + identity.deviceToken);
+              cookieParts.push('install_id=' + identity.installId);
+              const response = await axios.post(signed.url, signed.body, {
+                headers: { ...signed.headers, Cookie: cookieParts.join('; ') },
+                timeout: 15000, responseType: 'text', validateStatus: () => true,
+                maxContentLength: 8 * 1024 * 1024,
+              });
+              const text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+              if (!text || text.length < 8) { lastError = Object.assign(new Error('App 已登记模型空响应'), { code: 'APP_EMPTY_RESPONSE' }); continue; }
+              let body;
+              try { body = JSON.parse(text); } catch { throw Object.assign(new Error('App 已登记模型响应无效'), { code: 'APP_INVALID_RESPONSE' }); }
+              if (Number(body.Code ?? body.code ?? -1) !== 0) throw Object.assign(new Error('App 已登记模型请求未通过'), { code: 'BUSINESS_REJECTED' });
+              const entry = body.data && body.data[vid];
+              const model = entry ? (typeof entry.video_model === 'string' ? JSON.parse(entry.video_model) : entry.video_model) : null;
+              if (!model || typeof model !== 'object') { lastError = Object.assign(new Error('App 已登记模型未返回本集'), { code: 'APP_EMPTY_RESPONSE' }); continue; }
+              return { vid, video_model: model };
+            }
+            throw lastError || new Error('App 已登记模型未成功');
           } finally { setDeviceIdentity(null); }
         }
         case 'appRequest': return appRequest(params);
