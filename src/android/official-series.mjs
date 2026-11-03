@@ -22,6 +22,7 @@ if(typeof window!=='undefined')window.__androidSeriesResponse=message=>{
   if(!message||typeof message.id!=='string')return;const request=pending.get(message.id);if(!request)return;request.clean();
   if(message.error!=null)request.reject(message.errorCode==='ERR_CANCELED'?cancelled():new Error(String(message.error)));else request.resolve(message.result);
 };
+if(typeof window!=='undefined'){try{window.AndroidSeries?.onResponse?.(message=>window.__androidSeriesResponse(message));}catch{}}
 function project(raw){
   if(!raw||typeof raw.seriesId!=='string'||!ID.test(raw.seriesId)||typeof raw.title!=='string'||!raw.title.trim()||raw.title.length>200||typeof raw.playable!=='boolean'||typeof raw.upcoming!=='boolean')throw new Error('官方分季条目无效');
   if(raw.upcoming&&raw.playable)throw new Error('待上线分季状态无效');

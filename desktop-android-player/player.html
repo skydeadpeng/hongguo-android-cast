@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>红果短剧播放</title>
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif}
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+video{width:100%;height:100%;background:#000}
+.hud{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;opacity:0;transition:opacity .25s;pointer-events:none}
+.hud.show{opacity:1;pointer-events:auto}
+.top{display:flex;align-items:center;gap:14px;padding:18px 22px;background:linear-gradient(180deg,rgba(0,0,0,.65),transparent)}
+.top .back{padding:9px 20px;border-radius:999px;background:rgba(30,30,34,.8);color:#fff;font-size:15px;border:0}
+.top .title{color:#fff;font-size:17px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bottom{padding:14px 22px 20px;background:linear-gradient(0deg,rgba(0,0,0,.75),transparent)}
+.row{display:flex;align-items:center;gap:14px}
+.row button{background:rgba(30,30,34,.8);color:#fff;border:0;border-radius:9px;padding:10px 18px;font-size:15px}
+.row .time{color:#ddd;font-size:13px;min-width:120px;text-align:center}
+.row .spacer{flex:1}
+.row .label{color:#aaa;font-size:13px}
+input[type=range]{flex:1;accent-color:#e8503a;height:5px}
+.center{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#a9adb1;font-size:15px;background:#000}
+.center .err{color:#ef6a5b;text-align:center;line-height:1.8;max-width:70ch;padding:0 30px}
+.spin{width:42px;height:42px;border:4px solid #2e3134;border-top-color:#e8503a;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="hud" id="hud">
+  <div class="top"><button class="back" id="back">◀ 返回</button><span class="title" id="title"></span></div>
+  <div class="bottom">
+    <input type="range" id="seek" min="0" max="1000" value="0">
+    <div class="row">
+      <button id="prev">上一集</button>
+      <button id="toggle">暂停</button>
+      <button id="next">下一集</button>
+      <span class="time" id="time">00:00 / 00:00</span>
+      <span class="spacer"></span>
+      <span class="label" id="quality"></span>
+      <button id="speed">倍速 1×</button>
+    </div>
+  </div>
+</div>
+<div class="center" id="state"><div class="spin"></div><span id="stateText">正在解析本集片源…</span></div>
+<script>
+const api = window.HongguoPlayer;
+const video = document.createElement('video');
+video.playsInline = true;
+document.getElementById('stage').appendChild(video);
+const hud = document.getElementById('hud'), titleEl = document.getElementById('title'),
+  stateEl = document.getElementById('state'), stateText = document.getElementById('stateText'),
+  seek = document.getElementById('seek'), timeEl = document.getElementById('time'),
+  toggle = document.getElementById('toggle'), speedButton = document.getElementById('speed'),
+  qualityEl = document.getElementById('quality');
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2, 3];
+let speedAt = 1, session = null, hideTimer = null, progressTimer = null;
+
+function fmt(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
+  const m = Math.floor(seconds / 60), s = Math.floor(seconds % 60);
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+function showHud() {
+  hud.classList.add('show');
+  clearTimeout(hideTimer); hideTimer = setTimeout(() => hud.classList.remove('show'), 3200);
+}
+function state(text, error) {
+  stateEl.style.display = text ? 'flex' : 'none';
+  stateText.textContent = text || '';
+  stateText.className = error ? 'err' : '';
+}
+function saveProgress() {
+  if (!session || !video.duration || !Number.isFinite(video.duration)) return;
+  api.progress({ row: { seriesId: session.seriesId, title: session.title, cover: session.cover, episodeCount: session.episodeCount,
+    index: session.episode.index, vid: session.episode.vid, positionMs: Math.round(video.currentTime * 1000), durationMs: Math.round(video.duration * 1000) } });
+}
+async function load(episode) {
+  session.episode = episode; session.startAt = episode.resumeMs || 0;
+  state(episode.prepared ? '' : '正在下载本集到本地…'); video.removeAttribute('src'); video.load();
+  try {
+    const info = episode.prepared ? { playUrl: episode.prepared, qualityLabel: session.qualityLabel || '' }
+      : await api.resolve({ seriesId: session.seriesId, vid: episode.vid, quality: session.quality });
+    titleEl.textContent = session.title + ' · 第 ' + episode.index + ' 集';
+    qualityEl.textContent = '片源 ' + (info.qualityLabel || '');
+    video.src = info.playUrl;
+    state('');
+    await video.play().catch(() => {});
+    if (session.startAt > 0 && session.startAt < (video.duration || 1e9)) { try { video.currentTime = session.startAt / 1000; } catch {} }
+    saveProgress();
+  } catch (error) { state((error && error.message || '本集解析失败') + '\n可返回后换一集，或稍后重试。', true); }
+}
+api.onSession(payload => {
+  session = payload;
+  video.playbackRate = session.speed || 1; speedAt = SPEEDS.indexOf(session.speed || 1); speedAt = speedAt < 0 ? 1 : speedAt;
+  const start = payload.episodes.find(item => String(item.vid) === String(payload.startVid)) || payload.episodes[0];
+  start.prepared = payload.startPlayUrl; // 主进程已整集下载就绪
+  if (payload.episodes.length > 1) document.getElementById('next').disabled = document.getElementById('prev').disabled = false;
+  load(start);
+});
+video.addEventListener('timeupdate', () => {
+  if (video.duration) { seek.value = Math.round(video.currentTime / video.duration * 1000); timeEl.textContent = fmt(video.currentTime) + ' / ' + fmt(video.duration); }
+});
+seek.addEventListener('input', () => { if (video.duration) video.currentTime = seek.value / 1000 * video.duration; });
+seek.addEventListener('change', () => saveProgress());
+toggle.addEventListener('click', () => { if (video.paused) { video.play(); toggle.textContent = '暂停'; } else { video.pause(); toggle.textContent = '播放'; } showHud(); });
+document.getElementById('prev').addEventListener('click', () => { const at = session.episodes.findIndex(item => String(item.vid) === String(session.episode.vid)); if (at > 0) load(session.episodes[at - 1]); showHud(); });
+document.getElementById('next').addEventListener('click', () => { const at = session.episodes.findIndex(item => String(item.vid) === String(session.episode.vid)); if (at >= 0 && at < session.episodes.length - 1) load(session.episodes[at + 1]); showHud(); });
+speedButton.addEventListener('click', () => { speedAt = (speedAt + 1) % SPEEDS.length; video.playbackRate = SPEEDS[speedAt]; speedButton.textContent = '倍速 ' + SPEEDS[speedAt] + '×'; showHud(); });
+document.getElementById('back').addEventListener('click', () => api.close());
+video.addEventListener('click', showHud);
+video.addEventListener('mousemove', showHud);
+video.addEventListener('ended', saveProgress);
+setInterval(() => { if (!video.paused && !video.ended) saveProgress(); }, 4000);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') api.close();
+  else if (event.key === ' ') { event.preventDefault(); toggle.click(); }
+  else if (event.key === 'ArrowRight') { video.currentTime = Math.min((video.duration || 0), video.currentTime + 10); showHud(); }
+  else if (event.key === 'ArrowLeft') { video.currentTime = Math.max(0, video.currentTime - 10); showHud(); }
+  else if (event.key === 'ArrowUp') { video.volume = Math.min(1, video.volume + 0.1); showHud(); }
+  else if (event.key === 'ArrowDown') { video.volume = Math.max(0, video.volume - 0.1); showHud(); }
+});
+</script>
+</body>
+</html>
