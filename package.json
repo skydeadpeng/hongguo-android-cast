@@ -115,7 +115,7 @@
       ]
     },
     "portable": {
-      "artifactName": "${productName}-2.3-便携版.${ext}"
+      "artifactName": "${productName}-3.0-便携版.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -123,7 +123,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "红果短剧下载器",
-      "artifactName": "hongguo-downloader-2.3-win-x64-setup.${ext}"
+      "artifactName": "hongguo-downloader-3.0-win-x64-setup.${ext}"
     },
     "mac": {
       "target": [
