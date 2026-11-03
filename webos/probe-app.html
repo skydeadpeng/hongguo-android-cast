@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>webOS 应用自检</title></head>
+<body>
+<pre id="out">running…</pre>
+<div id="app" style="display:none"></div>
+<script src="js/source.js"></script>
+<script src="js/crypto-primitives.js"></script>
+<script src="js/signer.js"></script>
+<script src="js/passport.js"></script>
+<script src="js/app-chain.js"></script>
+<script>
+(async () => {
+  const out = document.getElementById('out');
+  const log = []; const say = t => { log.push(t); out.textContent = log.join('\n'); };
+  try {
+    const catalog = await HongguoSource.browse('real-drama');
+    say('分类目录 rows=' + catalog.results.length + ' 首条=' + catalog.results[0].title.slice(0, 18));
+    const detail = await HongguoSource.episodes(catalog.results[0].seriesId);
+    say('选集 total=' + detail.total + ' web开放=' + detail.webAccessibleEpisodes);
+    const vid = detail.episodes[0].vid;
+    const play = await HongguoSource.playUrl(catalog.results[0].seriesId, vid, { appChain: HongguoAppChain, proxy: null });
+    say('播放地址 source=' + play.source + ' url=' + String(play.url).slice(0, 64));
+    const head = await fetch(String(play.url).slice(0, 200), { method: 'GET', headers: { Range: 'bytes=0-1023' } }).catch(e => null);
+    say('视频可达=' + (head ? head.status : '失败'));
+    window.__WEBOS_APP__ = { ok: true, rows: catalog.results.length, total: detail.total, source: play.source, videoStatus: head ? head.status : 0 };
+    say('RESULT=OK');
+  } catch (error) {
+    say('ERROR: ' + (error && error.message ? error.message : String(error)));
+    window.__WEBOS_APP__ = { ok: false, reason: String((error && error.message) || error) };
+  }
+})();
+</script>
+</body></html>

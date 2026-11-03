@@ -1,28 +1,35 @@
-/* 红果 webOS 客户端 UI：分类 → 剧集 → 播放。遥控 D-pad（方向键 + Enter）+ 返回键。 */
+/* 红果 webOS 客户端：分类 → 剧集 → 播放（连播 + 预取），遥控 D-pad 导航。 */
 (function () {
   'use strict';
   var source = window.HongguoSource;
+  var appChain = window.HongguoAppChain || null;
   var main = document.getElementById('main');
   var nav = document.getElementById('nav');
   var toastEl = document.getElementById('toast');
-  var state = { category: source.CATEGORIES[0].slug, view: { name: 'home' } };
+  var state = { category: source.CATEGORIES[0].slug, view: { name: 'home' }, settings: loadSettings() };
+
+  function loadSettings() {
+    try { return JSON.parse(localStorage.getItem('hongguo.settings') || '{}') || {}; } catch (e) { return {}; }
+  }
+  function saveSettings(patch) {
+    state.settings = Object.assign({}, state.settings, patch);
+    try { localStorage.setItem('hongguo.settings', JSON.stringify(state.settings)); } catch (e) { }
+  }
 
   function toast(text) {
     toastEl.textContent = text; toastEl.hidden = false;
-    clearTimeout(toast._t); toast._t = setTimeout(function () { toastEl.hidden = true; }, 3200);
+    clearTimeout(toast._t); toast._t = setTimeout(function () { toastEl.hidden = true; }, 3000);
   }
   function esc(value) {
     return String(value == null ? '' : value).replace(/[&<>"]/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
-  function spinner(text) {
-    return '<div class="state"><div class="spinner"></div>' + esc(text || '正在读取…') + '</div>';
-  }
+  function spinner(text) { return '<div class="state"><div class="spinner"></div>' + esc(text || '正在读取…') + '</div>'; }
   function errorState(message) {
-    main.innerHTML = '<div class="state err">' + esc(message) + '<br><br><button id="retry" class="chips"><span>重试</span></button></div>';
+    main.innerHTML = '<div class="state err">' + esc(message) + '<br><br><button id="retry" class="retry">重新加载</button></div>';
     var retry = document.getElementById('retry');
-    if (retry) { retry.className = ''; retry.style.cssText = 'padding:10px 26px;border:1px solid #ef5a45;border-radius:999px;color:#ef5a45'; retry.addEventListener('click', render); retry.focus(); }
+    if (retry) { retry.addEventListener('click', render); retry.focus(); }
   }
 
   // ===== 栏目 =====
@@ -35,32 +42,31 @@
       button.addEventListener('click', function () {
         if (state.category === entry.slug && state.view.name === 'home') return;
         state.category = entry.slug; state.view = { name: 'home' };
-        [].forEach.call(nav.children, function (n) { n.classList.toggle('active', n.dataset.slug === entry.slug); });
+        Array.prototype.forEach.call(nav.children, function (n) { n.classList.toggle('active', n.dataset.slug === entry.slug); });
         render();
       });
       nav.appendChild(button);
     });
   }
 
-  // ===== 首页网格 =====
+  // ===== 首页 =====
   function render() {
     if (state.view.name === 'home') renderHome();
     else if (state.view.name === 'detail') renderDetail(state.view.seriesId);
   }
   function renderHome() {
-    main.innerHTML = '<h1>' + esc(navLabel()) + '</h1><div id="body">' + spinner() + '</div>';
+    main.innerHTML = '<h1>' + esc(categoryLabel()) + '</h1><div id="body">' + spinner() + '</div>';
     source.browse(state.category).then(function (data) {
       if (state.view.name !== 'home') return;
       var body = document.getElementById('body');
       if (!data.results.length) { body.innerHTML = '<div class="state">这个分类暂时没有内容</div>'; return; }
-      body.innerHTML = '<div class="chips" id="cats"></div><div class="grid">' +
-        data.results.map(function (item) {
-          return '<button type="button" class="card" data-sid="' + item.seriesId + '">' +
-            '<span class="art">' + (item.cover ? '<img src="' + esc(item.cover) + '" alt="" loading="lazy">' : '') +
-            (item.episodeCount ? '<span class="eps">全' + item.episodeCount + '集</span>' : '') + '</span>' +
-            '<strong>' + esc(item.title) + '</strong></button>';
-        }).join('') + '</div>';
-      [].forEach.call(body.querySelectorAll('.card'), function (card) {
+      body.innerHTML = '<div class="grid">' + data.results.map(function (item) {
+        return '<button type="button" class="card" data-sid="' + item.seriesId + '">' +
+          '<span class="art">' + (item.cover ? '<img src="' + esc(item.cover) + '" alt="" loading="lazy">' : '') +
+          (item.episodeCount ? '<span class="eps">全' + item.episodeCount + '集</span>' : '') + '</span>' +
+          '<strong>' + esc(item.title) + '</strong></button>';
+      }).join('') + '</div>';
+      Array.prototype.forEach.call(body.querySelectorAll('.card'), function (card) {
         card.addEventListener('click', function () {
           state.view = { name: 'detail', seriesId: card.dataset.sid };
           render();
@@ -70,63 +76,149 @@
       if (first) first.focus();
     }).catch(function (error) { errorState(error.message || '读取失败'); });
   }
-  function navLabel() {
+  function categoryLabel() {
     for (var i = 0; i < source.CATEGORIES.length; i++) if (source.CATEGORIES[i].slug === state.category) return source.CATEGORIES[i].label;
     return '发现';
   }
 
   // ===== 详情 =====
   function renderDetail(seriesId) {
-    main.innerHTML = '<div id="body">' + spinner() + '</div>';
+    main.innerHTML = '<div id="body">' + spinner('正在读取选集…') + '</div>';
     source.episodes(seriesId).then(function (data) {
       if (state.view.name !== 'detail' || state.view.seriesId !== seriesId) return;
       var body = document.getElementById('body');
       state.view.episodes = data;
       var gated = data.webAccessibleEpisodes !== null && data.webAccessibleEpisodes < data.total;
-      body.innerHTML = '<div class="detail-head"><img src="" alt="" hidden><div class="detail-info">' +
+      body.innerHTML = '<div class="detail-head"><img id="detailCover" src="" alt="" hidden><div class="detail-info">' +
         '<h1>' + esc(data.title) + '</h1>' +
-        '<p>全 ' + data.total + ' 集' + (gated ? ' · 官网开放前 ' + data.webAccessibleEpisodes + ' 集，其余请在官方 App 观看' : '') + '</p></div></div>' +
-        '<h1 style="font-size:20px">选集</h1><div class="episodes">' +
+        '<p>全 ' + data.total + ' 集' + (gated ? ' · 官网开放前 ' + data.webAccessibleEpisodes + ' 集试看，其余需官方 App 通道' : '') + '</p>' +
+        '</div></div>' +
+        '<h2 class="episodes-title">选集</h2><div class="episodes">' +
         data.episodes.map(function (episode) {
           var dim = data.webAccessibleEpisodes !== null && !episode.webAvailable;
           return '<button type="button" data-vid="' + episode.vid + '"' + (dim ? ' class="dim" disabled' : '') + '>' + episode.index + '</button>';
         }).join('') + '</div>';
-      [].forEach.call(body.querySelectorAll('.episodes button:not([disabled])'), function (button) {
-        button.addEventListener('click', function () { play(seriesId, button.dataset.vid, data.title); });
+      Array.prototype.forEach.call(body.querySelectorAll('.episodes button:not([disabled])'), function (button) {
+        button.addEventListener('click', function () { play(seriesId, button.dataset.vid, data.title, data.episodes); });
       });
       var first = body.querySelector('.episodes button:not([disabled])');
       if (first) first.focus();
     }).catch(function (error) { errorState(error.message || '读取失败'); });
   }
 
-  // ===== 播放 =====
+  // ===== 播放（含连播预取）=====
   var player = null;
-  function play(seriesId, vid, title) {
-    toast('正在解析本集片源…');
-    source.playUrl(seriesId, vid).then(function (info) {
-      if (!player) {
-        player = document.createElement('div');
-        player.className = 'player';
-        player.innerHTML = '<button type="button" class="back">◀ 返回</button><video controls autoplay></video>';
-        document.body.appendChild(player);
-        player.querySelector('.back').addEventListener('click', closePlayer);
-        player.querySelector('video').addEventListener('error', function () {
-          toast('本集播放失败，请稍后重试'); closePlayer();
-        });
-      }
-      player.querySelector('video').src = info.url;
-      player.classList.add('open');
-      player.dataset.vid = vid;
-      player.querySelector('video').focus();
-    }).catch(function (error) { toast(error.message || '解析失败'); });
+  var session = null;
+  function ensurePlayer() {
+    if (player) return player;
+    player = document.createElement('div');
+    player.className = 'player';
+    player.innerHTML = '<button type="button" class="back">◀ 返回</button><video controls autoplay playsinline></video>' +
+      '<div class="player-bar"><button type="button" id="pPrev">上一集</button><button type="button" id="pToggle">暂停</button>' +
+      '<button type="button" id="pNext">下一集</button><span id="pTime">00:00 / 00:00</span>' +
+      '<span class="spacer"></span><button type="button" id="pAuto">连播 开</button></div>';
+    document.body.appendChild(player);
+    var video = player.querySelector('video');
+    player.querySelector('.back').addEventListener('click', closePlayer);
+    player.querySelector('#pPrev').addEventListener('click', function () { stepEpisode(-1); });
+    player.querySelector('#pNext').addEventListener('click', function () { stepEpisode(1); });
+    player.querySelector('#pToggle').addEventListener('click', function () {
+      if (video.paused) { video.play(); player.querySelector('#pToggle').textContent = '暂停'; }
+      else { video.pause(); player.querySelector('#pToggle').textContent = '播放'; }
+    });
+    player.querySelector('#pAuto').addEventListener('click', function () {
+      var next = !(state.settings.autoplay !== false);
+      saveSettings({ autoplay: next });
+      player.querySelector('#pAuto').textContent = '连播 ' + (next ? '开' : '关');
+    });
+    video.addEventListener('timeupdate', function () {
+      if (!video.duration) return;
+      player.querySelector('#pTime').textContent = fmt(video.currentTime) + ' / ' + fmt(video.duration);
+    });
+    video.addEventListener('ended', function () {
+      if (state.settings.autoplay === false) return;
+      if (stepEpisode(1)) toast('正在播放下一集');
+    });
+    return player;
+  }
+  function fmt(seconds) {
+    if (!isFinite(seconds) || seconds < 0) seconds = 0;
+    var m = Math.floor(seconds / 60), s = Math.floor(seconds % 60);
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function play(seriesId, vid, title, episodes) {
+    var box = ensurePlayer();
+    var video = box.querySelector('video');
+    session = { seriesId: seriesId, vid: vid, title: title, episodes: episodes || [], prefetched: null, prefetching: null };
+    box.classList.add('open');
+    box.querySelector('#pAuto').textContent = '连播 ' + (state.settings.autoplay !== false ? '开' : '关');
+    video.removeAttribute('src'); video.load();
+    var st = document.createElement('div'); st.className = 'state-overlay'; st.textContent = '正在准备本集…';
+    box.appendChild(st);
+    resolveEpisode(seriesId, vid).then(function (info) {
+      st.remove();
+      video.src = info.url;
+      if (info.userAgent) video.setAttribute('data-ua', info.userAgent);
+      video.play().catch(function () { });
+      prefetchNext();
+    }).catch(function (error) {
+      st.remove();
+      st = document.createElement('div'); st.className = 'state-overlay err';
+      st.textContent = (error && error.message ? error.message : '本集暂不可播放');
+      box.appendChild(st);
+    });
+  }
+  function resolveEpisode(seriesId, vid) {
+    var options = { appChain: appChain, proxy: state.settings.proxy };
+    return source.playUrl(seriesId, vid, options).then(function (info) {
+      return { url: info.url, userAgent: info.userAgent || '', referer: info.referer || '' };
+    });
+  }
+  /** 后台预取下一集：连播切换时零等待。 */
+  function prefetchNext() {
+    if (!session || !session.episodes || session.episodes.length < 2) return;
+    var at = indexOfEpisode(session.vid);
+    if (at < 0 || at >= session.episodes.length - 1) return;
+    var next = session.episodes[at + 1];
+    if (session.prefetching && String(session.prefetching) === String(next.vid)) return;
+    session.prefetching = next.vid;
+    resolveEpisode(session.seriesId, next.vid).then(function (info) {
+      if (session && String(session.prefetching) === String(next.vid)) { session.prefetched = { vid: next.vid, info: info }; session.prefetching = null; }
+    }).catch(function () { if (session) session.prefetching = null; });
+  }
+  function indexOfEpisode(vid) {
+    for (var i = 0; i < (session.episodes || []).length; i++) if (String(session.episodes[i].vid) === String(vid)) return i;
+    return -1;
+  }
+  function stepEpisode(step) {
+    if (!session || !session.episodes) return false;
+    var at = indexOfEpisode(session.vid);
+    var target = at + step;
+    if (target < 0 || target >= session.episodes.length) return false;
+    var episode = session.episodes[target];
+    session.vid = episode.vid;
+    if (session.prefetched && String(session.prefetched.vid) === String(episode.vid)) {
+      var info = session.prefetched.info; session.prefetched = null;
+      applyPlayInfo(info);
+    } else {
+      resolveEpisode(session.seriesId, episode.vid).then(applyPlayInfo).catch(function (error) { toast(error.message || '下一集准备失败'); });
+    }
+    return true;
+  }
+  function applyPlayInfo(info) {
+    if (!player || !info) return;
+    var video = player.querySelector('video');
+    video.src = info.url;
+    video.play().catch(function () { });
+    prefetchNext();
   }
   function closePlayer() {
     if (!player) return;
     var video = player.querySelector('video');
     video.pause(); video.removeAttribute('src'); video.load();
     player.classList.remove('open');
-    var target = main.querySelector('.episodes button[data-vid="' + player.dataset.vid + '"]') || main.querySelector('.card');
-    if (target) target.focus();
+    var back = document.querySelector('.episodes button:not([disabled])');
+    if (back) back.focus();
   }
 
   // ===== 遥控键 =====
@@ -136,10 +228,6 @@
       if (state.view.name === 'detail') { event.preventDefault(); state.view = { name: 'home' }; render(); }
     }
   });
-  // webOS 平台返回键（webOSDev/LunaSystemFont 环境注入的 palm back）
-  if (window.webOS && window.webOS.event && typeof window.webOS.event.addEventListener === 'function') {
-    try { window.webOS.event.addEventListener('application', function (event) { if (event.key === 'back') { closePlayer(); if (state.view.name === 'detail') { state.view = { name: 'home' }; render(); } } }); } catch (_) { }
-  }
 
   buildNav();
   render();

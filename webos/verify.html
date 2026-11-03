@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>webOS 取源自检</title></head>
+<body>
+<pre id="out">running…</pre>
+<script src="js/crypto-primitives.js"></script>
+<script src="js/signer.js"></script>
+<script src="js/passport.js"></script>
+<script>
+(async () => {
+  const out = document.getElementById('out');
+  const log = [];
+  const say = text => { log.push(text); out.textContent = log.join('\n'); };
+  const headersOf = response => {
+    const list = [];
+    response.headers.forEach((value, key) => list.push(key + '=' + value.slice(0, 60)));
+    return list.join(' | ');
+  };
+  try {
+    const identity = await HongguoPassport.registerDevice({ signer: HongguoSigner, withCredentials: true });
+    say('注册成功 device_id=' + identity.deviceId + ' iid=' + identity.installId);
+    say('token=' + (identity.deviceToken ? '有' : '无') + ' cookie可见=' + (identity.cookie ? '是' : '否'));
+
+    const payload = JSON.stringify({
+      biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
+      mixed_video_id_map: { '1004': ['7701937936731737112'] },
+    });
+    const signed = HongguoSigner.signAppRequest('https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/', payload, {
+      deviceId: identity.deviceId, installId: identity.installId,
+    });
+    // 浏览器不能手动设 Cookie 头，改用 credentials:'include' 让浏览器自动携带会话。
+    const response = await fetch(signed.url, { method: 'POST', headers: signed.headers, body: signed.body, credentials: 'include' });
+    say('模型响应头: ' + headersOf(response));
+    const text = await response.text();
+    say('模型接口 status=' + response.status + ' bytes=' + text.length);
+    if (text.length < 8) { say('RESULT=EMPTY'); window.__WEBOS_PROBE__ = { ok: false, reason: 'empty model' }; return; }
+    const body = JSON.parse(text);
+    const entry = body.data && body.data['7701937936731737112'];
+    const model = entry ? (typeof entry.video_model === 'string' ? JSON.parse(entry.video_model) : entry.video_model) : null;
+    const list = model && model.video_list ? Object.values(model.video_list) : [];
+    say('模型条目=' + list.length);
+    list.slice(0, 3).forEach((item, index) => {
+      say('#' + index + ' codec=' + item.codec_type + ' def=' + item.definition + ' url=' + String(item.main_url || '').slice(0, 60) +
+        ' spade=' + (item.spade_a ? '有' : '无') + ' encrypt=' + JSON.stringify(item.encrypt_info || {}).slice(0, 60));
+    });
+    window.__WEBOS_PROBE__ = { ok: true, deviceId: identity.deviceId, items: list.length, hasSpade: !!(list[0] && list[0].spade_a), encrypt: list[0] && list[0].encrypt_info && list[0].encrypt_info.encrypt };
+    say('RESULT=OK');
+  } catch (error) {
+    say('ERROR: ' + (error && error.message ? error.message : String(error)));
+    window.__WEBOS_PROBE__ = { ok: false, reason: String((error && error.message) || error) };
+  }
+})();
+</script>
+</body>
+</html>

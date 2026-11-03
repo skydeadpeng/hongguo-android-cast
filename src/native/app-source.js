@@ -424,4 +424,4 @@ async function fetchAppPlayUrl(vid, options = {}) {
         : Object.assign(new Error('本集片源地址或密钥无法解析'), { code: 'INVALID_RESPONSE' });
 }
 
-module.exports = { fetchAppPlayUrl, signedAppRequest, setDeviceIdentity, API_HOSTS: [new URL(VIDEO_API).host] };
+module.exports = { fetchAppPlayUrl, signedAppRequest, setDeviceIdentity, __xGorgon: xGorgon, API_HOSTS: [new URL(VIDEO_API).host] };

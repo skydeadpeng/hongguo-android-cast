@@ -132,7 +132,7 @@
       var contentUrl = typeof video.contentUrl === 'string' ? video.contentUrl : '';
       if (!/^https?:\/\//.test(contentUrl)) continue;
       if (!publicMediaUrl(contentUrl)) continue;
-      return { vid: String(vid), seriesId: actualSid, url: contentUrl };
+      return { vid: String(vid), seriesId: actualSid, url: contentUrl, source: 'web', quality: '360p', items: [] };
     }
     throw new Error('本集未提供网页直链');
     /** 与桌面 web-media-guard 同语义：仅公网 http(s)，拒绝内网/本机/带凭据地址。 */
@@ -160,12 +160,26 @@
     }
   }
 
-  function playUrl(seriesId, vid) {
-    if (!/^\d{5,30}$/.test(String(seriesId)) || !/^\d{5,30}$/.test(String(vid))) {
-      return Promise.reject(new Error('剧集或分集编号无效'));
-    }
-    return fetchHtml('/player/' + encodeURIComponent(seriesId) + '/' + encodeURIComponent(vid), 10000)
-      .then(function (html) { return parsePlayUrl(html, seriesId, vid); });
+  /**
+   * 单集播放地址：优先官方加密链（配置了中转时可得完整正片），
+   * 否则回落官网明文直链（仅前几集开放试看）。
+   */
+  function playUrl(seriesId, vid, options) {
+    var settings = options || {};
+    var appChain = settings.appChain || null;
+    var chain = appChain && appChain.resolveEpisode
+      ? appChain.resolveEpisode(String(vid), { proxy: settings.proxy })
+      : Promise.resolve(null);
+    return chain.then(function (items) {
+      if (items && items.length) {
+        var best = items[0];
+        return { vid: String(vid), seriesId: String(seriesId), url: best.url, source: 'app', quality: best.quality,
+          items: items, userAgent: best.userAgent || '', referer: best.referer || '' };
+      }
+      return fetchHtml('/player/' + encodeURIComponent(seriesId) + '/' + encodeURIComponent(vid), 10000).then(function (html) {
+        return parsePlayUrl(html, seriesId, vid);
+      });
+    });
   }
 
   return {
