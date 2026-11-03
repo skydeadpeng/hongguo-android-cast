@@ -92,3 +92,6 @@ output/
 未命名文件夹/
 untitled folder/
 Screenshot_*.jpg
+
+# 桌面安卓 UI 构建产物
+dist-react-android/
