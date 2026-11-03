@@ -23,10 +23,12 @@ contextBridge.exposeInMainWorld('AndroidCrypto', {
 contextBridge.exposeInMainWorld('HongguoPlayer', {
   onSession: handler => ipcRenderer.on('player-session', (_event, payload) => handler(payload)),
   resolve: async payload => {
+    // 主进程 handler 直接返回解析结果（异常会以 rejected promise 形式抛出）。
     const result = await ipcRenderer.invoke('player-resolve', payload);
-    if (!result || !result.ok) throw new Error(result && result.error || '解析失败');
-    return result.value;
+    if (!result || !result.playUrl) throw new Error('解析失败');
+    return result;
   },
   progress: payload => { ipcRenderer.send('player-progress', payload); },
+  setOption: payload => { ipcRenderer.send('player-option', payload); },
   close: () => ipcRenderer.send('player-close'),
 });

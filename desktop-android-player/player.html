@@ -39,6 +39,7 @@ input[type=range]{flex:1;accent-color:#e8503a;height:5px}
       <span class="time" id="time">00:00 / 00:00</span>
       <span class="spacer"></span>
       <span class="label" id="quality"></span>
+      <button id="autoplay">连播 开</button>
       <button id="speed">倍速 1×</button>
     </div>
   </div>
@@ -55,6 +56,7 @@ const hud = document.getElementById('hud'), titleEl = document.getElementById('t
   toggle = document.getElementById('toggle'), speedButton = document.getElementById('speed'),
   qualityEl = document.getElementById('quality');
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2, 3];
+const autoplayButton = document.getElementById('autoplay');
 let speedAt = 1, session = null, hideTimer = null, progressTimer = null;
 
 function fmt(seconds) {
@@ -78,7 +80,8 @@ function saveProgress() {
 }
 async function load(episode) {
   session.episode = episode; session.startAt = episode.resumeMs || 0;
-  state(episode.prepared ? '' : '正在下载本集到本地…'); video.removeAttribute('src'); video.load();
+  // 准备下一集期间保留当前画面，拿到新地址后再切换。
+  state(episode.prepared ? '' : '正在准备下一集…');
   try {
     const info = episode.prepared ? { playUrl: episode.prepared, qualityLabel: session.qualityLabel || '' }
       : await api.resolve({ seriesId: session.seriesId, vid: episode.vid, quality: session.quality });
@@ -89,7 +92,34 @@ async function load(episode) {
     await startPlayback();
     if (session.startAt > 0 && session.startAt < (video.duration || 1e9)) { try { video.currentTime = session.startAt / 1000; } catch {} }
     saveProgress();
+    prefetchNext();
   } catch (error) { state((error && error.message || '本集解析失败') + '\n可返回后换一集，或稍后重试。', true); }
+}
+/** 连播：播完自动切下一集；下一集已在本地缓存时直接秒开。 */
+function nextEpisode() {
+  const at = session.episodes.findIndex(item => String(item.vid) === String(session.episode.vid));
+  if (at < 0 || at >= session.episodes.length - 1) { state('已经是最后一集'); return null; }
+  const episode = session.episodes[at + 1];
+  if (session.prefetched && String(session.prefetched.vid) === String(episode.vid)) {
+    episode.prepared = session.prefetched.playUrl;
+    session.prefetched = null;
+    load(episode);
+    return episode;
+  }
+  load(episode);
+  return episode;
+}
+/** 预取下一集：当前集开始播放后后台解析并下载下一集，连播切换零等待。 */
+function prefetchNext() {
+  if (!session || !session.episodes || session.episodes.length < 2) return;
+  const at = session.episodes.findIndex(item => String(item.vid) === String(session.episode.vid));
+  if (at < 0 || at >= session.episodes.length - 1) return;
+  const next = session.episodes[at + 1];
+  if (session.prefetching && String(session.prefetching) === String(next.vid)) return;
+  session.prefetching = next.vid;
+  api.resolve({ seriesId: session.seriesId, vid: next.vid, quality: session.quality })
+    .then(info => { if (session && String(session.prefetching) === String(next.vid)) { session.prefetched = { vid: next.vid, playUrl: info.playUrl }; session.prefetching = null; } })
+    .catch(() => { if (session) session.prefetching = null; });
 }
 /** 自动播放被系统策略拦截时，退回静音自动播放并提示开启声音。 */
 async function startPlayback() {
@@ -103,11 +133,23 @@ video.addEventListener('click', () => {
 });
 api.onSession(payload => {
   session = payload;
+  session.title = payload.title || (payload.series && payload.series.title) || '短剧';
+  session.seriesId = payload.seriesId || (payload.series && payload.series.seriesId) || '';
+  session.episodes = payload.episodes || [];
+  session.quality = payload.quality || 'auto';
+  session.autoplay = payload.autoplay !== false;
+  autoplayButton.textContent = '连播 ' + (session.autoplay ? '开' : '关');
   video.playbackRate = session.speed || 1; speedAt = SPEEDS.indexOf(session.speed || 1); speedAt = speedAt < 0 ? 1 : speedAt;
   const start = payload.episodes.find(item => String(item.vid) === String(payload.startVid)) || payload.episodes[0];
   start.prepared = payload.startPlayUrl; // 主进程已整集下载就绪
   if (payload.episodes.length > 1) document.getElementById('next').disabled = document.getElementById('prev').disabled = false;
   load(start);
+});
+autoplayButton.addEventListener('click', () => {
+  session.autoplay = !session.autoplay;
+  autoplayButton.textContent = '连播 ' + (session.autoplay ? '开' : '关');
+  api.setOption({ autoplay: session.autoplay });
+  showHud();
 });
 video.addEventListener('timeupdate', () => {
   if (video.duration) { seek.value = Math.round(video.currentTime / video.duration * 1000); timeEl.textContent = fmt(video.currentTime) + ' / ' + fmt(video.duration); }
@@ -116,12 +158,17 @@ seek.addEventListener('input', () => { if (video.duration) video.currentTime = s
 seek.addEventListener('change', () => saveProgress());
 toggle.addEventListener('click', () => { if (video.paused) { video.play(); toggle.textContent = '暂停'; } else { video.pause(); toggle.textContent = '播放'; } showHud(); });
 document.getElementById('prev').addEventListener('click', () => { const at = session.episodes.findIndex(item => String(item.vid) === String(session.episode.vid)); if (at > 0) load(session.episodes[at - 1]); showHud(); });
-document.getElementById('next').addEventListener('click', () => { const at = session.episodes.findIndex(item => String(item.vid) === String(session.episode.vid)); if (at >= 0 && at < session.episodes.length - 1) load(session.episodes[at + 1]); showHud(); });
+document.getElementById('next').addEventListener('click', () => { nextEpisode(); showHud(); });
 speedButton.addEventListener('click', () => { speedAt = (speedAt + 1) % SPEEDS.length; video.playbackRate = SPEEDS[speedAt]; speedButton.textContent = '倍速 ' + SPEEDS[speedAt] + '×'; showHud(); });
 document.getElementById('back').addEventListener('click', () => api.close());
 video.addEventListener('click', showHud);
 video.addEventListener('mousemove', showHud);
-video.addEventListener('ended', saveProgress);
+video.addEventListener('ended', () => {
+  saveProgress();
+  // 连播：播完自动下一集（预取命中时零等待）。
+  if (session.autoplay === false) return;
+  if (nextEpisode()) toast('正在播放下一集');
+});
 setInterval(() => { if (!video.paused && !video.ended) saveProgress(); }, 4000);
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') api.close();
