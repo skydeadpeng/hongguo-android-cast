@@ -3,6 +3,7 @@
  * 安全说明：可执行文件来自固定的打包资源路径白名单；参数为静态数组；
  * decryptionKey 在调用前已通过 32 位十六进制强校验（见调用方）。
  */
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -93,28 +94,38 @@ async function downloadEpisodeToFile(playInfo, destination, { axios, signal } = 
   const total = Number(response.headers['content-length']) || 0;
   if (total > limit) { response.data.destroy(); throw new Error('本集过大，请下载后播放'); }
   const fsp = require('fs/promises');
-  const os = require('os');
   const pipeline = require('stream/promises').pipeline;
-  const encryptedPath = contentKey || spadeA ? path.join(path.dirname(destination), 'incoming-' + path.basename(destination)) : destination;
+  // 临时名必须唯一：预取与手动切集可能同时下载同一集，共用固定名会互相覆盖，
+  // 一个流程清理临时文件时另一个的 ffmpeg 正在读它（No such file or directory）。
+  const unique = crypto.randomBytes(6).toString('hex');
+  const stem = path.basename(destination);
+  const encryptedPath = contentKey || spadeA ? path.join(path.dirname(destination), `incoming-${unique}-${stem}`) : destination;
+  const decodedPath = path.join(path.dirname(destination), `decoded-${unique}-${stem}`);
+  // 明文源也先落临时名再改名：中途退出的半截文件不能留在缓存目录里被当成完整集。
+  const plainTempPath = path.join(path.dirname(destination), `incoming-${unique}-${stem}`);
   try {
-    await pipeline(response.data, fs.createWriteStream(encryptedPath, { mode: 0o600 }), { signal });
+    await pipeline(response.data, fs.createWriteStream(contentKey || spadeA ? encryptedPath : plainTempPath, { mode: 0o600 }), { signal });
     if (contentKey) {
-      const output = path.join(path.dirname(destination), 'decoded-' + path.basename(destination));
-      await decryptCencFile(encryptedPath, output, contentKey);
-      await fsp.rename(output, destination);
+      await decryptCencFile(encryptedPath, decodedPath, contentKey);
+      await fsp.rename(decodedPath, destination);
     } else if (spadeA) {
       const { decryptInWorker } = require('./decrypt-worker.cjs');
       const buffer = await fsp.readFile(encryptedPath);
       const key = (() => { try { return require('./hongguo').deriveKey(spadeA); } catch { return null; } })();
       if (!key) throw new Error('密钥派生失败');
       const decrypted = await decryptInWorker({ buffer, key }, { signal });
-      await fsp.writeFile(destination, decrypted, { mode: 0o600 });
+      await fsp.writeFile(decodedPath, decrypted, { mode: 0o600 });
+      await fsp.rename(decodedPath, destination);
+    } else {
+      await fsp.rename(plainTempPath, destination);
     }
     const stat = await fsp.stat(destination);
     if (!stat.size) throw new Error('视频下载不完整，请重试');
     return { bytes: stat.size };
   } finally {
     if (encryptedPath !== destination) fsp.rm(encryptedPath, { force: true }).catch(() => { });
+    if (plainTempPath !== destination) fsp.rm(plainTempPath, { force: true }).catch(() => { });
+    fsp.rm(decodedPath, { force: true }).catch(() => { });
   }
 }
 

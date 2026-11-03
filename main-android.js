@@ -41,13 +41,21 @@ async function pruneCache() {
     }
   } catch { }
 }
+const pendingDownloads = new Map();  // vid → Promise（同一集的并发下载共用一次）
 async function prepareLocalEpisode(playInfo, vid) {
   const destination = path.join(cacheDir(), `${vid}-${(playInfo.contentKey ? 'c' : playInfo.spadeA ? 's' : 'p')}.mp4`);
   try { const existing = await fsp.stat(destination); if (existing.size > 1024) return { filePath: destination, size: existing.size, cached: true }; } catch { }
-  await downloadEpisodeToFile(playInfo, destination);
-  const stat = await fsp.stat(destination);
-  pruneCache();
-  return { filePath: destination, size: stat.size, cached: false };
+  // 预取与手动切集可能同时要同一集：复用同一下载，避免并发写同一临时文件。
+  if (pendingDownloads.has(vid)) return pendingDownloads.get(vid);
+  const task = downloadEpisodeToFile(playInfo, destination)
+    .then(async () => {
+      const stat = await fsp.stat(destination);
+      pruneCache();
+      return { filePath: destination, size: stat.size, cached: false };
+    })
+    .finally(() => { pendingDownloads.delete(vid); });
+  pendingDownloads.set(vid, task);
+  return task;
 }
 
 const bridge = createAndroidBridge({
