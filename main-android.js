@@ -13,6 +13,8 @@ const hongguo = require('./src/native/hongguo');
 const { downloadEpisodeToFile } = require('./src/native/ffmpeg-run.cjs');
 
 app.setName('hongguo-downloader');
+// 桌面播放器本就应随点随播：解除 Chromium 对自动播放的用户手势要求。
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 let mainWindow = null, playerWindow = null;
 let resolveSequence = 0;

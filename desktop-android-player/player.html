@@ -86,11 +86,21 @@ async function load(episode) {
     qualityEl.textContent = '片源 ' + (info.qualityLabel || '');
     video.src = info.playUrl;
     state('');
-    await video.play().catch(() => {});
+    await startPlayback();
     if (session.startAt > 0 && session.startAt < (video.duration || 1e9)) { try { video.currentTime = session.startAt / 1000; } catch {} }
     saveProgress();
   } catch (error) { state((error && error.message || '本集解析失败') + '\n可返回后换一集，或稍后重试。', true); }
 }
+/** 自动播放被系统策略拦截时，退回静音自动播放并提示开启声音。 */
+async function startPlayback() {
+  try { await video.play(); return; } catch { }
+  video.muted = true;
+  try { await video.play(); toast('浏览器静音自动播放限制：点击画面可开启声音'); } catch (error) { state('点击画面开始播放', true); }
+}
+video.addEventListener('click', () => {
+  if (video.paused) { startPlayback(); return; }
+  video.muted = !video.muted;
+});
 api.onSession(payload => {
   session = payload;
   video.playbackRate = session.speed || 1; speedAt = SPEEDS.indexOf(session.speed || 1); speedAt = speedAt < 0 ? 1 : speedAt;
