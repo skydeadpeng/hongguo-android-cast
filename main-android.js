@@ -283,14 +283,25 @@ ipcMain.handle('player-resolve', async (event, payload) => {
     playSessions.set(sessionId, { filePath: local.filePath, size: local.size, createdAt: Date.now() });
     return { playUrl: pathToFileURL(local.filePath).href, qualityLabel: playInfo.source === 'web' ? '网页 360p' : 'App ' + quality };
   }
-  // 流式：官网明文直链 + 转发会话（即点即播，不落盘）。
+  // 流式优先：官网明文直链即点即播；官网未开放的集回落 App 链整集下载解密（下载后播放）。
   const seriesId = String(payload.seriesId || '');
-  const web = await hongguo.fetchPlayUrlSingle(vid, seriesId, { quality: 'auto' });
-  if (!web || !web.url || web.source !== 'web') throw new Error('官网流式源未就绪');
-  const sessionId = `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let web = null;
+  try { web = await hongguo.fetchPlayUrlSingle(vid, seriesId, { quality: 'auto' }); } catch { /* 该集官网未开放 */ }
+  if (web && web.url && web.source === 'web') {
+    const sessionId = `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    for (const [key, value] of playSessions) if (Date.now() - value.createdAt > 6 * 3600_000) playSessions.delete(key);
+    playSessions.set(sessionId, { playInfo: { url: web.url, userAgent: web.userAgent || '', referer: web.referer || '' }, createdAt: Date.now() });
+    return { playUrl: `hkplay://s/${sessionId}`, qualityLabel: '流式 360p', streaming: true };
+  }
+  // 回落：App 加密链解析 → 整集下载解密 → 本地播放（带进度反馈）。
+  const playInfo = await resolveForPlayback(seriesId, vid, 'auto');
+  const local = await prepareLocalEpisode(playInfo, vid, (receivedBytes, totalBytes) => {
+    if (!event.sender.isDestroyed()) event.sender.send('player-download-progress', { vid, receivedBytes, totalBytes });
+  });
+  const sessionId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   for (const [key, value] of playSessions) if (Date.now() - value.createdAt > 6 * 3600_000) playSessions.delete(key);
-  playSessions.set(sessionId, { playInfo: { url: web.url, userAgent: web.userAgent || '', referer: web.referer || '' }, createdAt: Date.now() });
-  return { playUrl: `hkplay://s/${sessionId}`, qualityLabel: '流式 360p', streaming: true };
+  playSessions.set(sessionId, { filePath: local.filePath, size: local.size, createdAt: Date.now() });
+  return { playUrl: pathToFileURL(local.filePath).href, qualityLabel: playInfo.source === 'web' ? '网页 360p' : 'App 高清', cached: local.cached };
 });
 /** 已在本地缓存的整集：连播切集直接复用，不再走解析与下载。 */
 function cachedEpisode(vid) {
