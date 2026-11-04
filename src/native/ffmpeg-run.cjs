@@ -134,4 +134,20 @@ async function downloadEpisodeToFile(playInfo, destination, { axios, signal, onP
   }
 }
 
-module.exports = { decryptCencFile, ffmpegExecutable, prepareDecryptedMedia, downloadEpisodeToFile };
+/**
+ * 流式解密会话：ffmpeg 从加密转发端点实时拉流解密，输出增长中的解密文件。
+ * 返回 { proc, decPath }；调用方经 hkplay 供给该文件（挂起等待解密进度）。
+ */
+function startStreamDecryptSession({ inputUrl, contentKey, decPath, onLog }) {
+  const key = String(contentKey || '');
+  if (!/^[a-f\d]{32}$/i.test(key)) throw new Error('片源解密密钥格式无效');
+  const { spawn } = require('child_process');
+  const args = ['-y', '-hide_banner', '-loglevel', 'error', '-decryption_key', key,
+    '-i', String(inputUrl), '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', String(decPath)];
+  const child = spawn(ffmpegExecutable(), args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = '';
+  child.stderr.on('data', c => { stderr += c; if (onLog && stderr.length < 4000) onLog(String(c)); });
+  return { proc: child, decPath, stderrTail: () => stderr.slice(0, 200) };
+}
+
+module.exports = { decryptCencFile, ffmpegExecutable, prepareDecryptedMedia, downloadEpisodeToFile, startStreamDecryptSession };

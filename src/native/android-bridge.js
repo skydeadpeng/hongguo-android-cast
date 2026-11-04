@@ -279,7 +279,10 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
         case 'clearSearchHistory': prefs.set('searchKeywords', []); return { keywords: [] };
         case 'getAnnouncements': return { items: [] };
         case 'openExternal': return { opened: true, url: String(params && params.url || '') };
-        case 'getAccount': return null;
+        case 'getAccount': {
+          // 桌面版未接账号同步：返回未登录的合法投影，UI 显示未登录状态（扫码等动作在后续版本开放）。
+          return { provider: 'hongguo', authenticated: false, officialLoginAvailable: true, phase: 'logged_in', revision: 1, busy: false, maskedPhone: '', sync: {}, web: {}, counts: {} };
+        }
         case 'officialSendCode': case 'officialLoginSMS': case 'officialVerifyMFA': case 'officialCancelLogin':
         case 'officialLogout': case 'officialSync': case 'officialImportGuest':
         case 'officialWebQrcode': case 'officialWebPoll': case 'officialWebLogout': case 'officialWebCancel':

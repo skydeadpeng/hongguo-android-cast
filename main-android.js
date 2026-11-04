@@ -3,7 +3,7 @@
  * 播放复刻安卓架构：渲染器 App 链（__androidAppResolve/appResolveResult 协议）→ 官网链。
  * 阶段一：明文源直接流式供给；加密源（contentKey/spadeA）回落官网链，完整解密管线为阶段二。
  */
-const { app, BrowserWindow, ipcMain, protocol, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, shell, nativeTheme } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fsp = require('fs/promises');
@@ -15,6 +15,8 @@ const hongguo = require('./src/native/hongguo');
 const { downloadEpisodeToFile } = require('./src/native/ffmpeg-run.cjs');
 
 app.setName('hongguo-downloader');
+// 界面固定白色主题：不跟随系统深色切换（安卓 UI 的深色适配不完整，避免色彩断裂）。
+nativeTheme.themeSource = 'light';
 // 桌面播放器本就应随点随播：解除 Chromium 对自动播放的用户手势要求。
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
@@ -316,6 +318,38 @@ ipcMain.on('player-option', (_event, payload) => {
   } catch { }
 });
 ipcMain.on('player-close', () => { if (playerWindow && !playerWindow.isDestroyed()) playerWindow.close(); });
+
+// ===== 版本更新（桌面版）：检查本仓最新 release；下载/安装引导到发布页 =====
+ipcMain.on('android-updates-rpc', async (event, payload) => {
+  const reply = detail => {
+    if (event.sender.isDestroyed()) return;
+    event.sender.send('android-updates-event', detail);
+    event.sender.executeJavaScript(`window.__androidUpdatesChanged && window.__androidUpdatesChanged(${JSON.stringify(detail)})`, true).catch(() => { });
+  };
+  const method = String(payload && payload.method || 'status');
+  if (!['status', 'check', 'download', 'install', 'later', 'cancel'].includes(method)) return;
+  if (['download', 'install'].includes(method)) {
+    await shell.openExternal('https://github.com/skydeadpeng/hongguo-android-cast/releases/latest').catch(() => { });
+    reply({ state: 'idle', busy: false, message: '已在浏览器打开下载页' });
+    return;
+  }
+  const installed = { versionName: app.getVersion(), code: Number(app.getVersion().split('.').reduce((acc, part) => acc * 100 + Number(part), 0)) };
+  try {
+    const response = await axios.get('https://api.github.com/repos/skydeadpeng/hongguo-android-cast/releases/latest', {
+      timeout: 10000, headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Hongguo-Desktop-Update' },
+    });
+    const tag = String(response.data && response.data.tag_name || '').replace(/^v/, '');
+    const code = tag ? Number(tag.split('.').reduce((acc, part) => acc * 100 + Number(part || 0), 0)) : 0;
+    const notes = String(response.data && response.data.body || '').split('\n').find(Boolean) || '';
+    if (!tag || code <= installed.code) {
+      reply({ state: 'idle', installedVersion: installed.versionName, installedCode: installed.code, versionCode: installed.code, versionName: installed.versionName, flavor: 'desktop', busy: false, message: `当前已是最新版本 ${installed.versionName}` });
+    } else {
+      reply({ state: 'available', installedVersion: installed.versionName, installedCode: installed.code, versionCode: code, versionName: tag, flavor: 'desktop', busy: false, message: `发现新版本 ${tag}，点击「下载更新」前往发布页`, notes });
+    }
+  } catch (error) {
+    reply({ state: 'error', installedVersion: installed.versionName, installedCode: installed.code, versionCode: installed.code, versionName: installed.versionName, flavor: 'desktop', busy: false, message: '暂时无法检查更新，请稍后重试' });
+  }
+});
 
 app.whenReady().then(() => {
   registerPlayProtocol();

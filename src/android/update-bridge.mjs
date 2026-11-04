@@ -25,4 +25,5 @@ export function acceptUpdateResponse(message) {
 if (typeof window !== 'undefined') {
   window.__androidUpdatesResponse = acceptUpdateResponse;
   window.__androidUpdatesChanged = value => window.dispatchEvent(new CustomEvent('androidupdateschanged', { detail: value }));
+  try { window.AndroidUpdates?.onChanged?.(value => window.__androidUpdatesChanged(value)); } catch { }
 }
