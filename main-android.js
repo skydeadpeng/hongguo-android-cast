@@ -7,6 +7,7 @@ const { app, BrowserWindow, ipcMain, protocol, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fsp = require('fs/promises');
+const axios = require('axios');
 const { Readable } = require('stream');
 const { pathToFileURL } = require('url');
 const { createAndroidBridge } = require('./src/native/android-bridge');
@@ -116,8 +117,27 @@ function registerPlayProtocol() {
     const url = new URL(request.url);
     const id = url.pathname.replace(/^\/+/, '');
     const session = playSessions.get(id);
-    if (!session || !session.filePath) return new Response('not ready', { status: 404 });
+    if (!session) return new Response('not ready', { status: 404 });
     session.lastUsed = Date.now();
+    // 流式会话：直接转发 CDN（在线播放，不落盘）。
+    if (session.playInfo) {
+      try {
+        const range = request.headers.get('range');
+        const upstream = await axios.get(session.playInfo.url, {
+          responseType: 'stream', maxRedirects: 5,
+          headers: { 'User-Agent': session.playInfo.userAgent || 'Mozilla/5.0', ...(session.playInfo.referer ? { Referer: session.playInfo.referer } : {}), ...(range ? { Range: range } : {}) },
+          validateStatus: status => [200, 206, 416].includes(status),
+        });
+        const headers = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes' };
+        for (const name of ['content-length', 'content-range']) if (upstream.headers[name]) headers[name] = upstream.headers[name];
+        if (request.method === 'HEAD' || upstream.status === 416) { upstream.data.destroy(); return new Response(null, { status: upstream.status, headers }); }
+        return new Response(Readable.toWeb(upstream.data, { strategy: { highWaterMark: 64 * 1024, size: chunk => chunk.byteLength } }), { status: upstream.status, headers });
+      } catch (error) {
+        return new Response('media unavailable', { status: 502 });
+      }
+    }
+    // 本地文件会话：Range 供给。
+    if (!session.filePath) return new Response('not ready', { status: 404 });
     try {
       const stat = await fsp.stat(session.filePath);
       const rangeHeader = request.headers.get('range');
@@ -167,35 +187,61 @@ function playbackOptions() {
   } catch { return { autoplay: true, speed: 1, quality: 'auto' }; }
 }
 
-function openPlayer(payload) {  const seriesId = String(payload.series && payload.series.seriesId);
+/** 在线流式会话：注册 CDN 转发会话并返回流式播放地址（即点即播，不落盘）。 */
+function startStreamingSession(playInfo) {
+  const sessionId = `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  for (const [key, value] of playSessions) if (Date.now() - value.createdAt > 6 * 3600_000) playSessions.delete(key);
+  playSessions.set(sessionId, { playInfo: { url: playInfo.url, userAgent: playInfo.userAgent || '', referer: playInfo.referer || '' }, createdAt: Date.now() });
+  return `hkplay://s/${sessionId}`;
+}
+
+function openPlayer(payload) {
+  const seriesId = String(payload.series && payload.series.seriesId);
   const episodes = Array.isArray(payload.episodes) ? payload.episodes : [];
   console.log('[Play] request series=', seriesId, 'vid=', payload.startVid, 'episodes=', episodes.length, 'title=', payload.series && payload.series.title);
-  resolveForPlayback(seriesId, String(payload.startVid || episodes[0] && episodes[0].vid), payload.quality || 'auto')
-    .then(playInfo => prepareLocalEpisode(playInfo, String(payload.startVid || episodes[0] && episodes[0].vid)).then(local => ({ local, source: playInfo.source })))
-    .then(({ local, source }) => {
-      const sessionId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      for (const [key, value] of playSessions) if (Date.now() - value.createdAt > 6 * 3600_000) playSessions.delete(key);
-      playSessions.set(sessionId, { filePath: local.filePath, size: local.size, createdAt: Date.now() });
-      const sessionPayload = {
-        ...payload, seriesId, startPlayUrl: pathToFileURL(local.filePath).href, playCached: local.cached,
-        qualityLabel: source === 'web' ? '网页 360p' : 'App 高清',
-        autoplay: playbackOptions().autoplay !== false,
-        speed: playbackOptions().speed || 1,
-      };
-      if (playerWindow && !playerWindow.isDestroyed()) { playerWindow.webContents.send('player-session', sessionPayload); playerWindow.show(); return; }
-      playerWindow = new BrowserWindow({
-        fullscreen: true, backgroundColor: '#000', autoHideMenuBar: true,
-        webPreferences: { preload: path.join(__dirname, 'preload-android.js'), contextIsolation: true, nodeIntegration: false, sandbox: false },
-      });
-      playerWindow.loadFile(path.join(__dirname, 'desktop-android-player', 'player.html'));
-      playerWindow.webContents.on('did-finish-load', () => playerWindow && !playerWindow.isDestroyed() && playerWindow.webContents.send('player-session', sessionPayload));
-      playerWindow.on('closed', () => {
-        playerWindow = null;
-        if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.webContents.send('android-resume'); mainWindow.show(); }
-      });
-    }).catch(error => {
-      console.log('[Play] 失败:', error && error.message || error);
+  // 在线流式优先：官网明文源即点即播（不落盘）。
+  const web = hongguo.fetchPlayUrlSingle(String(payload.startVid || episodes[0] && episodes[0].vid), seriesId, { quality: 'auto' });
+  web.then(info => {
+    if (!info.url || info.source !== 'web') throw new Error('官网流式源未就绪');
+    const startPlayUrl = startStreamingSession(info);
+    const sessionPayload = {
+      ...payload, seriesId, startPlayUrl, playCached: false,
+      qualityLabel: '流式 360p', playStreaming: true,
+      autoplay: playbackOptions().autoplay !== false,
+      speed: playbackOptions().speed || 1,
+    };
+    if (playerWindow && !playerWindow.isDestroyed()) { playerWindow.webContents.send('player-session', sessionPayload); playerWindow.show(); return; }
+    playerWindow = new BrowserWindow({
+      fullscreen: true, backgroundColor: '#000', autoHideMenuBar: true,
+      webPreferences: { preload: path.join(__dirname, 'preload-android.js'), contextIsolation: true, nodeIntegration: false, sandbox: false },
     });
+    playerWindow.loadFile(path.join(__dirname, 'desktop-android-player', 'player.html'));
+    playerWindow.webContents.on('did-finish-load', () => playerWindow && !playerWindow.isDestroyed() && playerWindow.webContents.send('player-session', sessionPayload));
+    playerWindow.on('closed', () => {
+      playerWindow = null;
+      if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.webContents.send('android-resume'); mainWindow.show(); }
+    });
+  }).catch(error => {
+    console.log('[Play] 流式失败，回落下载模式:', error.message);
+    resolveForPlayback(seriesId, String(payload.startVid || episodes[0] && episodes[0].vid), payload.quality || 'auto')
+      .then(playInfo => prepareLocalEpisode(playInfo, String(payload.startVid || episodes[0] && episodes[0].vid)).then(local => ({ local, source: playInfo.source })))
+      .then(({ local, source }) => {
+        const sessionId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        playSessions.set(sessionId, { filePath: local.filePath, size: local.size, createdAt: Date.now() });
+        const sessionPayload = { ...payload, seriesId, startPlayUrl: pathToFileURL(local.filePath).href, qualityLabel: source === 'web' ? '网页 360p' : 'App 高清' };
+        if (playerWindow && !playerWindow.isDestroyed()) { playerWindow.webContents.send('player-session', sessionPayload); playerWindow.show(); return; }
+        playerWindow = new BrowserWindow({
+          fullscreen: true, backgroundColor: '#000', autoHideMenuBar: true,
+          webPreferences: { preload: path.join(__dirname, 'preload-android.js'), contextIsolation: true, nodeIntegration: false, sandbox: false },
+        });
+        playerWindow.loadFile(path.join(__dirname, 'desktop-android-player', 'player.html'));
+        playerWindow.webContents.on('did-finish-load', () => playerWindow && !playerWindow.isDestroyed() && playerWindow.webContents.send('player-session', sessionPayload));
+        playerWindow.on('closed', () => {
+          playerWindow = null;
+          if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.webContents.send('android-resume'); mainWindow.show(); }
+        });
+      }).catch(err2 => console.log('[Play] 下载模式也失败:', err2.message));
+  });
 }
 
 // 安卓桥走 send/回调 语义：bridge.mjs 靠 window.__androidResponse 收结果。
@@ -211,18 +257,32 @@ ipcMain.on('android-series-rpc', (event, payload) => {
   // 官方分季（bookapi/plan）为阶段二；拒绝后 UI 自动落标题匹配。
   event.sender.send('android-series-response', { id: payload.id, error: '官方分季通道未接入，已使用标题匹配', errorCode: 'UNAVAILABLE' });
 });
-// 播放器逐集解析：优先命中本地缓存（连播切集秒开），否则解析并整集下载落盘。
+// 播放器逐集解析：
+//  - auto 清晰度 → 官网明文源纯流式（即点即播，不落盘；CDN Range 可拖动）
+//  - 指定清晰度（1080p/720p/480p/360p）→ App 加密链整集下载解密（本地缓存秒开复用）
+//  - 已有本地缓存的集数 → 直接复用（连播切集秒开）
 ipcMain.handle('player-resolve', async (_event, payload) => {
   const vid = String(payload.vid || '');
+  const quality = String(payload.quality || 'auto');
   const cached = cachedEpisode(vid);
   if (cached) return { playUrl: cached.playUrl, qualityLabel: cached.qualityLabel, cached: true };
+  if (quality !== 'auto') {
+    const seriesId = String(payload.seriesId || '');
+    const playInfo = await resolveForPlayback(seriesId, vid, quality);
+    const local = await prepareLocalEpisode(playInfo, vid);
+    const sessionId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    for (const [key, value] of playSessions) if (Date.now() - value.createdAt > 6 * 3600_000) playSessions.delete(key);
+    playSessions.set(sessionId, { filePath: local.filePath, size: local.size, createdAt: Date.now() });
+    return { playUrl: pathToFileURL(local.filePath).href, qualityLabel: playInfo.source === 'web' ? '网页 360p' : 'App ' + quality };
+  }
+  // 流式：官网明文直链 + 转发会话（即点即播，不落盘）。
   const seriesId = String(payload.seriesId || '');
-  const playInfo = await resolveForPlayback(seriesId, vid, String(payload.quality || 'auto'));
-  const local = await prepareLocalEpisode(playInfo, vid);
-  const sessionId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const web = await hongguo.fetchPlayUrlSingle(vid, seriesId, { quality: 'auto' });
+  if (!web || !web.url || web.source !== 'web') throw new Error('官网流式源未就绪');
+  const sessionId = `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   for (const [key, value] of playSessions) if (Date.now() - value.createdAt > 6 * 3600_000) playSessions.delete(key);
-  playSessions.set(sessionId, { filePath: local.filePath, size: local.size, createdAt: Date.now() });
-  return { playUrl: pathToFileURL(local.filePath).href, qualityLabel: playInfo.source === 'web' ? '网页 360p' : 'App 高清' };
+  playSessions.set(sessionId, { playInfo: { url: web.url, userAgent: web.userAgent || '', referer: web.referer || '' }, createdAt: Date.now() });
+  return { playUrl: `hkplay://s/${sessionId}`, qualityLabel: '流式 360p', streaming: true };
 });
 /** 已在本地缓存的整集：连播切集直接复用，不再走解析与下载。 */
 function cachedEpisode(vid) {
