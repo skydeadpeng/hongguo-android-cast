@@ -81,7 +81,7 @@ function saveProgress() {
 async function load(episode) {
   session.episode = episode; session.startAt = episode.resumeMs || 0;
   // 准备下一集期间保留当前画面，拿到新地址后再切换。
-  state(episode.prepared ? '' : '正在准备下一集…');
+  state(episode.prepared ? '' : '正在准备本集…');
   try {
     const info = episode.prepared ? { playUrl: episode.prepared, qualityLabel: session.qualityLabel || '' }
       : await api.resolve({ seriesId: session.seriesId, vid: episode.vid, quality: session.quality });
@@ -95,6 +95,13 @@ async function load(episode) {
     prefetchNext();
   } catch (error) { state((error && error.message || '本集解析失败') + '\n可返回后换一集，或稍后重试。', true); }
 }
+/** 加密源整集下载时的进度反馈（主进程 player-download-progress 事件转发）。 */
+if (api.onDownloadProgress) api.onDownloadProgress(progress => {
+  if (!session) return;
+  const percent = progress.totalBytes ? Math.round(progress.receivedBytes / progress.totalBytes * 100) : 0;
+  const mb = (progress.receivedBytes / 1048576).toFixed(1);
+  state('正在缓冲本集 ' + percent + '%（' + mb + ' MB）…');
+});
 /** 连播：播完自动切下一集；下一集已在本地缓存时直接秒开。 */
 function nextEpisode() {
   const at = session.episodes.findIndex(item => String(item.vid) === String(session.episode.vid));

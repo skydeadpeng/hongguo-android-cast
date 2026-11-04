@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('AndroidCrypto', {
 });
 contextBridge.exposeInMainWorld('HongguoPlayer', {
   onSession: handler => ipcRenderer.on('player-session', (_event, payload) => handler(payload)),
+  onDownloadProgress: handler => ipcRenderer.on('player-download-progress', (_event, progress) => handler(progress)),
   resolve: async payload => {
     // 主进程 handler 直接返回解析结果（异常会以 rejected promise 形式抛出）。
     const result = await ipcRenderer.invoke('player-resolve', payload);

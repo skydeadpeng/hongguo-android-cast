@@ -43,12 +43,12 @@ async function pruneCache() {
   } catch { }
 }
 const pendingDownloads = new Map();  // vid → Promise（同一集的并发下载共用一次）
-async function prepareLocalEpisode(playInfo, vid) {
+async function prepareLocalEpisode(playInfo, vid, onProgress) {
   const destination = path.join(cacheDir(), `${vid}-${(playInfo.contentKey ? 'c' : playInfo.spadeA ? 's' : 'p')}.mp4`);
   try { const existing = await fsp.stat(destination); if (existing.size > 1024) return { filePath: destination, size: existing.size, cached: true }; } catch { }
   // 预取与手动切集可能同时要同一集：复用同一下载，避免并发写同一临时文件。
   if (pendingDownloads.has(vid)) return pendingDownloads.get(vid);
-  const task = downloadEpisodeToFile(playInfo, destination)
+  const task = downloadEpisodeToFile(playInfo, destination, { onProgress })
     .then(async () => {
       const stat = await fsp.stat(destination);
       pruneCache();
@@ -261,7 +261,11 @@ ipcMain.on('android-series-rpc', (event, payload) => {
 //  - auto 清晰度 → 官网明文源纯流式（即点即播，不落盘；CDN Range 可拖动）
 //  - 指定清晰度（1080p/720p/480p/360p）→ App 加密链整集下载解密（本地缓存秒开复用）
 //  - 已有本地缓存的集数 → 直接复用（连播切集秒开）
-ipcMain.handle('player-resolve', async (_event, payload) => {
+// 播放器逐集解析：
+//  - auto 清晰度 → 官网明文源纯流式（即点即播，不落盘；CDN Range 可拖动）
+//  - 指定清晰度（1080p/720p/480p/360p）→ App 加密链整集下载解密（本地缓存秒开复用）
+//  - 已有本地缓存的集数 → 直接复用（连播切集秒开）
+ipcMain.handle('player-resolve', async (event, payload) => {
   const vid = String(payload.vid || '');
   const quality = String(payload.quality || 'auto');
   const cached = cachedEpisode(vid);
@@ -269,7 +273,9 @@ ipcMain.handle('player-resolve', async (_event, payload) => {
   if (quality !== 'auto') {
     const seriesId = String(payload.seriesId || '');
     const playInfo = await resolveForPlayback(seriesId, vid, quality);
-    const local = await prepareLocalEpisode(playInfo, vid);
+    const local = await prepareLocalEpisode(playInfo, vid, (receivedBytes, totalBytes) => {
+      if (!event.sender.isDestroyed()) event.sender.send('player-download-progress', { vid, receivedBytes, totalBytes });
+    });
     const sessionId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     for (const [key, value] of playSessions) if (Date.now() - value.createdAt > 6 * 3600_000) playSessions.delete(key);
     playSessions.set(sessionId, { filePath: local.filePath, size: local.size, createdAt: Date.now() });
