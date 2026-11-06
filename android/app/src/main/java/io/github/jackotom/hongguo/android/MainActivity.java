@@ -23,6 +23,8 @@ public final class MainActivity extends Activity {
     private OfficialSeriesBridge officialSeries;
     private AppUpdater updates;
     private boolean loaded;
+    /** The system recreated us after a background process death; the page may restore the session. */
+    private boolean processRestored;
     private final Handler startupHandler = new Handler(Looper.getMainLooper());
     private final StartupPolicy startup = new StartupPolicy();
     private Runnable startupTimeout;
@@ -62,6 +64,7 @@ public final class MainActivity extends Activity {
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        processRestored = state != null;
         updates = new AppUpdater(this);
         handleSeriesIntent(getIntent());
         AccountSync.get().setListener(accountChanged);
@@ -128,7 +131,7 @@ public final class MainActivity extends Activity {
             candidate.addJavascriptInterface(new StartupBridge(candidate, token), "AndroidStartup");
             startupTimeout = () -> failStartup(candidate, token, "timeout");
             startupHandler.postDelayed(startupTimeout, StartupPolicy.TIMEOUT_MS);
-            candidate.loadUrl(ORIGIN + "/index.html?startup=" + token);
+            candidate.loadUrl(ORIGIN + "/index.html?startup=" + token + (processRestored ? "&restore=1" : ""));
         } catch (RuntimeException failure) {
             failStartup(web, token, "webview_unavailable");
             destroyWebView();

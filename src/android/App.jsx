@@ -1292,8 +1292,23 @@ function AnnouncementSettings({ announcementsRef, notify }) {
   </section>;
 }
 
+const SESSION_KEY = 'hongguo.session.v1';
+// MainActivity appends restore=1 when the system recreated the activity after a
+// background process death; only that path reopens the last browsing session.
+const PROCESS_RESTORED = typeof window !== 'undefined' && /(?:^|[?&])restore=1(?:&|$)/.test(window.location.search || '');
+const readSession = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    if (!saved || typeof saved !== 'object') return null;
+    const tab = NAV.some(entry => entry.id === saved.tab) ? saved.tab : 'discover';
+    const seriesId = saved.detail && /^[1-9][0-9]{0,29}$/.test(String(saved.detail.seriesId || '')) ? String(saved.detail.seriesId) : null;
+    return { tab, detail: seriesId ? { seriesId, title: String(saved.detail.title || '') } : null };
+  } catch { return null; }
+};
+
 export default function App() {
-  const [tab, setTab] = useState('discover');
+  const restored = PROCESS_RESTORED ? readSession() : null;
+  const [tab, setTab] = useState(() => restored?.tab || 'discover');
   const [detail, setDetail] = useState(null);
   const [info, setInfo] = useState({ isTv: false, version: '' });
   const [infoError, setInfoError] = useState('');
@@ -1353,6 +1368,13 @@ export default function App() {
   const closeDetail = useCallback(() => { setDetail(null); setTimeout(() => lastDetailFocus.current?.isConnected && lastDetailFocus.current.focus(), 0); }, []);
   const openDetail = (series, vid) => { lastDetailFocus.current = document.activeElement; previousScroll.current = content.current?.scrollTop || 0; setDetail({ seed: series, initialVid: vid }); };
   const navigate = (id) => { previousScroll.current = 0; setDetail(null); setTab(id); };
+  // Keep the browsing position so a background process death can reopen it.
+  useEffect(() => {
+    const seed = detail?.seed || null;
+    const seriesId = seed && /^[1-9][0-9]{0,29}$/.test(String(seed.seriesId || '')) ? String(seed.seriesId) : null;
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify({ tab, detail: seriesId ? { seriesId, title: String(seed.title || '') } : null, at: Date.now() })); } catch { }
+  }, [tab, detail]);
+  useEffect(() => { if (restored?.detail) openDetail(restored.detail); }, []);
   const closeAnnouncement = mode => {
     const current = announcement;
     setAnnouncement(null);
