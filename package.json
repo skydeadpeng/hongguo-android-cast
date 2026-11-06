@@ -35,7 +35,8 @@
   },
   "dependencies": {
     "axios": "1.20.0",
-    "buffer": "6.0.3"
+    "buffer": "6.0.3",
+    "core-js": "3.51.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
