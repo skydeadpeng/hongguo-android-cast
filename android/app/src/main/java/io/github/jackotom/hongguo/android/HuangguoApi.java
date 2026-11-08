@@ -11,12 +11,13 @@ import org.json.*;
  * 防止源站只下发预览片段。剧集在本机以 99 前缀数字编码与红果 ID 共存。
  */
 final class HuangguoApi {
-    /** 官方主域 + 自建 Worker 代理 + 社区镜像：部分运营商网络对主域 RST，失败按序切换并粘住可用域。
-     *  粘住 Worker 代理域时，封面与播放流同步改走代理（/img、/m3u8），不依赖内容 CDN 直连。 */
+    /** 官方直连优先、镜像次之；自建 Worker 代理（部分网络对 CloudFront 全断时才有用）放最后兜底。
+     *  粘住 Worker 代理域时，播放流改走代理改写（/m3u8）；封面解密始终经 Worker /img。 */
     private static final String[] ORIGINS = {
-        "https://huangguoai.com", "https://huoguo.skydeadpeng.xyz",
-        "https://l5f9m.rxzfszht.cc", "https://blolhh.rxzfszht.cc", "https://mxz58.rxzfszht.cc"
+        "https://huangguoai.com", "https://l5f9m.rxzfszht.cc", "https://blolhh.rxzfszht.cc", "https://mxz58.rxzfszht.cc",
+        "https://huoguo.skydeadpeng.xyz"
     };
+    private static final int PROXY_INDEX = 4;
     /** 每域快速失败：丢包型阻断不等满长超时，尽快切到可达线路。 */
     private static final long PER_ORIGIN_MS = 6_000;
     private static volatile int originIndex = 0;
@@ -26,7 +27,7 @@ final class HuangguoApi {
         if (appContext != null || context == null) return;
         appContext = context.getApplicationContext();
         try {
-            int saved = appContext.getSharedPreferences("huangguo", android.content.Context.MODE_PRIVATE).getInt("origin", 0);
+            int saved = appContext.getSharedPreferences("huangguo", android.content.Context.MODE_PRIVATE).getInt("origin2", 0);
             if (saved >= 0 && saved < ORIGINS.length) originIndex = saved;
         } catch (Exception ignored) { }
     }
@@ -34,7 +35,7 @@ final class HuangguoApi {
         originIndex = index;
         try {
             if (appContext != null)
-                appContext.getSharedPreferences("huangguo", android.content.Context.MODE_PRIVATE).edit().putInt("origin", index).apply();
+                appContext.getSharedPreferences("huangguo", android.content.Context.MODE_PRIVATE).edit().putInt("origin2", index).apply();
         } catch (Exception ignored) { }
     }
 
@@ -156,7 +157,9 @@ final class HuangguoApi {
                 return data;
             } catch (IOException error) { last = error; }
         }
-        throw last != null ? last : new IOException(pinned >= 0 ? "黄果固定线路不可用，请在设置中更换线路" : "黄果来源暂不可用，请稍后重试");
+        // 底层英文异常（Socket closed / Read timed out / Connection reset…）对用户没有意义：
+        // 全部线路都失败时统一归因为网络不可用。
+        throw new IOException(pinned >= 0 ? "固定线路连接失败，请在设置中更换线路或检查网络" : "网络连接失败，请检查手机网络后重试");
     }
     private static JSONObject getFrom(String origin, String path) throws Exception {
         NetworkGuard.Reply reply = NetworkGuard.publicGet(origin + path, System.nanoTime() + PER_ORIGIN_MS * 1_000_000L);
@@ -180,7 +183,7 @@ final class HuangguoApi {
     }
     // 官方封面是 AES-CBC 加密二进制，<img>/BitmapFactory 直接解码不了；一律经 Worker /img 解密后返回明文。
     private static String wrapCover(String url) {
-        return url.startsWith("https://") ? ORIGINS[1] + "/img?url=" + encode(url) : url;
+        return url.startsWith("https://") ? ORIGINS[PROXY_INDEX] + "/img?url=" + encode(url) : url;
     }
     private static String wrapStream(String url) {
         return viaProxy() ? ORIGINS[originIndex] + "/m3u8?url=" + encode(url) : url;

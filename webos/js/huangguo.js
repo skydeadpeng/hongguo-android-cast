@@ -5,21 +5,22 @@
   'use strict';
   var ORIGIN = 'https://huangguoai.com';
   // 部分家庭/运营商网络对主域 RST；失败按序切换备用域（含自建 Worker 代理）并粘住可用域。
-  var ORIGINS = [ORIGIN, 'https://huoguo.skydeadpeng.xyz', 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc'];
+  var ORIGINS = [ORIGIN, 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc', 'https://huoguo.skydeadpeng.xyz'];
+  var PROXY_INDEX = 4;
   var originAt = 0;
   // 记住上次成功的线路：冷启动直接使用，不再对被掐域逐一试错。
   try {
-    var saved = Number(localStorage.getItem('huangguo.origin'));
+    var saved = Number(localStorage.getItem('huangguo.origin2'));
     if (saved >= 0 && saved < ORIGINS.length) { originAt = saved; ORIGIN = ORIGINS[saved]; }
   } catch (e) { }
   function stickOrigin(index) {
     originAt = index; ORIGIN = ORIGINS[index];
-    try { localStorage.setItem('huangguo.origin', String(index)); } catch (e) { }
+    try { localStorage.setItem('huangguo.origin2', String(index)); } catch (e) { }
   }
   function viaProxy() { return ORIGIN.indexOf('skydeadpeng.xyz') >= 0; }
   // 官方封面是 AES-CBC 加密二进制，浏览器解不了；一律经 Worker /img 解密后返回明文。
   function wrapCover(url) {
-    return /^https:\/\//.test(url) ? ORIGINS[1] + '/img?url=' + encodeURIComponent(url) : url;
+    return /^https:\/\//.test(url) ? ORIGINS[PROXY_INDEX] + '/img?url=' + encodeURIComponent(url) : url;
   }
   function wrapStream(url) {
     return viaProxy() ? ORIGIN + '/m3u8?url=' + encodeURIComponent(url) : url;

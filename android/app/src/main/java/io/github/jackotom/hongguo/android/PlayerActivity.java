@@ -854,10 +854,13 @@ public final class PlayerActivity extends Activity {
             PlayerOptions.update(this, new JSONObject().put("quality", job.quality));
             VideoView old = video; old.stopPlayback(); adoptMedia(job.media); playerRoot.removeView(old);
             video = job.view; mediaPlayer = job.player; quality = job.quality;
-            mediaPlayer.setVolume(1f, 1f);
+            try {
+                mediaPlayer.setVolume(1f, 1f);
+                videoWidth = mediaPlayer.getVideoWidth(); videoHeight = mediaPlayer.getVideoHeight();
+            } catch (IllegalStateException released) { mediaPlayer = null; }
             qualitySwitch = null; if (job.timeout != null) main.removeCallbacks(job.timeout);
             automaticCeiling = job.media.ceiling;
-            actualSpeed = accepted; if (Float.isFinite(accepted)) requestedSpeed = accepted; videoWidth = mediaPlayer.getVideoWidth(); videoHeight = mediaPlayer.getVideoHeight();
+            actualSpeed = accepted; if (Float.isFinite(accepted)) requestedSpeed = accepted;
             bindPlayback(video, generation, episode, job.media.remote, actualQuality);
             final VideoView currentView = video; final int token = generation;
             watchProgressSeeks(mediaPlayer, token, currentView);
@@ -992,9 +995,12 @@ public final class PlayerActivity extends Activity {
             lastGoodPosition = Math.max(0, video.getCurrentPosition());
             seek.setMax(Math.max(1, video.getDuration())); seek.setProgress(lastGoodPosition); time.setText(format(video.getCurrentPosition()) + " / " + format(video.getDuration()));
             if (mediaPlayer != null) {
-                if (video.isPlaying()) actualSpeed = PlayerOptions.observedSpeed(mediaPlayer);
-                int width = mediaPlayer.getVideoWidth(), height = mediaPlayer.getVideoHeight();
-                if (width != videoWidth || height != videoHeight) { videoWidth = width; videoHeight = height; renderStatus(); }
+                // 换集/换源窗口内实例可能已释放：捕获状态异常并放弃失效引用，避免轮询崩溃。
+                try {
+                    if (video.isPlaying()) actualSpeed = PlayerOptions.observedSpeed(mediaPlayer);
+                    int width = mediaPlayer.getVideoWidth(), height = mediaPlayer.getVideoHeight();
+                    if (width != videoWidth || height != videoHeight) { videoWidth = width; videoHeight = height; renderStatus(); }
+                } catch (IllegalStateException released) { mediaPlayer = null; }
             }
             periodicProgress(); updateButtons();
         }

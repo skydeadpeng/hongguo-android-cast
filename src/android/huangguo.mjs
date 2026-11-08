@@ -45,10 +45,10 @@ export async function huangguoPlay(series, episode) {
 export const HUANGGUO_LINES = [
   { id: 'auto', label: '自动 · 按顺序智能切换（推荐）' },
   { id: '0', label: '官方直连 · huangguoai.com' },
-  { id: '1', label: '自建代理 · huoguo.skydeadpeng.xyz' },
-  { id: '2', label: '备用线路 1 · l5f9m.rxzfszht.cc' },
-  { id: '3', label: '备用线路 2 · blolhh.rxzfszht.cc' },
-  { id: '4', label: '备用线路 3 · mxz58.rxzfszht.cc' },
+  { id: '1', label: '备用线路 1 · l5f9m.rxzfszht.cc' },
+  { id: '2', label: '备用线路 2 · blolhh.rxzfszht.cc' },
+  { id: '3', label: '备用线路 3 · mxz58.rxzfszht.cc' },
+  { id: '4', label: '自建代理 · huoguo.skydeadpeng.xyz（较慢，兜底用）' },
 ];
 
 export async function huangguoGetSettings() {
