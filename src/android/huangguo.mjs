@@ -37,7 +37,8 @@ export async function huangguoPlay(series, episode) {
     episodeCount: Number(series.episodeCount) || 0,
     index: Number(episode.index) || 1,
   };
-  return nativeCall('huangguoPlay', params, 60000);
+  // 华为/荣耀设备首次播放需完整下载解密（可达数分钟），等待上限放宽到 10 分钟。
+  return nativeCall('huangguoPlay', params, 600000);
 }
 
 /** 黄果设置：visible 入口显隐；line 线路（auto=智能切换或固定线路下标）；pin 4-8 位数字密码。

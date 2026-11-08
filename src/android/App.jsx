@@ -165,8 +165,10 @@ function HuangguoPage({ notify }) {
       .catch(error => setDetail(previous => previous?.series?.seriesId === series.seriesId ? { ...previous, busy: false, error: errorText(error) } : previous));
   };
   const playEpisode = async (series, episode) => {
+    // 华为/荣耀首次播放需下载解密整集（数分钟），点击后立即提示，避免看起来无响应。
+    notify('正在准备本集…首次打开需下载完整视频，稍等片刻');
     try { await huangguoPlay(series, episode); }
-    catch (error) { notify(`播放未成功：${errorText(error)}`); }
+    catch (error) { notify(`本集准备失败：${errorText(error)}`); }
   };
   // 返回键优先关闭黄果详情；由 App 层 back 链派发 androidhuangguoback。
   useEffect(() => {
