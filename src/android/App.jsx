@@ -77,11 +77,21 @@ const webpCover = url => typeof url === 'string' && url.length > 6 && url.slice(
 function Poster({ item, onOpen, history }) {
   const [failed, setFailed] = useState(false);
   const [src, setSrc] = useState(item.coverUrl);
+  const imageRef = useRef(null);
   useEffect(() => { setSrc(item.coverUrl); setFailed(false); }, [item.coverUrl]);
+  // IPv6 黑洞等网络下图片请求可能无限挂起：限时未出图按失败处理，显示占位不留白块。
+  useEffect(() => {
+    if (!src || failed) return undefined;
+    const timer = setTimeout(() => {
+      const image = imageRef.current;
+      if (image && !(image.complete && image.naturalWidth > 0)) setFailed(true);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [src, failed]);
   const coverError = () => { const twin = webpCover(src); if (twin) setSrc(twin); else setFailed(true); };
   return <button className="poster" onClick={() => onOpen(item, history?.vid)} aria-label={`打开${item.title}`}>
     <span className="poster-art">
-      {src && !failed ? <img src={src} alt="" loading="lazy" onError={coverError} /> : <span className="poster-fallback"><Film size={32} /><span>暂无封面</span></span>}
+      {src && !failed ? <img ref={imageRef} src={src} alt="" loading="lazy" onError={coverError} /> : <span className="poster-fallback"><Film size={32} /><span>暂无封面</span></span>}
       {item.episodeLabel || item.episodeCount ? <span className="poster-label">{item.episodeLabel || `${item.episodeCount} 集`}</span> : null}
     </span>
     <strong>{item.title || '未命名短剧'}</strong>

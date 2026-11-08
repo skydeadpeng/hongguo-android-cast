@@ -17,8 +17,9 @@
     try { localStorage.setItem('huangguo.origin', String(index)); } catch (e) { }
   }
   function viaProxy() { return ORIGIN.indexOf('skydeadpeng.xyz') >= 0; }
+  // 官方封面是 AES-CBC 加密二进制，浏览器解不了；一律经 Worker /img 解密后返回明文。
   function wrapCover(url) {
-    return viaProxy() && /^https:\/\//.test(url) ? ORIGIN + '/img?url=' + encodeURIComponent(url) : url;
+    return /^https:\/\//.test(url) ? ORIGINS[1] + '/img?url=' + encodeURIComponent(url) : url;
   }
   function wrapStream(url) {
     return viaProxy() ? ORIGIN + '/m3u8?url=' + encodeURIComponent(url) : url;

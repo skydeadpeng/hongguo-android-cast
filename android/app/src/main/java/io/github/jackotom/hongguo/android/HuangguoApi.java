@@ -86,8 +86,9 @@ final class HuangguoApi {
     private static String encode(String value) {
         try { return java.net.URLEncoder.encode(value, "UTF-8"); } catch (java.io.UnsupportedEncodingException ignored) { return value; }
     }
+    // 官方封面是 AES-CBC 加密二进制，<img>/BitmapFactory 直接解码不了；一律经 Worker /img 解密后返回明文。
     private static String wrapCover(String url) {
-        return viaProxy() && url.startsWith("https://") ? ORIGINS[originIndex] + "/img?url=" + encode(url) : url;
+        return url.startsWith("https://") ? ORIGINS[1] + "/img?url=" + encode(url) : url;
     }
     private static String wrapStream(String url) {
         return viaProxy() ? ORIGINS[originIndex] + "/m3u8?url=" + encode(url) : url;

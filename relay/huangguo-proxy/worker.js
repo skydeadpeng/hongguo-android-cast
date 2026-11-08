@@ -26,14 +26,35 @@ async function proxyApi(url) {
   });
 }
 
+// 官方站封面为 AES-CBC 加密二进制（密钥来自站点前端常量）：解密后返回明文图片，
+// 解密失败（未加密内容）时原样透传，所有客户端无需自行实现解密。
+const IMG_KEY = "f5d965df75336270";
+const IMG_IV = "97b60394abc2fbe1";
+
 async function proxyImage(url) {
   const target = url.searchParams.get("url") || "";
   if (!/^https:\/\/[\w.-]+\/[\s\S]*$/i.test(target)) return new Response("bad url", { status: 400 });
   const response = await fetch(target, { headers: { "User-Agent": "Mozilla/5.0" } });
-  return new Response(response.body, {
-    status: response.status,
-    headers: { "Content-Type": response.headers.get("Content-Type") || "image/jpeg", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=86400" },
-  });
+  const buffer = await response.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  const isPlainImage = (bytes[0] === 0xff && bytes[1] === 0xd8) || (bytes[0] === 0x89 && bytes[1] === 0x50) || (bytes[0] === 0x52 && bytes[1] === 0x49);
+  if (isPlainImage || bytes.length === 0 || bytes.length % 16 !== 0) {
+    return new Response(buffer, { status: response.status,
+      headers: { "Content-Type": response.headers.get("Content-Type") || "image/jpeg", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=86400" } });
+  }
+  try {
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(IMG_KEY), { name: "AES-CBC" }, false, ["decrypt"]);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-CBC", iv: new TextEncoder().encode(IMG_IV) }, key, buffer);
+    const plain = new Uint8Array(decrypted);
+    const jpeg = plain[0] === 0xff && plain[1] === 0xd8;
+    const png = plain[0] === 0x89 && plain[1] === 0x50;
+    if (jpeg || png) {
+      return new Response(decrypted, { status: 200,
+        headers: { "Content-Type": jpeg ? "image/jpeg" : "image/png", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=86400" } });
+    }
+  } catch (ignored) { /* 未按块对齐或非本密钥加密：回退原始字节 */ }
+  return new Response(buffer, { status: response.status,
+    headers: { "Content-Type": response.headers.get("Content-Type") || "image/octet-stream", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=86400" } });
 }
 
 // m3u8：改写分片与 AES key 的绝对地址为本 Worker 代理，播放器只需拿到 Worker 域名清单。
