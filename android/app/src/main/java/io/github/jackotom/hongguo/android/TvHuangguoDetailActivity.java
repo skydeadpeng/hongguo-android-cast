@@ -25,6 +25,8 @@ public final class TvHuangguoDetailActivity extends Activity {
         seriesId = getIntent().getStringExtra("seriesId");
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
+        // 与红果 TV 详情一致：显式深色背景，浅色文字才有对比度。
+        root.setBackgroundColor(TvUi.BACKGROUND);
         root.setPadding(TvUi.dp(this, 24), TvUi.dp(this, 16), TvUi.dp(this, 24), TvUi.dp(this, 16));
         LinearLayout head = TvUi.row(this);
         Button back = TvUi.button(this, "← 返回");
@@ -84,24 +86,42 @@ public final class TvHuangguoDetailActivity extends Activity {
 
     private void render(JSONObject detail) {
         panel.removeAllViews();
-        TextView heading = TvUi.text(this, detail.optString("title", "黄果漫剧"), 19, TvUi.TEXT);
+        // 头部：封面 + 右侧信息（与红果 TV 详情一致的横向布局；封面经 Worker 解密为明文）。
+        LinearLayout head = TvUi.row(this);
+        head.setPadding(0, TvUi.dp(this, 8), 0, TvUi.dp(this, 12));
+        LinearLayout.LayoutParams coverParams = new LinearLayout.LayoutParams(TvUi.dp(this, 168), TvUi.dp(this, 224));
+        String cover = detail.optString("coverUrl", "");
+        if (!cover.isEmpty()) head.addView(TvUi.poster(this, detail), coverParams);
+        LinearLayout info = new LinearLayout(this);
+        info.setOrientation(LinearLayout.VERTICAL);
+        TextView heading = TvUi.text(this, detail.optString("title", "黄果漫剧"), 21, TvUi.TEXT);
         heading.setTypeface(null, android.graphics.Typeface.BOLD);
-        panel.addView(heading, new LinearLayout.LayoutParams(-1, -2));
+        info.addView(heading, new LinearLayout.LayoutParams(-1, -2));
+        TextView count = TvUi.text(this, detail.optInt("episodeCount", 0) + " 集 · 黄果官方片源", 14, TvUi.MUTED);
+        LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(-1, -2);
+        countParams.topMargin = TvUi.dp(this, 6);
+        info.addView(count, countParams);
         String description = detail.optString("description", "");
         if (!description.isEmpty()) {
             TextView intro = TvUi.text(this, description, 13, TvUi.MUTED);
-            intro.setMaxLines(4);
+            intro.setMaxLines(6);
+            intro.setLineSpacing(0, 1.25f);
             LinearLayout.LayoutParams introParams = new LinearLayout.LayoutParams(-1, -2);
-            introParams.topMargin = TvUi.dp(this, 6);
-            panel.addView(intro, introParams);
+            introParams.topMargin = TvUi.dp(this, 10);
+            info.addView(intro, introParams);
         }
-        TextView count = TvUi.text(this, detail.optInt("episodeCount", 0) + " 集 · 选集播放", 13, TvUi.MUTED);
-        LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(-1, -2);
-        countParams.topMargin = TvUi.dp(this, 6); countParams.bottomMargin = TvUi.dp(this, 10);
-        panel.addView(count, countParams);
+        LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        infoParams.leftMargin = TvUi.dp(this, 16);
+        head.addView(info, infoParams);
+        panel.addView(head, new LinearLayout.LayoutParams(-1, -2));
+        TextView episodesTitle = TvUi.text(this, "选集", 16, TvUi.TEXT);
+        episodesTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        panel.addView(episodesTitle, new LinearLayout.LayoutParams(-1, -2));
         GridLayout episodes = new GridLayout(this);
         episodes.setColumnCount(6);
         episodes.setUseDefaultMargins(true);
+        LinearLayout.LayoutParams episodesParams = new LinearLayout.LayoutParams(-1, -2);
+        episodesParams.topMargin = TvUi.dp(this, 8);
         JSONArray rows = detail.optJSONArray("episodes");
         for (int i = 0; rows != null && i < rows.length(); i++) {
             JSONObject episode = rows.optJSONObject(i);
@@ -116,7 +136,7 @@ public final class TvHuangguoDetailActivity extends Activity {
             button.setOnClickListener(view -> play(detail, episode));
             episodes.addView(button, cell);
         }
-        panel.addView(episodes, new LinearLayout.LayoutParams(-1, -2));
+        panel.addView(episodes, episodesParams);
         state(false, "", false);
         panel.requestFocus();
     }
