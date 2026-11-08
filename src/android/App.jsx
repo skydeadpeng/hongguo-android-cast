@@ -139,7 +139,15 @@ function HuangguoPage({ notify }) {
   const [query, setQuery] = useState('');
   const [state, setState] = useState({ busy: true, items: [], hasMore: false, page: 1, error: '' });
   const [detail, setDetail] = useState(null);
+  const [currentOrigin, setCurrentOrigin] = useState('');
   const generation = useRef(0);
+  // 顶栏展示当前实际生效线路；切页与设置变更后刷新。
+  useEffect(() => {
+    const read = () => huangguoGetSettings().then(result => setCurrentOrigin(result.currentOrigin || '')).catch(() => {});
+    read();
+    window.addEventListener('huangguosettingschanged', read);
+    return () => window.removeEventListener('huangguosettingschanged', read);
+  }, []);
   const load = useCallback((next = {}) => {
     const current = ++generation.current;
     const page = Math.max(1, Number(next.page) || 1);
@@ -169,7 +177,7 @@ function HuangguoPage({ notify }) {
   useEffect(() => { load({}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return <section className="huangguo-page" aria-label="黄果漫剧">
     <header className="huangguo-head">
-      <h1>黄果漫剧</h1>
+      <h1>黄果漫剧{currentOrigin ? <span className="huangguo-origin">线路 {currentOrigin}</span> : null}</h1>
       <form className="huangguo-search" onSubmit={event => { event.preventDefault(); setQuery(keyword.trim()); load({ query: keyword.trim(), page: 1 }); }}>
         <input value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="搜索黄果剧集" aria-label="搜索黄果剧集" maxLength={100} />
         <button type="submit" className="button">搜索</button>

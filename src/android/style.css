@@ -496,3 +496,4 @@
 .huangguo-pin-actions .button { flex: 1; }
 .huangguo-pin-setup { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .huangguo-pin-setup input { flex: 1 1 12rem; min-width: 0; min-height: 46px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--text); }
+.huangguo-origin { display: inline-block; margin-left: 10px; vertical-align: middle; font-size: 12px; font-weight: 400; color: var(--faint); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; }

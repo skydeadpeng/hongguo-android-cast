@@ -40,14 +40,15 @@ export async function huangguoPlay(series, episode) {
   return nativeCall('huangguoPlay', params, 60000);
 }
 
-/** 黄果设置：visible 入口显隐；line 线路（auto=智能切换或固定线路下标）；pin 4-8 位数字密码。 */
+/** 黄果设置：visible 入口显隐；line 线路（auto=智能切换或固定线路下标）；pin 4-8 位数字密码。
+ *  线路地址与原生 HuangguoApi.ORIGINS 保持一致，标签直接展示域名方便判断线路可用性。 */
 export const HUANGGUO_LINES = [
-  { id: 'auto', label: '自动（推荐）' },
-  { id: '0', label: '官方直连' },
-  { id: '1', label: '自建代理线路' },
-  { id: '2', label: '备用线路 1' },
-  { id: '3', label: '备用线路 2' },
-  { id: '4', label: '备用线路 3' },
+  { id: 'auto', label: '自动 · 按顺序智能切换（推荐）' },
+  { id: '0', label: '官方直连 · huangguoai.com' },
+  { id: '1', label: '自建代理 · huoguo.skydeadpeng.xyz' },
+  { id: '2', label: '备用线路 1 · l5f9m.rxzfszht.cc' },
+  { id: '3', label: '备用线路 2 · blolhh.rxzfszht.cc' },
+  { id: '4', label: '备用线路 3 · mxz58.rxzfszht.cc' },
 ];
 
 export async function huangguoGetSettings() {

@@ -48,6 +48,9 @@ final class HuangguoApi {
             String line = prefs.getString("line", "auto");
             result.put("line", "auto".equals(line) ? "auto" : String.valueOf(originIndexOf(line)));
             result.put("hasPin", !prefs.getString("pin", "").isEmpty());
+            // 当前实际生效线路（固定线路优先），黄果页顶栏展示，方便排查连接问题。
+            int active = pinnedOrigin() >= 0 ? pinnedOrigin() : originIndex;
+            result.put("currentOrigin", ORIGINS[active >= 0 && active < ORIGINS.length ? active : 0].replace("https://", ""));
         } catch (Exception ignored) { }
         return result;
     }
