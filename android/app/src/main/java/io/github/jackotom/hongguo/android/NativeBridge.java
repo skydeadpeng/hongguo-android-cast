@@ -383,6 +383,16 @@ final class NativeBridge {
                 String seriesId = LibraryStore.text(params, "seriesId", 30);
                 int index = Math.max(1, params.optInt("index", 1));
                 String url = HuangguoApi.episodeUrl(seriesId, index);
+                // 华为/荣耀系统播放器解不了 AES-128 HLS：先完整下载解密为本地 TS 再播。
+                boolean localFile = false;
+                if (HuangguoHlsCache.deviceNeedsCompat() && url.toLowerCase(Locale.ROOT).contains(".m3u8")) {
+                    java.io.File directory = activity.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES);
+                    if (directory == null) throw new Exception("黄果缓存目录尚未准备");
+                    java.io.File cached = new File(directory, "huangguo-" + seriesId + "-" + index + ".ts");
+                    if (!cached.isFile() || cached.length() == 0) HuangguoHlsCache.download(url, cached);
+                    url = Uri.fromFile(cached).toString();
+                    localFile = true;
+                }
                 JSONObject series = new JSONObject().put("seriesId", seriesId)
                     .put("title", LibraryStore.text(params, "title", 200))
                     .put("coverUrl", LibraryStore.text(params, "coverUrl", 4096))
@@ -392,7 +402,7 @@ final class NativeBridge {
                 if (!params.has("speed")) params.put("speed", mediaOptions.getDouble("speed"));
                 if (!(params.opt("speed") instanceof Number)) throw new JSONException("倍速无效");
                 PlayerOptions.validateSpeed(params.getDouble("speed"));
-                play(id, series, episode, new JSONArray().put(episode), url, false, params);
+                play(id, series, episode, new JSONArray().put(episode), url, localFile, params);
                 break;
             }
             case "getPlaybackOptions": respond(id, PlayerOptions.read(activity), null); break;
