@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 11,
-  "versionName": "0.1.10",
+  "versionCode": 12,
+  "versionName": "0.1.11",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.10/HongguoNative-0.1.10-tvNative-release-compatible.apk",
-  "size": 651148,
-  "sha256": "45aa53329a71eedde6f1155138f8031c8c6d2f058302d66f7b208baa685737e3",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.11/HongguoNative-0.1.11-tvNative-release-compatible.apk",
+  "size": 651292,
+  "sha256": "2202e8934158d6a647e07a7e1e4d204c4aae752e6cf886da7f8fc44595104a8b",
   "notes": "",
-  "publishedAt": "2026-11-08T11:15:06.362Z"
+  "publishedAt": "2026-11-08T11:35:59.612Z"
 }
