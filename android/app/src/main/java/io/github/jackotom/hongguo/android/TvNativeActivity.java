@@ -85,7 +85,7 @@ public class TvNativeActivity extends Activity {
         TextView brand = TvUi.text(this, "红果", 20, TvUi.TEXT);
         brand.setTypeface(null, android.graphics.Typeface.BOLD);
         header.addView(brand, new LinearLayout.LayoutParams(dp(64), -2));
-        String[][] destinations = { { "catalog", "发现" }, { "search", "搜索" }, { "library", "我的追剧" }, { "downloads", "下载" }, { "settings", "设置" } };
+        String[][] destinations = { { "catalog", "发现" }, { "huangguo", "黄果" }, { "search", "搜索" }, { "library", "我的追剧" }, { "downloads", "下载" }, { "settings", "设置" } };
         for (String[] destination : destinations) {
             Button button = TvUi.button(this, destination[1]);
             button.setTag(destination[0]);
@@ -147,7 +147,7 @@ public class TvNativeActivity extends Activity {
         emptyPanel.setPadding(dp(28), dp(12), dp(28), dp(16));
         content.addView(emptyPanel, new FrameLayout.LayoutParams(-1, -1));
         more = TvUi.button(this, "加载更多");
-        more.setOnClickListener(view -> loadCatalog(true));
+        more.setOnClickListener(view -> { if (mode.equals("huangguo")) loadHuangguo(true); else loadCatalog(true); });
         LinearLayout footer = TvUi.row(this); footer.setGravity(Gravity.CENTER);
         footer.setPadding(0, 0, 0, dp(8));
         footer.addView(more, new LinearLayout.LayoutParams(-2, dp(38)));
@@ -156,7 +156,7 @@ public class TvNativeActivity extends Activity {
         updates = new AppUpdater(this, null); updates.pageReady();
         PlaybackSources.attachNative(lookup);
         select(mode, category);
-        navButtons.get(mode.equals("library") ? 2 : mode.equals("downloads") ? 3 : mode.equals("settings") ? 4 : 0).requestFocus();
+        navButtons.get(mode.equals("huangguo") ? 1 : mode.equals("library") ? 3 : mode.equals("downloads") ? 4 : mode.equals("settings") ? 5 : 0).requestFocus();
     }
     private int dp(int value) { return TvUi.dp(this, value); }
     private boolean alive(int ticket) { return !destroyed && !isFinishing() && !isDestroyed() && ticket == generation; }
@@ -174,6 +174,7 @@ public class TvNativeActivity extends Activity {
         state("", false, null); buildSecondary();
         for (Button button : navButtons) button.setSelected(mode.equals(button.getTag()));
         if (mode.equals("catalog")) loadCatalog(false);
+        else if (mode.equals("huangguo")) loadHuangguo(false);
         else if (mode.equals("library")) loadLibrary();
         else if (mode.equals("downloads")) loadDownloads(true);
         else showSettings();
@@ -192,6 +193,17 @@ public class TvNativeActivity extends Activity {
             continueWatching = smallButton("继续观看"); continueWatching.setVisibility(View.GONE);
             continueWatching.setOnClickListener(view -> { if (recent != null) openSeries(recent); });
             addSecondary(continueWatching);
+        } else if (mode.equals("huangguo")) {
+            // 黄果官方站两个内容分类；分类值即官方 slug。
+            String[][] categories = { { "ai-manju", "漫剧" }, { "ai-duanju", "短剧" } };
+            if (category == null || category.isEmpty() || category.equals("real-drama")) category = "ai-manju";
+            for (String[] entry : categories) {
+                Button button = smallButton(entry[1]); button.setTag(entry[0]); button.setSelected(category.equals(entry[0]));
+                button.setOnClickListener(view -> {
+                    if (!category.equals(entry[0])) { select("huangguo", entry[0]); focusSecondary(entry[0]); }
+                });
+                addSecondary(button);
+            }
         } else if (mode.equals("library")) {
             for (String[] entry : new String[][] { { "favorites", "收藏" }, { "history", "观看历史" } }) {
                 Button button = smallButton(entry[1]); button.setTag(entry[0]); button.setSelected(libraryView.equals(entry[0]));
@@ -342,6 +354,55 @@ public class TvNativeActivity extends Activity {
             }
         });
     }
+    /** 黄果官方目录：只读分页列表，剧集编号由 HuangguoApi 编码。 */
+    private void loadHuangguo(boolean append) {
+        if (!mode.equals("huangguo") || loading || append && page >= totalPages) return;
+        final int ticket = ++generation;
+        final int target = append ? page + 1 : 1;
+        final String targetCategory = category == null || category.isEmpty() ? "ai-manju" : category;
+        final int selection = grid.getSelectedItemPosition(), first = grid.getFirstVisiblePosition();
+        final int previousCount = items.size();
+        final boolean focusMore = more.hasFocus();
+        loading = true; more.setEnabled(false); more.setText(append ? "加载中…" : "加载更多");
+        emptyPanel.setVisibility(View.GONE); grid.setVisibility(View.VISIBLE);
+        state(append ? "正在加载下一页…" : "正在读取黄果片单…", true, null);
+        submit(ticket, () -> {
+            try {
+                JSONObject result = HuangguoApi.feed(targetCategory, target);
+                final JSONArray converted = result.getJSONArray("items");
+                final boolean hasMore = result.optBoolean("hasMore", false);
+                runOnUiThread(() -> {
+                    if (!alive(ticket) || !mode.equals("huangguo") || !targetCategory.equals(category)) return;
+                    loading = false; more.setEnabled(true); more.setText("加载更多");
+                    if (!append) items.clear();
+                    Set<String> seen = new HashSet<>();
+                    for (JSONObject row : items) seen.add(row.optString("seriesId"));
+                    for (int i = 0; i < converted.length(); i++) {
+                        JSONObject row = converted.optJSONObject(i);
+                        if (row != null && seen.add(row.optString("seriesId"))) items.add(row);
+                    }
+                    page = target;
+                    totalPages = hasMore ? page + 1 : page;
+                    adapter.notifyDataSetChanged();
+                    if (append) {
+                        grid.setSelection(Math.max(0, focusMore ? Math.min(previousCount, items.size() - 1) : selection >= 0 ? selection : first));
+                        if (focusMore && !items.isEmpty()) grid.requestFocus();
+                    }
+                    more.setVisibility(page < totalPages ? View.VISIBLE : View.GONE);
+                    pageSummary.setText("第 " + page + " 批 · " + items.size() + " 部");
+                    state("", false, null);
+                    if (items.isEmpty()) empty("这个分类暂时没有黄果剧集", "可以刷新片单，或切换其他分类。", "重新加载", () -> loadHuangguo(false));
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    if (!alive(ticket)) return;
+                    loading = false; more.setEnabled(true); more.setText("加载更多");
+                    state(TvUi.message(error), false, () -> loadHuangguo(append));
+                    if (items.isEmpty()) empty("黄果片单读取未完成", "请检查网络后重试。", "重新加载", () -> loadHuangguo(false));
+                });
+            }
+        });
+    }
     private void refreshRecentHistory() {
         if (!mode.equals("catalog") || continueWatching == null) return;
         final int ticket = generation;
@@ -482,7 +543,10 @@ public class TvNativeActivity extends Activity {
     }
     private void openSeries(JSONObject row) {
         String id = row.optString("seriesId");
-        if (!id.isEmpty()) TvPlay.launch(this, new Intent(this, TvDetailActivity.class).putExtra("seriesId", id));
+        if (id.isEmpty()) return;
+        // 黄果剧集以 99 前缀编码进入原生详情，不与红果官网解析混用。
+        if (id.length() == 10 && id.startsWith("99")) TvPlay.launch(this, new Intent(this, TvHuangguoDetailActivity.class).putExtra("seriesId", id));
+        else TvPlay.launch(this, new Intent(this, TvDetailActivity.class).putExtra("seriesId", id));
     }
     private void showSettings() {
         grid.setVisibility(View.GONE); emptyPanel.setVisibility(View.GONE); pageScroll.setVisibility(View.VISIBLE);

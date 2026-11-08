@@ -17,6 +17,9 @@
         <activity android:name=".TvDetailActivity" android:exported="false"
             android:screenOrientation="landscape"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
+        <activity android:name=".TvHuangguoDetailActivity" android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
         <activity android:name=".TvSearchActivity" android:exported="false"
             android:screenOrientation="landscape"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
