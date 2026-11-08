@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 67,
-  "versionName": "0.12.44",
+  "versionCode": 68,
+  "versionName": "0.12.45",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.44/Hongguo-0.12.44-tv-release-compatible.apk",
-  "size": 650784,
-  "sha256": "92d991f658f985bd45856c4a5bc2ef2b3e19409d1bb76dd9e57cd44c82b34ae8",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.45/Hongguo-0.12.45-tv-release-compatible.apk",
+  "size": 650800,
+  "sha256": "b182f588d5487e15685db8b93bbd347c886fcbfba7ff59e0eadf87b087e8a985",
   "notes": "",
-  "publishedAt": "2026-11-08T10:27:53.244Z"
+  "publishedAt": "2026-11-08T10:42:41.371Z"
 }
