@@ -12,6 +12,7 @@ import UpdatePanel from './UpdatePanel.jsx';
 import { createOfficialSeasonLookup, requestOfficialSeries } from './official-series.mjs';
 import { announcementLink, createAnnouncements } from './announcements.mjs';
 import { completedEpisode, filterHistory, withHistoryHints } from './history-view.mjs';
+import { HUANGGUO_CATEGORIES, huangguoFeed, huangguoSearch, huangguoDetail, huangguoPlay } from './huangguo.mjs';
 
 const source = createSource(requestHtml, { fallback: fetchAppPlayUrl,
   searchPage: params => nativeCall('searchQuery', params, 60000),
@@ -20,6 +21,7 @@ const seasonLookup = createOfficialSeasonLookup(requestOfficialSeries, createSea
 const EMPTY_LIBRARY = { favorites: [], history: [] };
 const NAV = [
   { id: 'discover', label: '发现', Icon: Home },
+  { id: 'huangguo', label: '黄果', Icon: Radio },
   { id: 'search', label: '搜索', Icon: Search },
   { id: 'library', label: '我的追剧', Icon: Bookmark },
   { id: 'downloads', label: '下载', Icon: Download },
@@ -90,6 +92,75 @@ function Poster({ item, onOpen, history }) {
 
 function PosterGrid({ items, onOpen, history = false }) {
   return <div className="poster-grid">{items.map((item, index) => <Poster key={`${item.seriesId}-${index}`} item={item} onOpen={onOpen} history={history ? item : null} />)}</div>;
+}
+
+function HuangguoPage({ notify }) {
+  const [category, setCategory] = useState(HUANGGUO_CATEGORIES[0].id);
+  const [keyword, setKeyword] = useState('');
+  const [query, setQuery] = useState('');
+  const [state, setState] = useState({ busy: true, items: [], hasMore: false, page: 1, error: '' });
+  const [detail, setDetail] = useState(null);
+  const generation = useRef(0);
+  const load = useCallback((next = {}) => {
+    const current = ++generation.current;
+    const page = Math.max(1, Number(next.page) || 1);
+    const searching = 'query' in next ? !!next.query : !!query;
+    const word = 'query' in next ? next.query : query;
+    setState(previous => ({ busy: true, items: next.append ? previous.items : [], hasMore: false, page, error: '' }));
+    const request = searching && word ? huangguoSearch(word, page) : searching ? Promise.resolve({ items: [], hasMore: false }) : huangguoFeed('category' in next ? next.category : category, page);
+    request.then(result => { if (generation.current === current) setState(previous => ({ busy: false, items: next.append ? previous.items.concat(result.items) : result.items, hasMore: result.hasMore, page, error: '' })); })
+      .catch(error => { if (generation.current === current) setState({ busy: false, items: [], hasMore: false, page, error: errorText(error) }); });
+  }, [category, query]);
+  const openDetail = (series) => {
+    setDetail({ series, busy: true, error: '', data: null });
+    huangguoDetail(series.seriesId)
+      .then(data => setDetail(previous => previous?.series?.seriesId === series.seriesId ? { ...previous, busy: false, data } : previous))
+      .catch(error => setDetail(previous => previous?.series?.seriesId === series.seriesId ? { ...previous, busy: false, error: errorText(error) } : previous));
+  };
+  const playEpisode = async (series, episode) => {
+    try { await huangguoPlay(series, episode); }
+    catch (error) { notify(`播放未成功：${errorText(error)}`); }
+  };
+  // 返回键优先关闭黄果详情；由 App 层 back 链派发 androidhuangguoback。
+  useEffect(() => {
+    const back = event => { if (detail) { event.preventDefault(); setDetail(null); } };
+    window.addEventListener('androidhuangguoback', back);
+    return () => window.removeEventListener('androidhuangguoback', back);
+  }, [detail]);
+  useEffect(() => { load({}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return <section className="huangguo-page" aria-label="黄果漫剧">
+    <header className="huangguo-head">
+      <h1>黄果漫剧</h1>
+      <form className="huangguo-search" onSubmit={event => { event.preventDefault(); setQuery(keyword.trim()); load({ query: keyword.trim(), page: 1 }); }}>
+        <input value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="搜索黄果剧集" aria-label="搜索黄果剧集" maxLength={100} />
+        <button type="submit" className="button">搜索</button>
+        {!!query && <button type="button" className="button" onClick={() => { setKeyword(''); setQuery(''); load({ query: '', category, page: 1 }); }}>清除</button>}
+      </form>
+    </header>
+    {!query && <div className="category-tabs" role="group" aria-label="黄果分类">{HUANGGUO_CATEGORIES.map(item => <button key={item.id} aria-pressed={item.id === category} onClick={() => { setCategory(item.id); load({ category: item.id, page: 1 }); }}>{item.label}</button>)}</div>}
+    <Status busy={state.busy && !state.items.length} error={!state.items.length ? state.error : ''} onRetry={() => load({ page: 1 })} empty={!state.busy && !state.items.length && !state.error ? { title: '没有找到剧集', text: query ? '换个关键词试试。' : '该分类暂无内容。' } : null}>
+      <PosterGrid items={state.items} onOpen={openDetail} />
+      {state.items.length > 0 && <div className="feed-more">
+        <button type="button" className="button" disabled={state.busy || !state.hasMore} onClick={() => load({ page: state.page + 1, append: true })}>{state.busy ? '正在加载…' : state.hasMore ? '加载更多' : '没有更多了'}</button>
+      </div>}
+    </Status>
+    {detail && <div className="huangguo-detail" role="dialog" aria-label={detail.series.title}>
+      <div className="huangguo-detail-panel">
+        <button type="button" className="button huangguo-back" autoFocus onClick={() => setDetail(null)}>← 返回</button>
+        <Status busy={detail.busy} error={detail.error} onRetry={() => openDetail(detail.series)} empty={!detail.busy && !detail.error && !detail.data ? { title: '详情为空', text: '请稍后重试。' } : null}>
+          {detail.data && <>
+            <div className="huangguo-meta">
+              {detail.data.coverUrl ? <img src={detail.data.coverUrl} alt="" loading="lazy" /> : null}
+              <div><h2>{detail.data.title}</h2><p>{detail.data.description || '暂无简介'}</p><p className="huangguo-count">{detail.data.episodeCount} 集</p></div>
+            </div>
+            <div className="huangguo-episodes" role="group" aria-label="选集">
+              {detail.data.episodes.map(episode => <button key={episode.vid} disabled={episode.locked} onClick={() => playEpisode(detail.series, episode)}>{episode.locked ? `${episode.label} 🔒` : episode.label}</button>)}
+            </div>
+          </>}
+        </Status>
+      </div>
+    </div>}
+  </section>;
 }
 
 function Discover({ onOpen, library, onSearch, onUpdates }) {
@@ -1388,7 +1459,7 @@ export default function App() {
   useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [tab]);
   useEffect(() => { if (content.current) content.current.scrollTop = detail ? 0 : previousScroll.current; if (detail) content.current?.querySelector('.back-button')?.focus(); }, [detail?.seed?.seriesId]);
   useEffect(() => {
-    const back = () => { if (!window.dispatchEvent(new CustomEvent('androiddownloadback', { cancelable: true }))) return true; if (detail) { closeDetail(); return true; } if (tab !== 'discover') { setTab('discover'); return true; } return false; };
+    const back = () => { if (!window.dispatchEvent(new CustomEvent('androiddownloadback', { cancelable: true }))) return true; if (!window.dispatchEvent(new CustomEvent('androidhuangguoback', { cancelable: true }))) return true; if (detail) { closeDetail(); return true; } if (tab !== 'discover') { setTab('discover'); return true; } return false; };
     window.__androidBack = back;
     // A share link resolves to a series id natively; only an exact numeric id may open a detail.
     window.__androidOpenSeries = (seriesId) => { const id = String(seriesId || ''); if (/^\d{1,30}$/.test(id)) openDetail({ seriesId: id, title: '' }); };
@@ -1406,6 +1477,7 @@ export default function App() {
       {detail && <SeasonDetails key={detail.seed.seriesId} {...detail} library={library} onBack={closeDetail} onLibrary={replaceLibrary} notify={notify} isTv={!!info.isTv} />}
       <div className="page-slot" hidden={!!detail}>
         {tab === 'discover' && <Discover onOpen={openDetail} library={library} onSearch={() => navigate('search')} onUpdates={() => navigate('about')} />}
+        {tab === 'huangguo' && <HuangguoPage notify={notify} />}
         {tab === 'search' && <SearchPage onOpen={openDetail} />}
         {tab === 'library' && <Library library={library} error={libraryError} busy={libraryBusy} onRetry={loadLibrary} onOpen={openDetail} onAccount={() => { navigate('about'); setAccountFocus(value => value + 1); }} />}
         {tab === 'downloads' && !detail && <Downloads notify={notify} />}

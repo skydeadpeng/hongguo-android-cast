@@ -283,6 +283,8 @@ final class NetworkGuard {
     }
     static Reply get(String value) throws Exception { return request(value, true, false); }
     static Reply get(String value, long deadline) throws Exception { return request(value, true, false, deadline); }
+    /** Read-only public HTTPS GET for fixed third-party origins; the caller pins the host. */
+    static Reply publicGet(String value, long deadline) throws Exception { return request(value, false, false, deadline); }
     static Reply get(String value, long timeoutMs, long deadlineMs) throws Exception { return get(value, pageDeadline(timeoutMs, deadlineMs)); }
     static String media(String value) throws Exception { return request(value, false, true).url; }
     /** Bounded binary transfer; each redirect resolves public IPs and connects TLS to that checked IP. */

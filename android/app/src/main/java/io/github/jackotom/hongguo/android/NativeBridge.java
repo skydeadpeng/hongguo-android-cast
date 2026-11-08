@@ -34,7 +34,7 @@ final class NativeBridge {
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo"));
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo", "huangguoFeed", "huangguoSearch", "huangguoDetail", "huangguoPlay"));
     NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
@@ -77,7 +77,7 @@ final class NativeBridge {
                     AccountSync.get().requireCurrent(favoriteSelection);
                 } catch (Exception error) { respond(id, null, "账号正在切换，请稍后重试收藏"); return; }
             } else { favoriteSelection = null; favoriteStore = null; }
-            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") || method.equals("homeFeed") ? searchWorker : method.equals("download") ? downloadWorker : worker;
+            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") || method.equals("homeFeed") || method.startsWith("huangguo") ? searchWorker : method.equals("download") ? downloadWorker : worker;
             try { executor.execute(() -> { try (AutoCloseable updateLease = (method.equals("download") || method.equals("playDownload")) ? UpdateInstallCheckpoint.operation() : null) { handle(id, method, params, favoriteStore, favoriteSelection); } catch (Exception error) { respond(id, null, error.getMessage() == null ? "操作未成功，请重试" : error.getMessage()); } }); }
             catch (RejectedExecutionException error) { respond(id, null, "请求较多，请稍后重试"); }
         });
@@ -344,6 +344,40 @@ final class NativeBridge {
                     inlineFeedCovers(result.optJSONArray("items"), deadline);
                     respond(id, result, null);
                 }
+                break;
+            }
+            case "huangguoFeed": {
+                String category = params == null ? "ai-manju" : params.optString("category", "ai-manju");
+                int page = params == null ? 1 : Math.max(1, params.optInt("page", 1));
+                respond(id, HuangguoApi.feed(category, page), null);
+                break;
+            }
+            case "huangguoSearch": {
+                String keyword = params == null ? "" : LibraryStore.text(params, "keyword", 120);
+                int page = params == null ? 1 : Math.max(1, params.optInt("page", 1));
+                respond(id, HuangguoApi.search(keyword, page), null);
+                break;
+            }
+            case "huangguoDetail": {
+                String seriesId = params == null ? "" : LibraryStore.text(params, "seriesId", 30);
+                respond(id, HuangguoApi.detail(seriesId), null);
+                break;
+            }
+            case "huangguoPlay": {
+                // 黄果分集直接取官方签名 m3u8 后复用原生播放器；不进入红果片源恢复链。
+                String seriesId = LibraryStore.text(params, "seriesId", 30);
+                int index = Math.max(1, params.optInt("index", 1));
+                String url = HuangguoApi.episodeUrl(seriesId, index);
+                JSONObject series = new JSONObject().put("seriesId", seriesId)
+                    .put("title", LibraryStore.text(params, "title", 200))
+                    .put("coverUrl", LibraryStore.text(params, "coverUrl", 4096))
+                    .put("episodeCount", Math.max(0, Math.min(10000, params.optInt("episodeCount"))));
+                JSONObject episode = new JSONObject().put("vid", seriesId + String.format("%04d", index)).put("index", index);
+                JSONObject mediaOptions = PlayerOptions.read(activity);
+                if (!params.has("speed")) params.put("speed", mediaOptions.getDouble("speed"));
+                if (!(params.opt("speed") instanceof Number)) throw new JSONException("倍速无效");
+                PlayerOptions.validateSpeed(params.getDouble("speed"));
+                play(id, series, episode, new JSONArray().put(episode), url, false, params);
                 break;
             }
             case "getPlaybackOptions": respond(id, PlayerOptions.read(activity), null); break;
