@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 6,
-  "versionName": "0.1.5",
+  "versionCode": 7,
+  "versionName": "0.1.6",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.5/HongguoNative-0.1.5-tvNative-release-compatible.apk",
-  "size": 650888,
-  "sha256": "838a840a60634aaae153154c4d21426bb9fd0dccbe6d6fac89fe08c89a549ee1",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.6/HongguoNative-0.1.6-tvNative-release-compatible.apk",
+  "size": 650984,
+  "sha256": "f77e07a3b7dd4c15bfc27f728eb114f253488cbc502c761ca23d7bed54fcc6d8",
   "notes": "",
-  "publishedAt": "2026-11-08T09:36:00.023Z"
+  "publishedAt": "2026-11-08T10:27:53.743Z"
 }
