@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   var source = window.HongguoSource;
+  var huangguo = window.HuangguoSource;
   var appChain = window.HongguoAppChain || null;
   var main = document.getElementById('main');
   var nav = document.getElementById('nav');
@@ -35,7 +36,8 @@
   // ===== 栏目 =====
   function buildNav() {
     nav.innerHTML = '';
-    source.CATEGORIES.forEach(function (entry) {
+    var categories = source.CATEGORIES.concat(huangguo ? huangguo.CATEGORIES : []);
+    categories.forEach(function (entry) {
       var button = document.createElement('button');
       button.type = 'button'; button.textContent = entry.label; button.dataset.slug = entry.slug;
       if (entry.slug === state.category) button.classList.add('active');
@@ -56,7 +58,9 @@
   }
   function renderHome() {
     main.innerHTML = '<h1>' + esc(categoryLabel()) + '</h1><div id="body">' + spinner() + '</div>';
-    source.browse(state.category).then(function (data) {
+    var loader = huangguo && huangguo.isCategory(state.category)
+      ? huangguo.browse(state.category.slice(3)) : source.browse(state.category);
+    loader.then(function (data) {
       if (state.view.name !== 'home') return;
       var body = document.getElementById('body');
       if (!data.results.length) { body.innerHTML = '<div class="state">这个分类暂时没有内容</div>'; return; }
@@ -77,14 +81,16 @@
     }).catch(function (error) { errorState(error.message || '读取失败'); });
   }
   function categoryLabel() {
-    for (var i = 0; i < source.CATEGORIES.length; i++) if (source.CATEGORIES[i].slug === state.category) return source.CATEGORIES[i].label;
+    var categories = source.CATEGORIES.concat(huangguo ? huangguo.CATEGORIES : []);
+    for (var i = 0; i < categories.length; i++) if (categories[i].slug === state.category) return categories[i].label;
     return '发现';
   }
 
   // ===== 详情 =====
   function renderDetail(seriesId) {
     main.innerHTML = '<div id="body">' + spinner('正在读取选集…') + '</div>';
-    source.episodes(seriesId).then(function (data) {
+    var loader = huangguo && huangguo.isSeries(seriesId) ? huangguo.episodes(seriesId) : source.episodes(seriesId);
+    loader.then(function (data) {
       if (state.view.name !== 'detail' || state.view.seriesId !== seriesId) return;
       var body = document.getElementById('body');
       state.view.episodes = data;
@@ -169,6 +175,11 @@
     });
   }
   function resolveEpisode(seriesId, vid) {
+    if (huangguo && huangguo.isSeries(seriesId)) {
+      return huangguo.playUrl(seriesId, vid).then(function (info) {
+        return { url: info.url, userAgent: '', referer: '' };
+      });
+    }
     var options = { appChain: appChain, proxy: state.settings.proxy };
     return source.playUrl(seriesId, vid, options).then(function (info) {
       return { url: info.url, userAgent: info.userAgent || '', referer: info.referer || '' };
