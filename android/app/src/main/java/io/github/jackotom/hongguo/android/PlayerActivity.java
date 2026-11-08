@@ -715,6 +715,8 @@ public final class PlayerActivity extends Activity {
     private static String qualityLabel(String value) { return "auto".equals(value) ? "自动" : value; }
     private static String rateLabel(float value) { return String.format(Locale.ROOT, "%s×", value == (int) value ? Integer.toString((int) value) : Float.toString(value)); }
     private void renderStatus() {
+        // 黄果剧（99 前缀编码）解码出实际尺寸后按剧记录，详情页标注画质档位。
+        if (videoWidth > 0 && videoHeight > 0 && series != null) HuangguoApi.recordResolution(series.optString("seriesId", ""), videoWidth, videoHeight);
         String size = videoWidth > 0 && videoHeight > 0 ? "实际 " + videoWidth + "×" + videoHeight : "实际分辨率待解码确认";
         status.setText(currentKind + " · 当前 " + qualityLabel(actualQuality) + (quality.equals(actualQuality) ? "" : "（首选 " + qualityLabel(quality) + "）") + " · " + size);
     }

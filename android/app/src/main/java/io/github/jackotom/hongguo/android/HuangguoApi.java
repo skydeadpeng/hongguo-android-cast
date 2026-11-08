@@ -94,6 +94,29 @@ final class HuangguoApi {
     private static android.content.SharedPreferences prefs() {
         return appContext.getSharedPreferences("huangguo", android.content.Context.MODE_PRIVATE);
     }
+    /** 播放器解码出实际尺寸后按剧记录（"1920×1080"），详情页据此标注画质档位。 */
+    static void recordResolution(String seriesId, int width, int height) {
+        if (seriesId == null || !seriesId.matches("99[0-9]{8}") || width <= 0 || height <= 0) return;
+        try { prefs().edit().putString("res." + seriesId, width + "×" + height).apply(); } catch (Exception ignored) { }
+    }
+    static String recordedResolution(String seriesId) {
+        try { return prefs().getString("res." + seriesId, ""); } catch (Exception ignored) { return ""; }
+    }
+    /** "1920×1080" → 按短边归档：4K/2K/1080P/720P/480P；无法解析返回原文。 */
+    static String resolutionLabel(String size) {
+        if (size == null || size.isEmpty()) return "";
+        String[] parts = size.split("×");
+        if (parts.length != 2) return size;
+        try {
+            int shortEdge = Math.min(Integer.parseInt(parts[0].trim()), Integer.parseInt(parts[1].trim()));
+            if (shortEdge >= 2160) return "4K";
+            if (shortEdge >= 1440) return "2K";
+            if (shortEdge >= 1080) return "1080P";
+            if (shortEdge >= 720) return "720P";
+            if (shortEdge >= 480) return "480P";
+            return size;
+        } catch (NumberFormatException ignored) { return size; }
+    }
     private static String sha256(String value) throws Exception {
         java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
         StringBuilder hex = new StringBuilder();
@@ -227,7 +250,8 @@ final class HuangguoApi {
         if (episodes.length() == 0) throw new IOException("黄果分集列表为空");
         return new JSONObject().put("seriesId", seriesId).put("title", text(data, "title", 200))
             .put("coverUrl", wrapCover(data.optString("cover", ""))).put("description", text(data, "description", 8000))
-            .put("episodeCount", episodes.length()).put("episodes", episodes).put("source", "huangguo");
+            .put("episodeCount", episodes.length()).put("episodes", episodes).put("source", "huangguo")
+            .put("resolution", resolutionLabel(recordedResolution(seriesId)));
     }
 
     /**

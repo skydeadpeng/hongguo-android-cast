@@ -190,7 +190,7 @@ function HuangguoPage({ notify }) {
           {detail.data && <>
             <div className="huangguo-meta">
               {detail.data.coverUrl ? <img src={detail.data.coverUrl} alt="" loading="lazy" /> : null}
-              <div><h2>{detail.data.title}</h2><p>{detail.data.description || '暂无简介'}</p><p className="huangguo-count">{detail.data.episodeCount} 集</p></div>
+              <div><h2>{detail.data.title}</h2><p>{detail.data.description || '暂无简介'}</p><p className="huangguo-count">{detail.data.episodeCount} 集{detail.data.resolution ? ` · 画质 ${detail.data.resolution}` : ''}</p></div>
             </div>
             <div className="huangguo-episodes" role="group" aria-label="选集">
               {detail.data.episodes.map(episode => <button key={episode.vid} disabled={episode.locked} onClick={() => playEpisode(detail.series, episode)}>{episode.locked ? `${episode.label} 🔒` : episode.label}</button>)}
