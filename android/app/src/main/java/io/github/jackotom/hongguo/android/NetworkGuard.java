@@ -13,6 +13,15 @@ final class NetworkGuard {
     static final String REFERER = "https://hongguoduanju.com/";
     static final int LIMIT = 8 * 1024 * 1024;
     private static final Set<String> OFFICIAL = new HashSet<>(Arrays.asList("hongguoduanju.com", "www.hongguoduanju.com"));
+    // 黄果系域（官方站/镜像/自建代理/视频与密钥 CDN）：部分路由器与运营商 DNS 解析失败或污染，
+    // 与官方站一样参与「系统 DNS 与可信 DoH 竞速」，先出的公网地址先用。
+    private static final String[] RACE_SUFFIXES = { "huangguoai.com", "rxzfszht.cc", "skydeadpeng.xyz", "hzjvlo.cn", "drleao.cn" };
+    private static boolean racesHost(String host) {
+        if (host == null || host.isEmpty()) return false;
+        host = host.toLowerCase(Locale.ROOT);
+        for (String suffix : RACE_SUFFIXES) if (host.equals(suffix) || host.endsWith("." + suffix)) return true;
+        return false;
+    }
     private static final Set<String> EXTERNAL = new HashSet<>(Arrays.asList("hongguoduanju.com", "www.hongguoduanju.com", "github.com", "www.github.com"));
     // Official lookups race two lanes each (system + DoH), so the pool must hold more
     // than one concurrent resolution; two workers rejected every second parallel
@@ -145,7 +154,7 @@ final class NetworkGuard {
      * so a captured system resolver can only lose the race, never poison the winner.
      */
     static InetAddress[] officialAddresses(URI uri, long deadline) throws IOException {
-        if (!OFFICIAL.contains(uri.getHost().toLowerCase(Locale.ROOT)) && !uri.getHost().toLowerCase(Locale.ROOT).endsWith(".hongguoduanju.com")) return publicAddresses(uri, deadline);
+        if (!OFFICIAL.contains(uri.getHost().toLowerCase(Locale.ROOT)) && !uri.getHost().toLowerCase(Locale.ROOT).endsWith(".hongguoduanju.com") && !racesHost(uri.getHost())) return publicAddresses(uri, deadline);
         String host = uri.getHost();
         Callable<InetAddress[]> system = () -> InetAddress.getAllByName(host);
         Callable<InetAddress[]> trusted = () -> {
@@ -436,7 +445,7 @@ final class NetworkGuard {
         for (int redirects = 0; redirects <= 3; redirects++) {
             // Official pages race the system resolver against trusted DoH: a VPN's fake-IP
             // answer loses the race instead of hanging the episode.
-            InetAddress[] addresses = officialOnly ? officialAddresses(uri, deadline) : publicAddresses(uri, deadline);
+            InetAddress[] addresses = officialOnly || racesHost(uri.getHost()) ? officialAddresses(uri, deadline) : publicAddresses(uri, deadline);
             Socket raw = connectPublic(addresses, deadline);
             try (SocketGuard ignored = guardSocket(raw, deadline)) {
                 raw.setSoTimeout(remaining(deadline, 15_000));
