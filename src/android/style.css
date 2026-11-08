@@ -470,21 +470,22 @@
 .home-more{display:flex;justify-content:center;padding:6px 0 18px}
 .home-more-note{color:var(--faint);font-size:13px}
 
-/* ===== 黄果漫剧页 ===== */
+/* ===== 黄果漫剧页（使用 App 主题变量，跟随系统深浅色） ===== */
 .huangguo-page { padding: 0 0 2rem; }
 .huangguo-head { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
 .huangguo-head h1 { font-size: 1.25rem; margin: 0; }
 .huangguo-search { display: flex; gap: .5rem; flex: 1 1 16rem; max-width: 30rem; }
-.huangguo-search input { flex: 1; min-width: 0; padding: .55rem .8rem; border-radius: .6rem; border: 1px solid var(--border, #444); background: var(--panel, #1d1f27); color: inherit; font-size: .95rem; }
+.huangguo-search input { flex: 1; min-width: 0; min-height: 46px; padding: .55rem .9rem; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-size: .95rem; }
+.huangguo-search input::placeholder { color: var(--faint); }
 .feed-more { display: flex; justify-content: center; padding: 1rem 0; }
-.huangguo-detail { position: fixed; inset: 0; z-index: 40; background: var(--backdrop, rgba(0,0,0,.55)); display: flex; align-items: stretch; justify-content: center; }
-.huangguo-detail-panel { position: relative; width: min(56rem, 100%); height: 100%; overflow-y: auto; background: var(--background, #14151a); padding: 1rem 1.25rem 2rem; }
+.huangguo-detail { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; align-items: stretch; justify-content: center; }
+.huangguo-detail-panel { position: relative; width: min(56rem, 100%); height: 100%; overflow-y: auto; background: var(--bg); padding: 1rem 1.25rem 2rem; }
 .huangguo-back { margin-bottom: .75rem; }
 .huangguo-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.huangguo-meta img { width: 8.5rem; border-radius: .6rem; object-fit: cover; aspect-ratio: 3/4; }
-.huangguo-meta h2 { margin: 0 0 .5rem; font-size: 1.15rem; }
-.huangguo-meta p { margin: 0 0 .5rem; font-size: .9rem; opacity: .85; }
-.huangguo-count { opacity: .7; }
+.huangguo-meta img { width: 8.5rem; border-radius: .6rem; object-fit: cover; aspect-ratio: 3/4; background: var(--inset); }
+.huangguo-meta h2 { margin: 0 0 .5rem; font-size: 1.15rem; color: var(--text); }
+.huangguo-meta p { margin: 0 0 .5rem; font-size: .9rem; }
+.huangguo-count { color: var(--faint); }
 .huangguo-episodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: .5rem; }
-.huangguo-episodes button { padding: .6rem .25rem; border-radius: .55rem; border: 1px solid var(--border, #3a3c46); background: var(--panel, #1d1f27); color: inherit; font-size: .95rem; cursor: pointer; }
-.huangguo-episodes button:disabled { opacity: .45; cursor: default; }
+.huangguo-episodes button { min-height: 46px; padding: .6rem .25rem; border-radius: .55rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: .95rem; cursor: pointer; }
+.huangguo-episodes button:disabled { background: transparent; color: var(--faint); cursor: default; }
