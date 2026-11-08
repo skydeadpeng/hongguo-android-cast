@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 73,
-  "versionName": "0.12.50",
+  "versionCode": 74,
+  "versionName": "0.12.51",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.50/Hongguo-0.12.50-phone-release-compatible.apk",
-  "size": 654752,
-  "sha256": "ccedf9f6557a3ea993e7a9c72701b6f124c1da4c5368c02a264c807f93cb3e30",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.51/Hongguo-0.12.51-phone-release-compatible.apk",
+  "size": 655092,
+  "sha256": "f921fdb9d5697de44edd3efcf47921175cc5032f2201d5b195c871b55955294c",
   "notes": "",
-  "publishedAt": "2026-11-08T11:49:54.634Z"
+  "publishedAt": "2026-11-08T12:00:20.211Z"
 }
