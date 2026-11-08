@@ -11,9 +11,11 @@ import org.json.*;
  * 防止源站只下发预览片段。剧集在本机以 99 前缀数字编码与红果 ID 共存。
  */
 final class HuangguoApi {
-    /** 官方主域 + 社区镜像备用域：部分运营商网络对主域 RST，失败按序切换并粘住可用域。 */
+    /** 官方主域 + 自建 Worker 代理 + 社区镜像：部分运营商网络对主域 RST，失败按序切换并粘住可用域。
+     *  粘住 Worker 代理域时，封面与播放流同步改走代理（/img、/m3u8），不依赖内容 CDN 直连。 */
     private static final String[] ORIGINS = {
-        "https://huangguoai.com", "https://l5f9m.rxzfszht.cc", "https://blolhh.rxzfszht.cc", "https://mxz58.rxzfszht.cc"
+        "https://huangguoai.com", "https://huoguo.skydeadpeng.xyz",
+        "https://l5f9m.rxzfszht.cc", "https://blolhh.rxzfszht.cc", "https://mxz58.rxzfszht.cc"
     };
     private static volatile int originIndex = 0;
     private static final long DEADLINE_MS = 20_000;
@@ -62,6 +64,16 @@ final class HuangguoApi {
         String value = input.optString(key, "").replaceAll("<[^>]*>", "").trim();
         return value.length() > limit ? value.substring(0, limit) : value;
     }
+    private static boolean viaProxy() { return ORIGINS[originIndex].contains("skydeadpeng.xyz"); }
+    private static String encode(String value) {
+        try { return java.net.URLEncoder.encode(value, "UTF-8"); } catch (java.io.UnsupportedEncodingException ignored) { return value; }
+    }
+    private static String wrapCover(String url) {
+        return viaProxy() && url.startsWith("https://") ? ORIGINS[originIndex] + "/img?url=" + encode(url) : url;
+    }
+    private static String wrapStream(String url) {
+        return viaProxy() ? ORIGINS[originIndex] + "/m3u8?url=" + encode(url) : url;
+    }
 
     private static JSONObject item(JSONObject row) throws JSONException {
         long id = row.optLong("id", 0);
@@ -75,7 +87,7 @@ final class HuangguoApi {
             if (!label.isEmpty() && label.length() <= 80) tags.put(label);
         }
         return new JSONObject().put("seriesId", encodeSeries(id)).put("title", title)
-            .put("coverUrl", row.optString("cover", "")).put("episodeCount", Math.max(0, row.optInt("episode_count")))
+            .put("coverUrl", wrapCover(row.optString("cover", ""))).put("episodeCount", Math.max(0, row.optInt("episode_count")))
             .put("episodeLabel", "").put("tags", tags);
     }
 
@@ -129,7 +141,7 @@ final class HuangguoApi {
         }
         if (episodes.length() == 0) throw new IOException("黄果分集列表为空");
         return new JSONObject().put("seriesId", seriesId).put("title", text(data, "title", 200))
-            .put("coverUrl", data.optString("cover", "")).put("description", text(data, "description", 8000))
+            .put("coverUrl", wrapCover(data.optString("cover", ""))).put("description", text(data, "description", 8000))
             .put("episodeCount", episodes.length()).put("episodes", episodes).put("source", "huangguo");
     }
 
@@ -143,13 +155,15 @@ final class HuangguoApi {
         JSONObject data = get("/api/videos/" + id + "/play?ep=" + ep);
         String url = data.optString("video_url", "");
         if (url.isEmpty() || !url.startsWith("https://")) throw new IOException("黄果未提供有效播放地址");
+        // 走 Worker 代理时播放流与时长校验同样经代理，不依赖内容 CDN 直连。
+        String played = wrapStream(url);
         double declared = data.optDouble("duration", 0);
         if (declared > 0 && url.toLowerCase(Locale.ROOT).contains(".m3u8")) {
-            double actual = playlistSeconds(url);
+            double actual = playlistSeconds(played);
             if (actual > 0 && actual < declared * 0.8)
                 throw new IOException("该集只下发了预览片段（约 " + (int) actual + " 秒），暂无法完整播放");
         }
-        return url;
+        return played;
     }
 
     private static double playlistSeconds(String url) {

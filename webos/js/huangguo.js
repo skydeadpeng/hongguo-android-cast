@@ -4,9 +4,16 @@
 (function () {
   'use strict';
   var ORIGIN = 'https://huangguoai.com';
-  // 部分家庭/运营商网络对主域 RST；失败按序切换备用域并粘住可用域。
-  var ORIGINS = [ORIGIN, 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc'];
+  // 部分家庭/运营商网络对主域 RST；失败按序切换备用域（含自建 Worker 代理）并粘住可用域。
+  var ORIGINS = [ORIGIN, 'https://huoguo.skydeadpeng.xyz', 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc'];
   var originAt = 0;
+  function viaProxy() { return ORIGIN.indexOf('skydeadpeng.xyz') >= 0; }
+  function wrapCover(url) {
+    return viaProxy() && /^https:\/\//.test(url) ? ORIGIN + '/img?url=' + encodeURIComponent(url) : url;
+  }
+  function wrapStream(url) {
+    return viaProxy() ? ORIGIN + '/m3u8?url=' + encodeURIComponent(url) : url;
+  }
 
   function fetchJson(origin, path) {
     return fetch(origin + path, { headers: { 'Accept': 'application/json' } }).then(function (response) {
@@ -48,7 +55,7 @@
       if (label && label.length <= 80) tags.push(label);
       return false;
     });
-    return { seriesId: 'hg:' + id, title: title, cover: /^https:\/\//.test(String(row.cover || '')) ? row.cover : '',
+    return { seriesId: 'hg:' + id, title: title, cover: wrapCover(/^https:\/\//.test(String(row.cover || '')) ? row.cover : ''),
       episodeCount: Math.max(0, Number(row.episode_count) || 0), tags: tags };
   }
   function toPage(data, pageNumber) {
@@ -97,7 +104,7 @@
           episodes.push({ vid: 'hg:' + id + ':' + ep, index: ep, webAvailable: Number(episode.status) === 1 });
         });
         if (!episodes.length) throw new Error('黄果分集列表为空');
-        return { title: text(data.title, 200) || '黄果漫剧', cover: /^https:\/\//.test(String(data.cover || '')) ? data.cover : '',
+        return { title: text(data.title, 200) || '黄果漫剧', cover: wrapCover(/^https:\/\//.test(String(data.cover || '')) ? data.cover : ''),
           description: text(data.description, 4000), total: episodes.length, episodes: episodes,
           webAccessibleEpisodes: episodes.every(function (e) { return e.webAvailable; }) ? episodes.length : episodes.filter(function (e) { return e.webAvailable; }).length };
       });
@@ -108,10 +115,11 @@
       return get('/api/videos/' + id + '/play?ep=' + ep).then(function (data) {
         var url = String(data.video_url || '');
         if (!/^https:\/\//.test(url)) throw new Error('黄果未提供有效播放地址');
+        var played = wrapStream(url);
         var declared = Number(data.duration) || 0;
-        if (declared <= 0 || !/\.m3u8/i.test(url)) return { url: url };
+        if (declared <= 0 || !/\.m3u8/i.test(url)) return { url: played };
         // 预览片段防御：拉清单核对实际时长（清单很小，失败不拦截播放）。
-        return fetch(url, { headers: { 'Accept': '*/*' } }).then(function (response) {
+        return fetch(played, { headers: { 'Accept': '*/*' } }).then(function (response) {
           return response.ok ? response.text() : '';
         }).catch(function () { return ''; }).then(function (body) {
           if (body && body.indexOf('#EXTM3U') === 0 && body.indexOf('#EXT-X-STREAM-INF') < 0) {
@@ -121,7 +129,7 @@
               throw new Error('该集只下发了预览片段（约 ' + Math.round(total) + ' 秒），暂无法完整播放');
             }
           }
-          return { url: url };
+          return { url: played };
         });
       });
     }
