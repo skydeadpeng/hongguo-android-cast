@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 86,
-  "versionName": "0.12.63",
+  "versionCode": 87,
+  "versionName": "0.12.64",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.63/Hongguo-0.12.63-phone-release-compatible.apk",
-  "size": 656280,
-  "sha256": "d536231ea554f71b7f530d39fa9c958977705bbe40a1ae2a0608b3943c4db328",
-  "notes": "修复黄果在部分华为、荣耀设备上只能下载后播放、无法在线观看的问题；现与普通设备一致，点击即在线播放。\n修复黄果选集只能选当前一集的问题：选集面板现显示整剧分集，上一集、下一集与连播均可正常切换。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-08T20:41:20.232Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.64/Hongguo-0.12.64-phone-release-compatible.apk",
+  "size": 657420,
+  "sha256": "9fe0aa94eedc7afb3160050574bf071d5dc4a228e807dab6eaaa1406ed490acf",
+  "notes": "新增观看记录删除：我的追剧·观看历史中，每张卡片右上角可单独删除该剧记录；页面右上「清空记录」可一次清空全部观看记录（带确认）。登录官方账号时删除本机显示的记录，收藏不受影响。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-08T21:09:43.279Z"
 }
