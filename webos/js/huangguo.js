@@ -7,6 +7,15 @@
   // 部分家庭/运营商网络对主域 RST；失败按序切换备用域（含自建 Worker 代理）并粘住可用域。
   var ORIGINS = [ORIGIN, 'https://huoguo.skydeadpeng.xyz', 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc'];
   var originAt = 0;
+  // 记住上次成功的线路：冷启动直接使用，不再对被掐域逐一试错。
+  try {
+    var saved = Number(localStorage.getItem('huangguo.origin'));
+    if (saved >= 0 && saved < ORIGINS.length) { originAt = saved; ORIGIN = ORIGINS[saved]; }
+  } catch (e) { }
+  function stickOrigin(index) {
+    originAt = index; ORIGIN = ORIGINS[index];
+    try { localStorage.setItem('huangguo.origin', String(index)); } catch (e) { }
+  }
   function viaProxy() { return ORIGIN.indexOf('skydeadpeng.xyz') >= 0; }
   function wrapCover(url) {
     return viaProxy() && /^https:\/\//.test(url) ? ORIGIN + '/img?url=' + encodeURIComponent(url) : url;
@@ -29,8 +38,7 @@
         if (!body || body.status !== 1 || !body.data || typeof body.data !== 'object') {
           throw new Error((body && body.msg) || '黄果返回数据无效');
         }
-        originAt = (originAt + attempt) % ORIGINS.length;
-        ORIGIN = origin;
+        stickOrigin((originAt + attempt) % ORIGINS.length);
         return body.data;
       }).catch(function (error) {
         if (/^HTTP|^黄果返回/.test(String(error && error.message))) throw error;

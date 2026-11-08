@@ -347,23 +347,27 @@ final class NativeBridge {
                 break;
             }
             case "huangguoFeed": {
+                HuangguoApi.attach(activity);
                 String category = params == null ? "ai-manju" : params.optString("category", "ai-manju");
                 int page = params == null ? 1 : Math.max(1, params.optInt("page", 1));
                 respond(id, HuangguoApi.feed(category, page), null);
                 break;
             }
             case "huangguoSearch": {
+                HuangguoApi.attach(activity);
                 String keyword = params == null ? "" : LibraryStore.text(params, "keyword", 120);
                 int page = params == null ? 1 : Math.max(1, params.optInt("page", 1));
                 respond(id, HuangguoApi.search(keyword, page), null);
                 break;
             }
             case "huangguoDetail": {
+                HuangguoApi.attach(activity);
                 String seriesId = params == null ? "" : LibraryStore.text(params, "seriesId", 30);
                 respond(id, HuangguoApi.detail(seriesId), null);
                 break;
             }
             case "huangguoPlay": {
+                HuangguoApi.attach(activity);
                 // 黄果分集直接取官方签名 m3u8 后复用原生播放器；不进入红果片源恢复链。
                 String seriesId = LibraryStore.text(params, "seriesId", 30);
                 int index = Math.max(1, params.optInt("index", 1));

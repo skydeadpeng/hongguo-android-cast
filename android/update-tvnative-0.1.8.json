@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 9,
+  "versionName": "0.1.8",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.8/HongguoNative-0.1.8-tvNative-release-compatible.apk",
+  "size": 651012,
+  "sha256": "6129e4fe93fde07bf3684cb55cedf3586f5b201f3468de981ffa35eb52ca5799",
+  "notes": "新增黄果漫剧来源：顶部栏目新增「黄果」，支持漫剧/短剧分类浏览与遥控选集在线播放；片源来自黄果官方站。红果原有栏目、收藏、下载与设置不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-08T10:49:03.633Z"
+}

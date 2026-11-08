@@ -17,8 +17,26 @@ final class HuangguoApi {
         "https://huangguoai.com", "https://huoguo.skydeadpeng.xyz",
         "https://l5f9m.rxzfszht.cc", "https://blolhh.rxzfszht.cc", "https://mxz58.rxzfszht.cc"
     };
+    /** 每域快速失败：丢包型阻断不等满长超时，尽快切到可达线路。 */
+    private static final long PER_ORIGIN_MS = 6_000;
     private static volatile int originIndex = 0;
-    private static final long DEADLINE_MS = 20_000;
+    private static volatile android.content.Context appContext;
+    /** 首次桥调用注入应用上下文；上次成功的线路持久保存，冷启动直接使用，不再重复试错。 */
+    static void attach(android.content.Context context) {
+        if (appContext != null || context == null) return;
+        appContext = context.getApplicationContext();
+        try {
+            int saved = appContext.getSharedPreferences("huangguo", android.content.Context.MODE_PRIVATE).getInt("origin", 0);
+            if (saved >= 0 && saved < ORIGINS.length) originIndex = saved;
+        } catch (Exception ignored) { }
+    }
+    private static void stickOrigin(int index) {
+        originIndex = index;
+        try {
+            if (appContext != null)
+                appContext.getSharedPreferences("huangguo", android.content.Context.MODE_PRIVATE).edit().putInt("origin", index).apply();
+        } catch (Exception ignored) { }
+    }
     private static final Pattern CATEGORY = Pattern.compile("ai-manju|ai-duanju");
 
     private HuangguoApi() { }
@@ -42,14 +60,14 @@ final class HuangguoApi {
             String origin = ORIGINS[(originIndex + attempt) % ORIGINS.length];
             try {
                 JSONObject data = getFrom(origin, path);
-                originIndex = (originIndex + attempt) % ORIGINS.length;
+                stickOrigin((originIndex + attempt) % ORIGINS.length);
                 return data;
             } catch (IOException error) { last = error; }
         }
         throw last != null ? last : new IOException("黄果来源暂不可用，请稍后重试");
     }
     private static JSONObject getFrom(String origin, String path) throws Exception {
-        NetworkGuard.Reply reply = NetworkGuard.publicGet(origin + path, System.nanoTime() + DEADLINE_MS * 1_000_000L);
+        NetworkGuard.Reply reply = NetworkGuard.publicGet(origin + path, System.nanoTime() + PER_ORIGIN_MS * 1_000_000L);
         if (reply.status != 200) throw new IOException("黄果来源暂不可用，请稍后重试");
         JSONObject body;
         try { body = new JSONObject(reply.body); } catch (JSONException ignored) { throw new IOException("黄果返回数据无效"); }
