@@ -37,6 +37,69 @@ final class HuangguoApi {
                 appContext.getSharedPreferences("huangguo", android.content.Context.MODE_PRIVATE).edit().putInt("origin", index).apply();
         } catch (Exception ignored) { }
     }
+
+    // ===== 黄果设置：入口显隐 / 线路选择 / 密码锁 =====
+    /** line 取值：auto（智能切换）或 ORIGINS 下标字符串（固定线路）。密码以 SHA-256 摘要保存。 */
+    static JSONObject settings() {
+        JSONObject result = new JSONObject();
+        try {
+            android.content.SharedPreferences prefs = prefs();
+            result.put("visible", prefs.getBoolean("visible", true));
+            String line = prefs.getString("line", "auto");
+            result.put("line", "auto".equals(line) ? "auto" : String.valueOf(originIndexOf(line)));
+            result.put("hasPin", !prefs.getString("pin", "").isEmpty());
+        } catch (Exception ignored) { }
+        return result;
+    }
+    static JSONObject updateSettings(JSONObject patch) throws Exception {
+        android.content.SharedPreferences prefs = prefs();
+        android.content.SharedPreferences.Editor editor = prefs.edit();
+        if (patch.has("visible")) {
+            if (!(patch.opt("visible") instanceof Boolean)) throw new JSONException("黄果显示开关无效");
+            editor.putBoolean("visible", patch.getBoolean("visible"));
+        }
+        if (patch.has("line")) {
+            String line = patch.optString("line", "auto");
+            int index = originIndexOf(line);
+            if (!line.equals("auto") && (index < 0 || index >= ORIGINS.length)) throw new JSONException("黄果线路无效");
+            editor.putString("line", "auto".equals(line) ? "auto" : String.valueOf(index));
+        }
+        if (patch.has("pin")) {
+            String pin = patch.optString("pin", "");
+            if (!pin.isEmpty() && !pin.matches("[0-9]{4,8}")) throw new JSONException("密码需为 4 至 8 位数字");
+            editor.putString("pin", pin.isEmpty() ? "" : sha256(pin));
+        }
+        editor.apply();
+        return settings();
+    }
+    static boolean verifyPin(String pin) {
+        try {
+            String saved = prefs().getString("pin", "");
+            return !saved.isEmpty() && pin != null && pin.matches("[0-9]{4,8}") && sha256(pin).equals(saved);
+        } catch (Exception ignored) { return false; }
+    }
+    /** 固定线路时 get() 只使用该域，失败如实报错由用户换线路；auto 时保持智能切换。 */
+    private static int pinnedOrigin() {
+        try {
+            String line = prefs().getString("line", "auto");
+            if (line.equals("auto")) return -1;
+            int index = Integer.parseInt(line);
+            return index >= 0 && index < ORIGINS.length ? index : -1;
+        } catch (Exception ignored) { return -1; }
+    }
+    private static int originIndexOf(String line) {
+        try { return "auto".equals(line) ? -1 : Integer.parseInt(line); }
+        catch (NumberFormatException ignored) { return -1; }
+    }
+    private static android.content.SharedPreferences prefs() {
+        return appContext.getSharedPreferences("huangguo", android.content.Context.MODE_PRIVATE);
+    }
+    private static String sha256(String value) throws Exception {
+        java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+        StringBuilder hex = new StringBuilder();
+        for (byte b : digest.digest(value.getBytes("UTF-8"))) hex.append(String.format("%02x", b));
+        return hex.toString();
+    }
     private static final Pattern CATEGORY = Pattern.compile("ai-manju|ai-duanju");
 
     private HuangguoApi() { }
@@ -55,16 +118,19 @@ final class HuangguoApi {
 
     private static JSONObject get(String path) throws Exception {
         // 域名全部固定；路径由本类内部构成，绝无用户可控主机。连接失败按序换域并粘住成功域。
+        // 设置里固定线路时只用该域，失败如实报错（用户可回设置换线路）。
         Exception last = null;
-        for (int attempt = 0; attempt < ORIGINS.length; attempt++) {
-            String origin = ORIGINS[(originIndex + attempt) % ORIGINS.length];
+        int pinned = pinnedOrigin();
+        int attempts = pinned >= 0 ? 1 : ORIGINS.length;
+        for (int attempt = 0; attempt < attempts; attempt++) {
+            int index = pinned >= 0 ? pinned : (originIndex + attempt) % ORIGINS.length;
             try {
-                JSONObject data = getFrom(origin, path);
-                stickOrigin((originIndex + attempt) % ORIGINS.length);
+                JSONObject data = getFrom(ORIGINS[index], path);
+                stickOrigin(index);
                 return data;
             } catch (IOException error) { last = error; }
         }
-        throw last != null ? last : new IOException("黄果来源暂不可用，请稍后重试");
+        throw last != null ? last : new IOException(pinned >= 0 ? "黄果固定线路不可用，请在设置中更换线路" : "黄果来源暂不可用，请稍后重试");
     }
     private static JSONObject getFrom(String origin, String path) throws Exception {
         NetworkGuard.Reply reply = NetworkGuard.publicGet(origin + path, System.nanoTime() + PER_ORIGIN_MS * 1_000_000L);

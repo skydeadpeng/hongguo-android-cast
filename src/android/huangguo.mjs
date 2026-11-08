@@ -39,3 +39,32 @@ export async function huangguoPlay(series, episode) {
   };
   return nativeCall('huangguoPlay', params, 60000);
 }
+
+/** 黄果设置：visible 入口显隐；line 线路（auto=智能切换或固定线路下标）；pin 4-8 位数字密码。 */
+export const HUANGGUO_LINES = [
+  { id: 'auto', label: '自动（推荐）' },
+  { id: '0', label: '官方直连' },
+  { id: '1', label: '自建代理线路' },
+  { id: '2', label: '备用线路 1' },
+  { id: '3', label: '备用线路 2' },
+  { id: '4', label: '备用线路 3' },
+];
+
+export async function huangguoGetSettings() {
+  const result = await nativeCall('huangguoSettings', {}, 15000);
+  if (typeof result?.visible !== 'boolean' || typeof result?.line !== 'string' || typeof result?.hasPin !== 'boolean') {
+    throw new Error('黄果设置读取失败');
+  }
+  return result;
+}
+
+export async function huangguoUpdateSettings(patch) {
+  const result = await nativeCall('huangguoSettings', patch, 15000);
+  if (typeof result?.visible !== 'boolean') throw new Error('黄果设置保存失败');
+  return result;
+}
+
+export async function huangguoVerifyPin(pin) {
+  const result = await nativeCall('huangguoVerifyPin', { pin: String(pin || '') }, 15000);
+  return result?.ok === true;
+}

@@ -489,3 +489,10 @@
 .huangguo-episodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: .5rem; }
 .huangguo-episodes button { min-height: 46px; padding: .6rem .25rem; border-radius: .55rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: .95rem; cursor: pointer; }
 .huangguo-episodes button:disabled { background: transparent; color: var(--faint); cursor: default; }
+.huangguo-pin { margin: auto; display: flex; flex-direction: column; gap: 12px; width: min(22rem, calc(100% - 3rem)); padding: 28px 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+.huangguo-pin h2 { color: var(--text); }
+.huangguo-pin input { min-height: 48px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); font-size: 17px; letter-spacing: .3em; }
+.huangguo-pin-actions { display: flex; gap: 10px; }
+.huangguo-pin-actions .button { flex: 1; }
+.huangguo-pin-setup { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.huangguo-pin-setup input { flex: 1 1 12rem; min-width: 0; min-height: 46px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--text); }

@@ -34,7 +34,7 @@ final class NativeBridge {
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo", "huangguoFeed", "huangguoSearch", "huangguoDetail", "huangguoPlay"));
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo", "huangguoFeed", "huangguoSearch", "huangguoDetail", "huangguoPlay", "huangguoSettings", "huangguoVerifyPin"));
     NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
@@ -364,6 +364,17 @@ final class NativeBridge {
                 HuangguoApi.attach(activity);
                 String seriesId = params == null ? "" : LibraryStore.text(params, "seriesId", 30);
                 respond(id, HuangguoApi.detail(seriesId), null);
+                break;
+            }
+            // 设置读取/保存与密码校验：入口显隐、线路（auto/固定）、4-8 位数字密码（仅存摘要）。
+            case "huangguoSettings": {
+                HuangguoApi.attach(activity);
+                respond(id, params != null && params.length() > 0 ? HuangguoApi.updateSettings(params) : HuangguoApi.settings(), null);
+                break;
+            }
+            case "huangguoVerifyPin": {
+                HuangguoApi.attach(activity);
+                respond(id, new JSONObject().put("ok", HuangguoApi.verifyPin(params == null ? "" : params.optString("pin", ""))), null);
                 break;
             }
             case "huangguoPlay": {

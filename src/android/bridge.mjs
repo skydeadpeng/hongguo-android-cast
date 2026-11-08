@@ -9,6 +9,7 @@ const METHODS = new Set([
   'appRequest', 'appRegisteredModel', 'appResolveResult', 'getPlaybackOptions', 'setPlaybackOptions',
   'getSearchHistory', 'addSearchHistory', 'removeSearchHistory', 'clearSearchHistory', 'searchQuery',
   'huangguoFeed', 'huangguoSearch', 'huangguoDetail', 'huangguoPlay',
+  'huangguoSettings', 'huangguoVerifyPin',
 ]);
 const pending = new Map();
 let sequence = 0;
