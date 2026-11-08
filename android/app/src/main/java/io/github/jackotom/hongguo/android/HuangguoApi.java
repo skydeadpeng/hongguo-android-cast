@@ -158,8 +158,12 @@ final class HuangguoApi {
             } catch (IOException error) { last = error; }
         }
         // 底层英文异常（Socket closed / Read timed out / Connection reset…）对用户没有意义：
-        // 全部线路都失败时统一归因为网络不可用。
-        throw new IOException(pinned >= 0 ? "固定线路连接失败，请在设置中更换线路或检查网络" : "网络连接失败，请检查手机网络后重试");
+        // 全部线路都失败时统一归因为网络不可用。固定线路失败自动回退「自动」，避免卡死在不可用线路。
+        if (pinned >= 0) {
+            try { prefs().edit().putString("line", "auto").apply(); } catch (Exception ignored) { }
+            throw new IOException("固定线路连接失败，已自动切回「自动」线路，请重试");
+        }
+        throw new IOException("网络连接失败，请检查手机网络后重试");
     }
     private static JSONObject getFrom(String origin, String path) throws Exception {
         NetworkGuard.Reply reply = NetworkGuard.publicGet(origin + path, System.nanoTime() + PER_ORIGIN_MS * 1_000_000L);
