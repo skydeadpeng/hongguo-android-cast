@@ -1080,6 +1080,8 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
   const [opError, setOpError] = useState(null);
   const [resumeError, setResumeError] = useState('');
   const consumedResume = useRef(null);
+  // 详情偶发失败自动重试标记：每部剧只自动重试一次，重试仍失败则自动返回。
+  const detailRetried = useRef(null);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [favoriteError, setFavoriteError] = useState('');
   const [pointEntry, setPointEntry] = useState(null);
@@ -1156,7 +1158,18 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
       const remembered = initialVid || rememberedRow?.vid;
       const first = item.episodes?.[0];
       setSelectedVid(item.episodes?.some((episode) => String(episode.vid) === String(remembered)) ? remembered : first?.vid || null);
-    }).catch((error) => { if (current) setState({ busy: false, error: errorText(error) }); });
+    }).catch((error) => {
+      if (!current) return;
+      // 偶发失败自动重试一次；仍失败则自动返回列表并提示原因，不停留在错误页。
+      if (detailRetried.current !== seed.seriesId) {
+        detailRetried.current = seed.seriesId;
+        setState({ busy: true });
+        setTimeout(() => { if (current) setReload((value) => value + 1); }, 800);
+        return;
+      }
+      notify(`《${seed.title || '这部剧'}》加载未成功：${errorText(error)}`);
+      onBack();
+    });
     return () => { current = false; };
   }, [seed.seriesId, initialVid, reload, library.owner]);
   // A same-owner cloud refresh may change a row omitted from the bounded lists.
