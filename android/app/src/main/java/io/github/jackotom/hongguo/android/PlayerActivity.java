@@ -509,7 +509,9 @@ public final class PlayerActivity extends Activity {
                 } else media.plan = PlaybackSources.resolvePlayback(media.seriesId, target.optString("vid"), stageQuality, ceiling, false, failedWeb);
                 if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("播放准备已取消");
                 if (media.plan.playbackCeiling != ceiling) throw new java.io.IOException("播放片源清晰度边界不匹配");
-                if (!media.plan.source.equals("web") || !"auto".equals(stageQuality)) {
+                // 黄果为 AES-128 HLS 直链：无论画质档位恒走在线播放，不进入整文件缓存。
+                boolean huangguoStream = media.seriesId.length() == 10 && media.seriesId.startsWith("99");
+                if (!huangguoStream && (!media.plan.source.equals("web") || !"auto".equals(stageQuality))) {
                     File ready = cache.fetchForeground(media.seriesId, target.optString("vid"), target.optInt("index"), media.plan, stageQuality);
                     media.uri = Uri.fromFile(ready); media.kind = "片源已准备 · 缓存播放"; media.cached = true;
                 } else { media.remote = media.plan.url; media.uri = Uri.parse(media.remote); media.kind = "在线播放 · 滚动缓存"; }

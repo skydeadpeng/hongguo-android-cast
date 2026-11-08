@@ -380,29 +380,30 @@ final class NativeBridge {
             case "huangguoPlay": {
                 HuangguoApi.attach(activity);
                 // 黄果分集直接取官方签名 m3u8 后复用原生播放器；不进入红果片源恢复链。
+                // 华为/荣耀不再特殊处理：与普通手机一致，官方 m3u8 直接在线播放。
                 String seriesId = LibraryStore.text(params, "seriesId", 30);
                 int index = Math.max(1, params.optInt("index", 1));
                 String url = HuangguoApi.episodeUrl(seriesId, index);
-                // 华为/荣耀系统播放器解不了 AES-128 HLS：先完整下载解密为本地 TS 再播。
                 boolean localFile = false;
-                if (HuangguoHlsCache.deviceNeedsCompat() && url.toLowerCase(Locale.ROOT).contains(".m3u8")) {
-                    java.io.File directory = activity.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES);
-                    if (directory == null) throw new Exception("黄果缓存目录尚未准备");
-                    java.io.File cached = new File(directory, "huangguo-" + seriesId + "-" + index + ".ts");
-                    if (!cached.isFile() || cached.length() == 0) HuangguoHlsCache.download(url, cached);
-                    url = Uri.fromFile(cached).toString();
-                    localFile = true;
-                }
                 JSONObject series = new JSONObject().put("seriesId", seriesId)
                     .put("title", LibraryStore.text(params, "title", 200))
                     .put("coverUrl", LibraryStore.text(params, "coverUrl", 4096))
                     .put("episodeCount", Math.max(0, Math.min(10000, params.optInt("episodeCount"))));
-                JSONObject episode = new JSONObject().put("vid", seriesId + String.format("%04d", index)).put("index", index);
+                // 整剧队列交给播放器：选集、上一集/下一集与连播直接可用。
+                int episodeCount = series.optInt("episodeCount");
+                JSONArray episodeQueue = new JSONArray();
+                for (int ep = 1; ep <= episodeCount; ep++)
+                    episodeQueue.put(new JSONObject().put("vid", seriesId + String.format("%04d", ep)).put("index", ep));
+                JSONObject episode = episodeQueue.optJSONObject(index - 1);
+                if (episode == null) {
+                    episodeQueue.put(new JSONObject().put("vid", seriesId + String.format("%04d", index)).put("index", index));
+                    episode = episodeQueue.optJSONObject(episodeQueue.length() - 1);
+                }
                 JSONObject mediaOptions = PlayerOptions.read(activity);
                 if (!params.has("speed")) params.put("speed", mediaOptions.getDouble("speed"));
                 if (!(params.opt("speed") instanceof Number)) throw new JSONException("倍速无效");
                 PlayerOptions.validateSpeed(params.getDouble("speed"));
-                play(id, series, episode, new JSONArray().put(episode), url, localFile, params);
+                play(id, series, episode, episodeQueue, url, localFile, params);
                 break;
             }
             case "getPlaybackOptions": respond(id, PlayerOptions.read(activity), null); break;

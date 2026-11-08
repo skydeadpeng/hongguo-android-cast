@@ -37,7 +37,7 @@ export async function huangguoPlay(series, episode) {
     episodeCount: Number(series.episodeCount) || 0,
     index: Number(episode.index) || 1,
   };
-  // 华为/荣耀设备首次播放需完整下载解密（可达数分钟），等待上限放宽到 10 分钟。
+  // 华为/荣耀与普通手机一致：官方 m3u8 直接在线播放。
   return nativeCall('huangguoPlay', params, 600000);
 }
 

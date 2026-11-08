@@ -211,6 +211,7 @@ final class PlaybackSources {
     /** Fresh or bounded playback lookup; this opt-in path never changes manual download policy. */
     static Plan resolvePlayback(String sid,String vid,String quality,int ceiling,boolean fresh,boolean failedWeb) throws Exception {
         String requested=MediaQuality.normalize(quality);requireIdentity(sid,vid);
+        if(isHuangguoVid(vid))return huangguoPlan(sid,vid);
         if(ceiling<0||ceiling>16384)throw new IllegalArgumentException("播放清晰度边界无效");
         if(ceiling==0&&(requested.equals("480p")||requested.equals("360p")))ceiling=defaultPlaybackCeiling(requested);
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
@@ -223,9 +224,18 @@ final class PlaybackSources {
         String url=EpisodeResolver.resolve(sid,vid);
         return register(new JSONObject().put("url",url).put("vid",vid).put("seriesId",sid).put("source","web"),vid,true);
     }
+    /** 黄果分集（99 前缀 14 位编号）不进入 App 片源链：直接取官方签名 m3u8 在线播放，单档无降档。 */
+    private static boolean isHuangguoVid(String vid) { return vid.length()==14&&vid.startsWith("99"); }
+    private static Plan huangguoPlan(String sid,String vid) throws Exception {
+        android.content.Context host; synchronized(PlaybackSources.class) { host=activity.get(); }
+        if(host!=null)HuangguoApi.attach(host);
+        String url=HuangguoApi.episodeUrl(sid,HuangguoApi.decodeEpisodeIndex(vid));
+        return register(new JSONObject().put("url",url).put("vid",vid).put("seriesId",sid).put("source","web").put("requestedQuality","auto"),vid,true);
+    }
     /** One caller-owned reconnect; always obtains a fresh App model at the same quality. */
     static Plan recover(String sid,String vid,String quality,boolean failedWeb) throws Exception {
         String requestedQuality=MediaQuality.normalize(quality);requireIdentity(sid,vid);
+        if(isHuangguoVid(vid))return huangguoPlan(sid,vid);
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
         if(failedWeb)markWebFailure(sid,vid);
         recoveryPause();
