@@ -124,21 +124,30 @@
       return get('/api/videos/' + id + '/play?ep=' + ep).then(function (data) {
         var url = String(data.video_url || '');
         if (!/^https:\/\//.test(url)) throw new Error('黄果未提供有效播放地址');
-        var played = wrapStream(url);
+        if (!/\.m3u8/i.test(url)) return { url: url };
         var declared = Number(data.duration) || 0;
-        if (declared <= 0 || !/\.m3u8/i.test(url)) return { url: played };
-        // 预览片段防御：拉清单核对实际时长（清单很小，失败不拦截播放）。
-        return fetch(played, { headers: { 'Accept': '*/*' } }).then(function (response) {
-          return response.ok ? response.text() : '';
-        }).catch(function () { return ''; }).then(function (body) {
-          if (body && body.indexOf('#EXTM3U') === 0 && body.indexOf('#EXT-X-STREAM-INF') < 0) {
-            var total = 0, match, re = /#EXTINF:([0-9.]+)/g;
-            while ((match = re.exec(body))) total += Number(match[1]);
-            if (total > 0 && total < declared * 0.8) {
-              throw new Error('该集只下发了预览片段（约 ' + Math.round(total) + ' 秒），暂无法完整播放');
+        function secondsOf(body) {
+          if (!body || body.indexOf('#EXTM3U') !== 0 || body.indexOf('#EXT-X-STREAM-INF') >= 0) return 0;
+          var total = 0, match, re = /#EXTINF:([0-9.]+)/g;
+          while ((match = re.exec(body))) total += Number(match[1]);
+          return total;
+        }
+        function pull(target) {
+          return fetch(target, { headers: { 'Accept': '*/*' } }).then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; });
+        }
+        // 智能选路：官方视频 CDN 直连可达就直连（原生速度）；不可达才走 Worker 代理。
+        return pull(url).then(function (body) {
+          var direct = secondsOf(body);
+          if (direct >= declared * 0.8) return { url: url };
+          if (direct > 0) throw new Error('该集只下发了预览片段（约 ' + Math.round(direct) + ' 秒），暂无法完整播放');
+          var proxied = wrapStream(url);
+          return pull(proxied).then(function (proxyBody) {
+            var viaProxy = secondsOf(proxyBody);
+            if (viaProxy > 0 && viaProxy < declared * 0.8) {
+              throw new Error('该集只下发了预览片段（约 ' + Math.round(viaProxy) + ' 秒），暂无法完整播放');
             }
-          }
-          return { url: played };
+            return { url: proxied };
+          });
         });
       });
     }

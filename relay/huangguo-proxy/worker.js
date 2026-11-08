@@ -4,13 +4,13 @@
 const UPSTREAM = "https://huangguoai.com";
 
 export default {
-  async fetch(request) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
     if (path === "/__health") return json({ ok: true });
     if (path.startsWith("/api/")) return proxyApi(url);
     if (path === "/img") return proxyImage(url);
-    if (path === "/m3u8") return proxyPlaylist(url);
+    if (path === "/m3u8") return proxyPlaylist(url, ctx);
     if (path === "/seg") return proxySegment(url);
     return json({ error: "not found" }, 404);
   },
@@ -57,20 +57,31 @@ async function proxyImage(url) {
     headers: { "Content-Type": response.headers.get("Content-Type") || "image/octet-stream", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=86400" } });
 }
 
-// m3u8：改写分片与 AES key 的绝对地址为本 Worker 代理，播放器只需拿到 Worker 域名清单。
-async function proxyPlaylist(url) {
+// m3u8：改写分片与 AES key 的绝对地址为本 Worker 代理；同时在后台把分片预取进边缘缓存，
+// 播放器到达时省去逐分片回源往返（免费档单请求 subrequest 上限约 50，超出部分不预热）。
+async function proxyPlaylist(url, ctx) {
   const target = url.searchParams.get("url") || "";
   if (!/^https:\/\//i.test(target)) return new Response("bad url", { status: 400 });
   const response = await fetch(target, { headers: { "User-Agent": "Mozilla/5.0" } });
   const text = await response.text();
   const base = new URL(target);
   const baseDir = base.pathname.substring(0, base.pathname.lastIndexOf("/") + 1);
+  const segments = [];
   const body = text.split("\n").map(line => {
     const value = line.trim();
     if (!value || value.startsWith("#")) return rewriteKeys(line, base, baseDir);
     const absolute = value.startsWith("http") ? value : value.startsWith("/") ? base.origin + value : base.origin + baseDir + value;
+    if (segments.length < 44 && !absolute.includes("crypt.key")) segments.push(absolute);
     return "/seg?url=" + encodeURIComponent(absolute);
   }).join("\n");
+  if (ctx && segments.length) {
+    ctx.waitUntil((async () => {
+      for (let i = 0; i < segments.length; i += 6) {
+        await Promise.all(segments.slice(i, i + 6).map(seg =>
+          fetch(seg, { headers: { "User-Agent": "Mozilla/5.0" }, cf: { cacheEverything: true, cacheTtl: 7200 } }).catch(() => {})));
+      }
+    })());
+  }
   return new Response(body, {
     status: response.status,
     headers: { "Content-Type": "application/vnd.apple.mpegurl", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=60" },
@@ -87,10 +98,11 @@ function rewriteKeys(line, base, baseDir) {
 async function proxySegment(url) {
   const target = url.searchParams.get("url") || "";
   if (!/^https:\/\//i.test(target)) return new Response("bad url", { status: 400 });
-  const response = await fetch(target, { headers: { "User-Agent": "Mozilla/5.0" } });
+  // cacheEverything：分片 URL 带签名但两小时内稳定，命中边缘缓存即免回源。
+  const response = await fetch(target, { headers: { "User-Agent": "Mozilla/5.0" }, cf: { cacheEverything: true, cacheTtl: 7200 } });
   return new Response(response.body, {
     status: response.status,
-    headers: { "Content-Type": response.headers.get("Content-Type") || "video/mp2t", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=3600" },
+    headers: { "Content-Type": response.headers.get("Content-Type") || "video/mp2t", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=7200" },
   });
 }
 

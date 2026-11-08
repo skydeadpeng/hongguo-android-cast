@@ -174,15 +174,17 @@ final class HuangguoApi {
         JSONObject data = get("/api/videos/" + id + "/play?ep=" + ep);
         String url = data.optString("video_url", "");
         if (url.isEmpty() || !url.startsWith("https://")) throw new IOException("黄果未提供有效播放地址");
-        // 走 Worker 代理时播放流与时长校验同样经代理，不依赖内容 CDN 直连。
-        String played = wrapStream(url);
         double declared = data.optDouble("duration", 0);
-        if (declared > 0 && url.toLowerCase(Locale.ROOT).contains(".m3u8")) {
-            double actual = playlistSeconds(played);
-            if (actual > 0 && actual < declared * 0.8)
-                throw new IOException("该集只下发了预览片段（约 " + (int) actual + " 秒），暂无法完整播放");
-        }
-        return played;
+        if (!url.toLowerCase(Locale.ROOT).contains(".m3u8")) return url;
+        // 智能选路：官方视频 CDN 能直连拉到清单就直连（原生速度）；拉不到再走 Worker 代理
+        // （免费档中转带宽有限，仅在直连不可达时兜底）。清单时长同时用于预览片段校验。
+        double directSeconds = playlistSeconds(url);
+        if (directSeconds >= declared * 0.8) return url;
+        if (directSeconds > 0) throw new IOException("该集只下发了预览片段（约 " + (int) directSeconds + " 秒），暂无法完整播放");
+        double proxied = playlistSeconds(wrapStream(url));
+        if (proxied > 0 && proxied < declared * 0.8)
+            throw new IOException("该集只下发了预览片段（约 " + (int) proxied + " 秒），暂无法完整播放");
+        return wrapStream(url);
     }
 
     private static double playlistSeconds(String url) {
