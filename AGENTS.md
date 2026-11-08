@@ -1,13 +1,13 @@
 # 红果短剧项目规则
 
-## 黄果漫剧来源（2026-11-08 接入，同日切换官方 API）
+## 黄果漫剧来源（2026-11-08 接入，同日切换官方 API 并扩展全平台）
 
 - 用户已解除原「来源边界」禁令（该节已删除）；黄果漫剧接入为内置来源，设置 → 内置来源可开关，默认开启。
 - 数据直连黄果官方站 `https://huangguoai.com` JSON API（线索来自社区项目 huangguo-fongmi / huangguo-web / HGXZ）；分类 `/api/videos/category/{ai-manju|ai-duanju}`、搜索 `/api/search?q=`（仅认 q）、详情 `/api/videos/{id}`、取流 `/api/videos/{id}/play?ep=`；备用域名 rxzfszht.cc 系列按序切换。
-- 官方站全站分集直发完整签名 m3u8（AES-128，key/分片绝对地址），无 VIP 拦截；取流时按「实际 m3u8 时长 ≥ 声明时长八成」校验，防个别只下发预览片段的内容。
+- 官方站全站分集直发完整签名 m3u8（AES-128，key/分片绝对地址），无 VIP 拦截；各端取流均按「实际 m3u8 时长 ≥ 声明时长八成」校验，防个别只下发预览片段的内容。
 - 早前 hg-player Worker 路线（hg.5671234.xyz）已弃用：其 VIP 集被上游"地址校验"拦截（unverified），官方 API 无此问题。
-- 限制：仅支持自动画质；下载目录名「黄果漫剧」。
-- 本机验证：浏览/分类/搜索/分集/取流全通过；16 集剧末集完整下载管线（AES-128 解密 remux）产出 314 秒有效 H.264/AAC MP4；相关测试（media-sources、random-drama、check-ui-state 93 项）通过。未做 Windows/Linux 端验证。
+- 全平台覆盖（2026-11-08 完成）：桌面三端（main 分支 abb0c53）；Android 手机与 TV WebView（huangguo 分支 453de1d，模拟器实测播放）；TV 原生版 tvNative（347b434，模拟器实测播放）；webOS（858c3e7，源三接口 Node 实测，ipk 已打包，webOS 实机播放待验收）。安卓线剧集以 99 前缀十位数字编码共存；webOS 以 "hg:" 前缀隔离。
+- 限制：桌面仅自动画质、下载目录名「黄果漫剧」；安卓黄果暂无下载/收藏（仅在线播放），tvNative/webOS 同边界。
 
 ## 视频测试素材与声音
 
