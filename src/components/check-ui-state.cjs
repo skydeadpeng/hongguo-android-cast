@@ -1222,7 +1222,7 @@ async function mount(file, api, props = {}, storage = null) {
     assert.equal(ui.find(n => n.props['aria-label'] === '短剧来源').props.value, 'all');
     assert.ok(ui.find(n => n.type === 'option' && n.props.value === 'all'));
     ui.find(n => n.type === 'input').props.onChange({ target: { value: '同名剧' } }); ui.render(); ui.button('搜索').props.onClick();
-    assert.deepEqual(calls, [['同名剧', 'hongguo'], ['同名剧', 'xifan'], ['同名剧', 'hema']], 'all searches start without waiting for each other');
+    assert.deepEqual(calls, [['同名剧', 'hongguo'], ['同名剧', 'xifan'], ['同名剧', 'hema'], ['同名剧', 'huangguo']], 'all searches start without waiting for each other');
     second.resolve({ success: true, results: [{ series_id: 'xifan:test:123', series_title: '同名剧' }] });
     first.resolve({ success: true, results: [{ series_id: '123', series_title: '同名剧' }] }); await ui.flush();
     const cards = ui.nodes().filter(n => n.props.className?.startsWith('search-card '));
@@ -1301,7 +1301,7 @@ async function mount(file, api, props = {}, storage = null) {
   await test('load more deadline keeps completed sources and retries only the unfinished page', async () => {
     const old = deferred(), retry = deferred(), calls = [];
     const ui = await mount('SearchPanel', {
-      searchSeries: async (_kw, { source }) => ({ success: true, results: source === 'xifan' ? [] : [{ series_id: `${source}:1`, series_title: `${source}首屏` }], channel: 'web', page: 1, cursor: { page: 1 }, hasMore: source !== 'xifan' }),
+      searchSeries: async (_kw, { source }) => ({ success: true, results: source === 'xifan' || source === 'huangguo' ? [] : [{ series_id: `${source}:1`, series_title: `${source}首屏` }], channel: 'web', page: 1, cursor: { page: 1 }, hasMore: source !== 'xifan' && source !== 'huangguo' }),
       searchSeriesMore: (_kw, options) => {
         calls.push(options);
         if (options.source === 'hongguo') return Promise.resolve({ success: true, results: [{ series_id: '1000002', series_title: '已完成第二页' }], channel: 'web', page: 2, hasMore: false });
@@ -1396,7 +1396,7 @@ async function mount(file, api, props = {}, storage = null) {
     ui.advanceTimers(26000); await ui.flush();
     assert.ok(!ui.text().includes('正在寻找相关短剧'));
     ui.button('搜索').props.onClick(); await ui.flush();
-    assert.equal(calls, 6, 'the same keyword must start a new search even while an old source is pending');
+    assert.equal(calls, 8, 'the same keyword must start a new search even while an old source is pending');
     slow.resolve({ success: true, results: [{ series_id: 'old', series_title: '过期结果' }] }); await ui.flush();
     assert.ok(!ui.text().includes('过期结果'));
     assert.equal(ui.button('搜索').props.disabled, false);
@@ -1602,7 +1602,7 @@ async function mount(file, api, props = {}, storage = null) {
     input().props.onKeyDown({ key: 'Enter', preventDefault() {} });
     input().props.onKeyDown({ key: 'Enter', preventDefault() {} }); ui.render();
     input().props.onKeyDown({ key: 'Enter', preventDefault() {} });
-    assert.equal(calls, 3, 'same pending all-source search must call each source only once');
+    assert.equal(calls, 4, 'same pending all-source search must call each source only once');
     pending.resolve({ success: true, results: [] }); await ui.flush(); ui.unmount();
   });
   await test('resolve keyboard ignores IME confirmation and duplicate Enter', async () => {

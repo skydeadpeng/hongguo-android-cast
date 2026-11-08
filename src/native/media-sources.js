@@ -1,5 +1,6 @@
 const BUILTIN_SOURCES = [
   { id: 'hongguo', label: '红果' }, { id: 'xifan', label: '西饭' }, { id: 'hema', label: '河马' },
+  { id: 'huangguo', label: '黄果漫剧' },
 ];
 
 function getMediaSources(settings) {
@@ -11,7 +12,7 @@ function getMediaSources(settings) {
 
 function setBuiltinSourceEnabled(settings, id, enabled) {
   if (id === 'hongguo') throw new Error('红果来源固定开启，不能关闭');
-  if (!['xifan', 'hema'].includes(id) || typeof enabled !== 'boolean') throw new Error('来源开关无效');
+  if (!['xifan', 'hema', 'huangguo'].includes(id) || typeof enabled !== 'boolean') throw new Error('来源开关无效');
   return { ...settings, builtin_sources: { ...settings.builtin_sources, [id]: enabled } };
 }
 

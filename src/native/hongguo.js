@@ -624,6 +624,7 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
     if (String(vid).startsWith('custom:') || String(sid).startsWith('custom:')) return require('./custom-source').fetchPlayUrlSingle(vid, sid, options);
     if (String(vid).startsWith('hema:') || String(sid).startsWith('hema:')) return require('./hema').fetchPlayUrlSingle(vid, sid);
     if (String(vid).startsWith('xifan:') || String(sid).startsWith('xifan:')) return require('./xifan').fetchPlayUrlSingle(vid, sid);
+    if (String(vid).startsWith('huangguo:') || String(sid).startsWith('huangguo:')) return require('./huangguo').fetchPlayUrlSingle(vid, sid);
     const skipWeb = (failedWebMedia.get(String(vid)) || 0) > Date.now();
     const allowLowerQuality = options.allowLowerQuality === true && quality !== 'auto';
     const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}`;

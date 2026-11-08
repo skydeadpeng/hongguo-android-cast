@@ -1,0 +1,176 @@
+const axios = require('axios');
+
+// 黄果官方站 API（huangguoai.com，author「黄果官方」）。全站分集直发完整签名 m3u8（AES-128，
+// key/分片均为绝对地址），无 vip 拦截；配合时长校验防"只下发预览片段"的个别情况。
+// 备用域名来自社区项目 HGXZ 的配置，主站失败时按序切换。
+const ORIGINS = ['https://huangguoai.com', 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc'];
+const ID = /^\d{1,30}$/;
+const PAGE_SIZE = 30;
+// 与官方站点导航一致的内容分类（ranks/topics 等聚合页不作为题材）。
+const CATEGORIES = [
+  { slug: 'ai-manju', label: 'AI成人漫剧' },
+  { slug: 'ai-duanju', label: 'AI成人短剧' },
+];
+let originIndex = 0;
+
+function plainText(value) {
+  return String(value || '').replace(/<[^>]*>/g, '').trim();
+}
+
+function httpsUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : '';
+  } catch (_) { return ''; }
+}
+
+function parseId(value, episode = false) {
+  const parts = String(value || '').split(':');
+  if (parts[0] !== 'huangguo' || parts.length !== (episode ? 3 : 2) || !parts.slice(1).every(part => ID.test(part))) {
+    throw new Error('黄果剧集编号无效');
+  }
+  return { dramaId: parts[1], ep: Number(parts[2]), seriesId: `huangguo:${parts[1]}` };
+}
+
+// 多域名按序尝试；成功后粘住当前域名，主站恢复探测沿用 HGXZ 的思路从简（下次进程内不再回切）。
+async function request(apiPath, params, options = {}) {
+  const deadlineRemaining = Number(options.deadline) > 0 ? options.deadline - Date.now() : Infinity;
+  if (deadlineRemaining <= 0) throw new Error('黄果加载超时，请重试');
+  const timeout = Math.max(1000, Math.min(options.timeout || 12000, deadlineRemaining));
+  let lastError = null;
+  for (let attempt = 0; attempt < ORIGINS.length; attempt++) {
+    const origin = ORIGINS[(originIndex + attempt) % ORIGINS.length];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+      const { data } = await axios.get(origin + apiPath, {
+        params, headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json', Referer: origin + '/' },
+        timeout, signal: controller.signal, maxRedirects: 0, maxContentLength: 8 * 1024 * 1024,
+      });
+      if (!data || typeof data !== 'object') throw new Error('invalid result');
+      originIndex = (originIndex + attempt) % ORIGINS.length;
+      if (Number(data.status) === 1 && data.data && typeof data.data === 'object') return data.data;
+      throw new Error(plainText(data.msg).slice(0, 120) || '黄果来源暂不可用，请稍后重试');
+    } catch (error) {
+      if (error.response && error.response.data?.msg) lastError = new Error(plainText(error.response.data.msg).slice(0, 120));
+      else if (/^黄果/.test(error.message)) lastError = error;
+      else lastError = new Error(controller.signal.aborted || ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code)
+        ? '黄果加载超时，请重试' : '黄果来源暂不可用，请稍后重试');
+      if (/^(黄果加载超时|请输入|搜索词)/.test(lastError.message)) throw lastError;
+    } finally { clearTimeout(timer); }
+  }
+  throw lastError || new Error('黄果来源暂不可用，请稍后重试');
+}
+
+function normalizeItem(item) {
+  const id = Number(item?.id);
+  const title = plainText(item?.title);
+  if (!Number.isSafeInteger(id) || id <= 0 || !title) return null;
+  const tags = (Array.isArray(item?.tags) ? item.tags : [])
+    .map(tag => plainText(typeof tag === 'object' ? tag?.name : tag)).filter(Boolean).slice(0, 4);
+  return { series_id: `huangguo:${id}`, series_title: title, cover: httpsUrl(item?.cover),
+    episode_count: Number(item?.episode_count) || 0, tags, source: 'huangguo', url: '' };
+}
+
+function pageData(data, page, pageTitle) {
+  const seen = new Set();
+  const results = (Array.isArray(data?.items) ? data.items : [])
+    .map(normalizeItem)
+    .filter(item => { if (!item || seen.has(item.series_id)) return false; seen.add(item.series_id); return true; });
+  const pagination = data?.pagination || {};
+  const totalPages = Number(pagination.pages) || 0;
+  const hasMore = totalPages > page && results.length > 0;
+  return { success: true, results, page, total: Number(pagination.total) || 0, totalPages,
+    hasMore, nextPage: hasMore ? page + 1 : null, genres: CATEGORIES, pageTitle, sourceUrl: ORIGINS[originIndex] };
+}
+
+async function browseList(options = {}) {
+  try {
+    const { genre = '', page = 1 } = options || {};
+    const pg = Number.parseInt(page, 10) || 1;
+    if (!Number.isSafeInteger(pg) || pg < 1 || pg > 100000) throw new Error('黄果页码无效，请重新选择');
+    const slug = String(genre || CATEGORIES[0].slug);
+    if (!CATEGORIES.some(item => item.slug === slug)) throw new Error('黄果题材无效，请重新选择');
+    const data = await request('/api/videos/category/' + slug, { page: pg, size: PAGE_SIZE, sort: 'latest' });
+    return pageData(data, pg, '黄果漫剧');
+  } catch (error) { return { success: false, error: error.message }; }
+}
+
+async function search(keyword, page = 1, options = {}) {
+  try {
+    const kw = plainText(keyword);
+    if (!kw) throw new Error('请输入搜索关键词');
+    if (kw.length > 200) throw new Error('搜索词过长，请精简后重试');
+    const pg = Math.max(1, Number.parseInt(page, 10) || 1);
+    // 官方搜索只认 q 参数（keyword/wd 均返回"请输入搜索关键词"）。
+    const data = await request('/api/search', { q: kw, page: pg, size: PAGE_SIZE }, options);
+    return pageData(data, pg, '黄果漫剧');
+  } catch (error) { return { success: false, error: error.message }; }
+}
+
+async function detail(seriesId) {
+  const { dramaId } = parseId(seriesId);
+  const data = await request(`/api/videos/${dramaId}`);
+  if (String(data?.id) !== dramaId || !Array.isArray(data?.episodes)) {
+    throw new Error('黄果返回的剧集与请求不一致');
+  }
+  return data;
+}
+
+async function fetchEpisodeList(seriesId) {
+  const data = await detail(seriesId);
+  const series_title = plainText(data.title) || '未命名漫剧';
+  const cover = httpsUrl(data.cover);
+  const seen = new Set();
+  const episodes = data.episodes.filter(episode => episode && Number.isSafeInteger(Number(episode.ep_num)) && Number(episode.ep_num) > 0)
+    .map(episode => ({ vid: `${seriesId}:${Number(episode.ep_num)}`,
+      vid_index: Number(episode.ep_num), title: `第${Number(episode.ep_num)}集`,
+      series_id: seriesId, series_title, cover,
+      // status!==1 视为未开放（实测全站 status:1，保留语义防御）。
+      locked: Number(episode.status) !== 1, source: 'huangguo' }))
+    .filter(episode => { if (seen.has(episode.vid)) return false; seen.add(episode.vid); return true; })
+    .sort((a, b) => a.vid_index - b.vid_index);
+  if (!episodes.length) throw new Error('黄果分集列表为空');
+  return { series_id: seriesId, series_title, cover, total: episodes.length, episodes, source: 'huangguo' };
+}
+
+// 拉取 m3u8 文本并汇总 EXTINF 时长；拉取失败返回 0（网络抖动不应拦截播放本身）。
+async function playlistDuration(url, referer) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const { data } = await axios.get(url, { responseType: 'text', transformResponse: [text => text], timeout: 12000,
+      signal: controller.signal, maxRedirects: 0, maxContentLength: 2 * 1024 * 1024,
+      headers: { 'User-Agent': 'Mozilla/5.0', Referer: referer } });
+    if (typeof data !== 'string' || !data.startsWith('#EXTM3U')) return 0;
+    if (/#EXT-X-STREAM-INF:/.test(data)) return 0; // 多码率主清单不含分片时长，跳过校验
+    return data.split(/\r?\n/).reduce((sum, line) => {
+      const match = line.match(/^#EXTINF:([\d.]+)/);
+      return match ? sum + Number(match[1]) : sum;
+    }, 0);
+  } catch (_) { return 0; }
+  finally { clearTimeout(timer); }
+}
+
+async function fetchPlayUrlSingle(vid, sid) {
+  try {
+    const id = parseId(vid, true);
+    if (sid != null && sid !== '' && parseId(sid).seriesId !== id.seriesId) throw new Error('黄果分集不属于当前剧集');
+    const referer = ORIGINS[originIndex] + '/';
+    const data = await request(`/api/videos/${id.dramaId}/play`, { ep: id.ep }, { timeout: 15000 });
+    const url = httpsUrl(data.video_url);
+    if (!url) throw new Error('黄果未提供有效 HTTPS 播放地址');
+    // 官方对个别内容只下发预览片段：实际时长不足声明八成即视为不完整，如实报错（参照 huangguo-web 的做法）。
+    const declared = Number(data.duration) || 0;
+    if (declared > 0 && /\.m3u8/i.test(url)) {
+      const actual = await playlistDuration(url, referer);
+      if (actual > 0 && actual < declared * 0.8) {
+        throw new Error(`该集只下发了预览片段（约 ${Math.round(actual)} 秒），暂无法完整播放`);
+      }
+    }
+    return { url, spadeA: null, codec: '', source: 'huangguo', format: 'hls',
+      userAgent: 'Mozilla/5.0', referer: referer };
+  } catch (error) { return { url: null, spadeA: null, codec: null, source: 'huangguo', error: error.message }; }
+}
+
+module.exports = { browseList, search, fetchEpisodeList, fetchPlayUrlSingle };

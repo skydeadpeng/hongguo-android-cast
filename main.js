@@ -1023,7 +1023,7 @@ async function executeHongguoDownload(task) {
       }
     }
     // Recheck source access before reusing an existing third-party file or URL.
-    const checkedPlayInfo = /^(xifan|hema|custom):/.test(String(vid))
+    const checkedPlayInfo = /^(xifan|hema|huangguo|custom):/.test(String(vid))
       ? await hongguo.fetchPlayUrlSingle(vid, hongguoInfo?.series_id, { quality }) : null;
     if (checkedPlayInfo && !checkedPlayInfo.url) throw new Error(checkedPlayInfo.error || '来源未开放该集');
     // Existing complete files need no additional media transfer.
@@ -1040,7 +1040,7 @@ async function executeHongguoDownload(task) {
     }
     tmpPath = finalPath + '.enc.tmp';
     const cached = onlineCache.get(onlineCacheKey(vid, quality)) || onlineCache.get(String(vid));
-    const sourceId = /^custom:[^:]+/.exec(String(vid))?.[0] || /^(xifan|hema):/.exec(String(vid))?.[1] || 'hongguo';
+    const sourceId = /^custom:[^:]+/.exec(String(vid))?.[0] || /^(xifan|hema|huangguo):/.exec(String(vid))?.[1] || 'hongguo';
     let reusedCache = false;
     if (cached?.complete && cached.vid === String(vid) && cached.source === sourceId
       && cached.seriesId === String(hongguoInfo?.series_id || '') && cached.size > 0
@@ -1532,12 +1532,13 @@ ipcMain.handle('test-custom-source', async (_event,draft) => {
 
 
 ipcMain.handle('browse-list', async (_event, options) => {
-  if (['xifan', 'hema'].includes(options?.source) && getCurrentSettings().builtin_sources?.[options.source] === false) return { success: false, results: [], error: '此来源已关闭，可在设置中重新开启' };
+  if (['xifan', 'hema', 'huangguo'].includes(options?.source) && getCurrentSettings().builtin_sources?.[options.source] === false) return { success: false, results: [], error: '此来源已关闭，可在设置中重新开启' };
   if (proxyStartupFallback) return { success: false, error: '网络代理配置无效，请先在设置中修复或明确关闭代理。' };
   if ((!options?.source || options.source === 'hongguo') && options?.catalogChannel != null
     && !['app', 'web'].includes(options.catalogChannel)) return { success: false, error: '不支持的红果目录线路' };
   const moduleName = String(options?.source).startsWith('custom:') ? './src/native/custom-source' : options?.source === 'hema' ? './src/native/hema'
     : options?.source === 'xifan' ? './src/native/xifan'
+      : options?.source === 'huangguo' ? './src/native/huangguo'
       : options?.catalogChannel === 'web' ? './src/native/catalog' : './src/native/hongguo-app-catalog';
   const catalogOptions = moduleName === './src/native/catalog'
     ? { ...options, allowTrustedDns: resolveProxyConfig(getCurrentSettings()).mode === 'direct' } : options;
@@ -1620,7 +1621,7 @@ async function searchAtSource(keyword, options = {}) {
   const page = options.page === undefined ? 1 : options.page;
   if (!Number.isSafeInteger(page) || page < 1 || page > 50) throw new Error('搜索页码必须是 1 至 50 的整数');
   const source = options.source || 'hongguo';
-  if (['xifan', 'hema'].includes(source) && getCurrentSettings().builtin_sources?.[source] === false) throw new Error('此来源已关闭，可在设置中重新开启');
+  if (['xifan', 'hema', 'huangguo'].includes(source) && getCurrentSettings().builtin_sources?.[source] === false) throw new Error('此来源已关闭，可在设置中重新开启');
   if (page > 1 && source !== 'hongguo' && options.channel && options.channel !== source) throw new Error('搜索通道已变化，请重新搜索');
   const response = await searchAtSourcePage(keyword, { ...options, page });
   if (!response?.success) return response;
@@ -1635,6 +1636,7 @@ async function searchAtSourcePage(keyword, options = {}) {
   if (String(options?.source).startsWith('custom:')) return require('./src/native/custom-source').searchSeries(keyword, options);
   if (options?.source === 'hema') return require('./src/native/hema').search(keyword, options.page, { deadline });
   if (options?.source === 'xifan') return require('./src/native/xifan').search(keyword, options.page, { deadline });
+  if (options?.source === 'huangguo') return require('./src/native/huangguo').search(keyword, options.page, { deadline });
   if (options?.source && options.source !== 'hongguo') throw new Error('不支持的搜索来源');
   const page = options.page;
   const searchQuery = normalizeSearchTitle(keyword);
@@ -2216,7 +2218,8 @@ ipcMain.handle('get-merge-tasks', async () => mergeTasks.map(({ child, ...rest }
 function seriesDownloadDir(root, seriesId, seriesTitle) {
   const title = sanitizeFolderName(seriesTitle) || '未命名短剧';
   const suffix = createHash('sha256').update(String(seriesId)).digest('hex').slice(0, 12);
-  return path.join(root, String(seriesId).startsWith('hema:') ? '河马短剧' : String(seriesId).startsWith('xifan:') ? '西饭短剧' : '红果短剧', `${title}-${suffix}`);
+  return path.join(root, String(seriesId).startsWith('hema:') ? '河马短剧' : String(seriesId).startsWith('xifan:') ? '西饭短剧'
+    : String(seriesId).startsWith('huangguo:') ? '黄果漫剧' : '红果短剧', `${title}-${suffix}`);
 }
 
 /** 找到某剧在磁盘上的目录（优先用任务记录，其次按标题推导） */
@@ -2230,7 +2233,7 @@ function resolveSeriesDir(seriesId, seriesTitle, covers) {
   const guess = seriesDownloadDir(root, seriesId, seriesTitle);
   if (fs.existsSync(guess)) return guess;
   // Older versions used title-only directories. Reuse only when ownership is unambiguous.
-  if (!/^(xifan|hema|custom):/.test(String(seriesId))) {
+  if (!/^(xifan|hema|huangguo|custom):/.test(String(seriesId))) {
     const title = sanitizeFolderName(seriesTitle) || '未命名短剧';
     const owners = seriesRegistry.filter(s => sanitizeFolderName(s.series_title) === title);
     const legacy = path.join(root, '红果短剧', title);
@@ -2646,7 +2649,7 @@ ipcMain.handle('play-series', async (event, payload) => {
 // ===== 在线播放 =====
 function playbackQuality(value = 'auto', vid = '') {
   if (!['auto', '720p', '1080p'].includes(value)) throw new Error('在线播放清晰度无效，请选择自动、720p 或 1080p');
-  if (value !== 'auto' && /^(xifan|hema|custom):/.test(String(vid))) throw new Error('此来源暂不支持指定在线播放清晰度，请选择自动');
+  if (value !== 'auto' && /^(xifan|hema|huangguo|custom):/.test(String(vid))) throw new Error('此来源暂不支持指定在线播放清晰度，请选择自动');
   return value;
 }
 
@@ -3153,7 +3156,7 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
   onlineSessions.set(streamId, session);
   try {
     checkCustomAccess(sourceVid);
-    const checkedPlayInfo = /^(xifan|hema|custom):/.test(sourceVid) ? await hongguo.fetchPlayUrlSingle(sourceVid, seriesId, { force, quality }) : null;
+    const checkedPlayInfo = /^(xifan|hema|huangguo|custom):/.test(sourceVid) ? await hongguo.fetchPlayUrlSingle(sourceVid, seriesId, { force, quality }) : null;
     if (!onlineSessions.has(streamId)) throw new Error('已取消播放');
     if (checkedPlayInfo && !checkedPlayInfo.url) throw new Error(checkedPlayInfo.error || '来源未开放该集');
     if (force) deleteOnlineCacheEntry(key);
@@ -3179,7 +3182,7 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
               entry.size = entry.buffer.length;
             }
             if (controller.signal.aborted) throw new Error('已取消播放');
-            Object.assign(entry,{vid:sourceVid,source:/^custom:[^:]+/.exec(sourceVid)?.[0] || /^(xifan|hema):/.exec(sourceVid)?.[1] || 'hongguo',complete:true});
+            Object.assign(entry,{vid:sourceVid,source:/^custom:[^:]+/.exec(sourceVid)?.[0] || /^(xifan|hema|huangguo):/.exec(sourceVid)?.[1] || 'hongguo',complete:true});
             return entry;
           });
           prepared.lastUsed = Date.now();
@@ -3537,7 +3540,7 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
     if (filePath && fs.existsSync(filePath) && !isInsideMediaRoot(filePath) && !isRecordedMediaFile(filePath, payload)) {
       return { success: false, error: '只能转码下载目录中的视频' };
     }
-    if (!(filePath && fs.existsSync(filePath)) && (/^(xifan|hema|custom):/.test(String(seriesId)) || /^(xifan|hema|custom):/.test(String(payload.vid)))) {
+    if (!(filePath && fs.existsSync(filePath)) && (/^(xifan|hema|huangguo|custom):/.test(String(seriesId)) || /^(xifan|hema|huangguo|custom):/.test(String(payload.vid)))) {
       const current = await hongguo.fetchEpisodeList(seriesId);
       checkCancelled();
       const episode = current.episodes.find(ep => Number(ep.vid_index) === Number(vidIndex));
@@ -3727,7 +3730,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
   if (!Array.isArray(episodes) || episodes.length === 0) return 0;
   const settings = getCurrentSettings();
   const downloadQuality = normalizeDownloadQuality(quality ?? settings.download_quality);
-  if (/^(xifan|hema|custom):/.test(String(seriesId))) {
+  if (/^(xifan|hema|huangguo|custom):/.test(String(seriesId))) {
     const current = await hongguo.fetchEpisodeList(seriesId);
     episodes = episodes.map(requested => {
       const ep = current.episodes.find(item => item.vid === requested.vid && Number(item.vid_index) === Number(requested.vid_index));
@@ -3735,7 +3738,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
       if (ep.locked) throw new Error('该集已锁定，请在来源平台解锁');
       return ep;
     });
-  } else if (episodes.some(ep => /^(xifan|hema|custom):/.test(String(ep.vid)))) {
+  } else if (episodes.some(ep => /^(xifan|hema|huangguo|custom):/.test(String(ep.vid)))) {
     throw new Error('剧集来源不匹配');
   }
 

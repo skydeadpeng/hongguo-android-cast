@@ -12,11 +12,12 @@ test('pool keeps available sources, validates IDs and deduplicates', async () =>
     if (options.source === 'xifan') throw new Error('offline');
     return { success: true, results: options.source === 'hongguo'
       ? [drama('123456'), drama('123456'), drama('hema:1'), drama('bad'), drama('654321', ' ')]
+      : options.source === 'huangguo' ? [drama('huangguo:787')]
       : [drama('hema:1'), drama('hema:2')] };
   });
-  assert.deepEqual(result.items.map(item => item.series_id), ['123456', 'hema:1', 'hema:2']);
+  assert.deepEqual(result.items.map(item => item.series_id), ['123456', 'hema:1', 'hema:2', 'huangguo:787']);
   assert.deepEqual(result.unavailable, ['xifan']);
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 4);
   assert.ok(requests.every(request => request.page === 1 && request.category === 'real-drama'));
 });
 
@@ -44,7 +45,7 @@ test('slow source times out without discarding a working source', async () => {
     ? Promise.resolve({ success: true, results: [drama('123456')] })
     : new Promise(() => {}), { timeoutMs: 10 });
   assert.equal(result.items.length, 1);
-  assert.deepEqual(result.unavailable, ['xifan', 'hema']);
+  assert.deepEqual(result.unavailable, ['xifan', 'hema', 'huangguo']);
 });
 
 test('cancelling a pending pool rejects promptly', async () => {
