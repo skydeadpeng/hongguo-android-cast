@@ -4,17 +4,35 @@
 (function () {
   'use strict';
   var ORIGIN = 'https://huangguoai.com';
+  // 部分家庭/运营商网络对主域 RST；失败按序切换备用域并粘住可用域。
+  var ORIGINS = [ORIGIN, 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc'];
+  var originAt = 0;
 
-  function get(path) {
-    return fetch(ORIGIN + path, { headers: { 'Accept': 'application/json' } }).then(function (response) {
-      if (!response.ok) throw new Error('黄果来源暂不可用，请稍后重试');
+  function fetchJson(origin, path) {
+    return fetch(origin + path, { headers: { 'Accept': 'application/json' } }).then(function (response) {
+      if (!response.ok) throw new Error('HTTP ' + response.status);
       return response.json();
-    }).then(function (body) {
-      if (!body || body.status !== 1 || !body.data || typeof body.data !== 'object') {
-        throw new Error((body && body.msg) || '黄果返回数据无效');
-      }
-      return body.data;
     });
+  }
+  function get(path) {
+    var attempt = 0;
+    function tryNext() {
+      var origin = ORIGINS[(originAt + attempt) % ORIGINS.length];
+      return fetchJson(origin, path).then(function (body) {
+        if (!body || body.status !== 1 || !body.data || typeof body.data !== 'object') {
+          throw new Error((body && body.msg) || '黄果返回数据无效');
+        }
+        originAt = (originAt + attempt) % ORIGINS.length;
+        ORIGIN = origin;
+        return body.data;
+      }).catch(function (error) {
+        if (/^HTTP|^黄果返回/.test(String(error && error.message))) throw error;
+        attempt += 1;
+        if (attempt >= ORIGINS.length) throw new Error('黄果来源暂不可用，请稍后重试');
+        return tryNext();
+      });
+    }
+    return tryNext();
   }
   function text(value, limit) {
     value = String(value == null ? '' : value).replace(/<[^>]*>/g, '').trim();

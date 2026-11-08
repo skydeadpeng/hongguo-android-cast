@@ -11,7 +11,11 @@ import org.json.*;
  * 防止源站只下发预览片段。剧集在本机以 99 前缀数字编码与红果 ID 共存。
  */
 final class HuangguoApi {
-    private static final String ORIGIN = "https://huangguoai.com";
+    /** 官方主域 + 社区镜像备用域：部分运营商网络对主域 RST，失败按序切换并粘住可用域。 */
+    private static final String[] ORIGINS = {
+        "https://huangguoai.com", "https://l5f9m.rxzfszht.cc", "https://blolhh.rxzfszht.cc", "https://mxz58.rxzfszht.cc"
+    };
+    private static volatile int originIndex = 0;
     private static final long DEADLINE_MS = 20_000;
     private static final Pattern CATEGORY = Pattern.compile("ai-manju|ai-duanju");
 
@@ -30,8 +34,20 @@ final class HuangguoApi {
     }
 
     private static JSONObject get(String path) throws Exception {
-        // 拼接固定官方域；路径由本类内部构成，绝无用户可控主机。
-        NetworkGuard.Reply reply = NetworkGuard.publicGet(ORIGIN + path, System.nanoTime() + DEADLINE_MS * 1_000_000L);
+        // 域名全部固定；路径由本类内部构成，绝无用户可控主机。连接失败按序换域并粘住成功域。
+        Exception last = null;
+        for (int attempt = 0; attempt < ORIGINS.length; attempt++) {
+            String origin = ORIGINS[(originIndex + attempt) % ORIGINS.length];
+            try {
+                JSONObject data = getFrom(origin, path);
+                originIndex = (originIndex + attempt) % ORIGINS.length;
+                return data;
+            } catch (IOException error) { last = error; }
+        }
+        throw last != null ? last : new IOException("黄果来源暂不可用，请稍后重试");
+    }
+    private static JSONObject getFrom(String origin, String path) throws Exception {
+        NetworkGuard.Reply reply = NetworkGuard.publicGet(origin + path, System.nanoTime() + DEADLINE_MS * 1_000_000L);
         if (reply.status != 200) throw new IOException("黄果来源暂不可用，请稍后重试");
         JSONObject body;
         try { body = new JSONObject(reply.body); } catch (JSONException ignored) { throw new IOException("黄果返回数据无效"); }

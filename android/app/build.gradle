@@ -24,8 +24,8 @@ android {
         applicationId 'io.github.jackotom.hongguo.android'
         minSdk 26
         targetSdk 35
-        versionCode 66
-        versionName '0.12.43'
+        versionCode 67
+        versionName '0.12.44'
     }
     flavorDimensions 'device'
     productFlavors {
@@ -35,8 +35,8 @@ android {
         tvNative {
             dimension 'device'
             applicationIdSuffix '.tvnative'
-            versionCode 6
-            versionName '0.1.5'
+            versionCode 7
+            versionName '0.1.6'
             buildConfigField 'boolean', 'IS_TV', 'true'
             buildConfigField 'boolean', 'NATIVE_UI', 'true'
         }
