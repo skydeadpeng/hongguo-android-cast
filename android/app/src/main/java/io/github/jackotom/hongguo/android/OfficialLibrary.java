@@ -54,6 +54,8 @@ final class OfficialLibrary {
             @Override public int position(JSONObject series,JSONObject episode)throws JSONException{try{synchronized(lock){JSONObject row=state(owner).entries.get(series.optString("seriesId"));return row!=null&&row.optString("vid").equals(episode.optString("vid"))?(int)Math.min(Integer.MAX_VALUE,Math.max(0,row.optLong("positionMs"))):0;}}catch(Exception error){throw jsonError("官方播放进度读取未完成");}}
             @Override public JSONObject projection()throws JSONException{return projectionFor(owner);}
             @Override public JSONObject seriesHistory(String id)throws JSONException{try{synchronized(lock){JSONObject row=state(owner).entries.get(id);return row==null?null:projectRow(row);}}catch(Exception error){throw jsonError("官方剧集观看记录读取未完成");}}
+            @Override public void remove(String seriesId)throws JSONException{try{synchronized(lock){State next=state(owner).copy();next.entries.remove(seriesId);next.pending.remove("progress:"+seriesId);commit(owner,next);}}catch(Exception error){remember(owner,error);throw jsonError("官方观看记录删除未成功");}}
+            @Override public void clear()throws JSONException{try{synchronized(lock){State next=state(owner).copy();next.entries.clear();next.pending.keySet().removeIf(key->key.startsWith("progress:"));commit(owner,next);}}catch(Exception error){remember(owner,error);throw jsonError("官方观看记录清空未成功");}}
         };
     }
     JSONObject status()throws JSONException{

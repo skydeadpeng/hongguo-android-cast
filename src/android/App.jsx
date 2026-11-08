@@ -74,7 +74,7 @@ function Status({ busy, error, onRetry, empty, children, preserve = false, error
 const webpCover = url => typeof url === 'string' && url.length > 6 && url.slice(-5).toLowerCase() === '.heic' ? url.slice(0, -5) + '.webp'
   : typeof url === 'string' && url.length > 7 && url.slice(-6).toLowerCase() === '.image' ? url.slice(0, -6) + '.webp' : null;
 
-function Poster({ item, onOpen, history }) {
+function Poster({ item, onOpen, history, onDelete }) {
   const [failed, setFailed] = useState(false);
   const [src, setSrc] = useState(item.coverUrl);
   const imageRef = useRef(null);
@@ -89,19 +89,24 @@ function Poster({ item, onOpen, history }) {
     return () => clearTimeout(timer);
   }, [src, failed]);
   const coverError = () => { const twin = webpCover(src); if (twin) setSrc(twin); else setFailed(true); };
-  return <button className="poster" onClick={() => onOpen(item, history?.vid)} aria-label={`打开${item.title}`}>
+  const open = () => onOpen(item, history?.vid);
+  // 卡片可携带删除入口：外层用可聚焦 div（避免按钮嵌套），删除键独立成按钮并阻断冒泡。
+  return <div className="poster" role="button" tabIndex={0} aria-label={`打开${item.title}`}
+    onClick={event => { if (event.target.closest('.poster-delete')) return; open(); }}
+    onKeyDown={event => { if ((event.key !== 'Enter' && event.key !== ' ') || event.target.closest('.poster-delete')) return; event.preventDefault(); open(); }}>
     <span className="poster-art">
       {src && !failed ? <img ref={imageRef} src={src} alt="" loading="lazy" onError={coverError} /> : <span className="poster-fallback"><Film size={32} /><span>暂无封面</span></span>}
       {item.episodeLabel || item.episodeCount ? <span className="poster-label">{item.episodeLabel || `${item.episodeCount} 集`}</span> : null}
+      {onDelete ? <button type="button" className="poster-delete" onClick={event => { event.stopPropagation(); onDelete(item); }} aria-label={`删除${item.title}的观看记录`}>×</button> : null}
     </span>
     <strong>{item.title || '未命名短剧'}</strong>
     {history ? <span className="poster-caption">看到第 {history.index} 集 · {timeText(history.positionMs)}</span> : item.tags?.length ? <span className="poster-caption">{item.tags.slice(0, 2).join(' / ')}</span> : null}
     {history?.hint ? <span className="poster-hint">{history.hint}</span> : null}
-  </button>;
+  </div>;
 }
 
-function PosterGrid({ items, onOpen, history = false }) {
-  return <div className="poster-grid">{items.map((item, index) => <Poster key={`${item.seriesId}-${index}`} item={item} onOpen={onOpen} history={history ? item : null} />)}</div>;
+function PosterGrid({ items, onOpen, history = false, onDelete }) {
+  return <div className="poster-grid">{items.map((item, index) => <Poster key={`${item.seriesId}-${index}`} item={item} onOpen={onOpen} history={history ? item : null} onDelete={onDelete} />)}</div>;
 }
 
 /** 黄果密码门：设置密码后首次进入需要解锁（本会话有效）。 */
@@ -495,10 +500,30 @@ function SearchPage({ onOpen }) {
   </>;
 }
 
-function Library({ library, error, busy, onRetry, onOpen, onAccount }) {
+function Library({ library, error, busy, onRetry, onOpen, onAccount, onLibrary, notify }) {
   const [view, setView] = useState('favorites');
   const [historyView, setHistoryView] = useState('all');
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [historyBusy, setHistoryBusy] = useState(false);
   const items = library[view] || [];
+  // 观看记录删除：以设备返回的最新库视图整体替换，失败仅提示不动列表。
+  const applyHistoryResult = result => {
+    if (!result) return;
+    onLibrary({ favorites: result.favorites || [], history: result.history || [], projection: result.projection || null, owner: result.owner });
+  };
+  const removeRow = async item => {
+    if (historyBusy) return;
+    setHistoryBusy(true);
+    try { applyHistoryResult(await nativeCall('removeHistory', { seriesId: item.seriesId })); }
+    catch (cause) { notify(`删除未成功：${errorText(cause)}`); }
+    finally { setHistoryBusy(false); }
+  };
+  const clearAll = async () => {
+    setHistoryBusy(true);
+    try { applyHistoryResult(await nativeCall('clearHistory')); setConfirmClear(false); }
+    catch (cause) { notify(`清空未成功：${errorText(cause)}`); }
+    finally { setHistoryBusy(false); }
+  };
   // Completed means the last episode played near its end; hints only inform, never hide.
   const rows = useMemo(() => {
     const { decorate } = withHistoryHints(library.history || []);
@@ -507,15 +532,16 @@ function Library({ library, error, busy, onRetry, onOpen, onAccount }) {
   const shown = view === 'history' ? filterHistory(rows, historyView) : items;
   const completedCount = useMemo(() => (library.history || []).filter(row => completedEpisode(row)).length, [library.history]);
   return <>
-    <header className="page-heading heading-actions"><div><h1>我的追剧</h1><p>本机保留记录；登录红果官方账号后同步收藏、历史和进度。</p></div><button type="button" className="button" onClick={onAccount}>账号</button></header>
-    <div className="section-tabs" role="group" aria-label="我的内容"><button aria-pressed={view === 'favorites'} onClick={() => setView('favorites')}><Heart />追剧 ({library.favorites.length})</button><button aria-pressed={view === 'history'} onClick={() => setView('history')}><Clock />观看历史 ({library.history.length})</button></div>
+    <header className="page-heading heading-actions"><div><h1>我的追剧</h1><p>本机保留记录；登录红果官方账号后同步收藏、历史和进度。</p></div><div className="heading-buttons">{view === 'history' && !!(library.history || []).length && <button type="button" className="button" onClick={() => setConfirmClear(true)}>清空记录</button>}<button type="button" className="button" onClick={onAccount}>账号</button></div></header>
+    <div className="section-tabs" role="group" aria-label="我的内容"><button aria-pressed={view === 'favorites'} onClick={() => setView('favorites')}><Heart />追剧 ({library.favorites.length})</button><button aria-pressed={view === 'history'} onClick={() => { setView('history'); setConfirmClear(false); }}><Clock />观看历史 ({library.history.length})</button></div>
     {view === 'history' && <div className="section-tabs" role="group" aria-label="观看状态">
       <button aria-pressed={historyView === 'all'} onClick={() => setHistoryView('all')}>全部 ({(library.history || []).length})</button>
       <button aria-pressed={historyView === 'watching'} onClick={() => setHistoryView('watching')}>未看完 ({(library.history || []).length - completedCount})</button>
       <button aria-pressed={historyView === 'completed'} onClick={() => setHistoryView('completed')}>已看完 ({completedCount})</button>
     </div>}
     {library.projection?.[view === 'favorites' ? 'favoritesHasMore' : 'historyHasMore'] && <p className="account-note" role="status">当前展示最近 {items.length} 项；完整记录已保存在账号库，较早剧集的原生播放进度仍保留。</p>}
-    <Status busy={busy} error={error} preserve={!!shown.length} onRetry={onRetry} empty={!shown.length && { title: view === 'favorites' ? '还没有追剧' : historyView === 'completed' ? '还没有看完的短剧' : historyView === 'watching' ? '没有正在观看的短剧' : '还没有观看记录', text: view === 'favorites' ? '打开短剧详情，点击「加入追剧」。' : '播放短剧后，进度会自动记录。' }}><PosterGrid items={shown} onOpen={onOpen} history={view === 'history'} /></Status>
+    {view === 'history' && confirmClear && <div className="search-history-confirm" role="group" aria-label="确认清空观看记录"><p>清空这台设备上的全部观看记录？</p><div><button className="button" type="button" disabled={historyBusy} onClick={clearAll}>{historyBusy ? '正在更新…' : '确认清空'}</button><button className="button" type="button" disabled={historyBusy} onClick={() => setConfirmClear(false)}>取消</button></div></div>}
+    <Status busy={busy} error={error} preserve={!!shown.length} onRetry={onRetry} empty={!shown.length && { title: view === 'favorites' ? '还没有追剧' : historyView === 'completed' ? '还没有看完的短剧' : historyView === 'watching' ? '没有正在观看的短剧' : '还没有观看记录', text: view === 'favorites' ? '打开短剧详情，点击「加入追剧」。' : '播放短剧后，进度会自动记录。' }}><PosterGrid items={shown} onOpen={onOpen} history={view === 'history'} onDelete={view === 'history' ? removeRow : undefined} /></Status>
   </>;
 }
 
@@ -1608,7 +1634,7 @@ export default function App() {
         {tab === 'discover' && <Discover onOpen={openDetail} library={library} onSearch={() => navigate('search')} onUpdates={() => navigate('about')} />}
         {tab === 'huangguo' && huangguoConfig.visible && (!huangguoConfig.hasPin || huangguoConfig.unlocked) && <HuangguoPage notify={notify} />}
         {tab === 'search' && <SearchPage onOpen={openDetail} />}
-        {tab === 'library' && <Library library={library} error={libraryError} busy={libraryBusy} onRetry={loadLibrary} onOpen={openDetail} onAccount={() => { navigate('about'); setAccountFocus(value => value + 1); }} />}
+        {tab === 'library' && <Library library={library} error={libraryError} busy={libraryBusy} onRetry={loadLibrary} onOpen={openDetail} onAccount={() => { navigate('about'); setAccountFocus(value => value + 1); }} onLibrary={replaceLibrary} notify={notify} />}
         {tab === 'downloads' && !detail && <Downloads notify={notify} />}
         {tab === 'about' && <About info={info} notify={notify} accountFocus={accountFocus} announcementsRef={announcements} />}
       </div>

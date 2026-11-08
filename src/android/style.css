@@ -497,3 +497,7 @@
 .huangguo-pin-setup { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .huangguo-pin-setup input { flex: 1 1 12rem; min-width: 0; min-height: 46px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--text); }
 .huangguo-origin { display: inline-block; margin-left: 10px; vertical-align: middle; font-size: 12px; font-weight: 400; color: var(--faint); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; }
+/* 观看记录卡片右上角删除入口：半透明圆底，触屏与遥控器均可命中。 */
+.poster-delete { position: absolute; top: 6px; right: 6px; z-index: 1; width: 30px; height: 30px; min-height: 0; padding: 0; border: 0; border-radius: 999px; background: rgba(20, 20, 26, .66); color: #fff; font-size: 17px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.poster-delete:hover { background: rgba(200, 40, 40, .82); }
+.poster-delete:focus-visible { outline: 3px solid var(--ring); }

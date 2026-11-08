@@ -1,6 +1,6 @@
 /** Android-only JSON RPC. No Electron or browser networking fallback. */
 const METHODS = new Set([
-  'getInfo', 'httpGet', 'cancelHttp', 'getLibrary', 'getSeriesHistory', 'toggleFavorite', 'play',
+  'getInfo', 'httpGet', 'cancelHttp', 'getLibrary', 'getSeriesHistory', 'removeHistory', 'clearHistory', 'toggleFavorite', 'play',
   'getAccount', 'officialSendCode', 'officialLoginSMS', 'officialVerifyMFA', 'officialCancelLogin', 'officialLogout', 'officialSync', 'officialImportGuest',
   'officialWebQrcode', 'officialWebPoll', 'officialWebLogout', 'officialWebCancel', 'getAnnouncements', 'searchNewReleases', 'homeFeed', 'mergeDownloads',
   'getMergedVideos', 'deleteMergedVideo', 'playMergedVideo',
