@@ -151,3 +151,43 @@ Before the corrected device run, offline checks passed: resolver 633, real
 NetworkGuard doubles 223, guest integration 502, verifier 67, evidence contract
 37. All production and instrumentation Java compiled against SDK35 using the
 local Java21 compiler with source/target17. Genuine JDK17 remains the CI check.
+
+### Real Android playback accepted at 55d0bd2
+
+[Android playback QA run 43112033629](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/43112033629)
+passed on commit `55d0bd2ac50f008de170e1e49ce5625b4e3ea7a2`.
+The same previously failing episode ran through the unchanged production intent,
+normal source resolution, server-approved guest POST, complete private download,
+real Android MediaExtractor/full-file verification and Android MediaPlayer.
+
+- A real decoder-backed surface produced a nonblank first frame. The first
+  screenshot shows the correct title, episode, native controls and actual video.
+- Actual duration: 139,034 ms. Actual video size: 360 × 640.
+- Continuous wall interval: 30,235 ms; playback position: 199 → 30,202 ms,
+  advancing 30,003 ms. The same player, episode and generation were retained.
+- 103 state observations, 28 surface samples and 27 frame changes. No pause,
+  buffering, dialog, media error, source replacement or five-second stall occurred.
+- The second screenshot shows a different real scene after the interval.
+  Both screenshots were opened and visually inspected after artifact extraction.
+- Android output remained muted. No media URL/playInfo was injected, no User-Agent
+  or network setting changed, and no keys or protected decoding were used.
+- Temporary KVM ACL restoration passed an exact comparison.
+
+The six-file sanitized [artifact](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/43112033629/artifacts/13895869468)
+has ZIP SHA256 `7ba0dddaf47f3fe321d78d94e76796197b6a0b1366444eeb48ac9836e0bc2bfc`.
+It includes two screenshots and numerical reports, not raw logs or signed media
+addresses. The compact report is also retained next to this document.
+
+The same commit's [Android compilation, regression and APK workflow](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/43112033644)
+also passed with genuine JDK17/SDK35. The broader desktop `npm test` workflow
+[43112033640](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/43112033640)
+did not pass: its separate random real-media download test could not obtain the
+selected episode (`Real Hongguo media lookup failed (ERR_ASSERTION)`). The same
+case already failed in parent commit 2a3bfa9, [run 43110678322](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/43110678322).
+No desktop source/test files changed in the capability fix. This is disclosed,
+not treated as a passing global suite or silently replaced with test footage.
+
+Acceptance is limited to this real phone-player sample and interval. It does not
+claim every episode, complete browse-to-play interaction, seeking, completion,
+next-episode playback, TV, casting, fixed high resolutions or personal devices
+were verified. No main merge or release was performed.
