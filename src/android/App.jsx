@@ -13,6 +13,7 @@ import { createOfficialSeasonLookup, requestOfficialSeries } from './official-se
 import { announcementLink, createAnnouncements } from './announcements.mjs';
 import { completedEpisode, filterHistory, withHistoryHints } from './history-view.mjs';
 import { HUANGGUO_CATEGORIES, HUANGGUO_LINES, huangguoFeed, huangguoSearch, huangguoDetail, huangguoPlay, huangguoGetSettings, huangguoUpdateSettings, huangguoVerifyPin } from './huangguo.mjs';
+import { pickSpatialCandidate, pickInitialControl } from './tv-navigation.mjs';
 
 const source = createSource(requestHtml, { fallback: fetchAppPlayUrl,
   searchPage: params => nativeCall('searchQuery', params, 60000),
@@ -1375,10 +1376,17 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
   </div>;
 }
 
-/** Spatial D-pad navigation: only visible enabled controls participate. */
+/** Spatial D-pad navigation: only visible enabled controls participate.
+ * Geometry and edge rules live in tv-navigation.mjs: left/right stays inside
+ * the focused grid (poster/episode/chips) so grid edges stop there instead of
+ * jumping to the sidebar, and the first press after focus loss lands on main
+ * content instead of the first sidebar item. */
 function useTvNavigation(isTv) {
   useEffect(() => {
     if (!isTv) return;
+    // Horizontal grids whose rows must not leak focus sideways. The sidebar
+    // stays out: it is a vertical list, and right must leave into content.
+    const GRID_SELECTORS = '.poster-grid,.episode-grid,.category-tabs,.section-tabs';
     const keydown = (event) => {
       if (event.defaultPrevented) return;
       if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(event.key)) return;
@@ -1406,22 +1414,16 @@ function useTvNavigation(isTv) {
           return;
         }
       }
-      const controls = [...document.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]')].filter((element) => element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden'
-        && (!element.matches('.season-choice[role="tab"]') || element.tabIndex >= 0 || element === focused));
-      if (!controls.length) return;
+      const controls = [...document.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]')]
+        .filter((element) => element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden'
+          && (!element.matches('.season-choice[role="tab"]') || element.tabIndex >= 0 || element === focused))
+        .map((element) => ({ element, rect: element.getBoundingClientRect(), boundary: element.closest(GRID_SELECTORS),
+          poster: element.classList.contains('poster'), nav: !!element.closest('.app-nav') }));
+      if (!controls.length) { event.preventDefault(); return; }
       event.preventDefault();
-      if (!controls.includes(focused)) { controls[0].focus(); return; }
-      const origin = focused.getBoundingClientRect();
-      const ox = origin.left + origin.width / 2; const oy = origin.top + origin.height / 2;
-      const horizontal = ['ArrowLeft', 'ArrowRight'].includes(event.key);
-      const positive = ['ArrowRight', 'ArrowDown'].includes(event.key);
-      const candidate = controls.filter((element) => element !== focused).map((element) => {
-        const rect = element.getBoundingClientRect(); const dx = rect.left + rect.width / 2 - ox; const dy = rect.top + rect.height / 2 - oy;
-        const along = horizontal ? dx : dy; const across = horizontal ? dy : dx;
-        if ((positive ? along : -along) <= 2) return null;
-        return { element, score: Math.abs(along) + Math.abs(across) * 3 + across * across / Math.max(Math.abs(along), 1) };
-      }).filter(Boolean).sort((a, b) => a.score - b.score)[0];
-      if (candidate) { candidate.element.focus(); candidate.element.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+      const current = controls.find((control) => control.element === focused);
+      const target = current ? pickSpatialCandidate(controls, current, event.key) : pickInitialControl(controls);
+      if (target) { target.element.focus(); target.element.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
     };
     document.addEventListener('keydown', keydown);
     return () => document.removeEventListener('keydown', keydown);

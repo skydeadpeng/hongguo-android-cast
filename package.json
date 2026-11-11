@@ -30,7 +30,7 @@
     "build:android:tv:release": "bash scripts/build-android.sh --tv-release",
     "build:android:phone:release-compatible": "bash scripts/build-android.sh --phone-release-compatible",
     "build:android:phone:release": "bash scripts/build-android.sh --phone-release",
-    "check:android": "node --experimental-test-coverage --test scripts/check-android-source.test.mjs && node scripts/check-android-project.cjs",
+    "check:android": "node --experimental-test-coverage --test scripts/check-android-source.test.mjs scripts/check-android-tv-navigation.test.mjs && node scripts/check-android-project.cjs",
     "check:android:device": "node scripts/check-android-device.mjs",
     "check:android:playback": "node scripts/check-android-playback.mjs",
     "check:android:playback:ui": "bash scripts/check-android-playback-ui.sh",
