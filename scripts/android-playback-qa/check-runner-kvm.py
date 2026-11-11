@@ -41,7 +41,7 @@ def inspect_runner():
         "kvm": {"path": "/dev/kvm", "present": False, "opened": False},
         "emulator": {"present": False},
         "blockers": [],
-        "host_changes": "NONE: no sudo, chmod, udev, group, security, proxy, DNS or CA changes",
+        "probe_changes": "NONE: this read-only probe never grants permissions or changes host settings",
     }
     kvm = report["kvm"]
     fd = None

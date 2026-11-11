@@ -26,6 +26,7 @@ android {
         targetSdk 35
         versionCode 88
         versionName '0.12.65'
+        testInstrumentationRunner 'io.github.jackotom.hongguo.android.ProductionPlaybackInstrumentation'
     }
     flavorDimensions 'device'
     productFlavors {
