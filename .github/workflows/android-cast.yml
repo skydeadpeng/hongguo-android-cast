@@ -53,6 +53,7 @@ jobs:
         run: |
           bash android/tests/run-announcement-request-tests.sh
           bash android/tests/run-registered-playback-model-tests.sh
+          bash android/tests/run-official-transport-timeout-tests.sh
           bash android/tests/run-app-media-source-tests.sh
           bash android/tests/run-initial-playback-tests.sh
           bash android/tests/run-native-media-contract-tests.sh
