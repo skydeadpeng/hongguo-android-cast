@@ -1,3 +1,4 @@
+// 6.7 unified release.
 // SPDX-License-Identifier: GPL-3.0-only
 // Signing and Spade algorithms adapted from woshishiq1/drpys
 // commit 22261adfa31435e3b3ef5a730b8a2a75bcaf1715, spider/js/红果果[短].js,
@@ -6,16 +7,23 @@
 // bounded HTTPS transport; exact episode matching; supported codec selection.
 // Crypto tables and SDK protocol constants below are not user credentials.
 const crypto = require('node:crypto');
+const { gzipSync } = require('node:zlib');
+const { setTimeout: delay } = require('node:timers/promises');
 const { registerPlaybackDevice } = require('./playback-device');
+const { signPlayer } = require('./playback-signature');
+const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
 const sm3 = require('./sm3');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
 const localId = () => String(1000000000000000n + BigInt('0x' + crypto.randomBytes(6).toString('hex')));
 const PROCESS_NONCE = crypto.randomBytes(18).toString('base64url');
 const PROCESS_STARTED = Date.now();
+let playbackQueue = Promise.resolve();
+let playbackReadyAt = 0;
+let playbackRejection = null;
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
+const VIDEO_TAB_API = 'https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/';
 const SEARCH_API = 'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v';
 const VIDEO_UA = 'com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)';
-const PLAYBACK_UA = 'com.phoenix.read/71532 (Linux; U; Android 9; SM-N9860; Build/PQ3A.190705.10241111;tt-ok/3.12.13.20)';
 const SEARCH_UA = 'com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)';
 const DEVICE = {
     ac: 'wifi', channel: 'update_64', aid: '8662', app_name: 'novelread',
@@ -25,6 +33,11 @@ const DEVICE = {
     update_version_code: '71332', host_abi: 'arm64-v8a', dragon_device_type: 'phone', pv_player: '71332',
     compliance_status: '0', need_personal_recommend: '1', player_so_load: '1', is_android_pad_screen: '0',
 };
+const PLAYBACK_DEVICE = { ...DEVICE, version_code: '74332', version_name: '7.4.3.32',
+    manifest_version_code: '74332', update_version_code: '74332', pv_player: '74332' };
+const VIDEO_TAB_DEVICE = { ...DEVICE, version_code: '73932', version_name: '7.3.9.32',
+    manifest_version_code: '73932', update_version_code: '73932', pv_player: '73932' };
+const PLAYBACK_UA = VIDEO_UA.replace(DEVICE.version_code, PLAYBACK_DEVICE.version_code);
 function str(value, fallback = '') { return String(value == null ? fallback : value).trim(); }
 function cleanUrl(value) { return str(value).replace(/\\\//g, '/').replace(/\\u0026/g, '&').replace(/&amp;/g, '&'); }
 function jsonBody(value) { try { return JSON.parse(value); } catch { return null; } }
@@ -133,28 +146,29 @@ function helios(khronos) {
 }
 
 function branchOf(url, body, khronos) { const bodyMd5 = body ? crypto.createHash('md5').update(body).digest() : Buffer.alloc(16); const q = sm3(url.split('?')[1]); const iv = getIv(getIv(getIv(0x20230928, q), bodyMd5), le32(khronos)); const low = iv & 15; return low - (((low * 171) >> 9) * 3); }
-function playbackRequest(payload, identity, host = new URL(VIDEO_API).hostname) {
-    const body = Buffer.from(payload);
-    const khronos = Math.floor(Date.now() / 1000), ticketBase = Date.now();
-    const device = { ...DEVICE, ...identity };
-    let query, url, requestTicket;
-    for (let n = 0; n < 128; n += 1) {
-        requestTicket = ticketBase + n;
-        query = pythonUrlEncode({ ...device, ts: String(khronos), _rticket: String(requestTicket) });
-        url = `https://${host}/novel/player/multi_video_model/v1/?${query}`;
-        if (branchOf(url, body, khronos) === 0) break;
-        if (n === 127) throw new Error('无法生成播放请求签名');
-    }
-    return { url, body, headers: {
-        'User-Agent': PLAYBACK_UA, Accept: 'application/json; charset=utf-8,application/x-protobuf',
-        'Content-Type': 'application/json; charset=UTF-8',
-        'x-ss-req-ticket': String(requestTicket), 'sdk-version': '2', 'x-xs-from-web': '0',
-        'x-khronos': String(khronos),
-        'x-gorgon': xGorgon(query, body, khronos, Math.floor(Math.random() * 65536)),
-        'x-ladon': be32(khronos).toString('base64'), 'x-argus': le32(khronos).toString('base64'),
-        'x-helios': helios(khronos), 'x-medusa': buildMedusa(url, body, khronos, device), 'x-tt-dt': '',
+function playbackRequest(payload, identity, videoId = '') {
+    // Sign the final query and actual gzip body; other API families retain their original signer.
+    const body = videoId ? null : gzipSync(Buffer.from(payload));
+    const requestTicket = Date.now(), khronos = Math.floor(requestTicket / 1000);
+    const device = { ...(videoId ? VIDEO_TAB_DEVICE : PLAYBACK_DEVICE), ...identity };
+    const values = videoId ? { video_id: videoId, video_id_type: '0', device_level: '1',
+        need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
+        video_platform: '1024', source: '0', from_video_id: '' } : {};
+    const query = pythonUrlEncode({ ...device, ...values, ts: String(khronos), _rticket: String(requestTicket) });
+    const url = `${videoId ? VIDEO_TAB_API : VIDEO_API}?${query}`;
+    const signature = signPlayer({ query, body, ts: khronos });
+    const headers = {
+        'User-Agent': VIDEO_UA.replace(DEVICE.version_code, device.version_code), Accept: 'application/json; charset=utf-8,application/x-protobuf',
+        'x-ss-req-ticket': signature['x-ss-req-ticket'], 'sdk-version': '2', 'x-xs-from-web': '0',
+        'passport-sdk-version': videoId ? '50561' : '5051452', 'x-ss-dp': String(device.aid),
+        'x-khronos': signature['x-khronos'],
+        'x-ladon': signature['x-ladon'], 'x-argus': signature['x-argus'], 'x-tt-dt': '',
         'x-tt-store-region': 'cn', 'x-tt-store-region-src': 'did',
-    } };
+    };
+    if (body) Object.assign(headers, { 'Content-Type': 'application/json; charset=UTF-8',
+        'Content-Encoding': 'gzip', 'x-ss-stub': signature['x-ss-stub'] });
+    else headers['x-tt-request-tag'] = 't=0;n=0';
+    return { url, body, headers, method: videoId ? 'GET' : 'POST' };
 }
 
 function parseSearchInteger(value) {
@@ -320,6 +334,7 @@ async function requestJson(url, options, deadline, signal) {
     const requestOptions = { ...options };
     delete requestOptions.preserveLargeIntegerFields;
     for (let redirects = 0; redirects < 4; redirects++) {
+        throwIfAborted(signal);
         url = checkedUrl(url, ['fqnovel.com', 'snssdk.com']);
         const timeout = deadline - Date.now();
         if (timeout <= 0) throw Object.assign(new Error('App 片源请求超时'), { code: 'ETIMEDOUT' });
@@ -332,24 +347,29 @@ async function requestJson(url, options, deadline, signal) {
                 validateStatus: () => true,
             });
         } catch (error) {
-            const code = signal.aborted ? 'ETIMEDOUT' : ['ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN',
-                'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ERR_CANCELED'].includes(error.code) ? error.code : 'ERR_NETWORK';
+            if (signal?.aborted) throw abortError(signal);
+            if (error?.code === 'ERR_CANCELED') throw abortError();
+            const detail = networkFailure(error?.code);
+            const code = detail || ['ECONNABORTED', 'ETIMEDOUT'].includes(error?.code) ? error.code : 'ERR_NETWORK';
             throw Object.assign(new Error(['ECONNABORTED', 'ETIMEDOUT'].includes(code)
-                ? 'App 片源请求超时' : 'App 片源网络请求失败，请稍后重试'), { code });
+                ? 'App 片源请求超时' : 'App 片源网络请求失败，请稍后重试'), { code,
+                ...(detail && code !== 'ECONNABORTED' ? { networkFailure: detail } : {}),
+            });
         }
+        throwIfAborted(signal);
         if ([301, 302, 303, 307, 308].includes(response.status)) {
-            // Do not resend a signed body to a redirect destination.
-            if (requestOptions.method === 'POST' || !response.headers.location) throw Object.assign(new Error('App 接口发生不支持的跳转'), { code: 'SECURITY_BLOCKED' });
+            // Signatures/session headers bind the final URL and must not follow a redirect.
+            const bound = Object.keys(requestOptions.headers || {}).some(name => /^(?:x-argus|x-ladon|x-gorgon|x-medusa|cookie|authorization)$/i.test(name));
+            if (requestOptions.method === 'POST' || bound || !response.headers.location) throw Object.assign(new Error('App 接口发生不支持的跳转'), { code: 'SECURITY_BLOCKED' });
             url = checkedUrl(new URL(response.headers.location, url).href, ['fqnovel.com', 'snssdk.com']);
             continue;
         }
         if (response.status !== 200) throw Object.assign(new Error(`App 片源请求失败（HTTP ${response.status}）`), { status: response.status });
         const raw = typeof response.data === 'string' ? response.data : '';
         if (!raw.trim()) {
-            throw Object.assign(new Error('App 接口返回空响应，可能是签名或设备鉴权问题'), {
+            throw Object.assign(new Error('App 接口返回空响应（HTTP 200），原因尚未确认'), {
                 code: 'EMPTY_RESPONSE',
                 status: response.status,
-                logid: response.headers?.['x-tt-logid'] || '',
             });
         }
         const normalized = preserveFields?.length ? preserveLargeJsonIntegers(raw, preserveFields) : raw;
@@ -361,66 +381,125 @@ async function requestJson(url, options, deadline, signal) {
 }
 
 async function fetchAppPlayUrl(vid, options = {}) {
+    throwIfAborted(options.signal);
     normalizeDownloadQuality(options.quality); // Validate before registration or network I/O.
     vid = String(vid || '');
     if (!/^\d{1,30}$/.test(vid)) throw new Error('分集编号无效');
+    // Playback, prefetch and downloads share one paced turn, including registration.
+    const previousRejection = playbackRejection;
+    const pending = playbackQueue.then(async () => {
+        throwIfAborted(options.signal);
+        if (playbackRejection !== previousRejection) throw playbackRejection;
+        const wait = playbackReadyAt - Date.now();
+        if (wait > 0) {
+            try { await delay(wait, undefined, { signal: options.signal }); }
+            catch (error) { throwIfAborted(options.signal); throw error; }
+        }
+        throwIfAborted(options.signal);
+        try { return await fetchAppPlayUrlFresh(vid, options); }
+        catch (error) {
+            // An explicit refusal also stops work queued before it was received.
+            if ([403, 429].includes(error.status) || error.code === 'BUSINESS_REJECTED' || error.code === 'DEVICE_REGISTRATION_FAILED'
+                && ['BUSINESS_REJECTED', 'HTTP_403', 'HTTP_429'].includes(error.registrationFailure)) playbackRejection = error;
+            throw error;
+        }
+        finally { playbackReadyAt = Date.now() + 1000; }
+    });
+    playbackQueue = pending.catch(() => {});
+    if (!options.signal) return pending;
+    let cancel;
+    try {
+        return await Promise.race([pending, new Promise((resolve, reject) => {
+            cancel = () => reject(abortError(options.signal));
+            options.signal.addEventListener('abort', cancel, { once: true });
+            if (options.signal.aborted) cancel();
+        })]);
+    } finally { options.signal.removeEventListener('abort', cancel); }
+}
+
+async function fetchAppPlayUrlFresh(vid, options) {
     const payload = JSON.stringify({
         biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
         mixed_video_id_map: { '1004': [vid] },
     });
     // Playback identities can be single-use; search/account retain their shared device.
-    let identity = await registerPlaybackDevice(requestJson);
+    let identity = await registerPlaybackDevice(requestJson, { signal: options.signal });
+    throwIfAborted(options.signal);
     // Registration has its own 8s budget; it must not consume the model request budget.
     const deadline = Date.now() + 12000;
-    const signal = AbortSignal.timeout(12000);
-    let response;
-    for (let attempt = 0; attempt < 2; attempt++) {
-        const signed = playbackRequest(payload, identity, attempt ? 'api5-normal-hl.fqnovel.com' : new URL(VIDEO_API).hostname);
-        if (attempt) signed.headers.Connection = 'close';
-        try {
-            response = await requestJson(signed.url, { method: 'POST', headers: signed.headers, data: signed.body }, deadline, signal);
-            break;
-        } catch (error) {
-            if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
-            // Keep one alternate-host attempt even when a fresh registration fails.
-            if (deadline - Date.now() >= 8000) {
-                try { identity = await registerPlaybackDevice(requestJson); }
-                catch (_) { /* Keep the previously registered identity for the alternate route. */ }
-            }
-            if (deadline - Date.now() < 500) throw error;
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
-    }
-    if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-    const entry = response.data?.[vid];
-    const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
-    if (!model) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
-    const inline = Array.isArray(model.video_list) && model.video_list.length > 0;
-    const readFallback = async () => {
-        const fallback = parseFallback(model.fallback_api);
-        if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
-        const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal);
-        if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
-            throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-        }
-        return outer?.video_info?.data;
-    };
-    if (!inline) return parseAppPlayModel(await readFallback(), vid, options, false);
+    const request = boundedSignal(options.signal, 12000);
+    const { signal } = request;
     try {
-        return parseAppPlayModel(model, vid, options, true);
-    } catch (error) {
-        // Only absent encryption metadata enables this recovery path; the fallback
-        // must independently pass identity, duration, encryption and URL validation.
-        const duration = Number(model.video_duration);
-        if (!error.incompleteEncryptionMetadata || typeof model.video_id !== 'string' || !model.video_id.trim() || !Number.isFinite(duration) || duration <= 0
-            || !error.minimumPixels || !model.fallback_api) throw error;
-        const info = await readFallback();
-        const fallbackDuration = Number(info?.video_duration);
-        if (info?.video_id !== model.video_id || !Number.isFinite(fallbackDuration) || fallbackDuration <= 0
-            || Math.abs(fallbackDuration - duration) > 0.5) {
-            throw Object.assign(new Error('备用片源编号或完整时长无法确认，已停止取址'), { code: 'INVALID_RESPONSE' });
+        let response;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            throwIfAborted(signal);
+            // Prefer the current API; only an empty response enables one legacy attempt.
+            const signed = playbackRequest(payload, identity, attempt ? '' : vid);
+            if (attempt) signed.headers.Connection = 'close';
+            try {
+                response = await requestJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, deadline, signal);
+                throwIfAborted(signal);
+                break;
+            } catch (error) {
+                throwIfAborted(signal);
+                if (error.code === 'ERR_CANCELED') throw error;
+                if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
+                // Keep the legacy attempt even when a fresh registration fails.
+                if (deadline - Date.now() >= 8000) {
+                    try { identity = await registerPlaybackDevice(requestJson, { signal }); }
+                    catch (registrationError) {
+                        throwIfAborted(signal);
+                        if (registrationError.code === 'ERR_CANCELED') throw registrationError;
+                        // Keep the previous identity for a non-cancellation registration failure.
+                    }
+                }
+                throwIfAborted(signal);
+                if (deadline - Date.now() < 1500) throw error;
+                try { await delay(1000, undefined, { signal }); }
+                catch (waitError) { throwIfAborted(signal); throw waitError; }
+                throwIfAborted(signal);
+            }
         }
-        return parseAppPlayModel(info, vid, options, false, true, error.minimumPixels);
+        if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+        const entries = response.data?.video_model_data ?? response.data;
+        const entry = entries?.[vid];
+        const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
+        if (!model || typeof model !== 'object' || Array.isArray(model)) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
+        const inline = model.video_list && typeof model.video_list === 'object' && Object.keys(model.video_list).length > 0;
+        const readFallback = async () => {
+            const fallback = parseFallback(model.fallback_api);
+            if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
+            const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal);
+            throwIfAborted(signal);
+            if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
+                throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+            }
+            return outer?.video_info?.data;
+        };
+        if (!inline) {
+            const info = await readFallback();
+            throwIfAborted(signal);
+            return parseAppPlayModel(info, vid, options, false);
+        }
+        try {
+            return parseAppPlayModel(model, vid, options, true);
+        } catch (error) {
+            // Only absent encryption metadata enables this recovery path; the fallback
+            // must independently pass identity, duration, encryption and URL validation.
+            const duration = Number(model.video_duration);
+            if (!error.incompleteEncryptionMetadata || typeof model.video_id !== 'string' || !model.video_id.trim() || !Number.isFinite(duration) || duration <= 0
+                || !error.minimumPixels || !model.fallback_api) throw error;
+            const info = await readFallback();
+            throwIfAborted(signal);
+            const fallbackDuration = Number(info?.video_duration);
+            if (info?.video_id !== model.video_id || !Number.isFinite(fallbackDuration) || fallbackDuration <= 0
+                || Math.abs(fallbackDuration - duration) > 0.5) {
+                throw Object.assign(new Error('备用片源编号或完整时长无法确认，已停止取址'), { code: 'INVALID_RESPONSE' });
+            }
+            return parseAppPlayModel(info, vid, options, false, true, error.minimumPixels);
+        }
+    } finally {
+        request.dispose();
     }
 }
 
@@ -445,6 +524,7 @@ function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata
         const aMeets = meetsDownloadQuality(a, requestedQuality), bMeets = meetsDownloadQuality(b, requestedQuality);
         if (aMeets !== bMeets) return Number(bMeets) - Number(aMeets);
         const aPixels = Math.min(a.width, a.height), bPixels = Math.min(b.width, b.height);
+        if (aMeets && (a.codecRank === 2) !== (b.codecRank === 2)) return Number(a.codecRank === 2) - Number(b.codecRank === 2);
         return (aMeets ? aPixels - bPixels : bPixels - aPixels) || a.codecRank - b.codecRank;
     });
     if (!rows.length) {

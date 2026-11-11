@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 89,
+  "versionName": "0.12.66",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.66/Hongguo-0.12.66-phone-release-compatible.apk",
+  "size": 675328,
+  "sha256": "e1a18527a80754897326cc46c9cb2b58d6b5d8619efbf1ded817e7db84f1baef",
+  "notes": "修复红果播放：红果官方开始校验真实播放签名，旧版本的占位签名被拒（模型接口返回空数据），红果剧集无法播放。本版改用真实 551 Argus/Ladon 签名并在空响应时按集号走备用接口恢复；播放取流改用已登记设备身份，恢复红果在线播放与下载。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-11T21:10:00.000Z"
+}

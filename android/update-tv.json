@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 88,
-  "versionName": "0.12.65",
+  "versionCode": 89,
+  "versionName": "0.12.66",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.65/Hongguo-0.12.65-tv-release-compatible.apk",
-  "size": 655996,
-  "sha256": "a69a7150bfc20f968f0ac2a237d526b55f2b4952634b80672879daa3980dfd35",
-  "notes": "修复黄果播放：黄果官方调整了取流接口，旧版本无法获取播放地址、黄果剧集无法播放。本版改用官方新接口并保留自建备用线路，恢复黄果在线播放；官方不再提供时长信息时也能正常选路。其他功能不变。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-11T03:28:28.000Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.66/Hongguo-0.12.66-tv-release-compatible.apk",
+  "size": 673512,
+  "sha256": "a6afbedbd29d40815b8346a39ce299ef1f615049830820bdb1aa230d401b8793",
+  "notes": "修复红果播放与遥控器导航：红果官方开始校验真实播放签名，旧版本取流被拒（模型接口返回空数据）。本版改用真实 551 Argus/Ladon 签名、空响应时按集号走备用接口、取流使用已登记设备身份，恢复红果在线播放与下载。同时修复遥控器方向键：海报/选集网格移到行尾会停住不再跳出，冷启动首次按键直接落在海报上。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-11T21:10:00.000Z"
 }

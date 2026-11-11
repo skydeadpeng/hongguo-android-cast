@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -25,8 +26,22 @@ function encodedKey() {
   raw[0] = 48 ^ raw[1] ^ raw[2];
   return raw.toString('base64');
 }
-function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', media = 'https://v3-reading.qznovelvod.com/video.mp4', redirect = '', malformedKey = false, videoList = null, encrypted = true } = {}) {
-  const calls = [];
+function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', media = 'https://v3-reading.qznovelvod.com/video.mp4', redirect = '', malformedKey = false, videoList = null, encrypted = true, emptyCurrent = false } = {}) {
+  const calls = [], signatures = [];
+  const entropy = { randField: 420072733, ladonRandom: Buffer.from('01020304', 'hex') };
+  function assertPlayerSignature(config) {
+    const signed = signatures.at(-1), query = new URL(config.url).searchParams;
+    assert.ok(signed, 'model must use PlayerSigner');
+    assert.equal(signed.input.query, new URL(config.url).search.slice(1));
+    assert.equal(signed.input.body, config.data);
+    assert.equal(query.get('ts'), String(signed.input.ts));
+    assert.equal(config.headers['x-ss-req-ticket'], String(signed.input.ts * 1000));
+    assert.ok(Number(query.get('_rticket')) >= signed.input.ts * 1000 && Number(query.get('_rticket')) < signed.input.ts * 1000 + 1000);
+    for (const name of ['x-ss-req-ticket', 'x-khronos', 'x-argus', 'x-ladon', 'x-ss-stub']) assert.equal(config.headers[name], signed.headers[name], name);
+    for (const name of ['x-gorgon', 'x-medusa', 'x-helios']) assert.equal(config.headers[name], undefined);
+    assert.ok(Buffer.from(config.headers['x-argus'], 'base64').length > 4);
+    assert.ok(Buffer.from(config.headers['x-ladon'], 'base64').length > 4);
+  }
   const seed = Buffer.alloc(16, 7);
   const constants = Buffer.from('4dd4c2e6b83162090e52b3c7a6733ba41cb2462b829ab58a196b39db57177524f49baf7f08e8d68d26a72e37c1a95a2f1f05a51892aef2949732b62a38aadd58', 'hex');
   const material = crypto.createHash('sha512').update(Buffer.concat([crypto.createHash('sha512').update(seed).digest(), constants])).digest();
@@ -38,25 +53,30 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
     assert.ok(config.timeout > 0 && config.timeout <= 12000);
     assert.ok(config.signal);
     assert.equal(config.responseType, 'text');
+    const model = { video_model: JSON.stringify({ fallback_api: fallback }) };
+    const modelResponse = { status: 200, headers: {}, data: JSON.stringify({ code: 0, data: { '999': model, ...(wrongVid ? {} : { '11': model }) } }) };
+    if (new URL(config.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
+      assert.equal(config.method, 'GET');
+      assert.match(config.headers['User-Agent'], /^com\.phoenix\.read\/73932 /);
+      assert.equal(config.data, null);
+      for (const name of ['Content-Type', 'Content-Encoding', 'x-ss-stub', 'Cookie', 'Authorization']) assert.equal(config.headers[name], undefined);
+      const query = new URL(config.url).searchParams, timestamp = Number(config.headers['x-khronos']);
+      assert.equal(query.get('video_id'), '11');
+      assert.equal(query.get('ts'), String(timestamp));
+      assertPlayerSignature(config);
+      return emptyCurrent ? { status: 200, headers: {}, data: '' } : modelResponse;
+    }
     if (config.method === 'POST') {
-      assert.match(config.headers['User-Agent'], /^com\.phoenix\.read\/71532 /);
+      assert.match(config.headers['User-Agent'], /^com\.phoenix\.read\/74332 /);
       const query = new URL(config.url).searchParams;
       const timestamp = Number(config.headers['x-khronos']);
       assert.equal(query.get('ts'), String(timestamp));
-      assert.equal(query.get('_rticket'), config.headers['x-ss-req-ticket']);
       assert.ok(Buffer.isBuffer(config.data));
-      assert.deepEqual(JSON.parse(config.data).mixed_video_id_map['1004'], ['11']);
-      assert.equal(context.branchOf(config.url, config.data, timestamp), 0);
-      const raw = Buffer.from(config.headers['x-gorgon'], 'hex');
-      assert.equal(raw.length, 26);
-      const random = raw[2] | (raw[3] << 8);
-      assert.equal(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), config.data, timestamp, random));
-      assert.notEqual(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), Buffer.from('altered body'), timestamp, random));
-      for (const name of ['x-medusa', 'x-helios', 'x-ladon', 'x-argus']) assert.ok(Buffer.from(config.headers[name], 'base64').length > 0);
+      assert.deepEqual(JSON.parse(config.headers['Content-Encoding'] === 'gzip' ? zlib.gunzipSync(config.data) : config.data).mixed_video_id_map['1004'], ['11']);
+      assertPlayerSignature(config);
       assert.equal(config.headers.Cookie, undefined);
       assert.equal(config.headers.Authorization, undefined);
-      const model = { video_model: JSON.stringify({ fallback_api: fallback }) };
-      return { status: 200, headers: {}, data: JSON.stringify({ code: 0, data: { '999': model, ...(wrongVid ? {} : { '11': model }) } }) };
+      return modelResponse;
     }
     if (redirect) return { status: 302, headers: { location: redirect }, data: '' };
     return { status: 200, headers: {}, data: JSON.stringify({ video_info: { data: { key_seed: encrypted ? seed.toString('base64') : null, video_list: videoList || {
@@ -72,7 +92,14 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
         return playbackDevice;
       } };
       if (name === './sm3') return require(path.join(nativeDir, 'sm3'));
+      if (name === './playback-signature') return { signPlayer: input => {
+        const headers = require(path.join(nativeDir, 'playback-signature')).signPlayer({ ...input, ...entropy });
+        signatures.push({ input, headers }); return headers;
+      } };
       if (name === './download-quality') return require(path.join(nativeDir, 'download-quality'));
+      if (name === './request-signal') return require(path.join(nativeDir, 'request-signal'));
+      if (name === 'node:zlib') return zlib;
+      if (name === 'node:timers/promises') return require(name);
       if (name === 'node:crypto') return { ...crypto, createHash(name, ...args) {
         assert.notEqual(name.toLowerCase(), 'sm3', 'must not depend on OpenSSL SM3');
         return crypto.createHash(name, ...args);
@@ -86,7 +113,7 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
 
 function nativeFixture() {
   const pending = [];
-  const context = { module: { exports: {} }, Buffer, URL, process: { env: {} },
+  const context = { module: { exports: {} }, Buffer, URL, AbortController, process: { env: {} },
     require: name => name === 'axios' ? { get: () => new Promise(resolve => pending.push(resolve)) }
       : name === './app-source' ? { fetchAppPlayUrl: async () => { throw new Error('Unexpected App lookup in Web cache fixture'); } }
       : require(name.startsWith('.') ? path.join(nativeDir, name) : name),
@@ -108,7 +135,7 @@ const checks = [
     await f.fetch('11');
     await f.fetch('11');
     await Promise.all([f.fetch('11'), f.fetch('11'), f.fetch('11')]);
-    const requests = f.calls.filter(call => call.method === 'POST');
+    const requests = f.calls.filter(call => new URL(call.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/');
     assert.equal(requests.length, 5, 'one model request per lookup; no retry loop');
     for (const field of ['iid', 'device_id']) {
       const ids = requests.map(call => new URL(call.url).searchParams.get(field));
@@ -120,6 +147,10 @@ const checks = [
     assert.ok(cdids.every(id => id === playbackDevice.cdid), 'cdid must remain stable across lookups');
     assert.match(cdids[0], /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i);
     assert.equal(f.calls.length, 10, 'each lookup retains its two-stage flow');
+    const legacy = fixture({ emptyCurrent: true });
+    await legacy.fetch('11');
+    assert.equal(legacy.calls.length, 3, 'empty current response retains one signed legacy request and its verified metadata');
+    assert.equal(legacy.calls[0].method, 'GET'); assert.equal(legacy.calls[1].method, 'POST');
   }],
   ['App H264 takes priority over higher-resolution HEVC', async () => {
     const result = await appRows({ hd: { main_url: mediaUrl('hevc'), codec_type: 'hevc', quality_desc: '1080P' },

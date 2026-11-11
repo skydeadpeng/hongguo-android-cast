@@ -7,12 +7,11 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 // 安卓线的登记身份签名/取流链独立于桌面 app-source（签名头集与 branch 策略有协议差异），勿混用。
-const { fetchAppPlayUrl, signedAppRequest, setDeviceIdentity } = require('./app-source-registered');
+const { fetchAppPlayUrl, signedAppRequest, signedModelRequest, setDeviceIdentity } = require('./app-source-registered');
 const passport = require('./passport-register.cjs');
 const hongguo = require('./hongguo');
 
 const CATALOG_API = 'https://api5-normal-lq.fqnovel.com/reading/distribution/category/landpage/v/';
-const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
 const PAGE_LIMIT = 20;
 const GENRE = {
   '真人剧': 'short_play', 'short_play': 'short_play',
@@ -304,7 +303,8 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
           const vid = String(params && params.vid || '');
           if (!/^\d{1,30}$/.test(vid)) throw new Error('App 分集请求参数无效');
           let identity = await ensureRegisteredDevice();
-          // 已登记身份：只覆盖 device_id/iid（档案版本保持 71332 族——模型接口按此档案签发）。
+          // 已登记身份：只覆盖 device_id/iid；档案版本由 signedModelRequest 按接口形态决定
+          // （POST 7.4.x / video_tab GET 7.3.9——2026-11 起服务端按此校验）。
           setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
           try {            const payload = JSON.stringify({
               biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
@@ -320,7 +320,7 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
                 if (fresh) { identity.deviceId = fresh.deviceId; identity.installId = fresh.installId; identity.cookie = fresh.cookie; identity.deviceToken = fresh.deviceToken; }
                 setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
               }
-              const signed = signedAppRequest(VIDEO_API, payload);
+              const signed = signedModelRequest(payload);
               const cookieParts = [];
               if (identity.cookie) cookieParts.push(identity.cookie);
               if (identity.deviceToken) cookieParts.push('device_token=' + identity.deviceToken);

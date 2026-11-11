@@ -7,6 +7,7 @@
 // Crypto tables and SDK protocol constants below are not user credentials.
 const crypto = require('node:crypto');
 const sm3 = require('./sm3');
+const { signPlayer } = require('./playback-signature');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
 const localId = () => String(1000000000000000n + BigInt('0x' + crypto.randomBytes(6).toString('hex')));
 // 已登记设备身份（device_register 之后由桥接层注入）；未登记时保持合成身份。
@@ -16,6 +17,11 @@ function setDeviceIdentity(identity) { registeredIdentity = identity; }
 const PROCESS_NONCE = crypto.randomBytes(18).toString('base64url');
 const PROCESS_STARTED = Date.now();
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
+// 2026-11 起老模型 POST 持续返回空 HTTP 200；按集号的签名 video_tab GET 仍可用。
+const VIDEO_TAB_API = 'https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/';
+// 模型接口按请求形态校验设备版本：POST 用 7.4.x 档，video_tab GET 用 7.3.9 档。
+const PLAYBACK_PROFILE = { version_code: '74332', version_name: '7.4.3.32', manifest_version_code: '74332', update_version_code: '74332', pv_player: '74332' };
+const VIDEO_TAB_PROFILE = { version_code: '73932', version_name: '7.3.9.32', manifest_version_code: '73932', update_version_code: '73932', pv_player: '73932' };
 const VIDEO_UA = 'com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)';
 const DEVICE = {
     ac: 'wifi', channel: 'update_64', aid: '8662', app_name: 'novelread',
@@ -147,6 +153,44 @@ function signedAppRequest(api, payload) {
         'x-helios': helios(khronos), 'x-medusa': buildMedusa(url, body, khronos, device), 'x-tt-dt': '',
     };
     return { url, headers, body };
+}
+// gzip is a Node-side convenience only: the endpoint accepts the plaintext body
+// with its matching stub (verified 2026-11-11), and the WebView bundle has no zlib.
+let gzipOf = null;
+try { const zlib = require('node:zlib'); if (typeof zlib.gzipSync === 'function') gzipOf = zlib.gzipSync; } catch { }
+
+/** Signed model request. Without videoId: the model POST at the 7.4.x profile
+ * (gzip in Node, plaintext in the WebView; both carry the matching x-ss-stub).
+ * With videoId: the bodyless video_tab GET at the 7.3.9 profile — a bodyless
+ * GET signs sixteen zero bytes, never MD5(""). video_tab parameters follow
+ * tsukiyo-zero/hongguoTV's ContentRepository.tabVideoModel (GPL-3.0-only).
+ * 2026-11-11: the server now verifies real 551 Argus/Ladon signatures; the old
+ * timestamp-placeholder ladon/argus and gorgon/helios/medusa earn empty 200s. */
+function signedModelRequest(payload, videoId = '') {
+    const playbackDevice = videoId ? VIDEO_TAB_PROFILE : PLAYBACK_PROFILE;
+    const device = { ...DEVICE, ...playbackDevice,
+        ...(registeredIdentity ? { iid: registeredIdentity.iid, device_id: registeredIdentity.device_id } : { iid: localId(), device_id: localId() }) };
+    const userAgent = VIDEO_UA.replace(DEVICE.version_code, playbackDevice.version_code);
+    const plain = videoId ? null : Buffer.from(payload);
+    const body = plain && gzipOf ? gzipOf(plain) : plain;
+    const values = videoId ? { video_id: String(videoId), video_id_type: '0', device_level: '1',
+        need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
+        video_platform: '1024', source: '0', from_video_id: '' } : {};
+    const api = videoId ? VIDEO_TAB_API : VIDEO_API;
+    const requestTicket = Date.now(), khronos = Math.floor(requestTicket / 1000);
+    const query = pythonUrlEncode({ ...device, ...values, ts: String(khronos), _rticket: String(requestTicket) });
+    const url = `${api}?${query}`;
+    const signature = signPlayer({ query, body, ts: khronos });
+    const headers = {
+        'User-Agent': userAgent, Accept: 'application/json; charset=utf-8,application/x-protobuf',
+        'x-xs-from-web': '0', 'sdk-version': '2',
+        'passport-sdk-version': videoId ? '50561' : '5051452', 'x-ss-dp': String(device.aid),
+        'x-tt-store-region': 'cn', 'x-tt-store-region-src': 'did', 'x-tt-dt': '',
+        ...signature,
+    };
+    if (body) Object.assign(headers, { 'Content-Type': 'application/json; charset=UTF-8', ...(gzipOf ? { 'Content-Encoding': 'gzip' } : {}) });
+    else headers['x-tt-request-tag'] = 't=0;n=0';
+    return { url, headers, body, method: videoId ? 'GET' : 'POST' };
 }
 function parseFallback(value) {
     if (typeof value === 'string') { const parsed = jsonBody(value); return parsed?.fallback_api || value; }
@@ -353,22 +397,50 @@ async function fetchAppPlayUrl(vid, options = {}) {
         }
     }
     if (!info) {
-        const signed = signedAppRequest(VIDEO_API, payload);
-        const response = await lookupJson(signed.url, { method: 'POST', headers: signed.headers, data: signed.body }, 'model_post');
-        if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-        const entry = response.data?.[vid];
-        const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
-        if (!model) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
-        // Current models may carry the video list inline; the legacy fallback round trip is then skipped.
-        if (!acceptInline(model)) {
-            const fallback = parseFallback(model.fallback_api);
-            if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
-            const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
-            if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
-                throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+        // Shared model parsing for the POST route and the video_tab recovery.
+        const adoptModel = response => {
+            if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+            const entries = response.data?.video_model_data ?? response.data;
+            const entry = entries?.[vid];
+            const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
+            if (!model || typeof model !== 'object' || Array.isArray(model)) {
+                throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
             }
-            info = outer?.video_info?.data;
-            if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
+            return model;
+        };
+        try {
+            const signed = signedModelRequest(payload);
+            const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
+            const model = adoptModel(response);
+            // Current models may carry the video list inline; the legacy fallback round trip is then skipped.
+            if (!acceptInline(model)) {
+                const fallback = parseFallback(model.fallback_api);
+                if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
+                const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
+                if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
+                    throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+                }
+                info = outer?.video_info?.data;
+                if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
+            }
+        } catch (error) {
+            // Only a locally classified empty model POST may recover. Valid business
+            // refusals, wrong IDs, HTML and fallback GET errors keep their behavior.
+            if (error?.code !== 'APP_EMPTY_RESPONSE' || error.responseStage !== 'model_post') throw error;
+            // 老 POST 持续空 200 时，把恢复机会用在按集号签名的 video_tab GET 上。
+            const signed = signedModelRequest(payload, vid);
+            const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
+            const model = adoptModel(response);
+            if (!acceptInline(model)) {
+                const fallback = parseFallback(model.fallback_api);
+                if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
+                const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
+                if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
+                    throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+                }
+                info = outer?.video_info?.data;
+                if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
+            }
         }
     }
     const rows = Object.values(info?.video_list || {}).filter(item => item && (item.main_url || item.backup_url || Array.isArray(item.backup_url_list))).map(item => {
@@ -427,4 +499,4 @@ async function fetchAppPlayUrl(vid, options = {}) {
         : Object.assign(new Error('本集片源地址或密钥无法解析'), { code: 'INVALID_RESPONSE' });
 }
 
-module.exports = { fetchAppPlayUrl, signedAppRequest, setDeviceIdentity, __xGorgon: xGorgon, API_HOSTS: [new URL(VIDEO_API).host] };
+module.exports = { fetchAppPlayUrl, signedAppRequest, signedModelRequest, setDeviceIdentity, __xGorgon: xGorgon, API_HOSTS: [new URL(VIDEO_API).host] };

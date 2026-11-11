@@ -6,7 +6,7 @@ const METHODS = new Set([
   'getMergedVideos', 'deleteMergedVideo', 'playMergedVideo',
   'download', 'getDownloads', 'playDownload', 'deleteDownload', 'openExternal',
   'getPlaybackCache', 'clearPlaybackCache',
-  'appRequest', 'appRegisteredModel', 'appResolveResult', 'getPlaybackOptions', 'setPlaybackOptions',
+  'appRequest', 'appDeviceIdentity', 'appRegisteredModel', 'appResolveResult', 'getPlaybackOptions', 'setPlaybackOptions',
   'getSearchHistory', 'addSearchHistory', 'removeSearchHistory', 'clearSearchHistory', 'searchQuery',
   'huangguoFeed', 'huangguoSearch', 'huangguoDetail', 'huangguoPlay',
   'huangguoSettings', 'huangguoVerifyPin',

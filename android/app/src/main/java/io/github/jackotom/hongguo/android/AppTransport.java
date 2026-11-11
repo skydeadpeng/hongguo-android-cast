@@ -10,7 +10,7 @@ import org.json.*;
 
 /** Fixed-domain App JSON transport. Never forwards a signed POST to a redirect destination. */
 final class AppTransport {
-    private static final Set<String> HEADERS = new HashSet<>(Arrays.asList("user-agent", "accept", "content-type", "x-xs-from-web", "x-ss-req-ticket", "x-tt-request-tag", "sdk-version", "passport-sdk-version", "x-vc-bdturing-sdk-version", "x-ss-stub", "x-gorgon", "x-khronos", "x-ladon", "x-argus", "x-helios", "x-medusa", "x-tt-dt", "cookie", "log-encode-type", "x-ss-dp", "x-neptune", "lc"));
+    private static final Set<String> HEADERS = new HashSet<>(Arrays.asList("user-agent", "accept", "content-type", "x-xs-from-web", "x-ss-req-ticket", "x-tt-request-tag", "sdk-version", "passport-sdk-version", "x-vc-bdturing-sdk-version", "x-ss-stub", "x-gorgon", "x-khronos", "x-ladon", "x-argus", "x-helios", "x-medusa", "x-tt-dt", "cookie", "log-encode-type", "x-ss-dp", "x-neptune", "lc", "x-tt-store-region", "x-tt-store-region-src"));
     // Also bounds legacy NetworkGuard implementations/test doubles that expose only publicAddresses(URI).
     private static final ExecutorService SEARCH_DNS = new ThreadPoolExecutor(0,2,30,TimeUnit.SECONDS,new SynchronousQueue<Runnable>(), runnable -> {Thread thread=new Thread(runnable,"hongguo-app-dns");thread.setDaemon(true);return thread;},new ThreadPoolExecutor.AbortPolicy());
     /** One daemon timer closes stalled TCP/TLS/write/read operations on deadline or owner cancellation. */

@@ -26,6 +26,12 @@ public final class CryptoBridge {
                 Cipher cipher = Cipher.getInstance(input.optBoolean("autoPadding", true) ? "AES/CBC/PKCS5Padding" : "AES/CBC/NoPadding");
                 cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
                 result = cipher.doFinal(data);
+            } else if ("encrypt".equals(input.optString("operation")) && "AES-128-CBC".equals(input.optString("algorithm"))) {
+                byte[] key = Base64.getDecoder().decode(input.getString("key")), iv = Base64.getDecoder().decode(input.getString("iv"));
+                if (key.length != 16 || iv.length != 16 || data.length == 0 || data.length % 16 != 0) throw new Exception();
+                Cipher cipher = Cipher.getInstance(input.optBoolean("autoPadding", true) ? "AES/CBC/PKCS5Padding" : "AES/CBC/NoPadding");
+                cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+                result = cipher.doFinal(data);
             } else throw new Exception();
             return new JSONObject().put("data", Base64.getEncoder().encodeToString(result)).put("error", JSONObject.NULL).toString();
         } catch (Exception error) {

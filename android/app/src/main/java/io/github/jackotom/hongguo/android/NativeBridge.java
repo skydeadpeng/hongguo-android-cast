@@ -34,7 +34,7 @@ final class NativeBridge {
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "removeHistory", "clearHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo", "huangguoFeed", "huangguoSearch", "huangguoDetail", "huangguoPlay", "huangguoSettings", "huangguoVerifyPin"));
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appDeviceIdentity", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "removeHistory", "clearHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo", "huangguoFeed", "huangguoSearch", "huangguoDetail", "huangguoPlay", "huangguoSettings", "huangguoVerifyPin"));
     NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
@@ -87,6 +87,33 @@ final class NativeBridge {
             try { executor.execute(() -> { try (AutoCloseable updateLease = (method.equals("download") || method.equals("playDownload")) ? UpdateInstallCheckpoint.operation() : null) { handle(id, method, params, favoriteStore, favoriteSelection); } catch (Exception error) { respond(id, null, error.getMessage() == null ? "操作未成功，请重试" : error.getMessage()); } }); }
             catch (RejectedExecutionException error) { respond(id, null, "请求较多，请稍后重试"); }
         });
+    }
+    /** One anonymous registered identity per process for the WebView signing chain;
+     *  the model endpoints reject synthetic device ids with empty 200s. */
+    private volatile JSONObject cachedDeviceIdentity;
+    private void startDeviceIdentity(Object id) {
+        JSONObject cached = cachedDeviceIdentity;
+        if (cached != null) { respond(id, cached, null); return; }
+        try {
+            worker.execute(() -> {
+                if (closed) return;
+                try {
+                    OfficialApiClient client = new OfficialApiClient(OfficialApiClient.newSession(), new OfficialTransport());
+                    try {
+                        client.deadlineNanos(System.nanoTime() + 8_000_000_000L);
+                        client.registerDevice();
+                        JSONObject session = client.session();
+                        String deviceId = session.optString("device_id"), installId = session.optString("install_id");
+                        if (!OfficialApiClient.validID(deviceId) || !OfficialApiClient.validID(installId)) throw new Exception();
+                        JSONObject identity = new JSONObject().put("device_id", deviceId).put("install_id", installId);
+                        cachedDeviceIdentity = identity;
+                        respond(id, identity, null);
+                    } finally { client.close(); }
+                } catch (Exception failure) {
+                    respond(id, null, "设备登记未完成，请稍后重试");
+                }
+            });
+        } catch (RejectedExecutionException busy) { respond(id, null, "设备登记繁忙，请稍后重试"); }
     }
     private void startRegisteredModel(Object id, JSONObject params) {
         final String key = String.valueOf(id), vid;
@@ -422,6 +449,7 @@ final class NativeBridge {
             case "searchQuery": respond(id, SearchClient.search(activity, params), null); break;
             case "getInfo": respond(id, new JSONObject().put("version", BuildConfig.VERSION_NAME).put("isTv", BuildConfig.IS_TV).put("platform", "android"), null); break;
             case "appRequest": respond(id, AppTransport.request(params), null); break;
+            case "appDeviceIdentity": startDeviceIdentity(id); break;
             case "appResolveResult": PlaybackSources.result(params); respond(id, new JSONObject().put("accepted", true), null); break;
             // Library reads remain on-device; the retired sync account is not selected.
             case "getLibrary": respond(id, currentLibrary(), null); break;

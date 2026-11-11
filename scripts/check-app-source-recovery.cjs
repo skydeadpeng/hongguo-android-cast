@@ -18,6 +18,8 @@ function load(axios, { realDevice = false, getPlaybackDevice, registerPlaybackDe
       if (name === 'node:crypto') return crypto;
       if (name === './sm3') return require('../src/native/sm3');
       if (name === './download-quality') return require('../src/native/download-quality');
+      if (name === './request-signal') return require('../src/native/request-signal');
+      if (name === './playback-signature') return require('../src/native/playback-signature');
       if (name === './playback-device') return getPlaybackDevice || registerPlaybackDevice ? {
         getPlaybackDevice: getPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
         registerPlaybackDevice: registerPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
@@ -137,21 +139,23 @@ function row(definition, width, height, suffix) {
   }, { now: () => clock, getPlaybackDevice: async () => { clock += 7900; return identities[0]; } });
   assert.equal((await slowRegistration.fetchAppPlayUrl(vid)).url, plain.main_url);
   assert.equal(slowCalls, 1);
-  const hosts = [];
+  const routes = [];
   const alternate = load(async config => {
-    hosts.push(new URL(config.url).hostname);
-    if (hosts.length === 1) return { status: 200, headers: {}, data: '' };
+    routes.push([config.method, new URL(config.url).pathname]);
+    if (routes.length === 1) return { status: 200, headers: {}, data: '' };
     assert.equal(config.headers.Connection, 'close');
     return inlineResponse([plain]);
   }, { getPlaybackDevice: async () => identities[0] });
   assert.equal((await alternate.fetchAppPlayUrl(vid)).url, plain.main_url);
-  assert.deepEqual(hosts, ['api5-normal-sinfonlineb.fqnovel.com', 'api5-normal-hl.fqnovel.com']);
+  assert.deepEqual(routes, [['GET', '/reading/bookapi/video_tab/multi_video_model/v1/'],
+    ['POST', '/novel/player/multi_video_model/v1/']]);
   let inlineCalls = 0;
   const direct = load(async config => {
     inlineCalls++;
     assert.equal(new URL(config.url).searchParams.get('device_id'), '1000000000000001');
-    assert.ok(config.headers['x-medusa']);
-    assert.ok(config.headers['x-gorgon']);
+    assert.ok(Buffer.from(config.headers['x-argus'], 'base64').length > 4);
+    assert.ok(Buffer.from(config.headers['x-ladon'], 'base64').length > 4);
+    for (const name of ['x-medusa', 'x-gorgon', 'x-helios']) assert.equal(config.headers[name], undefined);
     assert.equal(config.headers.Cookie, undefined);
     return inlineResponse([plain]);
   });

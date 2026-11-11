@@ -68,4 +68,26 @@ export function createDecipheriv(name, key, iv) {
   };
   return decipher;
 }
-export default { randomBytes, createHash, createDecipheriv };
+export function createCipheriv(name, key, iv) {
+  if (String(name).toLowerCase().replace(/-/g, '') !== 'aes128cbc') throw new Error('设备未支持该加密算法');
+  const keyBytes = binary(key), ivBytes = binary(iv);
+  if (keyBytes.length !== 16 || ivBytes.length !== 16) throw new Error('AES 密钥或初始向量长度无效');
+  const chunks = []; let finalized = false, autoPadding = true;
+  const cipher = {
+    setAutoPadding(value = true) { if (finalized) throw new Error('加密已经完成'); autoPadding = !!value; return cipher; },
+    update(value, encoding, outputEncoding) {
+      if (finalized) throw new Error('加密已经完成');
+      chunks.push(binary(value, encoding));
+      return outputEncoding == null ? Buffer.alloc(0) : '';
+    },
+    final(encoding) {
+      if (finalized) throw new Error('加密已经完成');
+      finalized = true;
+      const output = nativeProcess({ operation: 'encrypt', algorithm: 'AES-128-CBC',
+        data: Buffer.concat(chunks).toString('base64'), key: keyBytes.toString('base64'), iv: ivBytes.toString('base64'), autoPadding });
+      return encoding == null ? output : output.toString(encoding);
+    },
+  };
+  return cipher;
+}
+export default { randomBytes, createHash, createDecipheriv, createCipheriv };

@@ -4,6 +4,7 @@ import { setNativeCall } from './axios-native.mjs';
 const TRANSIENT_LOOKUP_CODES = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNABORTED', 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE']);
 const RESPONSE_LOOKUP_CODES = new Set(['APP_EMPTY_RESPONSE', 'APP_INVALID_RESPONSE']);
 let registeredModelCall;
+let identityReady = false;
 const cancelledLookup = () => Object.assign(new Error('App 分集取源已取消'), { code: 'ERR_CANCELED' });
 
 /** Protocol, signatures, Spade parsing and quality selection use the shared Mac module. */
@@ -21,6 +22,16 @@ export async function fetchAppPlayUrl(vid, options = {}) {
   const timer = setTimeout(abort, 28000), call = registeredModelCall;
   let info;
   try {
+    // The model endpoints return empty 200s for synthetic device ids: obtain the
+    // process-wide anonymous registration once and pin the signing chain to it.
+    if (call && !identityReady) {
+      identityReady = true;
+      try {
+        const identity = await call('appDeviceIdentity', {}, Math.min(9000, Math.max(1000, deadline - Date.now())), { signal: controller.signal });
+        if (identity && /^\d{1,30}$/.test(String(identity.device_id)) && /^\d{1,30}$/.test(String(identity.install_id)))
+          desktopAppSource.setDeviceIdentity({ device_id: String(identity.device_id), iid: String(identity.install_id) });
+      } catch { /* Registration is best effort; the lookup keeps its synthetic fallback. */ }
+    }
     const registeredModelProvider = call ? async selectedVid => {
       if (controller.signal.aborted) throw Date.now() >= deadline ? Object.assign(new Error('App 分集取源超时'), { code: 'ETIMEDOUT' }) : cancelledLookup();
       const timeout = Math.min(20000, deadline - Date.now());
