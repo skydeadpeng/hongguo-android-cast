@@ -776,9 +776,11 @@ gradle -p android :app:assembleTvNativeDebug
 
 ## 从源码构建
 
-准备 Node.js **22.12+**、npm、JDK 17、Android SDK Platform 35，以及 Gradle 8.13 或项目 Gradle Wrapper。在仓库根目录执行：
+准备 Git、Node.js **22.12+**、npm、JDK 17、Android SDK Platform 35，以及 Gradle 8.13 或项目 Gradle Wrapper。首次构建先克隆仓库并进入目录；已有源码时，从仓库根目录的 `npm ci` 开始执行：
 
 ```sh
+git clone https://github.com/skydeadpeng/hongguo-android-cast.git
+cd hongguo-android-cast
 npm ci
 
 # 手机 / TV WebView / 原生 TV debug 包
