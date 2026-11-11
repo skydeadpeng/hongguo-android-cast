@@ -1,0 +1,49 @@
+name: Android playback QA preflight
+
+# This branch-only opt-in trigger does not need registration on main or a Secret.
+# A commit explicitly opts into one run with the commit-message marker.
+'on':
+  push:
+    branches:
+      - fix/hongguo-playback-fanqie-analysis
+    paths:
+      - .github/workflows/android-playback-qa.yml
+      - scripts/android-playback-qa/check-runner-kvm.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-playback-qa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Existing KVM access only (not playback acceptance)
+    if: github.ref == 'refs/heads/fix/hongguo-playback-fanqie-analysis' && contains(github.event.head_commit.message, '[run-android-playback-qa]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      ready: ${{ steps.kvm.outputs.ready }}
+      verification_status: ${{ steps.kvm.outputs.verification_status }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Query existing KVM device and official emulator acceleration
+        id: kvm
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/android-playback-qa/check-runner-kvm.py \
+            --output "$RUNNER_TEMP/hongguo-playback-preflight"
+      - name: Preserve minimal preflight result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hongguo-playback-preflight
+          path: |
+            ${{ runner.temp }}/hongguo-playback-preflight/preflight.json
+            ${{ runner.temp }}/hongguo-playback-preflight/summary.txt
+          if-no-files-found: error
+          retention-days: 3
