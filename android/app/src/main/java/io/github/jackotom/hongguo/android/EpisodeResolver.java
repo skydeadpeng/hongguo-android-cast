@@ -139,7 +139,12 @@ final class EpisodeResolver {
             throw new GuestFailure("官网播放信息与所选分集不一致");
         if(req!=null&&(Boolean.TRUE.equals(req.opt("pcLoginRequired"))||Boolean.TRUE.equals(req.opt("pcAuthenticatedPlayback"))))
             throw new GuestFailure("本集需要官网支持的登录播放流程，请在官方应用查看");
-        if(req==null||!Boolean.FALSE.equals(req.opt("pcLoginRequired"))||!Boolean.FALSE.equals(req.opt("pcAuthenticatedPlayback"))||!Boolean.FALSE.equals(req.opt("encryptedBrowserAllowed")))
+        // Official browser routing is isEncryptSupported && encryptedBrowserAllowed.
+        // This native public-MP4 path does not host that encrypted browser player, so
+        // either explicit boolean selects its normal public fallback. The capability
+        // flag is not a login entitlement. Unknown metadata still fails closed; the
+        // server POST and full unencrypted-file gate remain authoritative.
+        if(req==null||!Boolean.FALSE.equals(req.opt("pcLoginRequired"))||!Boolean.FALSE.equals(req.opt("pcAuthenticatedPlayback"))||!(req.opt("encryptedBrowserAllowed") instanceof Boolean))
             throw new GuestFailure("官网未明确允许本集使用公开游客播放流程");
         if(!Boolean.TRUE.equals(seo.opt("available")))throw new GuestFailure("官网暂未允许本集公开播放");
         JSONArray vids=detail.optJSONArray("vid_list");boolean present=false;

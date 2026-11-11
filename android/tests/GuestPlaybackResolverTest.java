@@ -108,11 +108,35 @@ public final class GuestPlaybackResolverTest {
             JSONObject p = pageData(); p.put("isSuccess", value); rejectPage(p, "isSuccess is explicit true: " + value);
             p = pageData(); p.getJSONObject("publicVideoSeo").put("available", value); rejectPage(p, "SEO available is explicit true: " + value);
         }
-        for (String key : new String[]{"pcLoginRequired", "pcAuthenticatedPlayback", "encryptedBrowserAllowed"}) {
+        for (String key : new String[]{"pcLoginRequired", "pcAuthenticatedPlayback"}) {
             for (Object value : new Object[]{true, "false", 0, JSONObject.NULL}) {
                 JSONObject p = pageData(); p.getJSONObject("req").put(key, value); rejectPage(p, key + " gate " + value);
             }
             JSONObject p = pageData(); p.getJSONObject("req").remove(key); rejectPage(p, "missing " + key);
+        }
+        // Browser permission is a capability selector, not guest authorization.
+        // The native public-MP4 path has no encrypted browser player implementation.
+        for (Object value : new Object[]{"true", "false", 0, 1, JSONObject.NULL}) {
+            JSONObject invalid = pageData(); invalid.getJSONObject("req").put("encryptedBrowserAllowed", value);
+            rejectPage(invalid, "browser capability metadata must be boolean " + value);
+        }
+        JSONObject absentCapability = pageData(); absentCapability.getJSONObject("req").remove("encryptedBrowserAllowed");
+        rejectPage(absentCapability, "unknown browser capability is not guessed");
+        final JSONObject nativePage = pageData(); nativePage.getJSONObject("req").put("encryptedBrowserAllowed", true);
+        JSONObject nativeInfo = resolve(nativePage, postReply(200, success()));
+        check(nativeInfo.getBoolean("guestPlayback") && CLEAN_MEDIA.equals(nativeInfo.getString("url")), "native unsupported browser crypto selects official public fallback even when browser flag true");
+        check(FixtureTransport.gets.get() == 1 && FixtureTransport.posts.get() == 1, "native capability selection adds no retry or alternate request");
+        for (String auth : new String[]{"pcLoginRequired", "pcAuthenticatedPlayback"}) {
+            JSONObject denied = pageData(); denied.getJSONObject("req").put("encryptedBrowserAllowed", true).put(auth, true);
+            rejectPage(denied, "true browser capability cannot override " + auth);
+        }
+        for (int status : new int[]{302, 401, 403}) {
+            fails(EpisodeResolver.GuestFailure.class, null, () -> resolve(nativePage, postReply(status, success())), "native public route preserves HTTP refusal " + status);
+            check(FixtureTransport.posts.get() == 1, "refused native public route makes one POST");
+        }
+        for (String protection : new String[]{"encrypt", "encrypted", "is_trial_video", "is_preview", "login_required"}) {
+            fails(EpisodeResolver.GuestFailure.class, null, () -> resolve(nativePage, postReply(200, success().put(protection, true))), "browser capability cannot override response protection " + protection);
+            check(FixtureTransport.posts.get() == 1, "protected native public response cannot retry");
         }
         JSONObject p = pageData(); p.getJSONObject("req").put("pcAuthenticatedPlayback", true); rejectPage(p, "authenticated player never guest");
         for (String flag : new String[]{"pcLoginRequired", "pcAuthenticatedPlayback"}) {

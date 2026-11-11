@@ -20,7 +20,7 @@ jobs:
     name: Isolated real Android playback
     if: >-
       github.ref == 'refs/heads/fix/hongguo-playback-fanqie-analysis' &&
-      github.event.before == '336c7db4ba665de09ce6f59f984e9803efb425d8' &&
+      github.event.before == '2a3bfa932dab63842649203b06d95e2050606837' &&
       contains(github.event.head_commit.message, '[run-approved-android-playback-20261111]')
     runs-on: ubuntu-24.04
     timeout-minutes: 20

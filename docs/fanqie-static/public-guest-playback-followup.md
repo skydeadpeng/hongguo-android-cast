@@ -20,9 +20,11 @@ Desktop and the WebView's separate manual source resolver are not changed here.
 - Bind current page, series detail, episode membership, and public SEO metadata
   to the exact requested series and episode. Require explicit public availability,
   finite full-episode duration, and integer dimensions.
-- Require all guest eligibility flags explicitly: no login required, no
-  authenticated PC route, and no encrypted browser route. Unknown or conflicting
-  flags stop this route rather than guessing.
+- Require explicit no-login/no-authenticated-PC authorization flags. The browser
+  capability field must be a boolean, but it is not an entitlement: the native
+  public-MP4 path does not host the official encrypted browser player, so it uses
+  the normal public fallback for either capability value. Unknown capability
+  metadata still stops this route. Server refusal remains final.
 - Select one page after existing bounded GET/hedge attempts, then issue at most
   one fixed-destination POST. Do not use an SEO content URL as the guest source.
 - Do not follow POST redirects. Non-200 replies are terminal before parsing any
@@ -93,3 +95,59 @@ replace that device acceptance. No main merge or release is part of this change.
 - All production Android Java compiled against official SDK35. Local host checks
   used the available JDK21 compiler in source/target17 mode, not a complete JDK17.
   The repository CI retains its genuine JDK17/SDK35 compilation and APK build.
+
+## Accelerated Android acceptance follow-up
+
+The later GitHub-hosted tests used a fresh Google API30 x86_64 AVD and the actual
+phone App plus opt-in instrumentation. Only the explicitly approved temporary
+runner user received KVM access; cleanup restored the original device ACL. No
+personal device, DNS, proxy, certificate, account or production network setting
+was changed. The production intent contained no media URL or playInfo.
+
+- `336c7db4ba665de09ce6f59f984e9803efb425d8`, [run 43109222599](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/43109222599):
+  official SDK install, genuine JDK17 APK/test build, KVM, muted cold-cache App,
+  main page and PlayerActivity launch passed. A terminal error appeared before
+  a verified frame. This did not pass playback acceptance.
+- `2a3bfa932dab63842649203b06d95e2050606837`, [run 43110678334](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/43110678334):
+  repeated those setup stages, then failed at 6,910 ms with fixed diagnostic
+  `guest_permission_not_explicit`. The current terminal dialog was present,
+  source resolution had finished, no historical media error or guest plan was
+  observed. No frame or 30-second playback was accepted. ACL restoration was
+  followed by an exact comparison, which passed.
+- The second run passed 37 evidence-contract fixtures and 58 diagnostic allowlist
+  checks. These are metadata tests, not substitutes for rendering.
+
+A separate same-page read-only comparison found that the project's existing
+Android Chrome/131 User-Agent received `encryptedBrowserAllowed=true`, whereas
+an ordinary HTTP client received `false`. Both had `pcLoginRequired=false`,
+`pcAuthenticatedPlayback=false`, public availability and matching episode IDs.
+This identifies the eligibility predicate that stops the native path. It does
+not by itself authorize changing that predicate, changing identity to bypass a
+restriction, or claiming a successful alternative source. The official client's
+capability/authorization distinction still requires verification before a fix.
+
+### Confirmed browser-capability correction
+
+The current official scripts distinguish permission from local browser support:
+
+- [async/d.21e8cce5d0.js](https://lf-fe.fqnovelstatic.com/obj/novel-fanqie-fe/growth/incentive-h5-monorepo/apps/hongguo/static/js/async/d.21e8cce5d0.js),
+  SHA256 `3bd4e55fc4bb511c5ef4fb43dd89cfa9cc7a30d40dcd1ebd75f902a08fd41261`,
+  function exported as `xm.H` around character 9056: local encryption support AND
+  the explicit browser flag (or browser allowlist when that flag is absent).
+- [async/w.31741d2ebf.js](https://lf-fe.fqnovelstatic.com/obj/novel-fanqie-fe/growth/incentive-h5-monorepo/apps/hongguo/static/js/async/w.31741d2ebf.js),
+  SHA256 `491c7585b106e359fabe21d4812537dcda6794370f5ea4f6e7e52872e01a7963`,
+  PC selection around character 71400 passes `Boolean(isEncryptSupported())`.
+  A false result selects the normal public-player factory and fallback-play-info.
+
+The native path does not implement that encrypted browser player. Requiring the
+server's browser capability flag to be false was therefore an implementation
+mistake. The correction accepts either explicit boolean while retaining login,
+authentication, episode identity, public availability, server response/refusal,
+expiry, media host, trial/encryption and full-file validation. It does not change
+User-Agent, spoof a different browser, extract keys or bypass a server denial.
+Android first-frame and continuous playback must still pass after this fix.
+
+Before the corrected device run, offline checks passed: resolver 633, real
+NetworkGuard doubles 223, guest integration 502, verifier 67, evidence contract
+37. All production and instrumentation Java compiled against SDK35 using the
+local Java21 compiler with source/target17. Genuine JDK17 remains the CI check.
