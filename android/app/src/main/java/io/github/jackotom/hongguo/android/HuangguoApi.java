@@ -143,7 +143,10 @@ final class HuangguoApi {
         return Integer.parseInt(vid.substring(10));
     }
 
-    private static JSONObject get(String path) throws Exception {
+    private static JSONObject get(String path) throws Exception { return fetch(path, false); }
+    /** 2026-11-09 官方改版：取流端点只收 POST（空 JSON 体），其余接口仍为 GET。 */
+    private static JSONObject post(String path) throws Exception { return fetch(path, true); }
+    private static JSONObject fetch(String path, boolean asPost) throws Exception {
         // 域名全部固定；路径由本类内部构成，绝无用户可控主机。连接失败按序换域并粘住成功域。
         // 设置里固定线路时只用该域，失败如实报错（用户可回设置换线路）。
         Exception last = null;
@@ -152,7 +155,7 @@ final class HuangguoApi {
         for (int attempt = 0; attempt < attempts; attempt++) {
             int index = pinned >= 0 ? pinned : (originIndex + attempt) % ORIGINS.length;
             try {
-                JSONObject data = getFrom(ORIGINS[index], path);
+                JSONObject data = fetchFrom(ORIGINS[index], path, asPost);
                 stickOrigin(index);
                 return data;
             } catch (IOException error) { last = error; }
@@ -165,8 +168,10 @@ final class HuangguoApi {
         }
         throw new IOException("网络连接失败，请检查手机网络后重试");
     }
-    private static JSONObject getFrom(String origin, String path) throws Exception {
-        NetworkGuard.Reply reply = NetworkGuard.publicGet(origin + path, System.nanoTime() + PER_ORIGIN_MS * 1_000_000L);
+    private static JSONObject fetchFrom(String origin, String path, boolean asPost) throws Exception {
+        NetworkGuard.Reply reply = asPost
+            ? NetworkGuard.publicPostJson(origin + path, System.nanoTime() + PER_ORIGIN_MS * 1_000_000L)
+            : NetworkGuard.publicGet(origin + path, System.nanoTime() + PER_ORIGIN_MS * 1_000_000L);
         if (reply.status != 200) throw new IOException("黄果来源暂不可用，请稍后重试");
         JSONObject body;
         try { body = new JSONObject(reply.body); } catch (JSONException ignored) { throw new IOException("黄果返回数据无效"); }
@@ -271,16 +276,20 @@ final class HuangguoApi {
     static String episodeUrl(String seriesId, int ep) throws Exception {
         long id = decodeSeries(seriesId);
         if (ep < 1 || ep > 9999) throw new JSONException("黄果分集编号无效");
-        JSONObject data = get("/api/videos/" + id + "/play?ep=" + ep);
-        String url = data.optString("video_url", "");
+        // 2026-11-09 官方改版：旧 GET /api/videos/:id/play 仅回页面元数据（video_url 恒空），
+        // 取流改为 POST /api/videos/:id/episodes/:ep/playback（空 JSON 体），地址在 data.streams.main。
+        JSONObject data = post("/api/videos/" + id + "/episodes/" + ep + "/playback");
+        JSONObject streams = data.optJSONObject("streams");
+        String url = streams == null ? "" : streams.optString("main", "");
         if (url.isEmpty() || !url.startsWith("https://")) throw new IOException("黄果未提供有效播放地址");
         double declared = data.optDouble("duration", 0);
         if (!url.toLowerCase(Locale.ROOT).contains(".m3u8")) return url;
         // 智能选路：官方视频 CDN 能直连拉到清单就直连（原生速度）；拉不到再走 Worker 代理
         // （免费档中转带宽有限，仅在直连不可达时兜底）。清单时长同时用于预览片段校验。
+        // 2026-11 官方对部分出口不再下发 duration：缺失时只做「直连可达即直连」，不做时长比对。
         double directSeconds = playlistSeconds(url);
-        if (directSeconds >= declared * 0.8) return url;
-        if (directSeconds > 0) throw new IOException("该集只下发了预览片段（约 " + (int) directSeconds + " 秒），暂无法完整播放");
+        if (directSeconds > 0 && (declared <= 0 || directSeconds >= declared * 0.8)) return url;
+        if (directSeconds > 0 && declared > 0) throw new IOException("该集只下发了预览片段（约 " + (int) directSeconds + " 秒），暂无法完整播放");
         double proxied = playlistSeconds(wrapStream(url));
         if (proxied > 0 && proxied < declared * 0.8)
             throw new IOException("该集只下发了预览片段（约 " + (int) proxied + " 秒），暂无法完整播放");

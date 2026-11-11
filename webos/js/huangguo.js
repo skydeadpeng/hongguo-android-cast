@@ -26,17 +26,19 @@
     return viaProxy() ? ORIGIN + '/m3u8?url=' + encodeURIComponent(url) : url;
   }
 
-  function fetchJson(origin, path) {
-    return fetch(origin + path, { headers: { 'Accept': 'application/json' } }).then(function (response) {
+  function fetchJson(origin, path, post) {
+    return fetch(origin + path, post
+      ? { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: '{}' }
+      : { headers: { 'Accept': 'application/json' } }).then(function (response) {
       if (!response.ok) throw new Error('HTTP ' + response.status);
       return response.json();
     });
   }
-  function get(path) {
+  function get(path, post) {
     var attempt = 0;
     function tryNext() {
       var origin = ORIGINS[(originAt + attempt) % ORIGINS.length];
-      return fetchJson(origin, path).then(function (body) {
+      return fetchJson(origin, path, post).then(function (body) {
         if (!body || body.status !== 1 || !body.data || typeof body.data !== 'object') {
           throw new Error((body && body.msg) || '黄果返回数据无效');
         }
@@ -122,8 +124,10 @@
     playUrl: function (seriesId, vid) {
       var id = String(seriesId || '').slice(3), ep = String(vid || '').split(':')[2];
       if (!/^\d{1,8}$/.test(id) || !/^\d{1,4}$/.test(ep || '')) return Promise.reject(new Error('黄果分集编号无效'));
-      return get('/api/videos/' + id + '/play?ep=' + ep).then(function (data) {
-        var url = String(data.video_url || '');
+      // 2026-11-09 官方改版：旧 GET /play 仅回页面元数据（video_url 恒空），取流改为
+      // POST /api/videos/:id/episodes/:ep/playback（空 JSON 体），地址在 data.streams.main。
+      return get('/api/videos/' + id + '/episodes/' + ep + '/playback', true).then(function (data) {
+        var url = String((data && data.streams && data.streams.main) || '');
         if (!/^https:\/\//.test(url)) throw new Error('黄果未提供有效播放地址');
         if (!/\.m3u8/i.test(url)) return { url: url };
         var declared = Number(data.duration) || 0;
@@ -137,10 +141,11 @@
           return fetch(target, { headers: { 'Accept': '*/*' } }).then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; });
         }
         // 智能选路：官方视频 CDN 直连可达就直连（原生速度）；不可达才走 Worker 代理。
+        // 2026-11 官方对部分出口不再下发 duration：缺失时只做「直连可达即直连」，不做时长比对。
         return pull(url).then(function (body) {
           var direct = secondsOf(body);
-          if (direct >= declared * 0.8) return { url: url };
-          if (direct > 0) throw new Error('该集只下发了预览片段（约 ' + Math.round(direct) + ' 秒），暂无法完整播放');
+          if (direct > 0 && (declared <= 0 || direct >= declared * 0.8)) return { url: url };
+          if (direct > 0 && declared > 0) throw new Error('该集只下发了预览片段（约 ' + Math.round(direct) + ' 秒），暂无法完整播放');
           var proxied = wrapStream(url);
           return pull(proxied).then(function (proxyBody) {
             var viaProxy = secondsOf(proxyBody);

@@ -8,7 +8,12 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     if (path === "/__health") return json({ ok: true });
-    if (path.startsWith("/api/")) return proxyApi(url);
+    // 2026-11 官方取流端点仅收 POST（JSON 体）：浏览器跨域 POST 会先发 CORS 预检，直接放行。
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: {
+      "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "86400",
+    } });
+    if (path.startsWith("/api/")) return proxyApi(request, url);
     if (path === "/img") return proxyImage(url);
     if (path === "/m3u8") return proxyPlaylist(url, ctx);
     if (path === "/seg") return proxySegment(url);
@@ -16,14 +21,19 @@ export default {
   },
 };
 
-async function proxyApi(url) {
+async function proxyApi(request, url) {
   const target = new URL(UPSTREAM + url.pathname);
   target.search = url.search;
-  const response = await fetch(target, { headers: { "User-Agent": "Mozilla/5.0", Referer: UPSTREAM + "/" } });
-  return new Response(response.body, {
-    status: response.status,
-    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=30" },
-  });
+  const init = { method: request.method, headers: { "User-Agent": "Mozilla/5.0", Referer: UPSTREAM + "/" } };
+  if (request.method === "POST") {
+    init.body = await request.text();
+    if (init.body) init.headers["Content-Type"] = request.headers.get("Content-Type") || "application/json";
+  }
+  const response = await fetch(target, init);
+  const headers = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" };
+  // POST 响应含时效签名地址，不进缓存；GET 维持原有的 30 秒边缘/浏览器缓存。
+  if (request.method !== "POST") headers["Cache-Control"] = "public, max-age=30";
+  return new Response(response.body, { status: response.status, headers });
 }
 
 // 官方站封面为 AES-CBC 加密二进制（密钥来自站点前端常量）：解密后返回明文图片，

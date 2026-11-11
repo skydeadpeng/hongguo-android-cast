@@ -294,6 +294,8 @@ final class NetworkGuard {
     static Reply get(String value, long deadline) throws Exception { return request(value, true, false, deadline); }
     /** Read-only public HTTPS GET for fixed third-party origins; the caller pins the host. */
     static Reply publicGet(String value, long deadline) throws Exception { return request(value, false, false, deadline); }
+    /** Public HTTPS POST with an empty JSON body (2026-11 黄果取流端点仅收 POST); host pinned by the caller. */
+    static Reply publicPostJson(String value, long deadline) throws Exception { return request(value, false, false, deadline, "{}"); }
     static Reply get(String value, long timeoutMs, long deadlineMs) throws Exception { return get(value, pageDeadline(timeoutMs, deadlineMs)); }
     static String media(String value) throws Exception { return request(value, false, true).url; }
     /** Bounded binary transfer; each redirect resolves public IPs and connects TLS to that checked IP. */
@@ -440,6 +442,9 @@ final class NetworkGuard {
         return request(value, officialOnly, head, System.nanoTime() + 25_000_000_000L);
     }
     private static Reply request(String value, boolean officialOnly, boolean head, long deadline) throws Exception {
+        return request(value, officialOnly, head, deadline, null);
+    }
+    private static Reply request(String value, boolean officialOnly, boolean head, long deadline, String postBody) throws Exception {
         remaining(deadline, Integer.MAX_VALUE);
         URI uri = validate(value, officialOnly);
         for (int redirects = 0; redirects <= 3; redirects++) {
@@ -457,8 +462,12 @@ final class NetworkGuard {
                     String path = uri.getRawPath();
                     if (path == null || path.isEmpty()) path = "/";
                     if (uri.getRawQuery() != null) path += "?" + uri.getRawQuery();
-                    String request = (head ? "HEAD " : "GET ") + path + " HTTP/1.1\r\nHost: " + uri.getHost() + "\r\nUser-Agent: " + UA + "\r\nReferer: " + REFERER + "\r\nAccept: text/html,*/*\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n";
+                    String method = head ? "HEAD" : (postBody != null ? "POST" : "GET");
+                    String request = method + " " + path + " HTTP/1.1\r\nHost: " + uri.getHost() + "\r\nUser-Agent: " + UA + "\r\nReferer: " + REFERER + "\r\nAccept: text/html,*/*\r\nAccept-Encoding: identity\r\n"
+                        + (postBody != null ? "Content-Type: application/json\r\nContent-Length: " + postBody.getBytes(StandardCharsets.UTF_8).length + "\r\n" : "")
+                        + "Connection: close\r\n\r\n";
                     socket.getOutputStream().write(request.getBytes(StandardCharsets.US_ASCII));
+                    if (postBody != null) socket.getOutputStream().write(postBody.getBytes(StandardCharsets.UTF_8));
                     socket.getOutputStream().flush();
                     InputStream input = new DeadlineInputStream(new BufferedInputStream(socket.getInputStream()), socket, deadline);
                     String statusLine = line(input, 8192);
