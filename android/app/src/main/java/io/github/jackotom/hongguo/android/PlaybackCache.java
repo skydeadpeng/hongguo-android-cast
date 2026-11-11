@@ -75,6 +75,11 @@ final class PlaybackCache {
         discardLegacyAuto(sid,vid,index,quality);
         return policy.fetchForeground(sid,playbackCacheVid(vid,quality,plan.playbackCeiling),index,plan.url,(value,file,max)->PlaybackSources.download(plan,file,max));
     }
+    /** Cast-only custom preparation; normal playback and manual downloads do not gain HLS downloads. */
+    File fetchCast(String sid,String vid,int index,boolean foreground,PlaybackCachePolicy.Downloader transfer) throws Exception {
+        String key=MediaQuality.cacheVid(vid,"auto");
+        return foreground?policy.fetchForeground(sid,key,index,"",transfer):policy.fetch(sid,key,index,"",transfer);
+    }
     void prune(String sid, int currentIndex, int keepPrevious) throws Exception { policy.prune(sid, currentIndex, keepPrevious); }
     JSONObject status() throws Exception {
         PlaybackCachePolicy.Stats stats = policy.status();

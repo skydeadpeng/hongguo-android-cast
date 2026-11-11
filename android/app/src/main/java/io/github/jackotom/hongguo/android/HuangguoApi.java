@@ -147,35 +147,53 @@ final class HuangguoApi {
     /** 2026-11-09 官方改版：取流端点只收 POST（空 JSON 体），其余接口仍为 GET。 */
     private static JSONObject post(String path) throws Exception { return fetch(path, true); }
     private static JSONObject fetch(String path, boolean asPost) throws Exception {
+        return fetch(path, asPost, false);
+    }
+    private static JSONObject fetch(String path, boolean asPost, boolean strict) throws Exception {
+        return fetch(path,asPost,strict,Long.MAX_VALUE);
+    }
+    private static JSONObject fetch(String path, boolean asPost, boolean strict, long deadline) throws Exception {
         // 域名全部固定；路径由本类内部构成，绝无用户可控主机。连接失败按序换域并粘住成功域。
         // 设置里固定线路时只用该域，失败如实报错（用户可回设置换线路）。
         Exception last = null;
         int pinned = pinnedOrigin();
         int attempts = pinned >= 0 ? 1 : ORIGINS.length;
         for (int attempt = 0; attempt < attempts; attempt++) {
+            if(System.nanoTime()>=deadline)throw new java.net.SocketTimeoutException("黄果取源超时");
             int index = pinned >= 0 ? pinned : (originIndex + attempt) % ORIGINS.length;
             try {
-                JSONObject data = fetchFrom(ORIGINS[index], path, asPost);
+                JSONObject data = fetchFrom(ORIGINS[index], path, asPost, strict, deadline);
                 stickOrigin(index);
                 return data;
-            } catch (IOException error) { last = error; }
+            } catch (java.io.InterruptedIOException error) {
+                if (Thread.currentThread().isInterrupted() || !(error instanceof java.net.SocketTimeoutException)) throw error;
+                last = error;
+            } catch (SourceDeniedException denied) { throw denied; }
+            catch (IOException error) { last = error; }
         }
         // 底层英文异常（Socket closed / Read timed out / Connection reset…）对用户没有意义：
         // 全部线路都失败时统一归因为网络不可用。固定线路失败自动回退「自动」，避免卡死在不可用线路。
+        if (strict && pinned >= 0) throw new IOException("固定线路连接失败，请在设置中检查黄果线路后重试");
         if (pinned >= 0) {
             try { prefs().edit().putString("line", "auto").apply(); } catch (Exception ignored) { }
             throw new IOException("固定线路连接失败，已自动切回「自动」线路，请重试");
         }
         throw new IOException("网络连接失败，请检查手机网络后重试");
     }
-    private static JSONObject fetchFrom(String origin, String path, boolean asPost) throws Exception {
+    private static JSONObject fetchFrom(String origin, String path, boolean asPost, boolean strict) throws Exception {
+        return fetchFrom(origin,path,asPost,strict,Long.MAX_VALUE);
+    }
+    private static JSONObject fetchFrom(String origin, String path, boolean asPost, boolean strict, long deadline) throws Exception {
+        deadline=Math.min(deadline,System.nanoTime()+PER_ORIGIN_MS*1_000_000L);
         NetworkGuard.Reply reply = asPost
-            ? NetworkGuard.publicPostJson(origin + path, System.nanoTime() + PER_ORIGIN_MS * 1_000_000L)
-            : NetworkGuard.publicGet(origin + path, System.nanoTime() + PER_ORIGIN_MS * 1_000_000L);
+            ? NetworkGuard.publicPostJson(origin + path, deadline)
+            : NetworkGuard.publicGet(origin + path, deadline);
+        if (strict && reply.status >= 400 && reply.status < 500) throw new SourceDeniedException();
         if (reply.status != 200) throw new IOException("黄果来源暂不可用，请稍后重试");
         JSONObject body;
         try { body = new JSONObject(reply.body); } catch (JSONException ignored) { throw new IOException("黄果返回数据无效"); }
         if (body.optInt("status", 0) != 1 || !(body.opt("data") instanceof JSONObject)) {
+            if (strict) throw new SourceDeniedException();
             String message = body.optString("msg", "");
             throw new IOException(message.isEmpty() ? "黄果来源暂不可用，请稍后重试" : message);
         }
@@ -294,6 +312,29 @@ final class HuangguoApi {
         if (proxied > 0 && proxied < declared * 0.8)
             throw new IOException("该集只下发了预览片段（约 " + (int) proxied + " 秒），暂无法完整播放");
         return wrapStream(url);
+    }
+
+    private static final class SourceDeniedException extends IOException {
+        SourceDeniedException() { super("黄果来源未授权或拒绝提供该集，无法投屏"); }
+    }
+    static final class CastStream {
+        final String url; final double seconds;
+        CastStream(String url, double seconds) { this.url=url; this.seconds=seconds; }
+    }
+    /** Cast uses only the returned authorized stream. A denial never tries a mirror or proxy. */
+    static CastStream episodeForCast(String sid, String vid, int index) throws Exception {
+        return episodeForCast(sid,vid,index,Long.MAX_VALUE);
+    }
+    static CastStream episodeForCast(String sid, String vid, int index, long deadline) throws Exception {
+        long id=decodeSeries(sid);
+        if(index<1||index>9999||!encodeEpisode(id,index).equals(vid))throw new JSONException("黄果投屏分集身份不匹配");
+        if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("黄果投屏准备已取消");
+        JSONObject data=fetch("/api/videos/"+id+"/episodes/"+index+"/playback",true,true,deadline);
+        JSONObject streams=data.optJSONObject("streams");String url=streams==null?"":streams.optString("main","");
+        url=HuangguoHls.address(url, "");
+        double seconds=data.optDouble("duration",0);
+        if(!Double.isFinite(seconds)||seconds<0||seconds>HuangguoHls.MAX_SECONDS)throw new IOException("黄果声明时长无效");
+        return new CastStream(url,seconds);
     }
 
     private static double playlistSeconds(String url) {

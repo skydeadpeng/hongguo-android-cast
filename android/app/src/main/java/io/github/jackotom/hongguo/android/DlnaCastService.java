@@ -159,6 +159,10 @@ public final class DlnaCastService extends Service {
         String diagnostics(){return prefetch.diagnostics();}
         private DlnaSession.Prepared prepareMedia(int position,String initial,boolean foreground,java.util.function.BooleanSupplier alive)throws Exception {
             JSONObject episode=request.episodes.get(position),owner=PlaybackPlaylist.owner(request.series,episode);String sid=owner.optString("seriesId"),vid=episode.optString("vid");int index=episode.optInt("index");
+            if(HuangguoCastSource.matches(sid)) {
+                HuangguoApi.attach(DlnaCastService.this);
+                return HuangguoCastSource.prepare(cache,sid,vid,index,title(episode),foreground,alive,window::prune);
+            }
             AdaptiveQuality.Result<DlnaSession.Prepared> result=AdaptiveQuality.prepare(initial,quality->{
                 if(!alive.getAsBoolean())throw new InterruptedIOException("投屏准备已取消");
                 if(quality.equals("auto")){

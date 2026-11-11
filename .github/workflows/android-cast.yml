@@ -1,0 +1,65 @@
+name: Android cast
+on:
+  push:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-cast.yml'
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-cast.yml'
+permissions:
+  contents: read
+jobs:
+  android-cast:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile all Android production Java against SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+          mkdir -p "$RUNNER_TEMP/cast-sdk/classes"
+          printf '%s\n' 'package io.github.jackotom.hongguo.android; public final class BuildConfig {public static final boolean IS_TV=false,NATIVE_UI=false,DEBUG=true;public static final String VERSION_NAME="ci";}' > "$RUNNER_TEMP/cast-sdk/BuildConfig.java"
+          javac -encoding UTF-8 -source 17 -target 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d "$RUNNER_TEMP/cast-sdk/classes" "$RUNNER_TEMP/cast-sdk/BuildConfig.java" android/app/src/main/java/io/github/jackotom/hongguo/android/*.java
+      - name: Prepare existing Android JSON test dependency
+        run: mvn -q dependency:get -Dartifact=com.vaadin.external.google:android-json:0.0.20131108.vaadin1
+      - name: Run HLS, remux and source lifecycle boundary tests
+        run: |
+          bash android/tests/run-huangguo-api-tests.sh
+          bash android/tests/run-huangguo-hls-tests.sh
+          bash android/tests/run-huangguo-remux-tests.sh
+          bash android/tests/run-huangguo-cast-source-tests.sh
+      - name: Run existing network, service-source and cache regressions
+        run: |
+          bash android/tests/run-network-guard-tests.sh
+          bash android/tests/run-network-guard-race-tests.sh
+          bash android/tests/run-cast-playlist-source-tests.sh
+          bash android/tests/run-dlna-merged-source-tests.sh
+          bash android/tests/run-browser-cast-session-tests.sh
+          bash android/tests/run-dlna-prefetch-tests.sh
+          bash android/tests/run-cast-cache-window-tests.sh
+      - name: Build phone debug APK
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build:android:ui
+          gradle -p android :app:assemblePhoneDebug --no-daemon --console=plain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: huangguo-cast-phone-debug
+          path: android/app/build/outputs/apk/phone/debug/app-phone-debug.apk
+          if-no-files-found: error
+          retention-days: 14

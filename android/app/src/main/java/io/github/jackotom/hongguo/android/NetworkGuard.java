@@ -169,19 +169,31 @@ final class NetworkGuard {
             }
             throw last == null ? new UnknownHostException("可信解析无结果") : last;
         };
-        Future<InetAddress[]> first, second;
-        try { first = DNS.submit(system); second = DNS.submit(trusted); }
+        try { return racePublic(DNS, system, trusted, deadline); }
         catch (RejectedExecutionException error) { return publicAddresses(uri, deadline); }
-        IOException[] failures = new IOException[2];
+    }
+    /** Package-private executor seam for offline races; production always uses the bounded DNS pool. */
+    static InetAddress[] racePublic(ExecutorService executor, Callable<InetAddress[]> system,
+                                    Callable<InetAddress[]> trusted, long deadline) throws IOException {
+        remaining(deadline, Integer.MAX_VALUE);
+        Future<InetAddress[]> first = null, second = null;
         try {
-            for (int done = 0; done < 2; done++) {
-                Future<InetAddress[]> finished;
-                try { finished = laneDone(first, second); }
-                catch (InterruptedException stopped) { Thread.currentThread().interrupt(); throw new InterruptedIOException("网络请求已取消"); }
-                try {
-                    InetAddress[] addresses;
-                    try { addresses = finished.get(remaining(deadline, Integer.MAX_VALUE), TimeUnit.MILLISECONDS); }
+            first = executor.submit(system);
+            second = executor.submit(trusted);
+            List<Future<InetAddress[]>> pending = new ArrayList<>(Arrays.asList(first, second));
+            IOException failure = null;
+            while (!pending.isEmpty()) {
+                remaining(deadline, Integer.MAX_VALUE);
+                Future<InetAddress[]> finished = null;
+                for (Future<InetAddress[]> candidate : pending) if (candidate.isDone()) { finished = candidate; break; }
+                if (finished == null) {
+                    try { Thread.sleep(Math.min(5, remaining(deadline, Integer.MAX_VALUE))); }
                     catch (InterruptedException stopped) { Thread.currentThread().interrupt(); throw new InterruptedIOException("网络请求已取消"); }
+                    continue;
+                }
+                pending.remove(finished); // A failed/empty/private lane is consumed exactly once.
+                try {
+                    InetAddress[] addresses = finished.get(remaining(deadline, Integer.MAX_VALUE), TimeUnit.MILLISECONDS);
                     remaining(deadline, Integer.MAX_VALUE);
                     if (addresses != null && addresses.length > 0) {
                         for (InetAddress address : addresses) if (address == null || !publicAddress(address)) throw new IOException("域名解析到非公网地址");
@@ -190,19 +202,18 @@ final class NetworkGuard {
                     throw new UnknownHostException("域名解析为空");
                 } catch (ExecutionException error) {
                     Throwable cause = error.getCause();
-                    IOException failure = cause instanceof IOException ? (IOException) cause : new IOException("域名解析失败", cause);
-                    if (failures[0] == null) failures[0] = failure; else failures[1] = failure;
-                } catch (TimeoutException error) { if (failures[0] == null) failures[0] = new SocketTimeoutException("域名解析超时"); }
+                    failure = cause instanceof IOException ? (IOException) cause : new IOException("域名解析失败", cause);
+                } catch (InterruptedException stopped) { Thread.currentThread().interrupt(); throw new InterruptedIOException("网络请求已取消"); }
+                catch (TimeoutException error) { failure = new SocketTimeoutException("域名解析超时"); }
+                catch (CancellationException error) { failure = new IOException("域名解析已取消"); }
+                catch (IOException invalid) { failure = invalid; }
             }
-            throw failures[0] != null ? failures[0] : failures[1];
-        } finally { first.cancel(true); second.cancel(true); }
-    }
-    /** Returns whichever resolver lane finishes first; both are bounded by the caller's deadline. */
-    private static <T> Future<T> laneDone(Future<T> first, Future<T> second) throws InterruptedException {
-        while (true) {
-            if (first.isDone()) return first;
-            if (second.isDone()) return second;
-            Thread.sleep(5);
+            remaining(deadline, Integer.MAX_VALUE);
+            throw failure == null ? new UnknownHostException("域名解析为空") : failure;
+        } finally {
+            // This also owns the first submission when the second submission is rejected.
+            if (first != null) first.cancel(true);
+            if (second != null) second.cancel(true);
         }
     }
     /** One DoH JSON query over TLS pinned to the resolver's own IP; bounded body, short timeout. */
@@ -303,9 +314,20 @@ final class NetworkGuard {
         download(value, destination, maxBytes, UA, REFERER);
     }
     static void download(String value, File destination, long maxBytes, String userAgent, String referer) throws Exception {
+        download(value, destination, maxBytes, userAgent, referer, System.nanoTime() + 120_000_000_000L);
+    }
+    /** Shared deadline keeps a multi-segment cast from receiving a fresh timeout per segment. */
+    static void download(String value, File destination, long maxBytes, String userAgent, String referer, long deadline) throws Exception {
+        downloadResource(value,destination,maxBytes,userAgent,referer,deadline,true);
+    }
+    /** Binary identity AES-128 HLS key only; some origins label these 16 bytes text/plain. */
+    static void downloadHlsKey(String value,File destination,long deadline) throws Exception {
+        downloadResource(value,destination,16,UA,"https://huangguoai.com/",deadline,false);
+    }
+    private static void downloadResource(String value,File destination,long maxBytes,String userAgent,String referer,long deadline,boolean media) throws Exception {
+        remaining(deadline, Integer.MAX_VALUE);
         if (userAgent == null || referer == null || userAgent.length() > 2048 || referer.length() > 2048 || userAgent.indexOf('\r') >= 0 || userAgent.indexOf('\n') >= 0 || referer.indexOf('\r') >= 0 || referer.indexOf('\n') >= 0) throw new IOException("片源请求头无效");
         if (destination == null || maxBytes <= 0) throw new IllegalArgumentException("下载参数无效");
-        long deadline = System.nanoTime() + 120_000_000_000L;
         boolean complete = false, touchedDestination = false;
         try {
             URI uri = validate(value, false);
@@ -346,7 +368,8 @@ final class NetworkGuard {
                         if (status != 200) throw new IOException("片源响应 HTTP " + status);
                         touchedDestination = true;
                         try (FileOutputStream output = new FileOutputStream(destination)) {
-                            streamMediaBody(input, output, headers, maxBytes, deadline);
+                            if(media)streamMediaBody(input, output, headers, maxBytes, deadline);
+                            else streamBody(input, output, headers, maxBytes, deadline);
                             output.flush();
                             output.getFD().sync();
                         }

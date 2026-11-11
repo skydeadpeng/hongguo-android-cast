@@ -58,6 +58,20 @@ final class HARNESS extends CastPlaylistContext {
 }
 '''.replace('HARNESS',harness).replace('FIRST',first).replace('EXTRA',',mergeWindow' if marker in source else '').replace('REQUEST',request).replace('CONNECT',connect).replace('CLEAN',clean).replace('SESSION',session).replace('SOURCE',filesource).replace(' WINDOWMAP',' '+windowmap)
  (out/(harness+'.java')).write_text(result)
+# The legacy red-source suite must never resolve Huangguo. Explicit fail-fast
+# doubles satisfy the new dispatch symbols without changing old fixture behavior.
+with (out/'DlnaPlaylistSourceHarness.java').open('a') as generated:
+ generated.write('''
+final class HuangguoApi {
+ static void attach(Object context){throw new AssertionError("Unexpected Huangguo route in red-source fixture");}
+}
+final class HuangguoCastSource {
+ static boolean matches(String sid){return sid!=null&&sid.matches("99[0-9]{8}");}
+ static DlnaSession.Prepared prepare(PlaybackCache cache,String sid,String vid,int index,String title,boolean foreground,java.util.function.BooleanSupplier alive,Runnable prune) {
+  throw new AssertionError("Unexpected Huangguo preparation in red-source fixture");
+ }
+}
+''')
 android=out/'android';(android/'content').mkdir(parents=True,exist_ok=True);(android/'os').mkdir(parents=True,exist_ok=True)
 (android/'content'/'Context.java').write_text('''package android.content;
 public abstract class Context {
