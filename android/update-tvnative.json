@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 15,
-  "versionName": "0.1.14",
+  "versionCode": 16,
+  "versionName": "0.1.15",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.14/HongguoNative-0.1.14-tvNative-release-compatible.apk",
-  "size": 656172,
-  "sha256": "18623080367078780de262d75d47e8ef90fb451478fd39f9e870a010cc0aefb4",
-  "notes": "修复黄果播放：黄果官方调整了取流接口，旧版本无法获取播放地址。本版改用官方新接口并保留自建备用线路，恢复黄果在线播放。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-11T03:28:28.000Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.15/HongguoNative-0.1.15-tvNative-release-compatible.apk",
+  "size": 677796,
+  "sha256": "800c8f00fd8f5a7753a17d836cf1f7931ebc99fed86f6bf220095516c3484bb2",
+  "notes": "修复红果播放：红果官方开始校验真实播放签名，旧版本的占位签名被拒（模型接口返回空数据），红果剧集无法播放。本版内置真实 551 Argus/Ladon 签名（Java 移植，与已发布的手机/TV 版逐字节一致），空响应时按集号走备用接口恢复，恢复红果在线播放与下载。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-11T23:05:00.000Z"
 }
