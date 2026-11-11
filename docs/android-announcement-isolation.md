@@ -27,4 +27,4 @@
 - `npm run check:android`：48 项及项目检查通过。JDK 17 / SDK 35 / Gradle 8.9 编译 QA APK 成功。
 - 现有搜索分流测试入口缺少 `closeRegisteredModels` 协作桩，基线 `805f747` 和本分支同样无法编译；本次未把该旧测试报为通过，也没有修改它。
 
-同证书独立 QA 包允许覆盖测试安装并保留资料，包名为 `io.github.jackotom.hongguo.android.playbackqa`；不卸载原应用、不清空任何数据。本次 QA APK SHA-256 为 `625b659a76afba25f2449b8156269c37ee6306b0d2c146484626e8deb5817ca2`。在同一模拟器覆盖安装后，即使首页仍在加载，`getInfo` 已立即成功回执；同一真实首集的生产播放桥返回 `started:true`，且系统确认实际进入 `PlayerActivity`。修前两个请求均超过 15 秒无回应，修后的播放入口隔离已获得运行时对照。片源准备和真实画面仍在验证，不能把进入播放器写成真实媒体播放通过。
+同证书独立 QA 包允许覆盖测试安装并保留资料，包名为 `io.github.jackotom.hongguo.android.playbackqa`；不卸载原应用、不清空任何数据。本次 QA APK SHA-256 为 `625b659a76afba25f2449b8156269c37ee6306b0d2c146484626e8deb5817ca2`。在同一模拟器覆盖安装后，即使首页仍在加载，`getInfo` 已立即成功回执；同一真实首集的生产播放桥返回 `started:true`，且系统确认实际进入 `PlayerActivity`。修前两个请求均超过 15 秒无回应，修后的播放入口隔离已获得运行时对照。应用自身自动重新取源和降档结束后，最终提示“第1集暂未播放 / App片源请求超时”，不再出现 `Index out of range`。没有获得视频画面或有效时长，因此只验收了入口响应与签名异常消除，没有验收真实媒体播放。最终仅类名/方法/行号的 Java 栈未见公告读取活跃阻塞；调试线程全部恢复。
