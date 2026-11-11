@@ -68,6 +68,7 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           node scripts/check-android-signer-offsets.cjs
           node scripts/check-android-source-budget.cjs
+          node scripts/check-app-source-entitlement.cjs
           npm run build:android:ui
           node --test scripts/check-android-mac-source.test.mjs scripts/check-android-registered-model.test.mjs
           npm run check:android
