@@ -125,9 +125,9 @@ public final class BrowserCastService extends Service {
                     File cached=cache.find(sid,vid,index,quality);
                     final PlaybackSources.Plan plan=cached==null?PlaybackSources.resolve(sid,vid,quality):null;
                     File file=DlnaSessionFile.prepare(
-                        ()->cached!=null?cached:fetch(sid,vid,index,plan.url,quality,foreground),
-                        cached!=null?quality.equals("auto"):plan.source.equals("web"),
-                        ()->{PlaybackSources.Plan app=PlaybackSources.recover(sid,vid,quality,true);return fetch(sid,vid,index,app.url,quality,foreground);},
+                        ()->cached!=null?cached:fetch(sid,vid,index,plan,quality,foreground),
+                        cached==null&&plan.source.equals("web")&&!plan.guestPlayback,
+                        ()->{PlaybackSources.Plan app=PlaybackSources.recover(sid,vid,quality,true);return fetch(sid,vid,index,app,quality,foreground);},
                         ()->cache.invalidate(sid,vid,index,quality),alive);
                     if(!alive.getAsBoolean())throw new InterruptedIOException("投屏准备已取消");
                     DlnaSession.Prepared prepared=new DlnaSession.Prepared(file,title(episode),quality,index,()->cache.protect(sid,vid,index,quality),()->releaseLease(sid,vid,index,quality));success=true;return prepared;
@@ -135,8 +135,8 @@ public final class BrowserCastService extends Service {
             },PlaybackSources::canLowerQuality,alive::getAsBoolean,(quality,stage,error)->{},DlnaSession.Prepared::releaseOwner);
             return result.value;
         }
-        private File fetch(String sid,String vid,int index,String url,String quality,boolean foreground)throws Exception {
-            return foreground?cache.fetchForeground(sid,vid,index,url,quality):cache.fetch(sid,vid,index,url,quality);
+        private File fetch(String sid,String vid,int index,PlaybackSources.Plan plan,String quality,boolean foreground)throws Exception {
+            return foreground?cache.fetchForeground(sid,vid,index,plan,quality):cache.fetch(sid,vid,index,plan,quality);
         }
         private String title(JSONObject episode){return PlaybackPlaylist.owner(request.series,episode).optString("title")+" · 第 "+episode.optInt("index")+" 集";}
         private void releaseLease(String sid,String vid,int index,String quality){cache.release(sid,vid,index,quality);window.prune();}

@@ -82,7 +82,10 @@ public final class MediaRedirectRecoveryTest {
     }
 }
 final class MainActivity {Consumer<String> callback;boolean isFinishing(){return false;}boolean isDestroyed(){return false;}void script(String value){callback.accept(value);}}
-final class EpisodeResolver {static int calls;static String resolve(String sid,String vid)throws Exception{calls++;throw new IOException("fixture web unavailable");}}
+final class PublicPlaybackVerifier {static final long MAX_FILE_BYTES=96L*1024*1024;static void verify(java.io.File f,double seconds,int w,int h)throws Exception{throw new AssertionError("Unexpected guest verification");}}
+final class EpisodeResolver {static final class GuestFailure extends java.io.IOException {GuestFailure(String message){super(message);}}
+ static org.json.JSONObject resolveInfo(String sid,String vid)throws Exception{return new org.json.JSONObject().put("url",resolve(sid,vid)).put("vid",vid).put("seriesId",sid).put("source","web");}
+static int calls;static String resolve(String sid,String vid)throws Exception{calls++;throw new IOException("fixture web unavailable");}}
 final class AppTransport {static boolean domain(String host,String...allowed){if(host==null)return false;host=host.toLowerCase(Locale.ROOT);for(String suffix:allowed)if(host.equals(suffix)||host.endsWith("."+suffix))return true;return false;}}
 final class CencDecryptor {
     static final Map<String,byte[]> keys=new HashMap<>();static final List<String> calls=new ArrayList<>();

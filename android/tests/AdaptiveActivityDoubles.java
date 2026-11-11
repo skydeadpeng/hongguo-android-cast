@@ -61,7 +61,7 @@ class PlaybackCache {
 class NetworkGuard {static final String UA="fixture-ua",REFERER="https://fixture.invalid/";}
 class PlaybackSources {
  static final class QualityUnavailableException extends IOException {QualityUnavailableException(String m){super(m);}}
- static final class Plan {int width,height,playbackCeiling;String source="app",url="https://fixture.invalid/media",userAgent="fixture-ua",referer="https://fixture.invalid/";}
+ static final class Plan {boolean guestPlayback;int width,height,playbackCeiling;String source="app",url="https://fixture.invalid/media",userAgent="fixture-ua",referer="https://fixture.invalid/";}
  static final List<String> calls=new ArrayList<>(),owners=new ArrayList<>();static final Map<String,Exception> failures=new HashMap<>(),onceFailures=new HashMap<>();static final Map<String,String> sourceKinds=new HashMap<>();static Runnable onResolve;static final Map<String,Integer> ceilings=new HashMap<>(),pixelEdges=new HashMap<>();static final List<String> playbackRequests=new ArrayList<>();
  static void reset(){calls.clear();owners.clear();failures.clear();onceFailures.clear();sourceKinds.clear();ceilings.clear();pixelEdges.clear();playbackRequests.clear();onResolve=null;PlayerOptions.saved.clear();PlayerOptions.failSave=false;Toast.messages.clear();}
  static Plan resolve(String sid,String vid,String q)throws Exception{calls.add("resolve:"+vid+":"+q);owners.add(sid+":"+vid+":"+q);Runnable action=onResolve;onResolve=null;if(action!=null)action.run();Exception e=onceFailures.remove(q);if(e==null)e=failures.get(q);if(e!=null)throw e;Plan p=new Plan();p.source=sourceKinds.getOrDefault(q,"app");return p;}

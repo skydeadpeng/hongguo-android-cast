@@ -13,11 +13,18 @@ JSON_JAR="${JSON_JAR:-$HOME/.m2/repository/com/vaadin/external/google/android-js
 TMP="$(mktemp -d -t hongguo-http403.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
 SRC="$SOURCE_ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
+cat > "$TMP/Context.java" <<'STUB'
+package android.content; public class Context {}
+STUB
 cat > "$TMP/Http403Stubs.java" <<'STUB'
 package io.github.jackotom.hongguo.android;
 import java.io.*;import java.net.*;import java.nio.file.Files;import java.util.*;import java.util.function.Consumer;
-final class MainActivity {Consumer<String> callback;boolean isFinishing(){return false;}boolean isDestroyed(){return false;}void script(String value){callback.accept(value);}}
-final class EpisodeResolver {static int calls;static String resolve(String sid,String vid)throws Exception{calls++;throw new IOException("fixture web lookup must not run");}}
+final class MainActivity extends android.content.Context {Consumer<String> callback;boolean isFinishing(){return false;}boolean isDestroyed(){return false;}void script(String value){callback.accept(value);}}
+final class HuangguoApi {static void attach(android.content.Context c){throw new AssertionError();}static String episodeUrl(String s,int i){throw new AssertionError();}static int decodeEpisodeIndex(String v){throw new AssertionError();}}
+final class PublicPlaybackVerifier {static final long MAX_FILE_BYTES=96L*1024*1024;static void verify(java.io.File f,double seconds,int w,int h)throws Exception{throw new AssertionError("Unexpected guest verification");}}
+final class EpisodeResolver {static final class GuestFailure extends java.io.IOException {GuestFailure(String message){super(message);}}
+ static org.json.JSONObject resolveInfo(String sid,String vid)throws Exception{return new org.json.JSONObject().put("url",resolve(sid,vid)).put("vid",vid).put("seriesId",sid).put("source","web");}
+static int calls;static String resolve(String sid,String vid)throws Exception{calls++;throw new IOException("fixture web lookup must not run");}}
 final class AppTransport {static int heads;static boolean domain(String host,String...allowed){if(host==null)return false;host=host.toLowerCase(Locale.ROOT);for(String suffix:allowed)if(host.equals(suffix)||host.endsWith("."+suffix))return true;return false;}static String media(String url,String ua,String ref){heads++;return url;}}
 final class NetworkGuard {
  static final class MediaRedirectException extends IOException {MediaRedirectException(){super("片源跳转不可用（地址无效或跳转次数超限）");}}
@@ -56,6 +63,6 @@ final class CencDecryptor {
 }
 STUB
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
- "$TMP/Http403Stubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
+ "$TMP/Context.java" "$TMP/Http403Stubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
  "$TEST_ROOT/Http403RecoveryTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.Http403RecoveryTest

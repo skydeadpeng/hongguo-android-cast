@@ -307,6 +307,13 @@ final class NetworkGuard {
     static Reply publicGet(String value, long deadline) throws Exception { return request(value, false, false, deadline); }
     /** Public HTTPS POST with an empty JSON body (2026-11 黄果取流端点仅收 POST); host pinned by the caller. */
     static Reply publicPostJson(String value, long deadline) throws Exception { return request(value, false, false, deadline, "{}"); }
+    /** The normal official guest-player request: fixed destination, one validated
+     * public episode ID, no cookies/credentials, and never a redirected POST. */
+    static Reply guestPlaybackPost(String itemId, long deadline) throws Exception {
+        if (itemId == null || !itemId.matches("[0-9]{1,30}")) throw new IOException("分集编号无效");
+        return request("https://hongguoduanju.com/api/video/protected/fallback-play-info", false, false,
+            deadline, "{\"item_id\":\"" + itemId + "\"}", true);
+    }
     static Reply get(String value, long timeoutMs, long deadlineMs) throws Exception { return get(value, pageDeadline(timeoutMs, deadlineMs)); }
     static String media(String value) throws Exception { return request(value, false, true).url; }
     /** Bounded binary transfer; each redirect resolves public IPs and connects TLS to that checked IP. */
@@ -468,12 +475,15 @@ final class NetworkGuard {
         return request(value, officialOnly, head, deadline, null);
     }
     private static Reply request(String value, boolean officialOnly, boolean head, long deadline, String postBody) throws Exception {
+        return request(value, officialOnly, head, deadline, postBody, false);
+    }
+    private static Reply request(String value, boolean officialOnly, boolean head, long deadline, String postBody, boolean guestPost) throws Exception {
         remaining(deadline, Integer.MAX_VALUE);
         URI uri = validate(value, officialOnly);
         for (int redirects = 0; redirects <= 3; redirects++) {
             // Official pages race the system resolver against trusted DoH: a VPN's fake-IP
             // answer loses the race instead of hanging the episode.
-            InetAddress[] addresses = officialOnly || racesHost(uri.getHost()) ? officialAddresses(uri, deadline) : publicAddresses(uri, deadline);
+            InetAddress[] addresses = officialOnly || guestPost || racesHost(uri.getHost()) ? officialAddresses(uri, deadline) : publicAddresses(uri, deadline);
             Socket raw = connectPublic(addresses, deadline);
             try (SocketGuard ignored = guardSocket(raw, deadline)) {
                 raw.setSoTimeout(remaining(deadline, 15_000));
@@ -506,6 +516,9 @@ final class NetworkGuard {
                         int colon = row.indexOf(':');
                         if (colon > 0) headers.put(row.substring(0, colon).toLowerCase(Locale.ROOT), row.substring(colon + 1).trim());
                     }
+                    // A refused guest request is final even when its error body is
+                    // compressed, malformed, or truncated. Never follow a POST redirect.
+                    if (guestPost && status != 200) return new Reply("", status, uri.toASCIIString());
                     if (Arrays.asList(301, 302, 303, 307, 308).contains(status)) {
                         if (redirects == 3 || !headers.containsKey("location")) throw new IOException("来源跳转次数过多");
                         uri = validate(uri.resolve(headers.get("location")).toString(), officialOnly);

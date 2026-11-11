@@ -15,7 +15,7 @@ public final class QualityCacheTest {
         check(MediaQuality.meets(720,1280,"720p"),"portrait720");
         check(!MediaQuality.meets(720,1280,"1080p"),"do not call long edge1080p");
         check(MediaQuality.meets(1920,1080,"1080p"),"landscape1080");
-        check(MediaQuality.cacheVid("1004","auto").equals("1004|quality=auto|complete=1"),"auto complete-source identity excludes legacy preview");
+        check(MediaQuality.cacheVid("1004","auto").equals("1004|quality=auto|complete=2"),"auto complete-source identity excludes legacy preview");
         check(new HashSet<>(Arrays.asList(MediaQuality.cacheVid("1004","auto"),MediaQuality.cacheVid("1004","720p"),MediaQuality.cacheVid("1004","1080p"))).size()==3,"all quality namespaces distinct");
         File dir=Files.createTempDirectory("hongguo-quality-cache-").toFile();
         try {

@@ -39,7 +39,7 @@ final class TvDownloads {
                 throw new IOException("下载片源身份或清晰度不匹配");
             if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("下载准备已取消");
             DownloadManager service = manager(context);
-            if (!plan.source.equals("web")) return prepared(context, service, store, series, episode, plan);
+            if (plan.guestPlayback || !plan.source.equals("web")) return prepared(context, service, store, series, episode, plan);
             String path = Uri.parse(plan.url).getPath();
             if (path != null && path.toLowerCase(Locale.ROOT).endsWith(".m3u8")) throw new IOException("此片源为流式播放列表，请在线播放；下载支持完整视频文件");
             if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("下载准备已取消");

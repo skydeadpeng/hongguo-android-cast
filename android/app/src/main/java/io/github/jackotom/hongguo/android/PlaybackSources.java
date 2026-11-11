@@ -13,10 +13,17 @@ final class PlaybackSources {
         final String url, contentKey, userAgent, referer, source, vid, seriesId, requestedQuality, quality;
         final int width, height, playbackCeiling;
         final List<Plan> variants;
+        final boolean guestPlayback;
+        final double expectedDurationSeconds;
+        final long urlExpiresAt;
         Plan(String url, String key, String ua, String ref, String source, String vid, String seriesId, String requestedQuality, int width, int height, String quality, List<Plan> variants) {
             this(url,key,ua,ref,source,vid,seriesId,requestedQuality,width,height,quality,variants,0);
         }
         Plan(String url,String key,String ua,String ref,String source,String vid,String seriesId,String requestedQuality,int width,int height,String quality,List<Plan> variants,int playbackCeiling) {
+            this(url,key,ua,ref,source,vid,seriesId,requestedQuality,width,height,quality,variants,playbackCeiling,false,0,0);
+        }
+        private Plan(String url,String key,String ua,String ref,String source,String vid,String seriesId,String requestedQuality,int width,int height,String quality,List<Plan> variants,int playbackCeiling,boolean guestPlayback,double expectedDurationSeconds,long urlExpiresAt) {
+            this.guestPlayback=guestPlayback;this.expectedDurationSeconds=expectedDurationSeconds;this.urlExpiresAt=urlExpiresAt;
             this.playbackCeiling=playbackCeiling;
             this.url=url; contentKey=key; userAgent=ua; referer=ref; this.source=source; this.vid=vid; this.seriesId=seriesId;
             this.requestedQuality=requestedQuality;this.width=width;this.height=height;this.quality=quality;
@@ -24,6 +31,7 @@ final class PlaybackSources {
         }
         JSONObject json() throws JSONException {
             JSONObject result=new JSONObject().put("url",url).put("contentKey",contentKey==null?JSONObject.NULL:contentKey).put("userAgent",userAgent).put("referer",referer).put("source",source).put("vid",vid).put("requestedQuality",requestedQuality);
+            if (guestPlayback) result.put("guestPlayback",true).put("expectedDurationSeconds",expectedDurationSeconds).put("urlExpiresAt",urlExpiresAt);
             if (seriesId!=null) result.put("seriesId",seriesId);
             if (width>0) result.put("width",width);
             if (height>0) result.put("height",height);
@@ -83,7 +91,7 @@ final class PlaybackSources {
         if(!checked.source.equals("web"))return register(bound,vid,false);
         try { return register(bound,vid,true); }
         catch(Exception webError) {
-            if(cancelled(webError))throw webError;
+            if(cancelled(webError)||webError instanceof EpisodeResolver.GuestFailure)throw webError;
             markWebFailure(sid,vid);
             try { return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true); }
             catch(Exception appError) {
@@ -121,6 +129,10 @@ final class PlaybackSources {
         return new Plan(url,primary.contentKey,primary.userAgent,primary.referer,primary.source,vid,primary.seriesId,primary.requestedQuality,primary.width,primary.height,primary.quality,variants,primary.playbackCeiling);
     }
     private static Plan parse(JSONObject input,String vid,Plan parent) throws Exception {
+        // Guest provenance can only be attached by resolveWeb after the official
+        // page/POST checks, never asserted by bridge JSON or a saved playInfo.
+        if (input != null && (input.has("guestPlayback") || input.has("expectedDurationSeconds") || input.has("urlExpiresAt")))
+            throw new EpisodeResolver.GuestFailure("官网游客播放信息必须由当前页面重新核实");
         if (input == null || !vid.equals(input.optString("vid",vid))) throw new IOException("片源与分集不一致");
         String sid=parent==null?null:parent.seriesId;
         if (input.has("seriesId") && !input.isNull("seriesId")) {
@@ -195,13 +207,13 @@ final class PlaybackSources {
                 if (cancelled(appError)) throw appError;
                 // Like the desktop, the penalty changes priority, not permanent availability.
                 try { return resolveWeb(sid,vid); }
-                catch (Exception webError) { if(cancelled(webError))throw webError;appError.addSuppressed(webError);throw appError; }
+                catch (Exception webError) { if(cancelled(webError)||webError instanceof EpisodeResolver.GuestFailure)throw webError;appError.addSuppressed(webError);throw appError; }
             }
         }
         try {
             return resolveWeb(sid,vid);
         } catch (Exception webError) {
-            if (cancelled(webError)) throw webError;
+            if (cancelled(webError) || webError instanceof EpisodeResolver.GuestFailure) throw webError;
             return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true);
         }
     }
@@ -221,8 +233,18 @@ final class PlaybackSources {
         return register(bindSeries(resolveApp(sid,vid,requested,!fresh,ceiling),sid),vid,true);
     }
     private static Plan resolveWeb(String sid,String vid) throws Exception {
-        String url=EpisodeResolver.resolve(sid,vid);
-        return register(new JSONObject().put("url",url).put("vid",vid).put("seriesId",sid).put("source","web"),vid,true);
+        JSONObject info=EpisodeResolver.resolveInfo(sid,vid);
+        if (!Boolean.TRUE.equals(info.opt("guestPlayback"))) return register(info,vid,true);
+        // resolveInfo is the only producer of this provenance. Do not run a HEAD
+        // or expose the remote URL to a decoder before complete-file validation.
+        double seconds=info.getDouble("expectedDurationSeconds");long expires=info.getLong("urlExpiresAt");
+        JSONObject basic=new JSONObject(info.toString());
+        basic.remove("guestPlayback");basic.remove("expectedDurationSeconds");basic.remove("urlExpiresAt");
+        Plan checked=preparePlan(basic,vid,false);
+        Plan plan=new Plan(checked.url,null,checked.userAgent,checked.referer,"web",vid,sid,"auto",checked.width,checked.height,checked.quality,
+            Collections.emptyList(),0,true,seconds,expires);
+        synchronized(plans) { plans.put(planKey(plan.url,plan.requestedQuality),plan);while(plans.size()>128)plans.remove(plans.keySet().iterator().next()); }
+        return plan;
     }
     /** 黄果分集（99 前缀 14 位编号）不进入 App 片源链：直接取官方签名 m3u8 在线播放，单档无降档。 */
     private static boolean isHuangguoVid(String vid) { return vid.length()==14&&vid.startsWith("99"); }
@@ -396,6 +418,22 @@ final class PlaybackSources {
     static void download(Plan plan,File destination,long maxBytes) throws Exception {
         if(plan==null)throw new IllegalArgumentException("播放片源准备信息无效");
         String requestedQuality=MediaQuality.normalize(plan.requestedQuality);
+        if(plan.guestPlayback) {
+            // This normal guest response is one permission decision. No Referer
+            // toggling, App-model fallback, decryption, or retry after refusal.
+            try {
+                if(plan.urlExpiresAt<=System.currentTimeMillis()/1000L)throw new EpisodeResolver.GuestFailure("官网播放地址已过期，请重新选择分集");
+                NetworkGuard.download(plan.url,destination,Math.min(maxBytes,PublicPlaybackVerifier.MAX_FILE_BYTES),plan.userAgent,plan.referer);
+                PublicPlaybackVerifier.verify(destination,plan.expectedDurationSeconds,plan.width,plan.height);
+                if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放准备已取消");
+                return;
+            } catch(Exception failure) {
+                if(destination.exists()&&!destination.delete())throw new EpisodeResolver.GuestFailure("未完成的官网视频清理失败");
+                if(cancelled(failure))throw failure;
+                EpisodeResolver.GuestFailure terminal=new EpisodeResolver.GuestFailure("官网视频未通过完整播放验证，请在官方应用查看");
+                terminal.initCause(failure);throw terminal;
+            }
+        }
         Exception last=null;
         int transfers=0, refreshes=0;
         boolean forbiddenRetryUsed=false, forbiddenFailureSeen=false;
@@ -479,7 +517,7 @@ final class PlaybackSources {
         if(error==null||cancelled(error))return false;
         boolean recoverable=false;Set<Throwable> seen=Collections.newSetFromMap(new IdentityHashMap<Throwable,Boolean>());
         for(Throwable cause=error;cause!=null&&seen.add(cause);cause=cause.getCause()) {
-            if(cause instanceof javax.net.ssl.SSLException||cause instanceof java.security.cert.CertificateException||cause instanceof JSONException||cause instanceof IllegalArgumentException||cause instanceof java.net.URISyntaxException||cause instanceof SecurityException||cause instanceof CancellationException)return false;
+            if(cause instanceof EpisodeResolver.GuestFailure||cause instanceof javax.net.ssl.SSLException||cause instanceof java.security.cert.CertificateException||cause instanceof JSONException||cause instanceof IllegalArgumentException||cause instanceof java.net.URISyntaxException||cause instanceof SecurityException||cause instanceof CancellationException)return false;
             if(cause instanceof AppLookupException) {
                 String code=((AppLookupException)cause).code;
                 if(RESPONSE_RETRY_CODE.equals(code)||code.equals("QUALITY_UNAVAILABLE")||LOOKUP_TRANSIENT_CODES.contains(code))recoverable=true;
@@ -495,7 +533,7 @@ final class PlaybackSources {
         boolean recoverable=false;
         Set<Throwable> seen=Collections.newSetFromMap(new IdentityHashMap<Throwable,Boolean>());
         for (Throwable cause=error;cause!=null&&seen.add(cause);cause=cause.getCause()) {
-            if (cause instanceof javax.net.ssl.SSLException || cause instanceof java.security.cert.CertificateException ||
+            if (cause instanceof EpisodeResolver.GuestFailure || cause instanceof javax.net.ssl.SSLException || cause instanceof java.security.cert.CertificateException ||
                 cause instanceof JSONException || cause instanceof IllegalArgumentException || cause instanceof java.net.URISyntaxException ||
                 cause instanceof SecurityException || cause instanceof CancellationException) return false;
             if (cause instanceof QualityUnavailableException) recoverable=true;

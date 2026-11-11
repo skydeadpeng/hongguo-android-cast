@@ -29,7 +29,10 @@ final class HuangguoApi {
  static int decodeEpisodeIndex(String vid){throw new AssertionError("Unexpected Huangguo request");}
  static String episodeUrl(String sid,int index){throw new AssertionError("Unexpected Huangguo request");}
 }
-final class EpisodeResolver {static int calls;static String result;static String resolve(String sid,String vid)throws Exception{calls++;if(result!=null)return result;throw new IOException("synthetic web miss");}}
+final class PublicPlaybackVerifier {static final long MAX_FILE_BYTES=96L*1024*1024;static void verify(java.io.File f,double seconds,int w,int h)throws Exception{throw new AssertionError("Unexpected guest verification");}}
+final class EpisodeResolver {static final class GuestFailure extends java.io.IOException {GuestFailure(String message){super(message);}}
+ static org.json.JSONObject resolveInfo(String sid,String vid)throws Exception{return new org.json.JSONObject().put("url",resolve(sid,vid)).put("vid",vid).put("seriesId",sid).put("source","web");}
+static int calls;static String result;static String resolve(String sid,String vid)throws Exception{calls++;if(result!=null)return result;throw new IOException("synthetic web miss");}}
 final class AppTransport {static int heads;static boolean domain(String host,String...allowed){if(host==null)return false;host=host.toLowerCase(Locale.ROOT);for(String suffix:allowed)if(host.equals(suffix)||host.endsWith("."+suffix))return true;return false;}static String media(String url,String ua,String ref){heads++;return url;}}
 final class NetworkGuard {
  static final class MediaRedirectException extends IOException {MediaRedirectException(){super("片源跳转不可用（地址无效或跳转次数超限）");}}
