@@ -3,10 +3,16 @@ on:
   push:
     paths:
       - 'android/**'
+      - 'src/android/**'
+      - 'src/native/app-source-registered.js'
+      - 'scripts/check-android-signer-offsets.cjs'
       - '.github/workflows/android-cast.yml'
   pull_request:
     paths:
       - 'android/**'
+      - 'src/android/**'
+      - 'src/native/app-source-registered.js'
+      - 'scripts/check-android-signer-offsets.cjs'
       - '.github/workflows/android-cast.yml'
 permissions:
   contents: read
@@ -55,6 +61,7 @@ jobs:
       - name: Build phone debug APK
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
+          node scripts/check-android-signer-offsets.cjs
           npm run build:android:ui
           gradle -p android :app:assemblePhoneDebug --no-daemon --console=plain
       - uses: actions/upload-artifact@v4

@@ -42,8 +42,10 @@ function u32(value) { return Number(value) >>> 0; }
 function rol32(value, count) { const n = count & 31; const x = u32(value); return u32((x << n) | (x >>> (32 - n))); }
 function ror32(value, count) { const n = count & 31; const x = u32(value); return u32((x >>> n) | (x << (32 - n))); }
 function ror64(value, count) { const n = BigInt(count) & 63n; const x = BigInt.asUintN(64, BigInt(value)); return BigInt.asUintN(64, (x >> n) | (x << (64n - n))); }
-function le32(value) { const b = Buffer.alloc(4); b.writeUInt32LE(u32(value)); return b; }
-function be32(value) { const b = Buffer.alloc(4); b.writeUInt32BE(u32(value)); return b; }
+// Use explicit byte offsets: the API30 x86_64 software-emulator WebView can
+// misconvert an omitted offset. This preserves the protocol bytes on normal engines.
+function le32(value) { const b = Buffer.alloc(4); b.writeUInt32LE(u32(value), 0); return b; }
+function be32(value) { const b = Buffer.alloc(4); b.writeUInt32BE(u32(value), 0); return b; }
 function zigzag(value) { const n = BigInt(value); return n < 0n ? ((-n) * 2n - 1n) : n * 2n; }
 function varint(value) { let n = BigInt(value); const out = []; while (n > 127n) { out.push(Number((n & 127n) | 128n)); n >>= 7n; } out.push(Number(n)); return Buffer.from(out); }
 function protoField(tag, value, type = 'string') {
@@ -52,7 +54,7 @@ function protoField(tag, value, type = 'string') {
         const body = type === 'bytes' ? Buffer.from(value) : type === 'message' ? value : Buffer.from(String(value));
         return Buffer.concat([varint((BigInt(tag) << 3n) | 2n), varint(body.length), body]);
     }
-    if (type === 'float') { const body = Buffer.alloc(4); body.writeFloatLE(Number(value)); return Buffer.concat([varint((BigInt(tag) << 3n) | 5n), body]); }
+    if (type === 'float') { const body = Buffer.alloc(4); body.writeFloatLE(Number(value), 0); return Buffer.concat([varint((BigInt(tag) << 3n) | 5n), body]); }
     return Buffer.concat([varint(BigInt(tag) << 3n), varint(type === 'sint' ? zigzag(value) : value)]);
 }
 function proto(fields) { return Buffer.concat(fields.map(([tag, value, type]) => protoField(tag, value, type))); }
@@ -91,7 +93,7 @@ function rc4Gorgon(data, key) {
     return Buffer.from(data.map((value) => { i += 1; const x = s[i]; j += x; const y = s[j & 255]; s[i] = y; return value ^ s[(y + y) & 255]; }));
 }
 function xGorgon(query, body, timestamp, random) {
-    const sdk = Buffer.alloc(4); sdk.writeUInt32LE(67503104);
+    const sdk = Buffer.alloc(4); sdk.writeUInt32LE(67503104, 0);
     const input = Buffer.concat([crypto.createHash('md5').update(query).digest().subarray(0, 4), body ? crypto.createHash('md5').update(body).digest().subarray(0, 4) : Buffer.alloc(4), Buffer.alloc(4), sdk, be32(timestamp)]);
     const key = [0x4a, 0x40, 0x16, (random >> 8) & 255, 0x47, 0x6c, 0x01, random & 255]; const out = rc4Gorgon([...input], key);
     for (let i = 0; i < out.length; i += 1) { let value = out[i]; value = ((value >> 4) | (value << 4)) & 255; const next = i + 1 < out.length ? out[i + 1] : out[0]; out[i] = (~(reverseBits((next ^ value) & 255) ^ 20)) & 255; }
