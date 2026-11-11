@@ -49,6 +49,12 @@ final class NativeBridge {
         } catch (JSONException error) { return; }
         activity.runOnUiThread(() -> {
             if (closed || !activity.trusted()) return;
+            // Announcements are optional and may stall in system DNS. Keep them out of
+            // playback/control workers, including after a WebView reload.
+            if (method.equals("getAnnouncements")) {
+                AnnouncementRequests.fetch(result -> respond(id, result, null));
+                return;
+            }
             // Control callbacks never enter a network queue; only registered page IDs are cancellable.
             if (method.equals("cancelHttp")) {
                 Object requestId = params.opt("requestId");
@@ -329,7 +335,6 @@ final class NativeBridge {
             case "officialWebPoll": respond(id, AccountSync.get().webPoll(), null); break;
             case "officialWebLogout": respond(id, AccountSync.get().webLogout(), null); break;
             case "officialWebCancel": respond(id, AccountSync.get().webCancel(), null); break;
-            case "getAnnouncements": respond(id, AnnouncementClient.fetch(), null); break;
             case "searchNewReleases": respond(id, newReleases(params), null); break;
             case "homeFeed": {
                 int offset = params == null ? 0 : Math.max(0, params.optInt("offset", 0));

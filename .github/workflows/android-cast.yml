@@ -51,6 +51,7 @@ jobs:
           bash android/tests/run-huangguo-cast-source-tests.sh
       - name: Run existing network, service-source and cache regressions
         run: |
+          bash android/tests/run-announcement-request-tests.sh
           bash android/tests/run-network-guard-tests.sh
           bash android/tests/run-network-guard-race-tests.sh
           bash android/tests/run-cast-playlist-source-tests.sh
