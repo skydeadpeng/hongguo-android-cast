@@ -2,8 +2,9 @@ const axios = require('axios');
 
 // 黄果官方站 API（huangguoai.com，author「黄果官方」）。全站分集直发完整签名 m3u8（AES-128，
 // key/分片均为绝对地址），无 vip 拦截；配合时长校验防"只下发预览片段"的个别情况。
-// 备用域名来自社区项目 HGXZ 的配置，主站失败时按序切换。
-const ORIGINS = ['https://huangguoai.com', 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc'];
+// 备用域名来自社区项目 HGXZ 的配置，主站失败时按序切换；末位为自建 Worker 代理
+// （安卓/webOS 同款线路），兜底部分网络把官方全系域名 DNS 污染到假 IP 的情况。
+const ORIGINS = ['https://huangguoai.com', 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc', 'https://huoguo.skydeadpeng.xyz'];
 const ID = /^\d{1,30}$/;
 const PAGE_SIZE = 30;
 // 与官方站点导航一致的内容分类（ranks/topics 等聚合页不作为题材）。
@@ -43,8 +44,14 @@ async function request(apiPath, params, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
-      const { data } = await axios.get(origin + apiPath, {
-        params, headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json', Referer: origin + '/' },
+      // options.method='POST' 时把参数改为 JSON 请求体发送（2026-11 官方取流端点仅收 POST）。
+      const post = String(options.method || 'GET').toUpperCase() === 'POST';
+      const { data } = await axios.request(origin + apiPath, {
+        method: post ? 'post' : 'get',
+        params: post ? undefined : params,
+        data: post ? {} : undefined,
+        headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json', Referer: origin + '/',
+          ...(post ? { 'Content-Type': 'application/json' } : {}) },
         timeout, signal: controller.signal, maxRedirects: 0, maxContentLength: 8 * 1024 * 1024,
       });
       if (!data || typeof data !== 'object') throw new Error('invalid result');
@@ -157,8 +164,10 @@ async function fetchPlayUrlSingle(vid, sid) {
     const id = parseId(vid, true);
     if (sid != null && sid !== '' && parseId(sid).seriesId !== id.seriesId) throw new Error('黄果分集不属于当前剧集');
     const referer = ORIGINS[originIndex] + '/';
-    const data = await request(`/api/videos/${id.dramaId}/play`, { ep: id.ep }, { timeout: 15000 });
-    const url = httpsUrl(data.video_url);
+    // 2026-11-09 官方改版：旧 GET /api/videos/:id/play 仅回页面元数据（video_url 恒空），
+    // 取流改为 POST /api/videos/:id/episodes/:ep/playback（空 JSON 体），地址在 data.streams.main。
+    const data = await request(`/api/videos/${id.dramaId}/episodes/${id.ep}/playback`, null, { method: 'POST', timeout: 15000 });
+    const url = httpsUrl(data.streams && data.streams.main);
     if (!url) throw new Error('黄果未提供有效 HTTPS 播放地址');
     // 官方对个别内容只下发预览片段：实际时长不足声明八成即视为不完整，如实报错（参照 huangguo-web 的做法）。
     const declared = Number(data.duration) || 0;
