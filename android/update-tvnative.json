@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 14,
-  "versionName": "0.1.13",
+  "versionCode": 15,
+  "versionName": "0.1.14",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.13/HongguoNative-0.1.13-tvNative-release-compatible.apk",
-  "size": 654460,
-  "sha256": "b898aafac2adcdd67c62d48f4102d423775a1828508adacb752aee87459ddc58",
-  "notes": "",
-  "publishedAt": "2026-11-08T13:13:36.542Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.14/HongguoNative-0.1.14-tvNative-release-compatible.apk",
+  "size": 656172,
+  "sha256": "18623080367078780de262d75d47e8ef90fb451478fd39f9e870a010cc0aefb4",
+  "notes": "修复黄果播放：黄果官方调整了取流接口，旧版本无法获取播放地址。本版改用官方新接口并保留自建备用线路，恢复黄果在线播放。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-11T03:28:28.000Z"
 }
