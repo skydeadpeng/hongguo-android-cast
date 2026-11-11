@@ -20,15 +20,10 @@ jobs:
     name: Isolated real Android playback
     if: >-
       github.ref == 'refs/heads/fix/hongguo-playback-fanqie-analysis' &&
-      github.event.before == '9062c21cc810cb56bdae1dbc86efed7e27a4b731' &&
+      github.event.before == 'de9812cc07e01cb3afd1af56184fe7dc8bf7bc86' &&
       contains(github.event.head_commit.message, '[run-approved-android-playback-20261111]')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    env:
-      QA_RUNNER_ENVIRONMENT: ${{ runner.environment }}
-      QA_OUT: ${{ runner.temp }}/hongguo-playback-qa
-      QA_PRIVATE: ${{ runner.temp }}/hongguo-playback-private
-      ANDROID_AVD_HOME: ${{ runner.temp }}/hongguo-playback-avd
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,7 +40,14 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Prepare isolated evidence directory
+        env:
+          QA_RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
+          export QA_OUT="$RUNNER_TEMP/hongguo-playback-qa"
+          export QA_PRIVATE="$RUNNER_TEMP/hongguo-playback-private"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/hongguo-playback-avd"
+          printf 'QA_RUNNER_ENVIRONMENT=%s\nQA_OUT=%s\nQA_PRIVATE=%s\nANDROID_AVD_HOME=%s\n' \
+            "$QA_RUNNER_ENVIRONMENT" "$QA_OUT" "$QA_PRIVATE" "$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
           mkdir -p "$QA_OUT" "$QA_PRIVATE" "$ANDROID_AVD_HOME"
           printf '{"status":"NOT_RUN","apk_execution":false,"first_frame":false,"continuous_30_seconds":false}\n' > "$QA_OUT/workflow-status.json"
       - name: Validate evidence acceptance rules (not device playback)
@@ -114,11 +116,11 @@ jobs:
         with:
           name: hongguo-real-android-playback
           path: |
-            ${{ env.QA_OUT }}/workflow-status.json
-            ${{ env.QA_OUT }}/preflight/preflight.json
-            ${{ env.QA_OUT }}/preflight/summary.txt
-            ${{ env.QA_OUT }}/report.json
-            ${{ env.QA_OUT }}/first-frame.png
-            ${{ env.QA_OUT }}/after-30s.png
+            ${{ runner.temp }}/hongguo-playback-qa/workflow-status.json
+            ${{ runner.temp }}/hongguo-playback-qa/preflight/preflight.json
+            ${{ runner.temp }}/hongguo-playback-qa/preflight/summary.txt
+            ${{ runner.temp }}/hongguo-playback-qa/report.json
+            ${{ runner.temp }}/hongguo-playback-qa/first-frame.png
+            ${{ runner.temp }}/hongguo-playback-qa/after-30s.png
           if-no-files-found: error
           retention-days: 3
