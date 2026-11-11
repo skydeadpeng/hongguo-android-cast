@@ -1,0 +1,907 @@
+{
+  "apk": "fanqie-official.apk",
+  "sha256": "daaf7463fbcaa10ac1db93d16ef873c97eb386397e42f8a0af1085c1ced0cb7e",
+  "bytes": 144772557,
+  "entries": 23354,
+  "uncompressed_bytes": 334921304,
+  "dex": [
+    {
+      "name": "classes.dex",
+      "bytes": 9276048,
+      "strings": 50751,
+      "types": 16368,
+      "method_ids": 65535,
+      "class_defs": 11927,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes10.dex",
+      "bytes": 10603380,
+      "strings": 52382,
+      "types": 20350,
+      "method_ids": 65531,
+      "class_defs": 13983,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes11.dex",
+      "bytes": 10838688,
+      "strings": 54529,
+      "types": 22341,
+      "method_ids": 65536,
+      "class_defs": 15345,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes12.dex",
+      "bytes": 10202372,
+      "strings": 58386,
+      "types": 17246,
+      "method_ids": 65535,
+      "class_defs": 14003,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes13.dex",
+      "bytes": 8171792,
+      "strings": 56009,
+      "types": 12779,
+      "method_ids": 65533,
+      "class_defs": 9399,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes14.dex",
+      "bytes": 9011684,
+      "strings": 68916,
+      "types": 14103,
+      "method_ids": 65531,
+      "class_defs": 9625,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes15.dex",
+      "bytes": 8591736,
+      "strings": 50025,
+      "types": 13623,
+      "method_ids": 65529,
+      "class_defs": 9839,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes16.dex",
+      "bytes": 10336436,
+      "strings": 59620,
+      "types": 24060,
+      "method_ids": 65533,
+      "class_defs": 15048,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes17.dex",
+      "bytes": 11110328,
+      "strings": 43062,
+      "types": 16739,
+      "method_ids": 65536,
+      "class_defs": 13308,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes18.dex",
+      "bytes": 698144,
+      "strings": 3306,
+      "types": 920,
+      "method_ids": 3238,
+      "class_defs": 650,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes19.dex",
+      "bytes": 8867276,
+      "strings": 56527,
+      "types": 13531,
+      "method_ids": 65536,
+      "class_defs": 10947,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes2.dex",
+      "bytes": 10130456,
+      "strings": 58432,
+      "types": 22425,
+      "method_ids": 65534,
+      "class_defs": 14784,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes20.dex",
+      "bytes": 8893676,
+      "strings": 61487,
+      "types": 16156,
+      "method_ids": 65536,
+      "class_defs": 12398,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes21.dex",
+      "bytes": 11933868,
+      "strings": 53559,
+      "types": 16161,
+      "method_ids": 65532,
+      "class_defs": 11484,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes22.dex",
+      "bytes": 9616256,
+      "strings": 65870,
+      "types": 19829,
+      "method_ids": 65534,
+      "class_defs": 12105,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes23.dex",
+      "bytes": 8995356,
+      "strings": 56738,
+      "types": 19752,
+      "method_ids": 65534,
+      "class_defs": 14376,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes24.dex",
+      "bytes": 10316364,
+      "strings": 46379,
+      "types": 21829,
+      "method_ids": 65535,
+      "class_defs": 15675,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes25.dex",
+      "bytes": 11344972,
+      "strings": 72192,
+      "types": 25741,
+      "method_ids": 65531,
+      "class_defs": 18757,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes3.dex",
+      "bytes": 9973196,
+      "strings": 59401,
+      "types": 24433,
+      "method_ids": 65533,
+      "class_defs": 15156,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes4.dex",
+      "bytes": 10456224,
+      "strings": 59140,
+      "types": 22460,
+      "method_ids": 65535,
+      "class_defs": 15086,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes5.dex",
+      "bytes": 10078580,
+      "strings": 54592,
+      "types": 22232,
+      "method_ids": 65534,
+      "class_defs": 14638,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes6.dex",
+      "bytes": 13732472,
+      "strings": 53053,
+      "types": 22772,
+      "method_ids": 65531,
+      "class_defs": 17029,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes7.dex",
+      "bytes": 12589528,
+      "strings": 55299,
+      "types": 21179,
+      "method_ids": 65532,
+      "class_defs": 15897,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes8.dex",
+      "bytes": 10127192,
+      "strings": 60060,
+      "types": 18857,
+      "method_ids": 65534,
+      "class_defs": 12936,
+      "sha1_ok": true,
+      "adler32_ok": true
+    },
+    {
+      "name": "classes9.dex",
+      "bytes": 11587424,
+      "strings": 62602,
+      "types": 20002,
+      "method_ids": 65535,
+      "class_defs": 12867,
+      "sha1_ok": true,
+      "adler32_ok": true
+    }
+  ],
+  "native": [
+    {
+      "path": "lib/armeabi-v7a/libByteVC1_dec.so",
+      "bytes": 478180,
+      "sha256": "c6edc05352fd605f1c900386ef454403b361b7654cba85c6822b234fa2a7214b"
+    },
+    {
+      "path": "lib/armeabi-v7a/libEncryptor.so",
+      "bytes": 79640,
+      "sha256": "59cc595f1f56388381454aefa817c42d926b0557c2e9c002dfc1cbea119791e3"
+    },
+    {
+      "path": "lib/armeabi-v7a/libTTHighlight.so",
+      "bytes": 55008,
+      "sha256": "7a3cc656ecf496335d9dfc086d9c214abc5eece9c65144a332623df1de761eb4"
+    },
+    {
+      "path": "lib/armeabi-v7a/libTTWebViewSdkFlipped.so",
+      "bytes": 6780,
+      "sha256": "f6c1786666c131bccfa399da67e4732b2dbc5929f0707221c513691857d44291"
+    },
+    {
+      "path": "lib/armeabi-v7a/libTuringYuvUtils.so",
+      "bytes": 5820,
+      "sha256": "356a7e92225b6adf34827f5049ee61ff1fe9ca07720c9ca408f398072b145f29"
+    },
+    {
+      "path": "lib/armeabi-v7a/libTxtParser.so",
+      "bytes": 38488,
+      "sha256": "cfe1aaf309b582b68b7602da4fe017e643c8a06bc40abd5249112e99fc5bae92"
+    },
+    {
+      "path": "lib/armeabi-v7a/libalog.so",
+      "bytes": 87920,
+      "sha256": "25e159c086a4696321e52adc83d8ce55b69337c93c46bedd95741d0fc4fcf24a"
+    },
+    {
+      "path": "lib/armeabi-v7a/libandroidx.graphics.path.so",
+      "bytes": 7252,
+      "sha256": "41399eba6fc2a60f6f14642375c1824f3cf25eb8fec7397d753730a3ceda3e2b"
+    },
+    {
+      "path": "lib/armeabi-v7a/libanimax.so",
+      "bytes": 464672,
+      "sha256": "d2ec4e24468b9aba8cbacdacd336cd2ad96752ba544d8659f47def7c20f16cba"
+    },
+    {
+      "path": "lib/armeabi-v7a/libanimax_bytevc1.so",
+      "bytes": 30304,
+      "sha256": "2e48724d7614787445caef80a60183ad37586534ad923b147bc2cbd7ab44e076"
+    },
+    {
+      "path": "lib/armeabi-v7a/libanimax_napi.so",
+      "bytes": 34468,
+      "sha256": "cfdc0f2a6823547ed8809d246dbdda130bcb8b97dee796e1f383b66f1f8e41a0"
+    },
+    {
+      "path": "lib/armeabi-v7a/libanimax_textra.so",
+      "bytes": 42540,
+      "sha256": "26a5954529137a9cca89e108e31bdb55a5790b8524e04a89c61f900ff51c6c47"
+    },
+    {
+      "path": "lib/armeabi-v7a/libart_method_ext.so",
+      "bytes": 9996,
+      "sha256": "89ce8bf8814049ccbb73730401b99c1ad037a8905b94ffe84a898d7ddf68cde4"
+    },
+    {
+      "path": "lib/armeabi-v7a/libart_sym.so",
+      "bytes": 130052,
+      "sha256": "6714119c2207b31082eb1d1f94cf4575d521d7d1150175843cf311428826e91d"
+    },
+    {
+      "path": "lib/armeabi-v7a/libavmdlbase.so",
+      "bytes": 30296,
+      "sha256": "686ce86f7ffb12eaba54b83f344ac40d326631ff4a2798613b149ad3e474a1b8"
+    },
+    {
+      "path": "lib/armeabi-v7a/libbdheif.so",
+      "bytes": 63960,
+      "sha256": "c431976c83dc888ba7b00e6f35cbb6dd6dbacaabf182f1376aec1a0bfbd36739"
+    },
+    {
+      "path": "lib/armeabi-v7a/libbdmpg123.so",
+      "bytes": 137056,
+      "sha256": "a1ee4a23cd5091ad149eba9f9ba3b506175dc3dca1b4e89222ff4154b1db567a"
+    },
+    {
+      "path": "lib/armeabi-v7a/libbdsword.so",
+      "bytes": 137408,
+      "sha256": "17ec8b9e6e766f59dfc34ea18bd6383468ee5be93ab631f7c718b2cf8f2fb869"
+    },
+    {
+      "path": "lib/armeabi-v7a/libbdzstd.so",
+      "bytes": 181836,
+      "sha256": "92797939ac83fd95af18dc9752fa9596f055631cd66579d7a49ca521f3736857"
+    },
+    {
+      "path": "lib/armeabi-v7a/libbitmapmonitor.so",
+      "bytes": 26200,
+      "sha256": "13ccaff8a01879484a41b3a6e218ec1e247f63c68dfb4d6c4300022e7876d627"
+    },
+    {
+      "path": "lib/armeabi-v7a/libbuffer.so",
+      "bytes": 18000,
+      "sha256": "e8829724ffd1ecaec63b00083db61ec12af1ef2c403abd89d47bae9bc9835091"
+    },
+    {
+      "path": "lib/armeabi-v7a/libbyteVC2dec.so",
+      "bytes": 474124,
+      "sha256": "2759b7b0bc017d7c660e8b23282c5ef8d91b21fbaf2bc4948e6e1a3f537a4d29"
+    },
+    {
+      "path": "lib/armeabi-v7a/libbytehook.so",
+      "bytes": 41876,
+      "sha256": "8a2007e696b32bfe4a4afc2b3f9326453c3baf264e9c1346c4bc86c31286e521"
+    },
+    {
+      "path": "lib/armeabi-v7a/libc++_shared.so",
+      "bytes": 554808,
+      "sha256": "66336f9675f720201d2c314f3d559da20b909fcc3eb8677d3ccbabd135e7f9b9"
+    },
+    {
+      "path": "lib/armeabi-v7a/libcollect_hook.so",
+      "bytes": 14932,
+      "sha256": "2fa357d65b9f070df65a4c3411e1587afbc19bcb94cf1e6eeb25e152ddd30a4a"
+    },
+    {
+      "path": "lib/armeabi-v7a/libcommon-logic.so",
+      "bytes": 16060,
+      "sha256": "10ca0b8b73dc20759ad436cdb9268281c52492e0407744bc061f74c93a7e46b2"
+    },
+    {
+      "path": "lib/armeabi-v7a/libcovode_number.so",
+      "bytes": 26200,
+      "sha256": "3aeb36531441dee88808847d3905c61931e51389ac7b43710c8ec3612fe9449d"
+    },
+    {
+      "path": "lib/armeabi-v7a/libdragon_crypt.so",
+      "bytes": 75324,
+      "sha256": "ee14c7533946882635cf11fc2a4dd47442684862fca61a3a04c8f894093cf9ba"
+    },
+    {
+      "path": "lib/armeabi-v7a/libdragoncore.so",
+      "bytes": 264052,
+      "sha256": "270638ed90f94984d76f21292f1f7ac6d40329fd9c53ff83fb5d79e092135e2a"
+    },
+    {
+      "path": "lib/armeabi-v7a/libencrypt.so",
+      "bytes": 18084,
+      "sha256": "4d7e5c40690dff8c7c9080dd9f0f2a6221e18a1821cf37d3ab83257d1c5fe3bb"
+    },
+    {
+      "path": "lib/armeabi-v7a/libflipped.so",
+      "bytes": 5180,
+      "sha256": "580850b3b0f478b038424170c3d59888c68bf5915fd0a1580f57978262183ea7"
+    },
+    {
+      "path": "lib/armeabi-v7a/libgecko_encrypt.so",
+      "bytes": 13948,
+      "sha256": "8b9fa41df64aa3b6736668913ff90f77590780fdeab3dac08a6d4acd985c2709"
+    },
+    {
+      "path": "lib/armeabi-v7a/libgeckox_bspatch.so",
+      "bytes": 74360,
+      "sha256": "b1d3470f3d2860960c7f503dee6ecae368e17d72321cb076163994f11c1e5c42"
+    },
+    {
+      "path": "lib/armeabi-v7a/libgifimage.so",
+      "bytes": 26496,
+      "sha256": "21e29e7b93a9bdd1f5aa5937f490d36e2a96ffdb1d75bdc663a71c884ed44cf6"
+    },
+    {
+      "path": "lib/armeabi-v7a/libgodzilla-sysopt.so",
+      "bytes": 63208,
+      "sha256": "2a6f3f668dac6e6292458c282d23c65f0d585a511d5fa3b812f34628aca43850"
+    },
+    {
+      "path": "lib/armeabi-v7a/libhdiffpatch.so",
+      "bytes": 308184,
+      "sha256": "63dbd19ca027b201a59b3e02fccdad980ace4e3b394fb6564470cbe4b5d141a2"
+    },
+    {
+      "path": "lib/armeabi-v7a/libhost.so",
+      "bytes": 7274496,
+      "sha256": "576e0789384ec653e9d683de440a58f9072cbf22aae802da8e6637c7316b128d"
+    },
+    {
+      "path": "lib/armeabi-v7a/libiesapplogger.so",
+      "bytes": 42584,
+      "sha256": "d343cd3502a0937c8105e7adb3bfaa2307c94d96245dc8de9b407e2a26ee9aa5"
+    },
+    {
+      "path": "lib/armeabi-v7a/libimagepipeline.so",
+      "bytes": 165584,
+      "sha256": "90aeaa035b5052cf76b17716dc509d16f2b96a0c574d0f2c6cf65ebd18817877"
+    },
+    {
+      "path": "lib/armeabi-v7a/libinterstellar.so",
+      "bytes": 9108,
+      "sha256": "0d6219912c60c53d2b47c7576d8be194320235008c90e7160481d47f1cbc5bb5"
+    },
+    {
+      "path": "lib/armeabi-v7a/libjato.so",
+      "bytes": 638612,
+      "sha256": "03a21aa1baeb2aa112f1ec9eedbaf07d4163654189722fe5bf505bcaa960f0df"
+    },
+    {
+      "path": "lib/armeabi-v7a/libkeva.so",
+      "bytes": 153604,
+      "sha256": "666aba26d14c3b1ba1ca5718c9dce6d86aa8d4aa07e49f64e46c4c28fac9ff90"
+    },
+    {
+      "path": "lib/armeabi-v7a/libkomprese-decompressor.so",
+      "bytes": 17272,
+      "sha256": "c1c607e20d34079b11e3b045a3285c2cf865be4efcca36c5a7f81d8f3fbac014"
+    },
+    {
+      "path": "lib/armeabi-v7a/libkrypton.so",
+      "bytes": 1235184,
+      "sha256": "bdf707ed65dfcc2a36ffa96102802075f3ecb5f99d8ac8f3a59bc72496926111"
+    },
+    {
+      "path": "lib/armeabi-v7a/libkryptonaudio.so",
+      "bytes": 210604,
+      "sha256": "c36e0f722e6177616a5ff1e261f7673e33c954696c8b879fcf50c07444ba03f8"
+    },
+    {
+      "path": "lib/armeabi-v7a/libkryptonaudioaudioeffect.so",
+      "bytes": 63112,
+      "sha256": "7b66c83d7e8011704edee18f6865f9a7ad5b0bb91ea1fca92763b5faf7f86717"
+    },
+    {
+      "path": "lib/armeabi-v7a/libkryptonaudioeffect.so",
+      "bytes": 34400,
+      "sha256": "2ec69a1dcde12fda80d7dc463a18924b0a5cc385e1527b378a19eedf0e9b71c1"
+    },
+    {
+      "path": "lib/armeabi-v7a/libkryptonaudioogg.so",
+      "bytes": 75360,
+      "sha256": "02e6d6932af5e158861952cf6b8a335ce204d46a99c1bbb17f2cb1897919972f"
+    },
+    {
+      "path": "lib/armeabi-v7a/libkryptonaurum.so",
+      "bytes": 128696,
+      "sha256": "851536724e407a581ec8e13b1615fa452dcbc87d125a95e95a113fa65601b5a2"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblivestrategy.so",
+      "bytes": 1697468,
+      "sha256": "dbb1e524ddd652733754466c83faf11b1d3f6db093a4528d34aec4372e4db45a"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynx.so",
+      "bytes": 3174860,
+      "sha256": "822fd0256d5d096d82b9282c6cceadf40b3de112dbcd996bfb314222ade3c94b"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynx_krypton.so",
+      "bytes": 30304,
+      "sha256": "ee8ae2c1a87f4586b508cecb7622b9e45faf9dffc70cfec93ea993312859b446"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynx_markdown.so",
+      "bytes": 178332,
+      "sha256": "1f4865ae40a596ae8d90d597ff29ac537ea04c81a664593a737c02c5ec7ec616"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynx_service_api.so",
+      "bytes": 22112,
+      "sha256": "ce72d75dad05c8f22366e55b59e62aaf851067b1beaacfacf5e5ea23113a1dff"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynx_text_service.so",
+      "bytes": 50980,
+      "sha256": "acfeb1ba803fadd142af8af687da486c53a633adad07e2e9edeca6ad975dcadd"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynx_v8_bridge.so",
+      "bytes": 63140,
+      "sha256": "9a4dcfe0e698b2969c18aa3289a58000b4c7ddb44e5b461c42c093c763d5c44f"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynxbase.so",
+      "bytes": 161884,
+      "sha256": "d8667d24e1396c3b61b559f484a0a06905c447f6809ad105e70a60a40181b6b9"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynxgfx.so",
+      "bytes": 58988,
+      "sha256": "21759525a5dafd1f79acce0a1c500072c842e9efc7b537991d67f239a02446c3"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynxsecurity.so",
+      "bytes": 42632,
+      "sha256": "3d0eb8b92669c31cc777218920fb119c95cb712d38927d196da845e96d1e57db"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynxservice.so",
+      "bytes": 13920,
+      "sha256": "7e780157573f876c04a21140c1d000c3a0eb0b378876e96b972ac8b1e1509aea"
+    },
+    {
+      "path": "lib/armeabi-v7a/liblynxtrace.so",
+      "bytes": 18020,
+      "sha256": "ebcec22b8c849eceb08b1070cfd99c26018160b93978820a489e397054bd7fc7"
+    },
+    {
+      "path": "lib/armeabi-v7a/libmannorarmor.so",
+      "bytes": 48108,
+      "sha256": "b158d3ee07a77f9d0942f58a4c495e76d74f52e74bf5e4bd740cc88626e338bd"
+    },
+    {
+      "path": "lib/armeabi-v7a/libmetasec_ml.so",
+      "bytes": 3306768,
+      "sha256": "127b052e70a81607b37580c4942c775d88907fc2cc3be105814b453ea77dd43f"
+    },
+    {
+      "path": "lib/armeabi-v7a/libmmkv.so",
+      "bytes": 150096,
+      "sha256": "3b653c75c6a7bb957d06fad8dcab0211f4b506eb17a755a6b2a2448b1bf1c1bb"
+    },
+    {
+      "path": "lib/armeabi-v7a/libmonitorcollector-lib.so",
+      "bytes": 182120,
+      "sha256": "7a21c1f9c934a96a0f9c0da0a5b0868e08e5b82d49c0670b0f239d5924ee6e57"
+    },
+    {
+      "path": "lib/armeabi-v7a/libn.so",
+      "bytes": 9792,
+      "sha256": "4b3c5230bfe3ae9de733fed84141bc4118ec888f36626580f38f788df6dce335"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnapi.so",
+      "bytes": 149076,
+      "sha256": "9e0ce656fb1315041d96c1fcea8c6ce99fd0a163c1ac71fe0309d6cc6da99588"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnative-filters.so",
+      "bytes": 13944,
+      "sha256": "23dbbf9959f35b31fbaa8451a4eeb0870663fca3771406f86bb44d55cc57cf1b"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth.so",
+      "bytes": 110348,
+      "sha256": "0ac28f79bae5bc4a5c6c52cc9126dc1809e8cc1f5825ca1a382e8570d6003661"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_bt.so",
+      "bytes": 5312,
+      "sha256": "1287a7a799905e4c137388474a1ccbd06ec7c3ca93fa35d2d2cff33228d6aaa0"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_dl.so",
+      "bytes": 24312,
+      "sha256": "0eb571c4b7d1df8f269f3fa46d05cb114ee7c5ff74954846471f51879ab021f1"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_dumper.so",
+      "bytes": 73428,
+      "sha256": "4c919e6488e829e1a933330cfdd33beeb2459f6ec9f26c26d73f67bfb68e4dce"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_fd_tracker.so",
+      "bytes": 25900,
+      "sha256": "d3eb911ff3ccaf4d7afd014fc32c7a7773c065c10eb274682ac8235b04582516"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_heap_tracker.so",
+      "bytes": 39612,
+      "sha256": "7dbd3e7c79f0a4895a47899c82a98275dd3b68f1bf1cbe059c827bb341848c03"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_logcat.so",
+      "bytes": 15788,
+      "sha256": "ef8e0955521343db0e8db0a4f08cd36fc64cf7ea0b4b09107992ecdec787f0af"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_ref_monitor.so",
+      "bytes": 19960,
+      "sha256": "713a5ba0187ef2e0e2f543396567cb12451b9e8e36083ba301b061cfca00ebcd"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_repair.so",
+      "bytes": 21004,
+      "sha256": "6c3abd17b1ab86f7335e94698a01858c45cc2acafbf396db90769c227949498a"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_tls_monitor.so",
+      "bytes": 11840,
+      "sha256": "9fbd25f14e9d394191f08fe63687f7df2357135fb8d4373e408e6f0d762a6f7c"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_unw.so",
+      "bytes": 21004,
+      "sha256": "f81098c3dea6ce5adc55e3c6fe8759616d6f944987954e81690d9312124ab261"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_unwind.so",
+      "bytes": 150588,
+      "sha256": "4a27c8019f9d42809d93cc85f2f68cace1a5a8515bca36d07b802fcc4b0fcb0d"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_vm_monitor.so",
+      "bytes": 35424,
+      "sha256": "86f97a86cdb50a0dc36874cd0f46d1658c4599cc12721998eb18caa3acb49dec"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnpth_xasan.so",
+      "bytes": 2852,
+      "sha256": "ac53d3c9fee54924aa615d2a0660734d0d154fee5a95c05e6e8343f17802d48c"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnslinker.so",
+      "bytes": 10404,
+      "sha256": "a64b0e09ce08367d88307f6fd4645de88bad9fb3cd4b7d1950ee95db170a5d33"
+    },
+    {
+      "path": "lib/armeabi-v7a/libnuwa.so",
+      "bytes": 67260,
+      "sha256": "b89f0695fe741b46a6c03b957aef35133d9e37119e0ff92e52d0a4c38cb1e182"
+    },
+    {
+      "path": "lib/armeabi-v7a/libpl_droidsonroids_gif.so",
+      "bytes": 30264,
+      "sha256": "f99c1a89dd587b62287925d79065fe179dfe572c0625d231dfad9d2386b7e267"
+    },
+    {
+      "path": "lib/armeabi-v7a/libprofiler.so",
+      "bytes": 275364,
+      "sha256": "6bccb5e8eefb97b6b8c97187774852b41bc73aa636e8e35c254a92c039f359c5"
+    },
+    {
+      "path": "lib/armeabi-v7a/libquick.so",
+      "bytes": 494004,
+      "sha256": "dfeda3ca9df9185380ab9f1c4e4617396657c41e13f30b167c8a776eac433ed2"
+    },
+    {
+      "path": "lib/armeabi-v7a/librelaxui.so",
+      "bytes": 71304,
+      "sha256": "024adfd7ba72ba1008185f7766fb4ec448e8d6d4bc41913b03f851be583f4a8b"
+    },
+    {
+      "path": "lib/armeabi-v7a/libreparo.so",
+      "bytes": 118796,
+      "sha256": "7ea9f2b1f5f6c7d6023ee7cef099140dba92f2158d46efbe674dde02d41d44b8"
+    },
+    {
+      "path": "lib/armeabi-v7a/libserval_markdown.so",
+      "bytes": 329432,
+      "sha256": "dc605564ee986a5a7ec9be6c035430de3b54b2ea2453211b817b8da80df79212"
+    },
+    {
+      "path": "lib/armeabi-v7a/libserval_svg.so",
+      "bytes": 101056,
+      "sha256": "6dd44761d40081ae28f89b7981050993d223020dcb10140808116c9193ecf487"
+    },
+    {
+      "path": "lib/armeabi-v7a/libshadowhook.so",
+      "bytes": 62076,
+      "sha256": "37a5ab4b5ddfb76cce7212559c4018397216179c308df6ae4605836f1f42c9cb"
+    },
+    {
+      "path": "lib/armeabi-v7a/libshadowhook_nothing.so",
+      "bytes": 704,
+      "sha256": "6975ae37551113e93937b5f5d924378ed91b6f7d97d8f2dd8fd0851e65a1168f"
+    },
+    {
+      "path": "lib/armeabi-v7a/libsliver.so",
+      "bytes": 87720,
+      "sha256": "b2c102f660d726992ec27286dc7de8b03c416fb73381313b78d84bec08829e0e"
+    },
+    {
+      "path": "lib/armeabi-v7a/libsscronet.so",
+      "bytes": 3672148,
+      "sha256": "f51a2c6b59f769bc1e6c0c10d4caff9957a6a9f6823737a7e9ac9763e1e97335"
+    },
+    {
+      "path": "lib/armeabi-v7a/libsysoptimizer.so",
+      "bytes": 411868,
+      "sha256": "d1eb0a98d0bdb5b1d65bfa4b808c374c1507d4563153d08a4569ce307f633db1"
+    },
+    {
+      "path": "lib/armeabi-v7a/libtailor.so",
+      "bytes": 34420,
+      "sha256": "f2b6659d244decb23a4df5957071b1d9754f5fc038344b3f56922e35b1e8c266"
+    },
+    {
+      "path": "lib/armeabi-v7a/libtexturerender_native.so",
+      "bytes": 46680,
+      "sha256": "0652636166c724bff774edb272ea52ada682cae7cebfdaf9b7ba836ad5d59f62"
+    },
+    {
+      "path": "lib/armeabi-v7a/libttboringssl.so",
+      "bytes": 299872,
+      "sha256": "9c4d88db84dd0621b373cd071e9c3ef585190617857e3c3da8ec04d1177e580a"
+    },
+    {
+      "path": "lib/armeabi-v7a/libttcrypto.so",
+      "bytes": 842288,
+      "sha256": "78c7c1ad47d2bede397b48cb4466d4615feb61381aba6adb9ecc0f15d79ffae0"
+    },
+    {
+      "path": "lib/armeabi-v7a/libttffmpeg.so",
+      "bytes": 4543616,
+      "sha256": "29390b287cf0dfb29b5642c95ba3ec02e89446a4344d23576078968228dc7ec8"
+    },
+    {
+      "path": "lib/armeabi-v7a/libttheif_dec.so",
+      "bytes": 354088,
+      "sha256": "8edd0b5e4db121cb19f4aa8386e5257d7211aa3c3fb4cd9c84601a5d177d688e"
+    },
+    {
+      "path": "lib/armeabi-v7a/libttmplayer.so",
+      "bytes": 2019360,
+      "sha256": "c896cdd2227f7c7610e0474cc6d4eeb979736d6b79c8a16d4ffee27b1184dc45"
+    },
+    {
+      "path": "lib/armeabi-v7a/libttmverify.so",
+      "bytes": 13748,
+      "sha256": "5b1736a7d590fcca3beb0e9785823903b5df7984ab35d138442f4c77f42c904e"
+    },
+    {
+      "path": "lib/armeabi-v7a/libttmverifylite.so",
+      "bytes": 17956,
+      "sha256": "11e667bc46996f77c442455557efa21898c8a5cb0fdbd9c51bc54291c3cad4dc"
+    },
+    {
+      "path": "lib/armeabi-v7a/libtttext.so",
+      "bytes": 444464,
+      "sha256": "d5b93f97f6d4393c79b8c0eaee440d2692e7d224475342a6ba88ea95ba7f2698"
+    },
+    {
+      "path": "lib/armeabi-v7a/libturbo.so",
+      "bytes": 30472,
+      "sha256": "31c5eb46ee5fd30da67bb2ad91987e107390dafd197e63bfe308cfcf5895b6c7"
+    },
+    {
+      "path": "lib/armeabi-v7a/libuniplayer.so",
+      "bytes": 366304,
+      "sha256": "be7d1922d96a89683610ef6374e76b5306d75f56cda60a1b1a1c9055fa2ffa38"
+    },
+    {
+      "path": "lib/armeabi-v7a/libvcbasekit.so",
+      "bytes": 194292,
+      "sha256": "a6b6b0d1592a4e8c34b883f5c70bb118f09aa6dac7ca69ce34d559d145c01807"
+    },
+    {
+      "path": "lib/armeabi-v7a/libvcnverify.so",
+      "bytes": 9720,
+      "sha256": "b9a8c9429db0004bf04271749c9288cd9a7acee257efaed72bfb037919f58f91"
+    },
+    {
+      "path": "lib/armeabi-v7a/libvcnverifylite.so",
+      "bytes": 13860,
+      "sha256": "54b97607908d5f4359eccae73ee124371cb87cc7604adea69263f08c52fb5c26"
+    },
+    {
+      "path": "lib/armeabi-v7a/libvctfo.so",
+      "bytes": 13904,
+      "sha256": "fce761b78996261caebc4587a54fa9788737cb7098285226f95c2a0c37febde2"
+    },
+    {
+      "path": "lib/armeabi-v7a/libvideodec.so",
+      "bytes": 38552,
+      "sha256": "70cc7352732262ff6becbf2228e5bb108db04f2612f5f3db3e61aeaa65442352"
+    },
+    {
+      "path": "lib/armeabi-v7a/libwatson.so",
+      "bytes": 26200,
+      "sha256": "1103fb4a27072ecf74db38d9b9c9854954a5409f7fd5ac33bcb74f3c38956f35"
+    },
+    {
+      "path": "lib/armeabi-v7a/libweibosdkcore.so",
+      "bytes": 21752,
+      "sha256": "f56128804a43c187bb0d880ca0c744bca6056a097c8efc8719a622eaf5eeb43c"
+    },
+    {
+      "path": "lib/armeabi-v7a/libwhisper.so",
+      "bytes": 46620,
+      "sha256": "39630d9d07417c081e5a226531ace06fa3ed61ed135a439c71b09b67212e0e30"
+    },
+    {
+      "path": "lib/armeabi-v7a/libworker.so",
+      "bytes": 157248,
+      "sha256": "f02a4859213b43ba09ce026e2511baba3861fb320d4d531babfd4fbf8ba071f3"
+    },
+    {
+      "path": "lib/armeabi-v7a/libyuv.so",
+      "bytes": 157472,
+      "sha256": "688f4a3cc070837707fbbe9cebdd650d90a22f050eb07fe2ab84eefdf9588d16"
+    },
+    {
+      "path": "lib/armeabi-v7a/libzoin.so",
+      "bytes": 13924,
+      "sha256": "425161b3d2ed2c62302532fe5d908aa5064bdf26bea7fc72ff3e3f395945a5e7"
+    }
+  ],
+  "prefix_counts": {
+    "AndroidManifest.xml": 1,
+    "DebugProbesKt.bin": 1,
+    "HMSCore-availableupdate.properties": 1,
+    "HMSCore-base.properties": 1,
+    "HMSCore-baselegacyapi.properties": 1,
+    "HMSCore-device.properties": 1,
+    "HMSCore-hatool.properties": 1,
+    "HMSCore-log.properties": 1,
+    "HMSCore-stats.properties": 1,
+    "HMSCore-ui.properties": 1,
+    "META-INF": 16,
+    "agconnect-core.properties": 1,
+    "androidsupportmultidexversion.txt": 1,
+    "assets": 531,
+    "classes.dex": 1,
+    "classes10.dex": 1,
+    "classes11.dex": 1,
+    "classes12.dex": 1,
+    "classes13.dex": 1,
+    "classes14.dex": 1,
+    "classes15.dex": 1,
+    "classes16.dex": 1,
+    "classes17.dex": 1,
+    "classes18.dex": 1,
+    "classes19.dex": 1,
+    "classes2.dex": 1,
+    "classes20.dex": 1,
+    "classes21.dex": 1,
+    "classes22.dex": 1,
+    "classes23.dex": 1,
+    "classes24.dex": 1,
+    "classes25.dex": 1,
+    "classes3.dex": 1,
+    "classes4.dex": 1,
+    "classes5.dex": 1,
+    "classes6.dex": 1,
+    "classes7.dex": 1,
+    "classes8.dex": 1,
+    "classes9.dex": 1,
+    "com": 2,
+    "kotlin-tooling-metadata.json": 1,
+    "lib": 119,
+    "network-common.properties": 1,
+    "network-framework-compat.properties": 1,
+    "network-grs.properties": 1,
+    "okhttp3": 1,
+    "org": 2,
+    "res": 22641,
+    "resources.arsc": 1
+  }
+}

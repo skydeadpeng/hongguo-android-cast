@@ -17,10 +17,18 @@ JSON_JAR="${JSON_JAR:-$HOME/.m2/repository/com/vaadin/external/google/android-js
 TMP="$(mktemp -d -t hongguo-initial-playback.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
 SRC="$SOURCE_ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
+cat > "$TMP/Context.java" <<'STUB'
+package android.content; public class Context { }
+STUB
 cat > "$TMP/InitialPlaybackStubs.java" <<'STUB'
 package io.github.jackotom.hongguo.android;
 import java.io.*;import java.net.*;import java.nio.file.Files;import java.util.*;import java.util.function.Consumer;
-final class MainActivity {Consumer<String> callback;boolean isFinishing(){return false;}boolean isDestroyed(){return false;}void script(String value){callback.accept(value);}}
+final class MainActivity extends android.content.Context {Consumer<String> callback;boolean isFinishing(){return false;}boolean isDestroyed(){return false;}void script(String value){callback.accept(value);}}
+final class HuangguoApi {
+ static void attach(android.content.Context context){throw new AssertionError("Unexpected Huangguo request");}
+ static int decodeEpisodeIndex(String vid){throw new AssertionError("Unexpected Huangguo request");}
+ static String episodeUrl(String sid,int index){throw new AssertionError("Unexpected Huangguo request");}
+}
 final class EpisodeResolver {static int calls;static String result;static String resolve(String sid,String vid)throws Exception{calls++;if(result!=null)return result;throw new IOException("synthetic web miss");}}
 final class AppTransport {static int heads;static boolean domain(String host,String...allowed){if(host==null)return false;host=host.toLowerCase(Locale.ROOT);for(String suffix:allowed)if(host.equals(suffix)||host.endsWith("."+suffix))return true;return false;}static String media(String url,String ua,String ref){heads++;return url;}}
 final class NetworkGuard {
@@ -60,7 +68,7 @@ final class CencDecryptor {
 }
 STUB
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
- "$TMP/InitialPlaybackStubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
+ "$TMP/Context.java" "$TMP/InitialPlaybackStubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
  "$TEST_ROOT/InitialPlaybackFallbackTest.java" "$TEST_ROOT/Playback1080RecoveryTest.java"
 STATUS=0
 if [ "$INITIAL" = true ]; then

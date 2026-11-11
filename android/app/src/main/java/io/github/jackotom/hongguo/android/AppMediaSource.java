@@ -102,6 +102,9 @@ final class AppMediaSource {
             String spade = text(row.opt("spade_a"));
             JSONObject encryption = row.optJSONObject("encrypt_info");
             if (spade.isEmpty() && encryption != null) spade = text(encryption.opt("spade_a"));
+            // Absence of a key is not proof of clear media. Match the WebView
+            // parser and require the upstream's explicit no-encryption marker.
+            if (spade.isEmpty() && !explicitClear(encryption)) continue;
             String contentKey = null;
             if (!spade.isEmpty()) {
                 try { contentKey = hex(SpadeDecoder.registeredContentKey(spade)); }
@@ -128,6 +131,11 @@ final class AppMediaSource {
             }
         }
         return variants;
+    }
+    private static boolean explicitClear(JSONObject encryption) {
+        Object value = encryption == null ? null : encryption.opt("encrypt");
+        return Boolean.FALSE.equals(value) || "0".equals(value) || "false".equals(value)
+            || value instanceof Number && ((Number) value).doubleValue() == 0;
     }
     private static boolean allowedMedia(String media) {
         try {

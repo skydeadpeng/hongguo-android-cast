@@ -299,8 +299,16 @@ async function fetchAppPlayUrl(vid, options = {}) {
     if (!/^\d{1,30}$/.test(vid)) throw new Error('分集编号无效');
     const lookupTimeout = options.lookupTimeoutMs === undefined ? 12000 : options.lookupTimeoutMs;
     if (!Number.isSafeInteger(lookupTimeout) || lookupTimeout < 1 || lookupTimeout > 12000) throw Object.assign(new Error('App 片源请求期限无效'), { code: 'INVALID_INPUT' });
-    const deadline = Date.now() + lookupTimeout;
-    const signal = options.signal || AbortSignal.timeout(lookupTimeout);
+    // Registration has its own bounded budget. Start the shared HTTP budget only
+    // when an HTTP lookup is needed, not while waiting for the registered provider.
+    let deadline, signal;
+    const lookupJson = (url, requestOptions, stage) => {
+        if (deadline === undefined) {
+            deadline = Date.now() + lookupTimeout;
+            signal = options.signal || AbortSignal.timeout(lookupTimeout);
+        }
+        return requestJson(url, requestOptions, deadline, signal, stage);
+    };
     const payload = JSON.stringify({
         biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
         mixed_video_id_map: { '1004': [vid] },
@@ -318,7 +326,8 @@ async function fetchAppPlayUrl(vid, options = {}) {
     if (registeredProvider) {
         // Registered identity first: the endpoint increasingly refuses the synthetic signed
         // model POST, and the native registration needs no signature at all. A provider
-        // failure before any usable model only falls back; a mismatch after one is final.
+        // explicitly transient/empty failure before a usable model may fall back;
+        // refusal, cancellation and mismatched model data are terminal.
         try {
             const reply = await registeredProvider(vid);
             if (!reply || reply.vid !== vid || !reply.video_model || typeof reply.video_model !== 'object' || Array.isArray(reply.video_model)) {
@@ -327,7 +336,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
             if (!acceptInline(reply.video_model)) {
                 const fallback = parseFallback(reply.video_model.fallback_api);
                 if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
-                const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal, 'fallback_get');
+                const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
                 if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
                     throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
                 }
@@ -335,39 +344,31 @@ async function fetchAppPlayUrl(vid, options = {}) {
             }
             if (!info || !info.video_list || typeof info.video_list !== 'object') throw Object.assign(new Error('App 单集模型缺少有效片源列表'), { code: 'APP_INVALID_RESPONSE' });
         } catch (providerError) {
-            if (registered) throw providerError;
+            // Only an explicitly transient/empty provider failure may try the existing
+            // legacy path. Never turn refusal, cancellation or mismatched data into a
+            // fresh request merely because that path now has its intended time budget.
+            if (registered || !['APP_EMPTY_RESPONSE', 'ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN',
+                'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE'].includes(providerError?.code)) throw providerError;
             info = null;
         }
     }
     if (!info) {
-        try {
-            const signed = signedAppRequest(VIDEO_API, payload);
-            const response = await requestJson(signed.url, { method: 'POST', headers: signed.headers, data: signed.body }, deadline, signal, 'model_post');
-            if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-            const entry = response.data?.[vid];
-            const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
-            if (!model) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
-            // Current models may carry the video list inline; the legacy fallback round trip is then skipped.
-            if (!acceptInline(model)) {
-                const fallback = parseFallback(model.fallback_api);
-                if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
-                const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal, 'fallback_get');
-                if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
-                    throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-                }
-                info = outer?.video_info?.data;
-                if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
+        const signed = signedAppRequest(VIDEO_API, payload);
+        const response = await lookupJson(signed.url, { method: 'POST', headers: signed.headers, data: signed.body }, 'model_post');
+        if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+        const entry = response.data?.[vid];
+        const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
+        if (!model) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
+        // Current models may carry the video list inline; the legacy fallback round trip is then skipped.
+        if (!acceptInline(model)) {
+            const fallback = parseFallback(model.fallback_api);
+            if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
+            const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
+            if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
+                throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
             }
-        } catch (error) {
-            // Only a locally classified empty model POST can still take the registered path.
-            // Valid business refusals, wrong IDs, HTML and fallback GET errors keep their behavior.
-            if (error?.code !== 'APP_EMPTY_RESPONSE' || error.responseStage !== 'model_post' || !registeredProvider) throw error;
-            const reply = await registeredProvider(vid);
-            if (!reply || reply.vid !== vid || !reply.video_model || typeof reply.video_model !== 'object' || Array.isArray(reply.video_model)) {
-                throw Object.assign(new Error('App 已登记设备的单集模型与请求不一致'), { code: 'APP_INVALID_RESPONSE' });
-            }
-            if (!acceptInline(reply.video_model)) { info = reply.video_model; registered = true; }
-            if (!info || !info.video_list || typeof info.video_list !== 'object') throw Object.assign(new Error('App 单集模型缺少有效片源列表'), { code: 'APP_INVALID_RESPONSE' });
+            info = outer?.video_info?.data;
+            if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
         }
     }
     const rows = Object.values(info?.video_list || {}).filter(item => item && (item.main_url || item.backup_url || Array.isArray(item.backup_url_list))).map(item => {

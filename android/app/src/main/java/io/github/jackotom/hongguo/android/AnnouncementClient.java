@@ -7,6 +7,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import org.json.JSONObject;
 
 /**
@@ -28,12 +29,15 @@ final class AnnouncementClient {
     }
 
     /** Returns each channel's raw text, or null when every mirror line failed for it. */
-    static JSONObject fetch() {
+    static JSONObject fetch(BooleanSupplier cancelled) {
         JSONObject result = new JSONObject();
         for (String channel : new String[]{"normal", "emergency"}) {
+            if (cancelled.getAsBoolean()) break;
             String text = null;
             for (String line : lines(channel)) {
+                if (cancelled.getAsBoolean()) break;
                 String candidate = read(line);
+                if (cancelled.getAsBoolean()) break;
                 if (candidate != null) { text = candidate; break; }
             }
             try { result.put(channel, text == null ? JSONObject.NULL : text); } catch (Exception ignored) { }
@@ -41,7 +45,8 @@ final class AnnouncementClient {
         return result;
     }
 
-    /** One GET: fixed HTTPS hosts only, no redirects, hard byte cap, bounded time. */
+    /** One GET: fixed HTTPS hosts only, no redirects, hard byte cap and socket timeouts.
+     * System DNS may ignore those timeouts; AnnouncementRequests bounds delivery separately. */
     private static String read(String line) {
         HttpURLConnection connection = null;
         try {

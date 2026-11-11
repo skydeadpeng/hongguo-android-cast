@@ -4,6 +4,7 @@ import java.io.*;import java.net.*;import java.nio.charset.StandardCharsets;impo
 
 /** Real registration/signing/model class with synthetic transport. Never sends SMS or opens sockets. */
 public final class RegisteredPlaybackModelTest {
+ static final JSONArray projectedFlags=new JSONArray();
  static int checks,groups; static final String VID="7694655440692448281",DID="7390000000000000001",IID="7390000000000000002";
  interface Action {void run()throws Exception;}
  static void check(boolean ok,String text){checks++;if(!ok)throw new AssertionError(text);}
@@ -31,6 +32,38 @@ public final class RegisteredPlaybackModelTest {
    RegisteredPlaybackModel op=operation(r->registration(),r->response(200,envelope(source)));JSONObject result=op.fetch(VID);String text=result.toString();check(!text.contains(DID)&&!text.contains(IID)&&!text.contains("private-")&&!text.contains("device_id")&&!text.contains("session")&&!text.contains("cookies")&&!text.contains("token"),"identity credentials and unrelated model fields discarded");
    check(result.getJSONObject("video_model").getJSONArray("video_list").getJSONObject(0).getJSONObject("encrypt_info").getString("spade_a").equals("fixture-media-metadata"),"media preparation information retained");source.getJSONArray("video_list").getJSONObject(0).put("main_url","mutated");check(!result.toString().contains("mutated"),"result has no mutable source alias");
   });
+  group("explicit clear and encrypted flags survive real fetch projection without coercion",()->{
+   for(Object flag:new Object[]{false,0,"0","false",true,1,"1","true",JSONObject.NULL,"", "False",2}){
+    JSONObject m=model();JSONObject encryption=m.getJSONArray("video_list").getJSONObject(0).getJSONObject("encrypt_info");encryption.remove("spade_a");encryption.put("encrypt",flag).put("token","private-flag-token").put("device_id",DID);
+    JSONObject result=operation(r->registration(),r->response(200,envelope(m))).fetch(VID);
+    projectedFlags.put(new JSONObject().put("clear",Boolean.FALSE.equals(flag)||Integer.valueOf(0).equals(flag)||"0".equals(flag)||"false".equals(flag)).put("reply",result));
+    JSONObject clean=result.getJSONObject("video_model").getJSONArray("video_list").getJSONObject(0).getJSONObject("encrypt_info");
+    check(clean.has("encrypt"),"explicit encrypt flag must survive projection: "+flag);
+    Object actual=clean.get("encrypt");check(flag instanceof Number ? actual instanceof Number&&((Number)actual).doubleValue()==((Number)flag).doubleValue() : actual.getClass()==flag.getClass()&&actual.equals(flag),"encrypt flag retains JSON scalar type and value: "+flag);
+    check(clean.length()==1&&!result.toString().contains("private-")&&!result.toString().contains(DID),"retaining encrypt never exposes unrelated sensitive fields");
+   }
+   for(boolean includeInfo:new boolean[]{false,true}){
+    JSONObject m=model();JSONObject row=m.getJSONArray("video_list").getJSONObject(0);if(includeInfo)row.put("encrypt_info",new JSONObject());else row.remove("encrypt_info");
+    JSONObject result=operation(r->registration(),r->response(200,envelope(m))).fetch(VID);
+    projectedFlags.put(new JSONObject().put("clear",false).put("reply",result));
+    JSONObject clean=result.getJSONObject("video_model").getJSONArray("video_list").getJSONObject(0);
+    check(includeInfo? !clean.getJSONObject("encrypt_info").has("encrypt"):!clean.has("encrypt_info"),"missing encryption flag is never invented as clear");
+   }
+   for(Object bad:new Object[]{new JSONObject().put("encrypt",false),new JSONArray().put(false),"0".repeat(16385)}){
+    JSONObject m=model();m.getJSONArray("video_list").getJSONObject(0).getJSONObject("encrypt_info").put("encrypt",bad);
+    Exception failure=reject(()->operation(r->registration(),r->response(200,envelope(m))).fetch(VID));
+    check(failure instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)failure).code.equals("APP_INVALID_RESPONSE"),"non-scalar or oversized flag rejected, never coerced to clear");
+   }
+  });
+  group("trial markers fail closed at envelope data and model before projection",()->{
+   for(String location:new String[]{"envelope","data","model"})for(Object flag:new Object[]{true,1,"false",JSONObject.NULL,false}){
+    JSONObject body=new JSONObject(envelope(model()));JSONObject target=location.equals("envelope")?body:location.equals("data")?body.getJSONObject("data"):body.getJSONObject("data").getJSONObject("video_model");target.put("is_trial_video",flag);
+    AtomicInteger registrations=new AtomicInteger(),requests=new AtomicInteger();RegisteredPlaybackModel op=operation(r->{registrations.incrementAndGet();return registration();},r->{requests.incrementAndGet();return response(200,body.toString());});
+    if(Boolean.FALSE.equals(flag)){check(op.fetch(VID).has("video_model"),"explicit non-trial marker succeeds at "+location);}
+    else {Exception failure=reject(()->op.fetch(VID));check(failure instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)failure).code.equals(Boolean.TRUE.equals(flag)?"BUSINESS_REJECTED":"APP_INVALID_RESPONSE"),"trial or malformed marker never publishes model at "+location+": "+flag);}
+    check(registrations.get()==1&&requests.get()==1,"trial handling never retries registration or model");
+   }
+  });
   group("string JSON and object-keyed quality models normalize without fallback network",()->{for(boolean text:new boolean[]{false,true}){JSONObject m=model();if(!text)m.put("video_list",new JSONObject().put("video_1",m.getJSONArray("video_list").get(0)));Object value=text?m.toString():m;String body=new JSONObject().put("code","0").put("data",new JSONObject().put("video_model",value)).toString();JSONObject result=operation(r->registration(),r->response(200,body)).fetch(VID);check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"either upstream quality shape supported");}});
   group("VOD video_id is a distinct namespace and never mistaken for item ID",()->{JSONObject m=model().put("video_id","v0300f0000fictionalvodidentity").put("vid","v0vodmeta");JSONObject value=operation(r->registration(),r->response(200,envelope(m))).fetch(VID);check(value.getString("vid").equals(VID)&&!value.toString().contains("fictionalvodidentity"),"actual request vid binds RPC independently of VOD metadata");});
   group("parameters only accept one string vid before any registration",()->{for(JSONObject bad:new JSONObject[]{null,new JSONObject(),new JSONObject().put("vid",12),new JSONObject().put("vid","../"),new JSONObject().put("vid",VID).put("url","https://else.invalid/"),new JSONObject().put("vid","1".repeat(31))}){check(reject(()->RegisteredPlaybackModel.requestedVid(bad)) instanceof RegisteredPlaybackModel.ModelError,"invalid RPC shape rejected");}check(RegisteredPlaybackModel.requestedVid(new JSONObject().put("vid",VID)).equals(VID),"numeric string only accepted");});
@@ -57,6 +90,7 @@ public final class RegisteredPlaybackModelTest {
    }
   });
   group("fixed model transport rejects alternate host path scheme auth port method before network",()->{for(String url:new String[]{"http://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/","https://evil.invalid/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com/reading/user/info/v1/","https://a@api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com:443/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/#x"})reject(()->RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(url,"POST",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)));reject(()->RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(RegisteredPlaybackModel.API,"GET",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)));check(RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(RegisteredPlaybackModel.API+"?x=1","POST",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)).getHost().equals("api5-normal-sinfonlineb.fqnovel.com"),"only intended fixed model target accepted");});
+  if(args.length==1)java.nio.file.Files.write(java.nio.file.Paths.get(args[0]),projectedFlags.toString().getBytes(StandardCharsets.UTF_8));
   System.out.println("REGISTERED_PLAYBACK_MODEL_OK groups="+groups+" checks="+checks+" actualRegistrationAndSigner=true oneSharedDeadline=true projectedModelOnly=true networkRequests=0");
  }
 }

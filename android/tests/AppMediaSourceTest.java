@@ -17,6 +17,7 @@ public final class AppMediaSourceTest {
         JSONObject row = new JSONObject().put("main_url", mainUrl).put("codec_type", codec).put("quality_desc", quality)
             .put("vwidth", w).put("vheight", h);
         if (spade != null) row.put("spade_a", spade);
+        else row.put("encrypt_info", new JSONObject().put("encrypt", false));
         return row;
     }
     static JSONObject model(JSONObject... rows) throws Exception {
@@ -68,6 +69,22 @@ public final class AppMediaSourceTest {
         JSONObject foreign = new JSONObject().put("main_url", Base64.getEncoder().encodeToString("https://evil.example.com/x.mp4".getBytes(StandardCharsets.UTF_8)))
             .put("codec_type", "h264").put("quality_desc", "1080p").put("vwidth", 1920).put("vheight", 1080);
         rejected(model(foreign), "auto", null, "INVALID_RESPONSE");
+        // Missing metadata is not proof that media is clear. Keep native and JS semantics aligned.
+        for (Object flag : new Object[]{false, 0, "0", "false"}) {
+            JSONObject clear = row(encoded("clear"), "h264", "720p", 1280, 720, null);
+            clear.put("encrypt_info", new JSONObject().put("encrypt", flag));
+            check(resolve(model(clear), "auto", null).isNull("contentKey"), "explicit clear flag accepted: " + flag);
+        }
+        for (Object flag : new Object[]{JSONObject.NULL, true, 1, "true", "", "False", new JSONArray(), new JSONObject()}) {
+            JSONObject unknown = row(encoded("unknown"), "h264", "720p", 1280, 720, null);
+            unknown.put("encrypt_info", new JSONObject().put("encrypt", flag));
+            rejected(model(unknown), "auto", null, "INVALID_RESPONSE");
+        }
+        JSONObject missing = row(encoded("missing"), "h264", "720p", 1280, 720, null);
+        missing.remove("encrypt_info");
+        rejected(model(missing), "auto", null, "INVALID_RESPONSE");
+        missing.put("encrypt_info", new JSONObject());
+        rejected(model(missing), "auto", null, "INVALID_RESPONSE");
         // provider failure mapping (plain transport IOException → APP_INVALID_RESPONSE)
         try { new AppMediaSource(vid -> { throw new IOException("x"); }).resolve("880006", "auto", null); throw new AssertionError("no error"); }
         catch (AppMediaSource.AppSourceException expected) { check("APP_INVALID_RESPONSE".equals(expected.code), "provider failure mapped, got " + expected.code); }

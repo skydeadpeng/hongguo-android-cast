@@ -88,12 +88,14 @@ final class RegisteredPlaybackModel implements AutoCloseable {
                 throw new ModelError("App接口暂未提供本集播放信息", "BUSINESS_REJECTED");
             if (payload == null) throw new ModelError("App接口未返回本集片源模型", "APP_INVALID_RESPONSE");
             identity(envelope, vid); identity(payload, vid);
+            rejectTrial(envelope); rejectTrial(payload);
             Object raw = payload.opt("video_model");
             JSONObject model;
             if (raw instanceof JSONObject) model = (JSONObject) raw;
             else if (raw instanceof String) { try { model = OfficialApiClient.parse(((String) raw).getBytes(StandardCharsets.UTF_8)); } catch (Exception invalid) { throw new ModelError("App片源模型响应格式无效", "APP_INVALID_RESPONSE"); } }
             else throw new ModelError("App接口未返回本集片源模型", "APP_INVALID_RESPONSE");
-            identity(model, vid); JSONObject projected = project(model); check();
+            identity(model, vid); rejectTrial(model);
+            JSONObject projected = project(model); check();
             return new JSONObject().put("vid", vid).put("video_model", projected);
         } finally {
             registering = null; owner = null;
@@ -113,6 +115,14 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             Object value = object.opt(key); String text = value instanceof String || value instanceof Number ? value.toString() : "";
             if (!vid.equals(text)) throw new ModelError("App片源与分集不一致", "APP_INVALID_RESPONSE");
         }
+    }
+    /** SaaSVideoModelData carries this outside video_model. Do not discard a
+     * positive trial verdict while projecting the inner playback model. */
+    private static void rejectTrial(JSONObject object) throws IOException {
+        if (!object.has("is_trial_video")) return;
+        Object value = object.opt("is_trial_video");
+        if (!(value instanceof Boolean)) throw new ModelError("App片源试看状态无效", "APP_INVALID_RESPONSE");
+        if (Boolean.TRUE.equals(value)) throw new ModelError("App接口仅提供本集试看，请在官方App查看", "BUSINESS_REJECTED");
     }
     private static void scalars(JSONObject from, JSONObject to, String... fields) throws Exception {
         for (String key : fields) if (from.has(key)) {
@@ -139,7 +149,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
                 JSONArray copy = new JSONArray(); for (int i = 0; i < urls.length(); i++) { Object url = urls.opt(i); if (!(url instanceof String) || ((String) url).length() > 16384) throw new ModelError("App备用片源地址无效", "APP_INVALID_RESPONSE"); copy.put(url); } item.put("backup_url_list", copy);
             }
             if (row.has("video_meta")) { JSONObject meta = row.optJSONObject("video_meta"); if (meta == null) throw new ModelError("App片源尺寸信息无效", "APP_INVALID_RESPONSE"); JSONObject copy = new JSONObject(); scalars(meta, copy, "codec_type", "definition", "width", "height", "vwidth", "vheight", "bitrate"); item.put("video_meta", copy); }
-            if (row.has("encrypt_info")) { JSONObject encryption = row.optJSONObject("encrypt_info"); if (encryption == null) throw new ModelError("App片源准备信息无效", "APP_INVALID_RESPONSE"); JSONObject copy = new JSONObject(); scalars(encryption, copy, "spade_a"); item.put("encrypt_info", copy); }
+            if (row.has("encrypt_info")) { JSONObject encryption = row.optJSONObject("encrypt_info"); if (encryption == null) throw new ModelError("App片源准备信息无效", "APP_INVALID_RESPONSE"); JSONObject copy = new JSONObject(); scalars(encryption, copy, "spade_a", "encrypt"); item.put("encrypt_info", copy); }
             clean.put(item);
         }
         JSONObject result = new JSONObject().put("video_list", clean); scalars(model, result, "video_duration", "duration", "key_seed"); return result;

@@ -42,8 +42,11 @@ public final class NativeCryptoTransportTest {
         JSONObject request=new JSONObject().put("url","https://unrelated.example.net/not-requested");
         rejected(()->AppTransport.request(new JSONObject(request.toString()).put("method","TRACE")),"方法");
         rejected(()->AppTransport.request(new JSONObject(request.toString()).put("body","x".repeat(128*1024+1))),"过长");
-        for(String header:new String[]{"authorization","cookie","host","content-length","transfer-encoding","x-unknown"}) rejected(()->AppTransport.request(new JSONObject(request.toString()).put("headers",new JSONObject().put(header,"test"))),"请求头");
+        for(String header:new String[]{"authorization","host","content-length","transfer-encoding","x-unknown"}) rejected(()->AppTransport.request(new JSONObject(request.toString()).put("headers",new JSONObject().put(header,"test"))),"请求头");
         for(String value:new String[]{"a\r\nInjected: true","line\nend","x".repeat(16385)}) rejected(()->AppTransport.request(new JSONObject(request.toString()).put("headers",new JSONObject().put("user-agent",value))),"请求头");
+        // Cookie is an intentionally supported account header. An invalid host must
+        // still stop it before DNS, rather than expecting the header to be rejected.
+        rejected(()->AppTransport.request(new JSONObject(request.toString()).put("headers",new JSONObject().put("cookie","synthetic-test-only"))),"地址");
         rejected(()->AppTransport.request(request),"地址");
         for(String url:new String[]{"https://fqnovel.com.evil.net/x","https://evilfqnovel.com/x","https://api.fqnovel.com@evil.net/x","http://api.fqnovel.com/x","https://api.fqnovel.com:444/x","https://api.fqnovel.com/x#fragment","https://127.0.0.1/x"}) {
             boolean failed=false; try { AppTransport.request(new JSONObject().put("url",url)); } catch(Exception expected) { failed=true; } check(failed,"malformed URL rejected before DNS");

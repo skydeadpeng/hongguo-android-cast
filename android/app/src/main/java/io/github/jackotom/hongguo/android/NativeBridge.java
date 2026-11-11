@@ -49,6 +49,12 @@ final class NativeBridge {
         } catch (JSONException error) { return; }
         activity.runOnUiThread(() -> {
             if (closed || !activity.trusted()) return;
+            // Announcements are optional and may stall in system DNS. Keep them out of
+            // playback/control workers, including after a WebView reload.
+            if (method.equals("getAnnouncements")) {
+                AnnouncementRequests.fetch(result -> respond(id, result, null));
+                return;
+            }
             // Control callbacks never enter a network queue; only registered page IDs are cancellable.
             if (method.equals("cancelHttp")) {
                 Object requestId = params.opt("requestId");
@@ -99,7 +105,9 @@ final class NativeBridge {
             final JSONObject ready = result; final String message = error, errorCode = code;
             activity.runOnUiThread(() -> {
                 try {
-                    if (!closed && operation.current() && modelCalls.get(key) == operation) {
+                    // An expired successful model is stale, but its terminal timeout
+                    // must still reach the live caller instead of waiting for its RPC timer.
+                    if (!closed && (message != null || operation.current()) && modelCalls.get(key) == operation) {
                         JSONObject response = new JSONObject().put("id", id).put("result", ready == null ? JSONObject.NULL : ready).put("error", message == null ? JSONObject.NULL : message);
                         if (errorCode != null) response.put("errorCode", errorCode);
                         activity.script("window.__androidResponse && window.__androidResponse(" + response.toString() + ")");
@@ -329,7 +337,6 @@ final class NativeBridge {
             case "officialWebPoll": respond(id, AccountSync.get().webPoll(), null); break;
             case "officialWebLogout": respond(id, AccountSync.get().webLogout(), null); break;
             case "officialWebCancel": respond(id, AccountSync.get().webCancel(), null); break;
-            case "getAnnouncements": respond(id, AnnouncementClient.fetch(), null); break;
             case "searchNewReleases": respond(id, newReleases(params), null); break;
             case "homeFeed": {
                 int offset = params == null ? 0 : Math.max(0, params.optInt("offset", 0));

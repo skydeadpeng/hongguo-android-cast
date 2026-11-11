@@ -1,0 +1,1698 @@
+{
+  "com.dragon.read.rpc.model.VideoErr": {
+    "dex": "classes9",
+    "values": [
+      {
+        "name": "SUCCESS",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "75cd92: 7040 dc83 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "FastReject",
+        "ordinal": 1,
+        "value": 100,
+        "evidence": "75cdaa: 7040 dc83 4135                         |0017: invoke-direct {v1, v4, v5, v3}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "IllegalAccess",
+        "ordinal": 2,
+        "value": 110,
+        "evidence": "75cdc2: 7040 dc83 6347                         |0023: invoke-direct {v3, v6, v7, v4}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "HitVerifyCode",
+        "ordinal": 3,
+        "value": 111,
+        "evidence": "75cdda: 7040 dc83 8469                         |002f: invoke-direct {v4, v8, v9, v6}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "AppReject",
+        "ordinal": 4,
+        "value": 112,
+        "evidence": "75cdf2: 7040 dc83 a68b                         |003b: invoke-direct {v6, v10, v11, v8}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "ParamInvalid",
+        "ordinal": 5,
+        "value": 100001,
+        "evidence": "75ce0c: 7040 dc83 c8ad                         |0048: invoke-direct {v8, v12, v13, v10}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "DataEmpty",
+        "ordinal": 6,
+        "value": 100002,
+        "evidence": "75ce26: 7040 dc83 eacf                         |0055: invoke-direct {v10, v14, v15, v12}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "DupOperation",
+        "ordinal": 7,
+        "value": 100003,
+        "evidence": "75ce40: 7040 dc83 fced                         |0062: invoke-direct {v12, v15, v13, v14}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "InternalError",
+        "ordinal": 8,
+        "value": 100004,
+        "evidence": "75ce5c: 7040 dc83 defb                         |0070: invoke-direct {v14, v13, v11, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "ServiceError",
+        "ordinal": 9,
+        "value": 101000,
+        "evidence": "75ce78: 7040 dc83 bdf9                         |007e: invoke-direct {v13, v11, v9, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "BookFulllyRemove",
+        "ordinal": 10,
+        "value": 101001,
+        "evidence": "75ce94: 7040 dc83 9bf7                         |008c: invoke-direct {v11, v9, v7, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "ContentVerifying",
+        "ordinal": 11,
+        "value": 101002,
+        "evidence": "75ceb0: 7040 dc83 79f5                         |009a: invoke-direct {v9, v7, v5, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "VideoNoPermission",
+        "ordinal": 12,
+        "value": 101003,
+        "evidence": "75cecc: 7040 dc83 57f2                         |00a8: invoke-direct {v7, v5, v2, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "AgeIllegal",
+        "ordinal": 13,
+        "value": 101004,
+        "evidence": "75ceec: 7040 dc83 25f7                         |00b8: invoke-direct {v5, v2, v7, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "VideoLocked",
+        "ordinal": 14,
+        "value": 101005,
+        "evidence": "75cf0c: 7040 dc83 72f5                         |00c8: invoke-direct {v2, v7, v5, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "RpcTimeOut",
+        "ordinal": 15,
+        "value": 101006,
+        "evidence": "75cf2c: 7040 dc83 57f2                         |00d8: invoke-direct {v7, v5, v2, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "VideoPaidLocked",
+        "ordinal": 16,
+        "value": 101007,
+        "evidence": "75cf4c: 7040 dc83 25f7                         |00e8: invoke-direct {v5, v2, v7, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "VideoUnPaidBlock",
+        "ordinal": 17,
+        "value": 101008,
+        "evidence": "75cf6c: 7040 dc83 72f5                         |00f8: invoke-direct {v2, v7, v5, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "CustomRecordNumberNotFound",
+        "ordinal": 18,
+        "value": 101009,
+        "evidence": "75cf8c: 7040 dc83 57f2                         |0108: invoke-direct {v7, v5, v2, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "FreqCtrl",
+        "ordinal": 19,
+        "value": 101010,
+        "evidence": "75cfac: 7040 dc83 25f7                         |0118: invoke-direct {v5, v2, v7, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "BookFieldNotSupport",
+        "ordinal": 20,
+        "value": 200001,
+        "evidence": "75cfcc: 7040 dc83 72f5                         |0128: invoke-direct {v2, v7, v5, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      },
+      {
+        "name": "I18nVideoModelRiskControlError",
+        "ordinal": 21,
+        "value": 300001,
+        "evidence": "75cfec: 7040 dc83 57f2                         |0138: invoke-direct {v7, v5, v2, v15}, Lcom/dragon/read/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@83dc"
+      }
+    ]
+  },
+  "com.dragon.read.rpc.model.VideoSeriesIdType": {
+    "dex": "classes9",
+    "values": [
+      {
+        "name": "VideoId",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "767ca2: 7040 bd85 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lcom/dragon/read/rpc/model/VideoSeriesIdType;.<init>:(Ljava/lang/String;II)V // method@85bd"
+      },
+      {
+        "name": "SeriesId",
+        "ordinal": 1,
+        "value": 1,
+        "evidence": "767cb6: 7040 bd85 3144                         |0015: invoke-direct {v1, v3, v4, v4}, Lcom/dragon/read/rpc/model/VideoSeriesIdType;.<init>:(Ljava/lang/String;II)V // method@85bd"
+      },
+      {
+        "name": "PostId",
+        "ordinal": 2,
+        "value": 2,
+        "evidence": "767cca: 7040 bd85 5366                         |001f: invoke-direct {v3, v5, v6, v6}, Lcom/dragon/read/rpc/model/VideoSeriesIdType;.<init>:(Ljava/lang/String;II)V // method@85bd"
+      }
+    ]
+  },
+  "com.dragon.read.rpc.model.VideoPlatformType": {
+    "dex": "classes9",
+    "values": [
+      {
+        "name": "Unknown",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "76326a: 7040 e684 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lcom/dragon/read/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@84e6"
+      },
+      {
+        "name": "PlatformDouyin",
+        "ordinal": 1,
+        "value": 1,
+        "evidence": "76327e: 7040 e684 3144                         |0015: invoke-direct {v1, v3, v4, v4}, Lcom/dragon/read/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@84e6"
+      },
+      {
+        "name": "UgcVideo",
+        "ordinal": 2,
+        "value": 2,
+        "evidence": "763292: 7040 e684 5366                         |001f: invoke-direct {v3, v5, v6, v6}, Lcom/dragon/read/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@84e6"
+      },
+      {
+        "name": "Outer",
+        "ordinal": 3,
+        "value": 3,
+        "evidence": "7632a6: 7040 e684 7588                         |0029: invoke-direct {v5, v7, v8, v8}, Lcom/dragon/read/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@84e6"
+      },
+      {
+        "name": "PlatformXigua",
+        "ordinal": 4,
+        "value": 4,
+        "evidence": "7632ba: 7040 e684 97aa                         |0033: invoke-direct {v7, v9, v10, v10}, Lcom/dragon/read/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@84e6"
+      },
+      {
+        "name": "Chameleon",
+        "ordinal": 5,
+        "value": 5,
+        "evidence": "7632ce: 7040 e684 b9cc                         |003d: invoke-direct {v9, v11, v12, v12}, Lcom/dragon/read/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@84e6"
+      },
+      {
+        "name": "Mixed",
+        "ordinal": 6,
+        "value": 1024,
+        "evidence": "7632e6: 7040 e684 ebdf                         |0049: invoke-direct {v11, v14, v15, v13}, Lcom/dragon/read/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@84e6"
+      }
+    ]
+  },
+  "com.dragon.read.rpc.model.VideoDetailSource": {
+    "dex": "classes9",
+    "values": [
+      {
+        "name": "FromColdStart",
+        "ordinal": 0,
+        "value": 1,
+        "evidence": "756f3c: 7040 7283 1032                         |000c: invoke-direct {v0, v1, v2, v3}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromSearch",
+        "ordinal": 1,
+        "value": 2,
+        "evidence": "756f50: 7040 7283 2143                         |0016: invoke-direct {v1, v2, v3, v4}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromBookmall",
+        "ordinal": 2,
+        "value": 3,
+        "evidence": "756f64: 7040 7283 5264                         |0020: invoke-direct {v2, v5, v4, v6}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromPlayer",
+        "ordinal": 3,
+        "value": 4,
+        "evidence": "756f78: 7040 7283 7586                         |002a: invoke-direct {v5, v7, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromDetailPage",
+        "ordinal": 4,
+        "value": 5,
+        "evidence": "756f8c: 7040 7283 97a8                         |0034: invoke-direct {v7, v9, v8, v10}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUgcProfile",
+        "ordinal": 5,
+        "value": 6,
+        "evidence": "756fa0: 7040 7283 b9ca                         |003e: invoke-direct {v9, v11, v10, v12}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromPreload",
+        "ordinal": 6,
+        "value": 7,
+        "evidence": "756fb4: 7040 7283 dbec                         |0048: invoke-direct {v11, v13, v12, v14}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromShare",
+        "ordinal": 7,
+        "value": 8,
+        "evidence": "756fca: 7040 7283 fdce                         |0053: invoke-direct {v13, v15, v14, v12}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromVideoFeedTab",
+        "ordinal": 8,
+        "value": 9,
+        "evidence": "756fe0: 7040 7283 efac                         |005e: invoke-direct {v15, v14, v12, v10}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromVideoFeedTabInto",
+        "ordinal": 9,
+        "value": 10,
+        "evidence": "756ff6: 7040 7283 ce8a                         |0069: invoke-direct {v14, v12, v10, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromReadProgress",
+        "ordinal": 10,
+        "value": 11,
+        "evidence": "75700c: 7040 7283 ac68                         |0074: invoke-direct {v12, v10, v8, v6}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromEditor",
+        "ordinal": 11,
+        "value": 12,
+        "evidence": "757022: 7040 7283 8a46                         |007f: invoke-direct {v10, v8, v6, v4}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromLikeListPage",
+        "ordinal": 12,
+        "value": 13,
+        "evidence": "757038: 7040 7283 6834                         |008a: invoke-direct {v8, v6, v4, v3}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUgcProfile_CelebrityWorksTab",
+        "ordinal": 13,
+        "value": 14,
+        "evidence": "757052: 7040 7283 4683                         |0097: invoke-direct {v6, v4, v3, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUgcProfile_ProduceVideoTab",
+        "ordinal": 14,
+        "value": 15,
+        "evidence": "75706c: 7040 7283 3468                         |00a4: invoke-direct {v4, v3, v8, v6}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUnlockNew",
+        "ordinal": 15,
+        "value": 16,
+        "evidence": "757086: 7040 7283 8346                         |00b1: invoke-direct {v3, v8, v6, v4}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUgcProfile_SingleRowVideo",
+        "ordinal": 16,
+        "value": 17,
+        "evidence": "7570a0: 7040 7283 6834                         |00be: invoke-direct {v8, v6, v4, v3}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromOperation",
+        "ordinal": 17,
+        "value": 18,
+        "evidence": "7570ba: 7040 7283 4683                         |00cb: invoke-direct {v6, v4, v3, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromSubscribeCard",
+        "ordinal": 18,
+        "value": 19,
+        "evidence": "7570d4: 7040 7283 3468                         |00d8: invoke-direct {v4, v3, v8, v6}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromSingleColumn",
+        "ordinal": 19,
+        "value": 20,
+        "evidence": "7570ee: 7040 7283 8346                         |00e5: invoke-direct {v3, v8, v6, v4}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromMyselfPUGC",
+        "ordinal": 20,
+        "value": 21,
+        "evidence": "757108: 7040 7283 6834                         |00f2: invoke-direct {v8, v6, v4, v3}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromAlbumList",
+        "ordinal": 21,
+        "value": 22,
+        "evidence": "757122: 7040 7283 4683                         |00ff: invoke-direct {v6, v4, v3, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromBookshelf",
+        "ordinal": 22,
+        "value": 23,
+        "evidence": "75713c: 7040 7283 3468                         |010c: invoke-direct {v4, v3, v8, v6}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromHistory",
+        "ordinal": 23,
+        "value": 24,
+        "evidence": "757156: 7040 7283 4386                         |0119: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromToutiaoDaoliang",
+        "ordinal": 24,
+        "value": 25,
+        "evidence": "757174: 7040 7283 3486                         |0128: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromShareReturnPage",
+        "ordinal": 25,
+        "value": 26,
+        "evidence": "757192: 7040 7283 4386                         |0137: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUGCTab",
+        "ordinal": 26,
+        "value": 27,
+        "evidence": "7571b0: 7040 7283 3486                         |0146: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromDoubleCol",
+        "ordinal": 27,
+        "value": 28,
+        "evidence": "7571ce: 7040 7283 4386                         |0155: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromSecondCreateInnerFlow",
+        "ordinal": 28,
+        "value": 29,
+        "evidence": "7571ec: 7040 7283 3486                         |0164: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromShortVideoTab",
+        "ordinal": 29,
+        "value": 30,
+        "evidence": "75720a: 7040 7283 4386                         |0173: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUgcEditor",
+        "ordinal": 30,
+        "value": 31,
+        "evidence": "757228: 7040 7283 3486                         |0182: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromOfficialWebsite",
+        "ordinal": 31,
+        "value": 32,
+        "evidence": "757246: 7040 7283 4386                         |0191: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUgcVoteRankPage",
+        "ordinal": 32,
+        "value": 33,
+        "evidence": "757264: 7040 7283 3486                         |01a0: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromDoubleColEnterSingleOutflow",
+        "ordinal": 33,
+        "value": 34,
+        "evidence": "757282: 7040 7283 4386                         |01af: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromPugcDataCenter",
+        "ordinal": 34,
+        "value": 35,
+        "evidence": "7572a0: 7040 7283 3486                         |01be: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromAIContentListStore",
+        "ordinal": 35,
+        "value": 36,
+        "evidence": "7572be: 7040 7283 4386                         |01cd: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromAIContentListSelf",
+        "ordinal": 36,
+        "value": 37,
+        "evidence": "7572dc: 7040 7283 3486                         |01dc: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUserProfile",
+        "ordinal": 37,
+        "value": 38,
+        "evidence": "7572fa: 7040 7283 4386                         |01eb: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromActorInnerFlow",
+        "ordinal": 38,
+        "value": 39,
+        "evidence": "757318: 7040 7283 3486                         |01fa: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromMeloloShareDetailPage",
+        "ordinal": 39,
+        "value": 40,
+        "evidence": "757336: 7040 7283 4386                         |0209: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromFollowTabPersonCard",
+        "ordinal": 40,
+        "value": 41,
+        "evidence": "757354: 7040 7283 3486                         |0218: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromSeriesEndRecommend",
+        "ordinal": 41,
+        "value": 42,
+        "evidence": "757372: 7040 7283 4386                         |0227: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromImConversation",
+        "ordinal": 42,
+        "value": 43,
+        "evidence": "757390: 7040 7283 3486                         |0236: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromSelectPanelSeriesPreload",
+        "ordinal": 43,
+        "value": 44,
+        "evidence": "7573ae: 7040 7283 4386                         |0245: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromUgcProfileSimpleCreate",
+        "ordinal": 44,
+        "value": 45,
+        "evidence": "7573cc: 7040 7283 3486                         |0254: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromSeriesDetailPageSeasonSwitch",
+        "ordinal": 45,
+        "value": 46,
+        "evidence": "7573ea: 7040 7283 4386                         |0263: invoke-direct {v3, v4, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      },
+      {
+        "name": "FromSpringUG",
+        "ordinal": 46,
+        "value": 501,
+        "evidence": "757408: 7040 7283 3486                         |0272: invoke-direct {v4, v3, v6, v8}, Lcom/dragon/read/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@8372"
+      }
+    ]
+  },
+  "com.dragon.read.rpc.model.VideoContentType": {
+    "dex": "classes9",
+    "values": [
+      {
+        "name": "ShortSeriesPlay",
+        "ordinal": 0,
+        "value": 1,
+        "evidence": "743e64: 7040 a782 1032                         |000c: invoke-direct {v0, v1, v2, v3}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "ScenePlay",
+        "ordinal": 1,
+        "value": 2,
+        "evidence": "743e78: 7040 a782 4153                         |0016: invoke-direct {v1, v4, v3, v5}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "ExpertRecommendBook",
+        "ordinal": 2,
+        "value": 3,
+        "evidence": "743e8c: 7040 a782 6475                         |0020: invoke-direct {v4, v6, v5, v7}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "PPTRecommendBook",
+        "ordinal": 3,
+        "value": 4,
+        "evidence": "743ea0: 7040 a782 8697                         |002a: invoke-direct {v6, v8, v7, v9}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "Movie",
+        "ordinal": 4,
+        "value": 5,
+        "evidence": "743eb4: 7040 a782 a8b9                         |0034: invoke-direct {v8, v10, v9, v11}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "TelePlay",
+        "ordinal": 5,
+        "value": 6,
+        "evidence": "743ec8: 7040 a782 cadb                         |003e: invoke-direct {v10, v12, v11, v13}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "ShortPlay",
+        "ordinal": 6,
+        "value": 7,
+        "evidence": "743edc: 7040 a782 ecfd                         |0048: invoke-direct {v12, v14, v13, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "DropMaterial",
+        "ordinal": 7,
+        "value": 1000,
+        "evidence": "743ef2: 7040 a782 debf                         |0053: invoke-direct {v14, v13, v15, v11}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "PUGC",
+        "ordinal": 8,
+        "value": 1001,
+        "evidence": "743f0c: 7040 a782 fbd9                         |0060: invoke-direct {v11, v15, v9, v13}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "UnrealShortPlay",
+        "ordinal": 9,
+        "value": 1002,
+        "evidence": "743f26: 7040 a782 9df7                         |006d: invoke-direct {v13, v9, v7, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "Album",
+        "ordinal": 10,
+        "value": 1003,
+        "evidence": "743f40: 7040 a782 79f5                         |007a: invoke-direct {v9, v7, v5, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "MotionComic",
+        "ordinal": 11,
+        "value": 1004,
+        "evidence": "743f5a: 7040 a782 57f3                         |0087: invoke-direct {v7, v5, v3, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "FamousSceneVideo",
+        "ordinal": 12,
+        "value": 1005,
+        "evidence": "743f74: 7040 a782 35f2                         |0094: invoke-direct {v5, v3, v2, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "UgcPostVideo",
+        "ordinal": 13,
+        "value": 1006,
+        "evidence": "743f92: 7040 a782 23f5                         |00a3: invoke-direct {v3, v2, v5, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "UnrealMotionComic",
+        "ordinal": 14,
+        "value": 1007,
+        "evidence": "743fb0: 7040 a782 52f3                         |00b2: invoke-direct {v2, v5, v3, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "CommerceVideoSlice",
+        "ordinal": 15,
+        "value": 1008,
+        "evidence": "743fce: 7040 a782 35f2                         |00c1: invoke-direct {v5, v3, v2, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "AIRewriteDraft",
+        "ordinal": 16,
+        "value": 1009,
+        "evidence": "743fec: 7040 a782 23f5                         |00d0: invoke-direct {v3, v2, v5, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "Video1ColPushBookVideo",
+        "ordinal": 17,
+        "value": 1010,
+        "evidence": "74400a: 7040 a782 52f3                         |00df: invoke-direct {v2, v5, v3, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "FamousSceneTtv",
+        "ordinal": 18,
+        "value": 1011,
+        "evidence": "744028: 7040 a782 35f2                         |00ee: invoke-direct {v5, v3, v2, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      },
+      {
+        "name": "AdReplacePlay",
+        "ordinal": 19,
+        "value": 1012,
+        "evidence": "744046: 7040 a782 23f5                         |00fd: invoke-direct {v3, v2, v5, v15}, Lcom/dragon/read/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@82a7"
+      }
+    ]
+  },
+  "com.dragon.read.rpc.model.DeviceLevel": {
+    "dex": "classes17",
+    "values": [
+      {
+        "name": "Low",
+        "ordinal": 0,
+        "value": 1,
+        "evidence": "681af8: 7040 bb56 1032                         |000c: invoke-direct {v0, v1, v2, v3}, Lcom/dragon/read/rpc/model/DeviceLevel;.<init>:(Ljava/lang/String;II)V // method@56bb"
+      },
+      {
+        "name": "Middle",
+        "ordinal": 1,
+        "value": 2,
+        "evidence": "681b0c: 7040 bb56 4153                         |0016: invoke-direct {v1, v4, v3, v5}, Lcom/dragon/read/rpc/model/DeviceLevel;.<init>:(Ljava/lang/String;II)V // method@56bb"
+      },
+      {
+        "name": "High",
+        "ordinal": 2,
+        "value": 3,
+        "evidence": "681b20: 7040 bb56 6475                         |0020: invoke-direct {v4, v6, v5, v7}, Lcom/dragon/read/rpc/model/DeviceLevel;.<init>:(Ljava/lang/String;II)V // method@56bb"
+      }
+    ]
+  },
+  "com.dragon.read.rpc.model.ContentType": {
+    "dex": "classes17",
+    "values": [
+      {
+        "name": "NoneContentType",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "632d3e: 7040 9749 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lcom/dragon/read/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@4997"
+      },
+      {
+        "name": "PostStory",
+        "ordinal": 1,
+        "value": 1,
+        "evidence": "632d52: 7040 9749 3144                         |0015: invoke-direct {v1, v3, v4, v4}, Lcom/dragon/read/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@4997"
+      },
+      {
+        "name": "UgcStory",
+        "ordinal": 2,
+        "value": 2,
+        "evidence": "632d66: 7040 9749 5366                         |001f: invoke-direct {v3, v5, v6, v6}, Lcom/dragon/read/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@4997"
+      },
+      {
+        "name": "AIGC",
+        "ordinal": 3,
+        "value": 3,
+        "evidence": "632d7a: 7040 9749 7588                         |0029: invoke-direct {v5, v7, v8, v8}, Lcom/dragon/read/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@4997"
+      },
+      {
+        "name": "PgcPayStory",
+        "ordinal": 4,
+        "value": 4,
+        "evidence": "632d8e: 7040 9749 97aa                         |0033: invoke-direct {v7, v9, v10, v10}, Lcom/dragon/read/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@4997"
+      },
+      {
+        "name": "VideoSeriesPost",
+        "ordinal": 5,
+        "value": 5,
+        "evidence": "632da2: 7040 9749 b9cc                         |003d: invoke-direct {v9, v11, v12, v12}, Lcom/dragon/read/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@4997"
+      },
+      {
+        "name": "KOLVideoSeriesPost",
+        "ordinal": 6,
+        "value": 6,
+        "evidence": "632db6: 7040 9749 dbee                         |0047: invoke-direct {v11, v13, v14, v14}, Lcom/dragon/read/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@4997"
+      }
+    ]
+  },
+  "seriessdk.com.dragon.read.saas.rpc.model.VideoErr": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "SUCCESS",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "8c0c16: 7040 29e1 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "FastReject",
+        "ordinal": 1,
+        "value": 100,
+        "evidence": "8c0c2e: 7040 29e1 4135                         |0017: invoke-direct {v1, v4, v5, v3}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "IllegalAccess",
+        "ordinal": 2,
+        "value": 110,
+        "evidence": "8c0c46: 7040 29e1 6347                         |0023: invoke-direct {v3, v6, v7, v4}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "HitVerifyCode",
+        "ordinal": 3,
+        "value": 111,
+        "evidence": "8c0c5e: 7040 29e1 8469                         |002f: invoke-direct {v4, v8, v9, v6}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "AppReject",
+        "ordinal": 4,
+        "value": 112,
+        "evidence": "8c0c76: 7040 29e1 a68b                         |003b: invoke-direct {v6, v10, v11, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "ParamInvalid",
+        "ordinal": 5,
+        "value": 100001,
+        "evidence": "8c0c90: 7040 29e1 c8ad                         |0048: invoke-direct {v8, v12, v13, v10}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "DataEmpty",
+        "ordinal": 6,
+        "value": 100002,
+        "evidence": "8c0caa: 7040 29e1 eacf                         |0055: invoke-direct {v10, v14, v15, v12}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "DupOperation",
+        "ordinal": 7,
+        "value": 100003,
+        "evidence": "8c0cc4: 7040 29e1 fced                         |0062: invoke-direct {v12, v15, v13, v14}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "InternalError",
+        "ordinal": 8,
+        "value": 100004,
+        "evidence": "8c0ce0: 7040 29e1 defb                         |0070: invoke-direct {v14, v13, v11, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "ServiceError",
+        "ordinal": 9,
+        "value": 101000,
+        "evidence": "8c0cfc: 7040 29e1 bdf9                         |007e: invoke-direct {v13, v11, v9, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "BookFulllyRemove",
+        "ordinal": 10,
+        "value": 101001,
+        "evidence": "8c0d18: 7040 29e1 9bf7                         |008c: invoke-direct {v11, v9, v7, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "ContentVerifying",
+        "ordinal": 11,
+        "value": 101002,
+        "evidence": "8c0d34: 7040 29e1 79f5                         |009a: invoke-direct {v9, v7, v5, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "VideoNoPermission",
+        "ordinal": 12,
+        "value": 101003,
+        "evidence": "8c0d50: 7040 29e1 57f2                         |00a8: invoke-direct {v7, v5, v2, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "AgeIllegal",
+        "ordinal": 13,
+        "value": 101004,
+        "evidence": "8c0d70: 7040 29e1 25f7                         |00b8: invoke-direct {v5, v2, v7, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "VideoLocked",
+        "ordinal": 14,
+        "value": 101005,
+        "evidence": "8c0d90: 7040 29e1 72f5                         |00c8: invoke-direct {v2, v7, v5, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "RpcTimeOut",
+        "ordinal": 15,
+        "value": 101006,
+        "evidence": "8c0db0: 7040 29e1 57f2                         |00d8: invoke-direct {v7, v5, v2, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "VideoPaidLocked",
+        "ordinal": 16,
+        "value": 101007,
+        "evidence": "8c0dd0: 7040 29e1 25f7                         |00e8: invoke-direct {v5, v2, v7, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "VideoUnPaidBlock",
+        "ordinal": 17,
+        "value": 101008,
+        "evidence": "8c0df0: 7040 29e1 72f5                         |00f8: invoke-direct {v2, v7, v5, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "CustomRecordNumberNotFound",
+        "ordinal": 18,
+        "value": 101009,
+        "evidence": "8c0e10: 7040 29e1 57f2                         |0108: invoke-direct {v7, v5, v2, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "FreqCtrl",
+        "ordinal": 19,
+        "value": 101010,
+        "evidence": "8c0e30: 7040 29e1 25f7                         |0118: invoke-direct {v5, v2, v7, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "BookFieldNotSupport",
+        "ordinal": 20,
+        "value": 200001,
+        "evidence": "8c0e50: 7040 29e1 72f5                         |0128: invoke-direct {v2, v7, v5, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      },
+      {
+        "name": "I18nVideoModelRiskControlError",
+        "ordinal": 21,
+        "value": 300001,
+        "evidence": "8c0e70: 7040 29e1 57f2                         |0138: invoke-direct {v7, v5, v2, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@e129"
+      }
+    ]
+  },
+  "readersaas.com.dragon.read.saas.rpc.model.VideoErr": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "SUCCESS",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "8432ee: 7040 83cc 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "FastReject",
+        "ordinal": 1,
+        "value": 100,
+        "evidence": "843306: 7040 83cc 4135                         |0017: invoke-direct {v1, v4, v5, v3}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "IllegalAccess",
+        "ordinal": 2,
+        "value": 110,
+        "evidence": "84331e: 7040 83cc 6347                         |0023: invoke-direct {v3, v6, v7, v4}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "HitVerifyCode",
+        "ordinal": 3,
+        "value": 111,
+        "evidence": "843336: 7040 83cc 8469                         |002f: invoke-direct {v4, v8, v9, v6}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "AppReject",
+        "ordinal": 4,
+        "value": 112,
+        "evidence": "84334e: 7040 83cc a68b                         |003b: invoke-direct {v6, v10, v11, v8}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "ParamInvalid",
+        "ordinal": 5,
+        "value": 100001,
+        "evidence": "843368: 7040 83cc c8ad                         |0048: invoke-direct {v8, v12, v13, v10}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "DataEmpty",
+        "ordinal": 6,
+        "value": 100002,
+        "evidence": "843382: 7040 83cc eacf                         |0055: invoke-direct {v10, v14, v15, v12}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "DupOperation",
+        "ordinal": 7,
+        "value": 100003,
+        "evidence": "84339c: 7040 83cc fced                         |0062: invoke-direct {v12, v15, v13, v14}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "InternalError",
+        "ordinal": 8,
+        "value": 100004,
+        "evidence": "8433b8: 7040 83cc defb                         |0070: invoke-direct {v14, v13, v11, v15}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "ServiceError",
+        "ordinal": 9,
+        "value": 101000,
+        "evidence": "8433d4: 7040 83cc bdf9                         |007e: invoke-direct {v13, v11, v9, v15}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "BookFulllyRemove",
+        "ordinal": 10,
+        "value": 101001,
+        "evidence": "8433f0: 7040 83cc 9bf7                         |008c: invoke-direct {v11, v9, v7, v15}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "ContentVerifying",
+        "ordinal": 11,
+        "value": 101002,
+        "evidence": "84340c: 7040 83cc 79f5                         |009a: invoke-direct {v9, v7, v5, v15}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      },
+      {
+        "name": "VideoNoPermission",
+        "ordinal": 12,
+        "value": 101003,
+        "evidence": "843428: 7040 83cc 57f2                         |00a8: invoke-direct {v7, v5, v2, v15}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoErr;.<init>:(Ljava/lang/String;II)V // method@cc83"
+      }
+    ]
+  },
+  "seriessdk.com.dragon.read.saas.rpc.model.VideoSeriesIdType": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "VideoId",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "8c34aa: 7040 a5e1 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoSeriesIdType;.<init>:(Ljava/lang/String;II)V // method@e1a5"
+      },
+      {
+        "name": "SeriesId",
+        "ordinal": 1,
+        "value": 1,
+        "evidence": "8c34be: 7040 a5e1 3144                         |0015: invoke-direct {v1, v3, v4, v4}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoSeriesIdType;.<init>:(Ljava/lang/String;II)V // method@e1a5"
+      },
+      {
+        "name": "PostId",
+        "ordinal": 2,
+        "value": 2,
+        "evidence": "8c34d2: 7040 a5e1 5366                         |001f: invoke-direct {v3, v5, v6, v6}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoSeriesIdType;.<init>:(Ljava/lang/String;II)V // method@e1a5"
+      }
+    ]
+  },
+  "seriessdk.com.dragon.read.saas.rpc.model.VideoPlatformType": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "Unknown",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "8c2436: 7040 6de1 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@e16d"
+      },
+      {
+        "name": "PlatformDouyin",
+        "ordinal": 1,
+        "value": 1,
+        "evidence": "8c244a: 7040 6de1 3144                         |0015: invoke-direct {v1, v3, v4, v4}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@e16d"
+      },
+      {
+        "name": "UgcVideo",
+        "ordinal": 2,
+        "value": 2,
+        "evidence": "8c245e: 7040 6de1 5366                         |001f: invoke-direct {v3, v5, v6, v6}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@e16d"
+      },
+      {
+        "name": "Outer",
+        "ordinal": 3,
+        "value": 3,
+        "evidence": "8c2472: 7040 6de1 7588                         |0029: invoke-direct {v5, v7, v8, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@e16d"
+      },
+      {
+        "name": "PlatformXigua",
+        "ordinal": 4,
+        "value": 4,
+        "evidence": "8c2486: 7040 6de1 97aa                         |0033: invoke-direct {v7, v9, v10, v10}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@e16d"
+      },
+      {
+        "name": "Chameleon",
+        "ordinal": 5,
+        "value": 5,
+        "evidence": "8c249a: 7040 6de1 b9cc                         |003d: invoke-direct {v9, v11, v12, v12}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@e16d"
+      },
+      {
+        "name": "Mixed",
+        "ordinal": 6,
+        "value": 1024,
+        "evidence": "8c24b2: 7040 6de1 ebdf                         |0049: invoke-direct {v11, v14, v15, v13}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@e16d"
+      }
+    ]
+  },
+  "seriessdk.com.dragon.read.saas.rpc.model.VideoDetailSource": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "FromColdStart",
+        "ordinal": 0,
+        "value": 1,
+        "evidence": "8c0454: 7040 1ee1 1032                         |000c: invoke-direct {v0, v1, v2, v3}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromSearch",
+        "ordinal": 1,
+        "value": 2,
+        "evidence": "8c0468: 7040 1ee1 2143                         |0016: invoke-direct {v1, v2, v3, v4}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromBookmall",
+        "ordinal": 2,
+        "value": 3,
+        "evidence": "8c047c: 7040 1ee1 5264                         |0020: invoke-direct {v2, v5, v4, v6}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromPlayer",
+        "ordinal": 3,
+        "value": 4,
+        "evidence": "8c0490: 7040 1ee1 7586                         |002a: invoke-direct {v5, v7, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromDetailPage",
+        "ordinal": 4,
+        "value": 5,
+        "evidence": "8c04a4: 7040 1ee1 97a8                         |0034: invoke-direct {v7, v9, v8, v10}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUgcProfile",
+        "ordinal": 5,
+        "value": 6,
+        "evidence": "8c04b8: 7040 1ee1 b9ca                         |003e: invoke-direct {v9, v11, v10, v12}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromPreload",
+        "ordinal": 6,
+        "value": 7,
+        "evidence": "8c04cc: 7040 1ee1 dbec                         |0048: invoke-direct {v11, v13, v12, v14}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromShare",
+        "ordinal": 7,
+        "value": 8,
+        "evidence": "8c04e2: 7040 1ee1 fdce                         |0053: invoke-direct {v13, v15, v14, v12}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromVideoFeedTab",
+        "ordinal": 8,
+        "value": 9,
+        "evidence": "8c04f8: 7040 1ee1 efac                         |005e: invoke-direct {v15, v14, v12, v10}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromVideoFeedTabInto",
+        "ordinal": 9,
+        "value": 10,
+        "evidence": "8c050e: 7040 1ee1 ce8a                         |0069: invoke-direct {v14, v12, v10, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromReadProgress",
+        "ordinal": 10,
+        "value": 11,
+        "evidence": "8c0524: 7040 1ee1 ac68                         |0074: invoke-direct {v12, v10, v8, v6}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromEditor",
+        "ordinal": 11,
+        "value": 12,
+        "evidence": "8c053a: 7040 1ee1 8a46                         |007f: invoke-direct {v10, v8, v6, v4}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromLikeListPage",
+        "ordinal": 12,
+        "value": 13,
+        "evidence": "8c0550: 7040 1ee1 6834                         |008a: invoke-direct {v8, v6, v4, v3}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUgcProfile_CelebrityWorksTab",
+        "ordinal": 13,
+        "value": 14,
+        "evidence": "8c056a: 7040 1ee1 4683                         |0097: invoke-direct {v6, v4, v3, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUgcProfile_ProduceVideoTab",
+        "ordinal": 14,
+        "value": 15,
+        "evidence": "8c0584: 7040 1ee1 3468                         |00a4: invoke-direct {v4, v3, v8, v6}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUnlockNew",
+        "ordinal": 15,
+        "value": 16,
+        "evidence": "8c059e: 7040 1ee1 8346                         |00b1: invoke-direct {v3, v8, v6, v4}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUgcProfile_SingleRowVideo",
+        "ordinal": 16,
+        "value": 17,
+        "evidence": "8c05b8: 7040 1ee1 6834                         |00be: invoke-direct {v8, v6, v4, v3}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromOperation",
+        "ordinal": 17,
+        "value": 18,
+        "evidence": "8c05d2: 7040 1ee1 4683                         |00cb: invoke-direct {v6, v4, v3, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromSubscribeCard",
+        "ordinal": 18,
+        "value": 19,
+        "evidence": "8c05ec: 7040 1ee1 3468                         |00d8: invoke-direct {v4, v3, v8, v6}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromSingleColumn",
+        "ordinal": 19,
+        "value": 20,
+        "evidence": "8c0606: 7040 1ee1 8346                         |00e5: invoke-direct {v3, v8, v6, v4}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromMyselfPUGC",
+        "ordinal": 20,
+        "value": 21,
+        "evidence": "8c0620: 7040 1ee1 6834                         |00f2: invoke-direct {v8, v6, v4, v3}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromAlbumList",
+        "ordinal": 21,
+        "value": 22,
+        "evidence": "8c063a: 7040 1ee1 4683                         |00ff: invoke-direct {v6, v4, v3, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromBookshelf",
+        "ordinal": 22,
+        "value": 23,
+        "evidence": "8c0654: 7040 1ee1 3468                         |010c: invoke-direct {v4, v3, v8, v6}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromHistory",
+        "ordinal": 23,
+        "value": 24,
+        "evidence": "8c066e: 7040 1ee1 4386                         |0119: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromToutiaoDaoliang",
+        "ordinal": 24,
+        "value": 25,
+        "evidence": "8c068c: 7040 1ee1 3486                         |0128: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromShareReturnPage",
+        "ordinal": 25,
+        "value": 26,
+        "evidence": "8c06aa: 7040 1ee1 4386                         |0137: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUGCTab",
+        "ordinal": 26,
+        "value": 27,
+        "evidence": "8c06c8: 7040 1ee1 3486                         |0146: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromDoubleCol",
+        "ordinal": 27,
+        "value": 28,
+        "evidence": "8c06e6: 7040 1ee1 4386                         |0155: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromSecondCreateInnerFlow",
+        "ordinal": 28,
+        "value": 29,
+        "evidence": "8c0704: 7040 1ee1 3486                         |0164: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromShortVideoTab",
+        "ordinal": 29,
+        "value": 30,
+        "evidence": "8c0722: 7040 1ee1 4386                         |0173: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUgcEditor",
+        "ordinal": 30,
+        "value": 31,
+        "evidence": "8c0740: 7040 1ee1 3486                         |0182: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromOfficialWebsite",
+        "ordinal": 31,
+        "value": 32,
+        "evidence": "8c075e: 7040 1ee1 4386                         |0191: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUgcVoteRankPage",
+        "ordinal": 32,
+        "value": 33,
+        "evidence": "8c077c: 7040 1ee1 3486                         |01a0: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromDoubleColEnterSingleOutflow",
+        "ordinal": 33,
+        "value": 34,
+        "evidence": "8c079a: 7040 1ee1 4386                         |01af: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromPugcDataCenter",
+        "ordinal": 34,
+        "value": 35,
+        "evidence": "8c07b8: 7040 1ee1 3486                         |01be: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromAIContentListStore",
+        "ordinal": 35,
+        "value": 36,
+        "evidence": "8c07d6: 7040 1ee1 4386                         |01cd: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromAIContentListSelf",
+        "ordinal": 36,
+        "value": 37,
+        "evidence": "8c07f4: 7040 1ee1 3486                         |01dc: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUserProfile",
+        "ordinal": 37,
+        "value": 38,
+        "evidence": "8c0812: 7040 1ee1 4386                         |01eb: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromActorInnerFlow",
+        "ordinal": 38,
+        "value": 39,
+        "evidence": "8c0830: 7040 1ee1 3486                         |01fa: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromMeloloShareDetailPage",
+        "ordinal": 39,
+        "value": 40,
+        "evidence": "8c084e: 7040 1ee1 4386                         |0209: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromFollowTabPersonCard",
+        "ordinal": 40,
+        "value": 41,
+        "evidence": "8c086c: 7040 1ee1 3486                         |0218: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromSeriesEndRecommend",
+        "ordinal": 41,
+        "value": 42,
+        "evidence": "8c088a: 7040 1ee1 4386                         |0227: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromImConversation",
+        "ordinal": 42,
+        "value": 43,
+        "evidence": "8c08a8: 7040 1ee1 3486                         |0236: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromSelectPanelSeriesPreload",
+        "ordinal": 43,
+        "value": 44,
+        "evidence": "8c08c6: 7040 1ee1 4386                         |0245: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromUgcProfileSimpleCreate",
+        "ordinal": 44,
+        "value": 45,
+        "evidence": "8c08e4: 7040 1ee1 3486                         |0254: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromSeriesDetailPageSeasonSwitch",
+        "ordinal": 45,
+        "value": 46,
+        "evidence": "8c0902: 7040 1ee1 4386                         |0263: invoke-direct {v3, v4, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      },
+      {
+        "name": "FromSpringUG",
+        "ordinal": 46,
+        "value": 501,
+        "evidence": "8c0920: 7040 1ee1 3486                         |0272: invoke-direct {v4, v3, v6, v8}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@e11e"
+      }
+    ]
+  },
+  "seriessdk.com.dragon.read.saas.rpc.model.DeviceLevel": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "Low",
+        "ordinal": 0,
+        "value": 1,
+        "evidence": "866464: 7040 d1d3 1032                         |000c: invoke-direct {v0, v1, v2, v3}, Lseriessdk/com/dragon/read/saas/rpc/model/DeviceLevel;.<init>:(Ljava/lang/String;II)V // method@d3d1"
+      },
+      {
+        "name": "Middle",
+        "ordinal": 1,
+        "value": 2,
+        "evidence": "866478: 7040 d1d3 4153                         |0016: invoke-direct {v1, v4, v3, v5}, Lseriessdk/com/dragon/read/saas/rpc/model/DeviceLevel;.<init>:(Ljava/lang/String;II)V // method@d3d1"
+      },
+      {
+        "name": "High",
+        "ordinal": 2,
+        "value": 3,
+        "evidence": "86648c: 7040 d1d3 6475                         |0020: invoke-direct {v4, v6, v5, v7}, Lseriessdk/com/dragon/read/saas/rpc/model/DeviceLevel;.<init>:(Ljava/lang/String;II)V // method@d3d1"
+      }
+    ]
+  },
+  "readersaas.com.dragon.read.saas.rpc.model.VideoSeriesIdType": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "VideoId",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "843a42: 7040 a6cc 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoSeriesIdType;.<init>:(Ljava/lang/String;II)V // method@cca6"
+      },
+      {
+        "name": "SeriesId",
+        "ordinal": 1,
+        "value": 1,
+        "evidence": "843a56: 7040 a6cc 3144                         |0015: invoke-direct {v1, v3, v4, v4}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoSeriesIdType;.<init>:(Ljava/lang/String;II)V // method@cca6"
+      },
+      {
+        "name": "PostId",
+        "ordinal": 2,
+        "value": 2,
+        "evidence": "843a6a: 7040 a6cc 5366                         |001f: invoke-direct {v3, v5, v6, v6}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoSeriesIdType;.<init>:(Ljava/lang/String;II)V // method@cca6"
+      }
+    ]
+  },
+  "readersaas.com.dragon.read.saas.rpc.model.VideoPlatformType": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "Unknown",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "84379e: 7040 98cc 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@cc98"
+      },
+      {
+        "name": "PlatformDouyin",
+        "ordinal": 1,
+        "value": 1,
+        "evidence": "8437b2: 7040 98cc 3144                         |0015: invoke-direct {v1, v3, v4, v4}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@cc98"
+      },
+      {
+        "name": "UgcVideo",
+        "ordinal": 2,
+        "value": 2,
+        "evidence": "8437c6: 7040 98cc 5366                         |001f: invoke-direct {v3, v5, v6, v6}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@cc98"
+      },
+      {
+        "name": "Outer",
+        "ordinal": 3,
+        "value": 3,
+        "evidence": "8437da: 7040 98cc 7588                         |0029: invoke-direct {v5, v7, v8, v8}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@cc98"
+      },
+      {
+        "name": "PlatformXigua",
+        "ordinal": 4,
+        "value": 4,
+        "evidence": "8437ee: 7040 98cc 97aa                         |0033: invoke-direct {v7, v9, v10, v10}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@cc98"
+      },
+      {
+        "name": "Chameleon",
+        "ordinal": 5,
+        "value": 5,
+        "evidence": "843802: 7040 98cc b9cc                         |003d: invoke-direct {v9, v11, v12, v12}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@cc98"
+      },
+      {
+        "name": "Mixed",
+        "ordinal": 6,
+        "value": 1024,
+        "evidence": "84381a: 7040 98cc ebdf                         |0049: invoke-direct {v11, v14, v15, v13}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoPlatformType;.<init>:(Ljava/lang/String;II)V // method@cc98"
+      }
+    ]
+  },
+  "readersaas.com.dragon.read.saas.rpc.model.VideoDetailSource": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "FromColdStart",
+        "ordinal": 0,
+        "value": 1,
+        "evidence": "842e8c: 7040 72cc 1032                         |000c: invoke-direct {v0, v1, v2, v3}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromSearch",
+        "ordinal": 1,
+        "value": 2,
+        "evidence": "842ea0: 7040 72cc 4153                         |0016: invoke-direct {v1, v4, v3, v5}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromBookmall",
+        "ordinal": 2,
+        "value": 3,
+        "evidence": "842eb4: 7040 72cc 6475                         |0020: invoke-direct {v4, v6, v5, v7}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromPlayer",
+        "ordinal": 3,
+        "value": 4,
+        "evidence": "842ec8: 7040 72cc 8697                         |002a: invoke-direct {v6, v8, v7, v9}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromDetailPage",
+        "ordinal": 4,
+        "value": 5,
+        "evidence": "842edc: 7040 72cc a8b9                         |0034: invoke-direct {v8, v10, v9, v11}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromUgcProfile",
+        "ordinal": 5,
+        "value": 6,
+        "evidence": "842ef0: 7040 72cc cadb                         |003e: invoke-direct {v10, v12, v11, v13}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromPreload",
+        "ordinal": 6,
+        "value": 7,
+        "evidence": "842f04: 7040 72cc ecfd                         |0048: invoke-direct {v12, v14, v13, v15}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromShare",
+        "ordinal": 7,
+        "value": 8,
+        "evidence": "842f1a: 7040 72cc debf                         |0053: invoke-direct {v14, v13, v15, v11}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromVideoFeedTab",
+        "ordinal": 8,
+        "value": 9,
+        "evidence": "842f30: 7040 72cc fd9b                         |005e: invoke-direct {v13, v15, v11, v9}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromVideoFeedTabInto",
+        "ordinal": 9,
+        "value": 10,
+        "evidence": "842f46: 7040 72cc bf79                         |0069: invoke-direct {v15, v11, v9, v7}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromReadProgress",
+        "ordinal": 10,
+        "value": 11,
+        "evidence": "842f5c: 7040 72cc 9b57                         |0074: invoke-direct {v11, v9, v7, v5}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromEditor",
+        "ordinal": 11,
+        "value": 12,
+        "evidence": "842f72: 7040 72cc 7935                         |007f: invoke-direct {v9, v7, v5, v3}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromLikeListPage",
+        "ordinal": 12,
+        "value": 13,
+        "evidence": "842f88: 7040 72cc 5723                         |008a: invoke-direct {v7, v5, v3, v2}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      },
+      {
+        "name": "FromFirm",
+        "ordinal": 13,
+        "value": 14,
+        "evidence": "842fa2: 7040 72cc 3572                         |0097: invoke-direct {v5, v3, v2, v7}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoDetailSource;.<init>:(Ljava/lang/String;II)V // method@cc72"
+      }
+    ]
+  },
+  "readersaas.com.dragon.read.saas.rpc.model.DeviceLevel": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "Low",
+        "ordinal": 0,
+        "value": 1,
+        "evidence": "8179fc: 7040 06c2 1032                         |000c: invoke-direct {v0, v1, v2, v3}, Lreadersaas/com/dragon/read/saas/rpc/model/DeviceLevel;.<init>:(Ljava/lang/String;II)V // method@c206"
+      },
+      {
+        "name": "Middle",
+        "ordinal": 1,
+        "value": 2,
+        "evidence": "817a10: 7040 06c2 4153                         |0016: invoke-direct {v1, v4, v3, v5}, Lreadersaas/com/dragon/read/saas/rpc/model/DeviceLevel;.<init>:(Ljava/lang/String;II)V // method@c206"
+      },
+      {
+        "name": "High",
+        "ordinal": 2,
+        "value": 3,
+        "evidence": "817a24: 7040 06c2 6475                         |0020: invoke-direct {v4, v6, v5, v7}, Lreadersaas/com/dragon/read/saas/rpc/model/DeviceLevel;.<init>:(Ljava/lang/String;II)V // method@c206"
+      }
+    ]
+  },
+  "seriessdk.com.dragon.read.saas.rpc.model.VideoContentType": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "ShortSeriesPlay",
+        "ordinal": 0,
+        "value": 1,
+        "evidence": "8bb8d8: 7040 02e1 1032                         |000c: invoke-direct {v0, v1, v2, v3}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "ScenePlay",
+        "ordinal": 1,
+        "value": 2,
+        "evidence": "8bb8ec: 7040 02e1 4153                         |0016: invoke-direct {v1, v4, v3, v5}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "ExpertRecommendBook",
+        "ordinal": 2,
+        "value": 3,
+        "evidence": "8bb900: 7040 02e1 6475                         |0020: invoke-direct {v4, v6, v5, v7}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "PPTRecommendBook",
+        "ordinal": 3,
+        "value": 4,
+        "evidence": "8bb914: 7040 02e1 8697                         |002a: invoke-direct {v6, v8, v7, v9}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "Movie",
+        "ordinal": 4,
+        "value": 5,
+        "evidence": "8bb928: 7040 02e1 a8b9                         |0034: invoke-direct {v8, v10, v9, v11}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "TelePlay",
+        "ordinal": 5,
+        "value": 6,
+        "evidence": "8bb93c: 7040 02e1 cadb                         |003e: invoke-direct {v10, v12, v11, v13}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "ShortPlay",
+        "ordinal": 6,
+        "value": 7,
+        "evidence": "8bb950: 7040 02e1 ecfd                         |0048: invoke-direct {v12, v14, v13, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "DropMaterial",
+        "ordinal": 7,
+        "value": 1000,
+        "evidence": "8bb966: 7040 02e1 debf                         |0053: invoke-direct {v14, v13, v15, v11}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "PUGC",
+        "ordinal": 8,
+        "value": 1001,
+        "evidence": "8bb980: 7040 02e1 fbd9                         |0060: invoke-direct {v11, v15, v9, v13}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "UnrealShortPlay",
+        "ordinal": 9,
+        "value": 1002,
+        "evidence": "8bb99a: 7040 02e1 9df7                         |006d: invoke-direct {v13, v9, v7, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "Album",
+        "ordinal": 10,
+        "value": 1003,
+        "evidence": "8bb9b4: 7040 02e1 79f5                         |007a: invoke-direct {v9, v7, v5, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "MotionComic",
+        "ordinal": 11,
+        "value": 1004,
+        "evidence": "8bb9ce: 7040 02e1 57f3                         |0087: invoke-direct {v7, v5, v3, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "FamousSceneVideo",
+        "ordinal": 12,
+        "value": 1005,
+        "evidence": "8bb9e8: 7040 02e1 35f2                         |0094: invoke-direct {v5, v3, v2, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "UgcPostVideo",
+        "ordinal": 13,
+        "value": 1006,
+        "evidence": "8bba06: 7040 02e1 23f5                         |00a3: invoke-direct {v3, v2, v5, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "UnrealMotionComic",
+        "ordinal": 14,
+        "value": 1007,
+        "evidence": "8bba24: 7040 02e1 52f3                         |00b2: invoke-direct {v2, v5, v3, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "CommerceVideoSlice",
+        "ordinal": 15,
+        "value": 1008,
+        "evidence": "8bba42: 7040 02e1 35f2                         |00c1: invoke-direct {v5, v3, v2, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "AIRewriteDraft",
+        "ordinal": 16,
+        "value": 1009,
+        "evidence": "8bba60: 7040 02e1 23f5                         |00d0: invoke-direct {v3, v2, v5, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "Video1ColPushBookVideo",
+        "ordinal": 17,
+        "value": 1010,
+        "evidence": "8bba7e: 7040 02e1 52f3                         |00df: invoke-direct {v2, v5, v3, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "FamousSceneTtv",
+        "ordinal": 18,
+        "value": 1011,
+        "evidence": "8bba9c: 7040 02e1 35f2                         |00ee: invoke-direct {v5, v3, v2, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      },
+      {
+        "name": "AdReplacePlay",
+        "ordinal": 19,
+        "value": 1012,
+        "evidence": "8bbaba: 7040 02e1 23f5                         |00fd: invoke-direct {v3, v2, v5, v15}, Lseriessdk/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@e102"
+      }
+    ]
+  },
+  "readersaas.com.dragon.read.saas.rpc.model.VideoContentType": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "ShortSeriesPlay",
+        "ordinal": 0,
+        "value": 1,
+        "evidence": "842cdc: 7040 6bcc 1032                         |000c: invoke-direct {v0, v1, v2, v3}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@cc6b"
+      },
+      {
+        "name": "ScenePlay",
+        "ordinal": 1,
+        "value": 2,
+        "evidence": "842cf0: 7040 6bcc 4153                         |0016: invoke-direct {v1, v4, v3, v5}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@cc6b"
+      },
+      {
+        "name": "ExpertRecommendBook",
+        "ordinal": 2,
+        "value": 3,
+        "evidence": "842d04: 7040 6bcc 6475                         |0020: invoke-direct {v4, v6, v5, v7}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@cc6b"
+      },
+      {
+        "name": "PPTRecommendBook",
+        "ordinal": 3,
+        "value": 4,
+        "evidence": "842d18: 7040 6bcc 8697                         |002a: invoke-direct {v6, v8, v7, v9}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@cc6b"
+      },
+      {
+        "name": "Movie",
+        "ordinal": 4,
+        "value": 5,
+        "evidence": "842d2c: 7040 6bcc a8b9                         |0034: invoke-direct {v8, v10, v9, v11}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@cc6b"
+      },
+      {
+        "name": "TelePlay",
+        "ordinal": 5,
+        "value": 6,
+        "evidence": "842d40: 7040 6bcc cadb                         |003e: invoke-direct {v10, v12, v11, v13}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@cc6b"
+      },
+      {
+        "name": "ShortPlay",
+        "ordinal": 6,
+        "value": 7,
+        "evidence": "842d54: 7040 6bcc ecfd                         |0048: invoke-direct {v12, v14, v13, v15}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@cc6b"
+      },
+      {
+        "name": "DropMaterial",
+        "ordinal": 7,
+        "value": 1000,
+        "evidence": "842d6a: 7040 6bcc debf                         |0053: invoke-direct {v14, v13, v15, v11}, Lreadersaas/com/dragon/read/saas/rpc/model/VideoContentType;.<init>:(Ljava/lang/String;II)V // method@cc6b"
+      }
+    ]
+  },
+  "readersaas.com.dragon.read.saas.rpc.model.ContentType": {
+    "dex": "classes16",
+    "values": [
+      {
+        "name": "NoneContentType",
+        "ordinal": 0,
+        "value": 0,
+        "evidence": "81635e: 7040 91c1 1022                         |000b: invoke-direct {v0, v1, v2, v2}, Lreadersaas/com/dragon/read/saas/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@c191"
+      },
+      {
+        "name": "PostStory",
+        "ordinal": 1,
+        "value": 1,
+        "evidence": "816372: 7040 91c1 3144                         |0015: invoke-direct {v1, v3, v4, v4}, Lreadersaas/com/dragon/read/saas/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@c191"
+      },
+      {
+        "name": "UgcStory",
+        "ordinal": 2,
+        "value": 2,
+        "evidence": "816386: 7040 91c1 5366                         |001f: invoke-direct {v3, v5, v6, v6}, Lreadersaas/com/dragon/read/saas/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@c191"
+      },
+      {
+        "name": "AIGC",
+        "ordinal": 3,
+        "value": 3,
+        "evidence": "81639a: 7040 91c1 7588                         |0029: invoke-direct {v5, v7, v8, v8}, Lreadersaas/com/dragon/read/saas/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@c191"
+      },
+      {
+        "name": "PgcPayStory",
+        "ordinal": 4,
+        "value": 4,
+        "evidence": "8163ae: 7040 91c1 97aa                         |0033: invoke-direct {v7, v9, v10, v10}, Lreadersaas/com/dragon/read/saas/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@c191"
+      },
+      {
+        "name": "VideoSeriesPost",
+        "ordinal": 5,
+        "value": 5,
+        "evidence": "8163c2: 7040 91c1 b9cc                         |003d: invoke-direct {v9, v11, v12, v12}, Lreadersaas/com/dragon/read/saas/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@c191"
+      },
+      {
+        "name": "KOLVideoSeriesPost",
+        "ordinal": 6,
+        "value": 6,
+        "evidence": "8163d6: 7040 91c1 dbee                         |0047: invoke-direct {v11, v13, v14, v14}, Lreadersaas/com/dragon/read/saas/rpc/model/ContentType;.<init>:(Ljava/lang/String;II)V // method@c191"
+      }
+    ]
+  }
+}

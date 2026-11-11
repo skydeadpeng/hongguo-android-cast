@@ -86,7 +86,7 @@ if (typeof window !== 'undefined') {
     request.cleanup();
     if (message.error != null) {
       const error = new Error(String(message.error));
-      if (['ETIMEDOUT', 'ERR_CANCELED', 'INVALID_INPUT', 'APP_EMPTY_RESPONSE', 'APP_INVALID_RESPONSE'].includes(message.errorCode)) error.code = message.errorCode;
+      if (['ETIMEDOUT', 'ERR_CANCELED', 'INVALID_INPUT', 'APP_EMPTY_RESPONSE', 'APP_INVALID_RESPONSE', 'BUSINESS_REJECTED', 'HTTP_ERROR', 'SECURITY_BLOCKED'].includes(message.errorCode)) error.code = message.errorCode;
       request.reject(error);
     }
     else request.resolve(message.result);

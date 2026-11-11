@@ -5,14 +5,14 @@ on:
       - 'android/**'
       - 'src/android/**'
       - 'src/native/app-source-registered.js'
-      - 'scripts/check-android-signer-offsets.cjs'
+      - 'scripts/check-android-*'
       - '.github/workflows/android-cast.yml'
   pull_request:
     paths:
       - 'android/**'
       - 'src/android/**'
       - 'src/native/app-source-registered.js'
-      - 'scripts/check-android-signer-offsets.cjs'
+      - 'scripts/check-android-*'
       - '.github/workflows/android-cast.yml'
 permissions:
   contents: read
@@ -51,6 +51,11 @@ jobs:
           bash android/tests/run-huangguo-cast-source-tests.sh
       - name: Run existing network, service-source and cache regressions
         run: |
+          bash android/tests/run-announcement-request-tests.sh
+          bash android/tests/run-registered-playback-model-tests.sh
+          bash android/tests/run-app-media-source-tests.sh
+          bash android/tests/run-initial-playback-tests.sh
+          bash android/tests/run-native-media-contract-tests.sh
           bash android/tests/run-network-guard-tests.sh
           bash android/tests/run-network-guard-race-tests.sh
           bash android/tests/run-cast-playlist-source-tests.sh
@@ -62,7 +67,11 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           node scripts/check-android-signer-offsets.cjs
+          node scripts/check-android-source-budget.cjs
           npm run build:android:ui
+          node --test scripts/check-android-mac-source.test.mjs scripts/check-android-registered-model.test.mjs
+          npm run check:android
+          npm run check:android:playback
           gradle -p android :app:assemblePhoneDebug --no-daemon --console=plain
       - uses: actions/upload-artifact@v4
         with:

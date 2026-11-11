@@ -6,7 +6,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { transform } from 'esbuild';
+import { build, transform } from 'esbuild';
 import { Buffer as BrowserBuffer } from '../src/android/mac-source/buffer-runtime.mjs';
 import cryptoShim from '../src/android/mac-source/crypto-shim.mjs';
 import axiosNative, { setNativeCall } from '../src/android/mac-source/axios-native.mjs';
@@ -17,8 +17,19 @@ const sid = '1234567890123456789', vid = '2345678901234567890';
 const media = 'https://v3-reading.qznovelvod.com/fixture.mp4?token=fixture%20X';
 const keyHex = '0123456789abcdef0123456789abcdef';
 const generated = fs.readFileSync(path.join(root, 'src/android/generated/mac-app-source.mjs'), 'utf8');
+// Assert the shipped browser artifact comes from the real registered module, not a
+// fixture replacement or the independently evolved desktop source.
+const adapter = path.join(root, 'src/android/mac-source');
+const fresh = await build({ entryPoints: [path.join(adapter, 'entry.mjs')], bundle: true,
+  write: false, format: 'esm', platform: 'browser', target: 'chrome67', metafile: true,
+  inject: [path.join(adapter, 'buffer-runtime.mjs')],
+  alias: { 'node:crypto': path.join(adapter, 'crypto-shim.mjs'), axios: path.join(adapter, 'axios-common.cjs') },
+  define: { 'AbortSignal.timeout': 'androidAppTimeout' }, legalComments: 'inline' });
+assert.ok(Object.keys(fresh.metafile.inputs).some(name => name.endsWith('/native/app-source-registered.js')));
+assert.ok(!Object.keys(fresh.metafile.inputs).some(name => name.endsWith('/native/app-source.js')));
+assert.ok(generated.endsWith(fresh.outputFiles[0].text), 'generated adapter must match the actual current browser entry and secure dependency aliases');
 const iife = (await transform(generated, { format: 'iife', globalName: 'AndroidMacSource', target: 'chrome89' })).code;
-const appText = fs.readFileSync(path.join(root, 'src/native/app-source.js'), 'utf8');
+const appText = fs.readFileSync(path.join(root, 'src/native/app-source-registered.js'), 'utf8');
 const appHash = crypto.createHash('sha256').update(appText).digest('hex');
 
 // All network responses are explicit synthetic fixtures. Nothing in this suite makes HTTP requests.
@@ -115,6 +126,7 @@ function browserFixture(options = {}) {
   vm.runInContext(iife, context);
   const rpc = async (method, params) => {
     calls.push({ method, params: structuredClone(params) });
+    if (method === 'appRegisteredModel') throw Object.assign(new Error('fixture provider empty'), { code: 'APP_EMPTY_RESPONSE' });
     if (method === 'appRequest' && options.callNative) return options.callNative(method, params);
     if (method === 'appRequest' && options.nativeFailure) return { status: 0, body: '', url: params.url, errorCode: options.nativeFailure };
     return method === 'appRequest' ? reply(params) : { received: true };
@@ -136,7 +148,7 @@ function desktopFixture(options = {}) {
   } });
   vm.runInContext(appText, context);
   return { source: context.module.exports, calls, branch(request) {
-    // Call the original helper without modifying or instrumenting the Mac source.
+    // Call the original helper without modifying or instrumenting the shared registered source.
     context.__fixtureRequest = structuredClone(request);
     return vm.runInContext('branchOf(__fixtureRequest.url, Buffer.from(__fixtureRequest.body), Number(__fixtureRequest.headers["x-khronos"]))', context);
   } };
@@ -198,7 +210,7 @@ test('native request adapter rejects invalid/oversize responses and observes abo
   const request = axiosNative({ signal: live.signal }); live.abort();
   await assert.rejects(request, error => error.code === 'ERR_CANCELED');
 });
-test('browser bundle reproduces the Mac signed request, decryption and complete playInfo byte-for-byte', async () => {
+test('browser bundle reproduces the shared registered source signed request, decryption and complete playInfo byte-for-byte', async () => {
   const browser = browserFixture(), desktop = desktopFixture();
   const actual = await browser.source.fetchAppPlayUrl(vid), expected = await desktop.source.fetchAppPlayUrl(vid);
   assert.deepEqual(JSON.parse(JSON.stringify(actual)), JSON.parse(JSON.stringify(requestedModel(expected))));
@@ -209,7 +221,7 @@ test('browser bundle reproduces the Mac signed request, decryption and complete 
   assert.equal(requests.length, 2); assert.ok(requests[0].headers['x-medusa']); assert.ok(requests[0].headers['x-gorgon']);
   assert.equal(JSON.parse(requests[0].body).mixed_video_id_map['1004'][0], vid);
 });
-test('32 entropy seeds preserve all Mac request bytes and models across signature branches offline', async t => {
+test('32 entropy seeds preserve all shared registered request bytes and models across signature branches offline', async t => {
   const branches = new Map(), headerLengths = new Set(), signatures = new Set(), urls = new Set();
   for (let seed = 0; seed < 32; seed++) {
     await t.test(`entropy seed ${seed}`, async () => {
@@ -281,7 +293,7 @@ test('invalid resolve identities never issue an HTTP request', async () => {
   assert.equal(browser.calls.some(call => call.method === 'appRequest'), false);
   assert.match(browser.calls[0].params.error, /信息无效/);
 });
-test('explicit quality reuses the actual Mac dimension filter rather than advertised quality labels', async () => {
+test('explicit quality reuses the actual registered dimension filter rather than advertised quality labels', async () => {
   const videoList = {
     misleading: { main_url: media + '&row=low', codec_type: 'h264', quality_desc: '1080P', width: 360, height: 640 },
     portrait: { main_url: media + '&row=720', codec_type: 'h264', quality_desc: 'fixture portrait', vwidth: 720, vheight: 1280 },
@@ -323,7 +335,7 @@ test('quality callback binds the requested value, preserves three-argument auto,
     assert.equal(invalid.calls.some(call => call.method === 'appRequest'), false);
   }
 });
-test('trusted JNI DNS/timeout codes survive the actual unmodified Mac requestJson wrapper and callback', async () => {
+test('trusted JNI DNS/timeout codes survive the actual unmodified shared registered requestJson wrapper and callback', async () => {
   for (const code of ['ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNABORTED', 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE']) {
     const browser = browserFixture({ nativeFailure: code });
     await assert.rejects(browser.source.fetchAppPlayUrl(vid), error => error.code === code);
@@ -345,7 +357,7 @@ test('untrusted remote JSON fields, business and generic native errors do not ac
   setNativeCall(async () => ({ status: 200, body: '{"errorCode":"ENOTFOUND"}', url: 'https://vod.snssdk.com/fixture' }));
   assert.equal((await axiosNative({})).data, '{"errorCode":"ENOTFOUND"}', 'remote body is data, never JNI transport classification');
 });
-test('real appRequest RPC-owned deadline stays typed through the actual Mac wrapper, without typing other methods', async () => {
+test('real appRequest RPC-owned deadline stays typed through the actual registered wrapper, without typing other methods', async () => {
   const prior = globalThis.window;
   globalThis.window = { dispatchEvent() {}, AndroidBridge: { postMessage() {} } };
   try {
@@ -360,5 +372,5 @@ test('real appRequest RPC-owned deadline stays typed through the actual Mac wrap
 });
 test('generated module has no external code execution, browser fetch fallback or remaining Node crypto dependency', () => {
   assert.doesNotMatch(generated, /\beval\s*\(|new Function\s*\(|\bfetch\s*\(|require\(["'](?:node:crypto|axios)["']\)/);
-  assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'src/native/app-source.js'))).digest('hex'), appHash);
+  assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'src/native/app-source-registered.js'))).digest('hex'), appHash);
 });

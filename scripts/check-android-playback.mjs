@@ -39,6 +39,12 @@ const seasonPlaybackModulePath = path.join(root, 'src/android/season-playback.mj
 const seasonPlaybackModule = fs.existsSync(seasonPlaybackModulePath) ? await import(pathToFileURL(seasonPlaybackModulePath).href) : null;
 const officialSeriesModulePath = path.join(root, 'src/android/official-series.mjs');
 const officialSeriesModule = fs.existsSync(officialSeriesModulePath) ? await import(pathToFileURL(officialSeriesModulePath).href) : null;
+// These adjacent UI modules are pure at import. Load their real exports while the
+// Detail-only gate keeps native network operations behind its existing bridge stub.
+const adjacentModules = new Map();
+for (const name of ['update-bridge', 'announcements', 'history-view', 'huangguo', 'tv-navigation']) {
+  adjacentModules.set(`./${name}.mjs`, await import(pathToFileURL(path.join(root, `src/android/${name}.mjs`)).href));
+}
 await group('FUNCTION source preview=3 leaves episode 4 unknown in full 5-episode directory', async () => {
   sourceModule = await import(`${pathToFileURL(path.join(root, 'src/android/source.mjs')).href}?gate=${Date.now()}`);
   detail = sourceModule.parseDetail(detailHtml, sid);
@@ -108,6 +114,7 @@ await group('FUNCTION rendered Detail controls allow episode 4 and submit queue/
   const exports = {};
   const code = transformSync(read('src/android/App.jsx') + '\nexports.__gateDetail = Detail;\n', { loader: 'jsx', format: 'cjs', target: 'node22' }).code;
   vm.runInNewContext(code, { exports, module: { exports }, console, require(name) {
+    if (adjacentModules.has(name)) return adjacentModules.get(name);
     if (name === 'react') return { __esModule: true, default: react, ...react };
     if (name.includes('icons.jsx')) return new Proxy({ __esModule: true }, { get: (target, key) => key in target ? target[key] : () => null });
     if (name === './generated/mac-app-source.mjs') return { fetchAppPlayUrl() { throw new Error('App fallback unexpectedly called for valid web fixture'); } };
@@ -131,7 +138,8 @@ await group('FUNCTION rendered Detail controls allow episode 4 and submit queue/
   const buttons = elements.filter(element => element.type === 'button');
   const fourth = buttons.find(button => button.props['aria-label']?.includes('第 4 集'));
   verify(fourth && fourth.props.disabled !== true, 'fourth unknown episode selection button enabled');
-  const playButton = buttons.find(button => text(button.children).includes('播放本集'));
+  const playButton = buttons.find(button => button.props.className?.split(' ').includes('dock-play'));
+  verify(playButton && text(playButton.children).includes('第 4 集'), 'dock play action targets the selected fourth episode');
   verify(playButton && playButton.props.disabled !== true, 'selected unknown episode play action enabled');
   await playButton.props.onClick();
   verify(requested.length === 0, 'play delegates exact on-demand resolution to native without an early JS preflight');
@@ -162,7 +170,12 @@ await group('STATIC UI source has no preview-count/webAvailable disabling gate',
 });
 await group('STATIC native bridge transmits queue/preferences and exposes isolated cache', () => {
   const bridge = read(java + 'NativeBridge.java');
-  for (const field of ['episodes', 'autoplay', 'cleanupPlaybackCache', 'getPlaybackCache', 'clearPlaybackCache']) verify(bridge.includes(`"${field}"`), `native bridge carries ${field}`);
+  // Playback intent construction moved into PlayLauncher; still require the
+  // actual bridge to call it instead of merely finding detached option strings.
+  const launcher = read(java + 'PlayLauncher.java');
+  verify(bridge.includes('PlayLauncher.build('), 'native bridge uses the shared player Intent builder');
+  for (const field of ['autoplay', 'cleanupPlaybackCache']) verify(launcher.includes(`.putExtra("${field}"`), `player Intent carries ${field}`);
+  for (const field of ['episodes', 'getPlaybackCache', 'clearPlaybackCache']) verify(bridge.includes(`"${field}"`), `native bridge carries ${field}`);
   verify(!/if\s*\([^)]*!episode\.optBoolean\("webAvailable"\)/.test(bridge), 'native play/download does not reject unknown directory hint');
   verify(/PlaybackCache\.get\(activity\)\.status\(/.test(bridge) && /PlaybackCache\.get\(activity\)\.clear\(/.test(bridge), 'cache RPC uses isolated cache facade');
 });

@@ -24,10 +24,18 @@ if [ "$RECOVERY_ONLY" = false ] && [ "$LOOKUP_ONLY" = false ]; then
   "$SRC/CryptoBridge.java" "$SRC/AppTransport.java" "$SRC/NetworkGuard.java" "$ROOT/tests/NativeCryptoTransportTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/crypto:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.NativeCryptoTransportTest
 fi
+cat > "$TMP/Context.java" <<'STUB'
+package android.content; public class Context { }
+STUB
 cat > "$TMP/OfflineMediaStubs.java" <<'STUB'
 package io.github.jackotom.hongguo.android;
 import java.io.*;import java.net.URI;import java.nio.file.Files;import java.util.function.Consumer;
-final class MainActivity {Consumer<String> callback;boolean isFinishing(){return false;}boolean isDestroyed(){return false;}void script(String value){callback.accept(value);}}
+final class MainActivity extends android.content.Context {Consumer<String> callback;boolean isFinishing(){return false;}boolean isDestroyed(){return false;}void script(String value){callback.accept(value);}}
+final class HuangguoApi {
+ static void attach(android.content.Context context){throw new AssertionError("Unexpected Huangguo request");}
+ static int decodeEpisodeIndex(String vid){throw new AssertionError("Unexpected Huangguo request");}
+ static String episodeUrl(String sid,int index){throw new AssertionError("Unexpected Huangguo request");}
+}
 final class EpisodeResolver {static int calls;static String result;static void reset(){calls=0;result=null;}static String resolve(String sid,String vid)throws Exception{calls++;if(result!=null)return result;throw new IOException("synthetic web miss");}}
 final class AppTransport {static int heads;static boolean domain(String host,String...allowed){if(host==null)return false;host=host.toLowerCase(java.util.Locale.ROOT);for(String suffix:allowed)if(host.equals(suffix)||host.endsWith("."+suffix))return true;return false;}static String media(String url,String ua,String ref){heads++;return url;}}
 final class NetworkGuard {
@@ -65,7 +73,7 @@ final class CencDecryptor {
 }
 STUB
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR:$SDK_JAR" -d "$TMP/plans" \
-  "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/DanmakuSigner.java" "$SRC/SpadeDecoder.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
+  "$TMP/Context.java" "$TMP/OfflineMediaStubs.java" "$SRC/MediaQuality.java" "$SRC/DanmakuSigner.java" "$SRC/SpadeDecoder.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
   "$ROOT/tests/PlaybackSourcesContractTest.java" "$ROOT/tests/PlaybackSourcesRecoveryTest.java" "$ROOT/tests/PlaybackSourcesLookupRetryTest.java" "$ROOT/tests/PlaybackSourcesNativeLookupTest.java"
 if [ "$RECOVERY_ONLY" = false ] && [ "$LOOKUP_ONLY" = false ]; then
   "$JAVA_HOME/bin/java" -cp "$TMP/plans:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.PlaybackSourcesContractTest
