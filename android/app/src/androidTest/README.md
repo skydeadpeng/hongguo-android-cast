@@ -34,6 +34,20 @@ Failure diagnostics contain only fixed stage/status/reason fields and the boolea
 `guest_plan_observed`, never the source model or raw exception text. No failure screenshot
 is generated, extracted or published: production error UI could include signed URLs.
 
+`playback_diagnostic` adds booleans for a current HUD dialog, terminal dialog state,
+decoder preparation, pending source resolution, current status text, and historical media
+error presence. Only an explicit literal/anchored-format allowlist classifies the current
+App `status` TextView and historical `lastMediaError` in memory. It emits enum codes for
+guest identity/login/HTTP/expiry/format/complete-file failures and recognizable network or
+decoder messages. Unrecognized text stays `unknown`; a generic guest-request failure does
+not establish DNS, TLS, HTTP status, or any hidden cause. Raw text is never persisted.
+
+The initial frame wait does not fail merely because `lastMediaError` retains an earlier
+automatic recovery. A current terminal dialog still fails immediately. After the first
+actual frame, the same generation/player and historical-error identity must remain stable;
+any new error, dialog, interruption or renderer stall fails. Historical recovery is reported
+as a boolean, never hidden or counted as proof of successful playback.
+
 The media stream is set to volume zero and muted before either activity opens, and checked
 throughout. The runner temporarily adopts only `MODIFY_AUDIO_SETTINGS` via Android's
 instrumentation shell API. It never changes network, DNS, proxy, CA, credentials or accounts.

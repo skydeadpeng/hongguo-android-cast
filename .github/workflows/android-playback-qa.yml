@@ -20,7 +20,7 @@ jobs:
     name: Isolated real Android playback
     if: >-
       github.ref == 'refs/heads/fix/hongguo-playback-fanqie-analysis' &&
-      github.event.before == 'de9812cc07e01cb3afd1af56184fe7dc8bf7bc86' &&
+      github.event.before == '336c7db4ba665de09ce6f59f984e9803efb425d8' &&
       contains(github.event.head_commit.message, '[run-approved-android-playback-20261111]')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -51,7 +51,13 @@ jobs:
           mkdir -p "$QA_OUT" "$QA_PRIVATE" "$ANDROID_AVD_HOME"
           printf '{"status":"NOT_RUN","apk_execution":false,"first_frame":false,"continuous_30_seconds":false}\n' > "$QA_OUT/workflow-status.json"
       - name: Validate evidence acceptance rules (not device playback)
-        run: python3 scripts/android-playback-qa/test-evidence-contract.py
+        run: |
+          python3 scripts/android-playback-qa/test-evidence-contract.py
+          mkdir -p "$QA_PRIVATE/diagnostic-classes"
+          javac -encoding UTF-8 -source 17 -target 17 -d "$QA_PRIVATE/diagnostic-classes" \
+            android/app/src/androidTest/java/io/github/jackotom/hongguo/android/PlaybackFailureCategory.java \
+            android/app/src/androidTest/java/io/github/jackotom/hongguo/android/PlaybackFailureCategoryChecks.java
+          java -cp "$QA_PRIVATE/diagnostic-classes" io.github.jackotom.hongguo.android.PlaybackFailureCategoryChecks
       - name: Install Google official emulator and system image
         shell: bash
         run: |
@@ -109,6 +115,9 @@ jobs:
           fi
           if [ -f "$QA_PRIVATE/restore-kvm-acl" ] && [ -s "$QA_PRIVATE/original-kvm.acl" ]; then
             sudo setfacl --restore="$QA_PRIVATE/original-kvm.acl"
+            getfacl -p /dev/kvm > "$QA_PRIVATE/restored-kvm.acl"
+            cmp "$QA_PRIVATE/original-kvm.acl" "$QA_PRIVATE/restored-kvm.acl"
+            printf 'QA_KVM_ACL=RESTORED_AND_VERIFIED\n'
           fi
       - name: Preserve only sanitized evidence and App screenshots
         if: always()

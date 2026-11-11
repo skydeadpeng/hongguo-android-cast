@@ -99,6 +99,7 @@ def validate(report, instrumentation, directory, commit, command_exit):
     need(launch.get('production_intent_builder') is True and launch.get('url_supplied') is False and launch.get('play_info_supplied') is False, 'nonproduction_source_injection')
     need(mute.get('music_volume') == 0 and mute.get('music_stream_muted') is True, 'mute_before_launch_not_verified')
     for evidence in [first, last]:
+        need(evidence.get('hud_dialog_present') is False and evidence.get('terminal_dialog_state') is False, 'dialog_during_verified_playback')
         need(evidence.get('playing') is True and evidence.get('same_episode') is True and evidence.get('buffering') is False, 'player_not_continuously_healthy')
         need(evidence.get('music_volume') == 0 and evidence.get('music_stream_muted') is True, 'media_output_not_muted')
         for key in ['position_ms', 'duration_ms', 'video_width', 'video_height', 'generation']:

@@ -13,7 +13,7 @@ spec.loader.exec_module(contract)
 COMMIT = 'a' * 40
 LOG = 'INSTRUMENTATION_RESULT: qa_status=passed\nINSTRUMENTATION_CODE: -1\n'
 renderer = {'proof':'actual_video_surface_pixelcopy_buffer','pixelcopy_success':True,'luma_range':150,'nonblack_permille':900,'frame_hash':'abcdef'}
-first = {'position_ms':1000,'duration_ms':139034,'video_width':360,'video_height':640,'generation':1,'playing':True,'same_episode':True,'buffering':False,'music_volume':0,'music_stream_muted':True,'renderer':renderer,'official_guest_plan':True,'full_mp4_gate':'production_guest_cache_publication_requires_verifier','expected_duration_ms':139034}
+first = {'position_ms':1000,'duration_ms':139034,'video_width':360,'video_height':640,'generation':1,'playing':True,'same_episode':True,'buffering':False,'hud_dialog_present':False,'terminal_dialog_state':False,'music_volume':0,'music_stream_muted':True,'renderer':renderer,'official_guest_plan':True,'full_mp4_gate':'production_guest_cache_publication_requires_verifier','expected_duration_ms':139034}
 last = copy.deepcopy(first)
 last.update(position_ms=31500,wall_elapsed_ms=30500,position_advance_ms=30500,observations=120,max_no_advance_ms=500,same_episode_and_player=True,surface_observations=30,frame_changes=29,max_frame_unchanged_ms=1100)
 last['renderer']['frame_hash']='fedcba'
@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory() as temporary:
     rejected(lambda r:r['stages'].pop())
     rejected(lambda r:r['stages'][1]['evidence'].update(music_volume=5))
     rejected(lambda r:r['stages'][3]['evidence'].update(url_supplied=True))
-    for field,value in [('playing',False),('buffering',True),('official_guest_plan',False),('duration_ms',0)]:
+    for field,value in [('playing',False),('buffering',True),('hud_dialog_present',True),('terminal_dialog_state',True),('official_guest_plan',False),('duration_ms',0)]:
         rejected(lambda r,f=field,v=value:r['stages'][4]['evidence'].update({f:v}))
     rejected(lambda r:r['stages'][4]['evidence']['renderer'].update(pixelcopy_success=False))
     rejected(lambda r:r['stages'][4]['evidence']['renderer'].update(luma_range=0))

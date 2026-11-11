@@ -17,6 +17,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.view.PixelCopy;
 import android.widget.VideoView;
+import android.widget.TextView;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -29,6 +30,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -59,6 +61,8 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
     private volatile PlayerActivity player;
     private volatile MainActivity host;
     private volatile boolean guestPlanObserved;
+    private volatile boolean historyObservedBeforeFrame;
+    private volatile Diagnostic diagnostic = new Diagnostic();
 
     @Override public void onCreate(Bundle args) {
         super.onCreate(args);
@@ -165,7 +169,7 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
             if (first.width != guest.width || first.height != guest.height
                     || Math.abs(first.duration - guest.durationMs) > Math.max(2_000, guest.durationMs / 50))
                 throw failed("decoded_media_metadata_mismatch");
-            saveScreenshot("first-frame.png");
+            saveScreenshot("first-frame.png", first);
             record(stage, first.json().put("renderer", firstSurface.json())
                 .put("official_guest_plan", true)
                 .put("full_mp4_gate", "production_guest_cache_publication_requires_verifier")
@@ -183,8 +187,7 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
                 Sample current = sample();
                 sampleCount++;
                 requireHealthy(current, true);
-                if (current.player != first.player || current.view != first.view || current.generation != first.generation)
-                    throw failed("player_or_source_changed_after_first_frame");
+                requireStable(first, current);
                 if (current.width != first.width || current.height != first.height
                         || current.duration != first.duration)
                     throw failed("decoded_metadata_changed");
@@ -223,7 +226,7 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
             maxFrameUnchanged = Math.max(maxFrameUnchanged, finalFrameGap);
             if (finalFrameGap >= STALL_MS) throw failed("renderer_unchanged_or_unavailable_5s");
             if (finalSurface.hash != lastFrameHash) frameChanges++;
-            saveScreenshot("after-30s.png");
+            saveScreenshot("after-30s.png", first);
             record(stage, last.json().put("renderer", finalSurface.json())
                 .put("wall_elapsed_ms", last.elapsed - first.elapsed)
                 .put("position_advance_ms", last.position - first.position)
@@ -285,7 +288,26 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
             s.completed = (Boolean) read(player, "completed");
             s.paused = (Boolean) read(player, "userPaused");
             s.buffering = (Boolean) read(player, "buffering");
-            s.error = read(player, "lastMediaError") != null || (Integer) read(player, "hudDialogs") > 0;
+            s.historyErrorIdentity = read(player, "lastMediaError");
+            s.historyErrorPresent = s.historyErrorIdentity != null;
+            s.hudDialogPresent = (Integer) read(player, "hudDialogs") > 0;
+            s.decoderPreparing = (Boolean) read(player, "decoderPreparing");
+            s.terminalDialog = PlaybackFailureCategory.terminalDialogState(s.hudDialogPresent, s.prepared, s.decoderPreparing);
+            Future<?> resolution = (Future<?>) read(player, "resolution");
+            s.resolutionPending = resolution != null && !resolution.isDone();
+            TextView statusView = (TextView) read(player, "status");
+            Diagnostic observed = new Diagnostic();
+            observed.hudDialogPresent = s.hudDialogPresent;
+            observed.terminalDialog = s.terminalDialog;
+            observed.historyErrorPresent = s.historyErrorPresent;
+            observed.decoderPreparing = s.decoderPreparing;
+            observed.resolutionPending = s.resolutionPending;
+            observed.statusTextPresent = statusView != null && statusView.getText() != null && statusView.getText().length() > 0;
+            // Input text remains in memory only. Every serialized category is an enum constant.
+            observed.statusCategory = PlaybackFailureCategory.classify(statusView == null || statusView.getText() == null ? null : statusView.getText().toString());
+            observed.historyCategory = PlaybackFailureCategory.classify(s.historyErrorIdentity instanceof String ? (String) s.historyErrorIdentity : null);
+            diagnostic = observed;
+            if ("first_rendered_frame".equals(stage) && s.historyErrorPresent) historyObservedBeforeFrame = true;
             s.cached = (Boolean) read(player, "currentCache");
             s.manual = (Boolean) read(player, "currentManual");
             s.remote = (Boolean) read(player, "currentWeb");
@@ -306,10 +328,18 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
     private void requireHealthy(Sample s, boolean continuous) throws ProbeProblem {
         if (s.closed) throw failed("production_player_closed");
         if (!s.sameEpisode) throw failed("episode_identity_changed");
-        if (s.error) throw failed("production_playback_error_or_dialog");
+        if (s.terminalDialog) throw failed("production_terminal_playback_dialog");
+        if (continuous && s.hudDialogPresent) throw failed("production_dialog_after_first_frame");
         if (s.completed) throw failed("episode_completed_before_acceptance");
         if (continuous && (!s.active || !s.prepared || !s.playing || s.paused || s.buffering))
             throw failed("playback_interrupted_after_first_frame");
+    }
+
+    private void requireStable(Sample first, Sample current) throws ProbeProblem {
+        if (current.player != first.player || current.view != first.view || current.generation != first.generation)
+            throw failed("player_or_source_changed_after_first_frame");
+        if (current.historyErrorIdentity != first.historyErrorIdentity)
+            throw failed("new_media_error_after_first_frame");
     }
 
     private GuestEvidence guestEvidence() throws Exception {
@@ -374,14 +404,22 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
         }
     }
 
-    private void saveScreenshot(String name) throws Exception {
+    private void saveScreenshot(String name, Sample baseline) throws Exception {
         requireMuted();
         Sample before = sample();
         requireHealthy(before, true);
+        requireStable(baseline, before);
         Bitmap screenshot = automation.takeScreenshot();
         if (screenshot == null) throw blocked("app_screenshot_unavailable");
-        try (FileOutputStream file = new FileOutputStream(new File(output, name))) {
-            if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, file)) throw blocked("app_screenshot_failed");
+        try {
+            // A terminal error dialog persists until user action. Recheck before writing
+            // so a screenshot racing that transition is discarded, never published.
+            Sample after = sample();
+            requireHealthy(after, true);
+            requireStable(baseline, after);
+            try (FileOutputStream file = new FileOutputStream(new File(output, name))) {
+                if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, file)) throw blocked("app_screenshot_failed");
+            }
         } finally { screenshot.recycle(); }
     }
 
@@ -435,7 +473,9 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
             synchronized (report) {
                 report.put("status", status).put("reason", reason).put("final_stage", stage)
                     .put("elapsed_ms", SystemClock.elapsedRealtime() - started)
-                    .put("guest_plan_observed", guestPlanObserved);
+                    .put("guest_plan_observed", guestPlanObserved)
+                    .put("historical_error_observed_before_first_frame", historyObservedBeforeFrame)
+                    .put("playback_diagnostic", diagnostic.json());
                 if (!pass) stages.put(new JSONObject().put("stage", stage).put("status", status).put("reason", reason));
                 report.put("stages", stages);
                 writeReport();
@@ -477,6 +517,23 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
         long durationMs;
     }
 
+    private static final class Diagnostic {
+        boolean statusTextPresent, historyErrorPresent, hudDialogPresent, terminalDialog;
+        boolean decoderPreparing, resolutionPending;
+        PlaybackFailureCategory.Category statusCategory = PlaybackFailureCategory.Category.NONE;
+        PlaybackFailureCategory.Category historyCategory = PlaybackFailureCategory.Category.NONE;
+
+        JSONObject json() throws Exception {
+            return new JSONObject().put("status_text_present", statusTextPresent)
+                .put("last_media_error_present", historyErrorPresent).put("hud_dialog_present", hudDialogPresent)
+                .put("terminal_dialog_state", terminalDialog).put("decoder_preparing", decoderPreparing)
+                .put("resolution_pending", resolutionPending).put("status_category", statusCategory.code)
+                .put("last_media_error_category", historyCategory.code)
+                .put("status_error_classified", statusCategory.knownError())
+                .put("historical_error_classified", historyCategory.knownError());
+        }
+    }
+
     private static final class SurfaceEvidence {
         int result = PixelCopy.ERROR_UNKNOWN, lumaRange, brightPermille;
         long hash;
@@ -491,7 +548,9 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
     private static final class Sample {
         long elapsed;
         int position, duration, width, height, generation;
-        boolean closed, sameEpisode, prepared, active, completed, paused, buffering, error, playing;
+        boolean closed, sameEpisode, prepared, active, completed, paused, buffering, playing;
+        boolean historyErrorPresent, hudDialogPresent, terminalDialog, decoderPreparing, resolutionPending;
+        Object historyErrorIdentity;
         boolean cached, manual, remote;
         VideoView view;
         MediaPlayer player;
@@ -499,6 +558,8 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
             return new JSONObject().put("position_ms", position).put("duration_ms", duration)
                 .put("video_width", width).put("video_height", height).put("generation", generation)
                 .put("playing", playing).put("same_episode", sameEpisode).put("buffering", buffering)
+                .put("historical_error_present", historyErrorPresent).put("hud_dialog_present", hudDialogPresent)
+                .put("terminal_dialog_state", terminalDialog)
                 .put("music_volume", 0).put("music_stream_muted", true);
         }
     }

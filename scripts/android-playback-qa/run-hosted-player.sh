@@ -78,6 +78,17 @@ for name in report.json first-frame.png after-30s.png; do
     rm -f "$QA_OUT/$name"
   fi
 done
+# adb exec-out may report a successful transport for a remote cat error. Never
+# publish those error strings under a screenshot filename.
+python3 - "$QA_OUT" <<'PYIMAGE'
+import importlib.util,sys
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('qa_contract', 'scripts/android-playback-qa/verify-report.py')
+contract=importlib.util.module_from_spec(spec);spec.loader.exec_module(contract)
+for name in ('first-frame.png','after-30s.png'):
+    path=Path(sys.argv[1])/name
+    if path.exists() and not contract.png_exists(path):path.unlink()
+PYIMAGE
 # Completion is determined by actual evidence, never by am instrument's exit code.
 python3 scripts/android-playback-qa/verify-report.py "$QA_OUT" "$GITHUB_SHA" "$instrument_exit" "$QA_PRIVATE/instrumentation.log"
 STAGE=completed
