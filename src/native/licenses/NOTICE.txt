@@ -29,3 +29,7 @@ persistent identity or retained device_token. The same in-memory identity is
 shared by all playback requests in one process. Search/catalogue signatures
 remain unchanged. app-source.js also accepts the current inline video_list
 without requesting the legacy fallback endpoint.
+
+The Android port carries the same chain: RegisteredPlaybackModel.java and
+OfficialApiClient.registerDevice() adapt the same registration protocol, and
+DanmakuSigner.java implements the comment-client signatures.

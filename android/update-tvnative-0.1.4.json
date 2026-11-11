@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 5,
+  "versionName": "0.1.4",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.4/HongguoNative-0.1.4-tvNative-release-compatible.apk",
+  "size": 641504,
+  "sha256": "7baf505ce9d14973884388f12092cdb9255b2e16102c917b1fdb6cffb69bd242",
+  "notes": "修复点开剧集后第一集加载慢、缓存慢的问题：应用内域名解析的并发通道只有两个名额，首页推荐、分类、详情页同时发起的解析会互相挤占，被挤掉的请求立刻报「域名解析繁忙」，表现为分集加载失败或反复重试、首次播放和下载等待变长。现在解析通道扩容，多请求并行不再互相拒绝。\n同时移除详情页顶部的装饰性模糊大图：旧电视/盒子的网页内核不支持它的模糊与渐变效果，会显示成一张清晰巨图挤乱布局；移除后详情页更干净，各机型一致。\n原生 TV 版（0.1.4）同步获得解析通道扩容。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T13:28:24.390Z"
+}

@@ -1,0 +1,72 @@
+apply plugin: 'com.android.application'
+
+// A normal release stays unsigned. The compatibility entry is explicit: it is
+// non-debuggable release code signed with the existing debug install certificate.
+// Production credentials are read only from the environment, never CLI arguments.
+def releaseSigning = providers.gradleProperty('hongguoReleaseSigning').orElse('none').get()
+if (!(releaseSigning in ['none', 'compatible', 'external'])) {
+    throw new GradleException('Unknown hongguoReleaseSigning mode')
+}
+def externalSigning = [:]
+if (releaseSigning == 'external') {
+    [KEYSTORE: 'HONGGUO_RELEASE_KEYSTORE', STORE_PASSWORD: 'HONGGUO_RELEASE_STORE_PASSWORD', KEY_ALIAS: 'HONGGUO_RELEASE_KEY_ALIAS'].each { name, environmentName ->
+        def value = System.getenv(environmentName)
+        if (!value) throw new GradleException('Missing ' + environmentName)
+        externalSigning[name] = value
+    }
+    externalSigning['KEY_PASSWORD'] = System.getenv('HONGGUO_RELEASE_KEY_PASSWORD') ?: externalSigning['STORE_PASSWORD']
+}
+
+android {
+    namespace 'io.github.jackotom.hongguo.android'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'io.github.jackotom.hongguo.android'
+        minSdk 26
+        targetSdk 35
+        versionCode 87
+        versionName '0.12.64'
+    }
+    flavorDimensions 'device'
+    productFlavors {
+        phone { dimension 'device'; buildConfigField 'boolean', 'IS_TV', 'false'; buildConfigField 'boolean', 'NATIVE_UI', 'false' }
+        tv { dimension 'device'; applicationIdSuffix '.tv'; buildConfigField 'boolean', 'IS_TV', 'true'; buildConfigField 'boolean', 'NATIVE_UI', 'false' }
+        // Independent WebView-free TV line: own applicationId and version series.
+        tvNative {
+            dimension 'device'
+            applicationIdSuffix '.tvnative'
+            versionCode 14
+            versionName '0.1.13'
+            buildConfigField 'boolean', 'IS_TV', 'true'
+            buildConfigField 'boolean', 'NATIVE_UI', 'true'
+        }
+    }
+    buildFeatures { buildConfig true }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    signingConfigs {
+        if (releaseSigning == 'compatible') {
+            releaseCompatible {
+                storeFile file(System.getenv('HONGGUO_COMPAT_KEYSTORE') ?: "${System.getProperty('user.home')}/.android/debug.keystore")
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+        if (releaseSigning == 'external') {
+            releaseExternal {
+                storeFile file(externalSigning['KEYSTORE'])
+                storePassword externalSigning['STORE_PASSWORD']
+                keyAlias externalSigning['KEY_ALIAS']
+                keyPassword externalSigning['KEY_PASSWORD']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            debuggable false
+            minifyEnabled false
+            if (releaseSigning == 'compatible') signingConfig signingConfigs.releaseCompatible
+            if (releaseSigning == 'external') signingConfig signingConfigs.releaseExternal
+        }
+    }
+}

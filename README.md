@@ -1,10 +1,9 @@
-<p align="center">
-  <img src="build/icon.png" alt="红果短剧桌面版图标" width="112" height="112">
-</p>
+# 红果 Android Cast（红果短剧 Hongguo Drama）
 
-<h1 align="center">红果短剧 · 桌面版</h1>
+> **红果短剧多端客户端** —— 已发布：📱 Android 手机 · 📺 Android TV（WebView / 原生双版本）· 💻 Windows · 🍎 macOS · 🐧 Linux ·
+> 开发中：🔵 webOS（LG 电视）· 🍎tv Apple TV（tvOS）。全部客户端见 [客户端总览与下载](docs/CLIENTS.md) 或 [Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases)。
 
-<p align="center">发现好剧，接着上次看。搜索、播放、下载、追剧与合并导出，在一个桌面应用里完成。</p>
+**红果短剧的 Android 客户端：手机选剧，电视接着看。** 面向 Android 手机与 Android TV，看红果短剧（免费短剧平台）的独立客户端，支持局域网 DLNA 视频投屏：手机选电视、选集控播，同季自动连播，提前缓存后 5 集，看过的临时缓存自动清理。支持按剧分组下载、整部无损合并导出、扫码登录后云同步收藏与观看进度。
 
 <p align="center">
   <a href="https://github.com/jackotom/hongguo-drama/releases/latest"><img alt="最新公开版本" src="https://img.shields.io/github/v/release/jackotom/hongguo-drama?style=flat-square"></a>
@@ -13,13 +12,18 @@
   <a href="LICENSE"><img alt="GPL-3.0 许可证" src="https://img.shields.io/badge/license-GPL--3.0-555555?style=flat-square"></a>
 </p>
 
-<p align="center">
-  <a href="#下载与安装"><strong>下载与安装</strong></a> ·
-  <a href="#完整功能">完整功能</a> ·
-  <a href="#界面与演示">界面与演示</a> ·
-  <a href="#常见问题">常见问题</a> ·
-  <a href="https://github.com/jackotom/hongguo-drama/issues">反馈问题</a>
-</p>
+[下载桌面版](https://github.com/jackotom/hongguo-drama/releases/latest) · [下载手机 / TV 版](https://github.com/skydeadpeng/hongguo-android-cast/releases) · [Android 详细说明](ANDROID.md) · [应用内更新](docs/ANDROID-UPDATES.md) · [上游项目](https://github.com/jackotom/hongguo-drama)
+
+## 为大屏连续观看而做
+
+- **手机就是遥控器**：发现局域网内的 DLNA 电视或盒子，手机上直接切集、播放 / 暂停、拖动进度，也可停止投屏回到手机继续看。
+- **本季连着看**：手机、TV 本机播放及手机投屏均支持同一季内自动下一集；保留横向分季 Tab 与各季观看记录，当前季播完停止，不自动跳到下一季。
+- **后 5 集提前准备**：投屏时预取后续 5 集，减少换集等待；按前一集、当前集、后 5 集维护窗口，自动清理窗口外的已看临时缓存，不删除手动下载。
+- **可选合并投屏**：把本季连续 2 / 3 / 5 集准备成一段 MP4 再投出，减少接收端换片次数；编码配置不兼容时回退逐集投屏，不进行转码。
+- **离开再回来，知道看到哪**：本机保存集数与播放位置。自建同步入口及后台任务已移除，旧数据文件保留；已接入红果官方手机号登录，支持官方收藏、历史与进度同步。
+- **照顾取源失败**：支持画质选择、备用源、重新取源及自动降画质重试。0.12.8 补齐网页预览识别、完整源回退与取源等待期限，不把预览误当整集。
+
+> 5 集是预取目标，不代表每次都已缓存完成；受片源可用性、网络、单集 96 MiB 和投屏缓存 768 MiB 预算影响。手机本机播放沿用自己的预取策略。
 
 ## 下载与安装
 
@@ -720,41 +724,40 @@ https://github.com/user-attachments/assets/b95f4f60-b57c-495f-a30e-62ac2b0bda11
 应用使用 **Electron + React + Node.js**。构建需要 Node.js **22.12 或更新版本**、npm、Apple Command Line Tools、`pkg-config`，以及可用的 `make`、`git`、`curl`。构建脚本不会自动安装这些系统依赖。
 
 ```sh
-git clone https://github.com/jackotom/hongguo-drama.git
-cd hongguo-drama
-npm ci
-npm run build:mac
+# 独立原生 TV：使用现有兼容证书的 release 构建
+bash scripts/build-android.sh --tvnative-release-compatible
+
+# 仅编译原生 TV debug，适合已准备好 Android SDK 的开发环境
+gradle -p android :app:assembleTvNativeDebug
 ```
 
-上述默认命令在 Apple Silicon 上构建两种 Mac 架构。Intel 构建机请先运行 `node scripts/setup-ffmpeg-mac.js x64` 和 `npm run build:react`，再运行 `npx electron-builder --mac dmg zip --x64 --publish never`。
+界面与下载播放已在 Android 模拟器验证；具体电视遥控、厂商系统和解码兼容性仍以设备表现为准。更新流程与源码发布步骤见 [应用内更新](docs/ANDROID-UPDATES.md)。
 
-构建会验证已有 FFmpeg / FFprobe 缓存；缺少匹配缓存时，从固定且经过 SHA256 校验的 FFmpeg/x264 源码编译，然后生成前端、指定架构应用、DMG 和 ZIP。首次构建需联网获取依赖和源码，编译可能耗时数分钟。默认 ZIP 只是构建产物，不能直接作为官方签名更新包发布；正式发行需在签名、公证和装订后重新生成 ZIP 与更新清单。
+## 三步开始 DLNA 投屏
 
-| 用途 | 命令或产物 |
-|---|---|
-| 开发模式 | `npm run dev` |
-| 仅生成 Mac 应用 | `npm run build:mac:dir` |
-| 应用产物 | `dist/mac-arm64/红果短剧.app`、`dist/mac/红果短剧.app` |
-| DMG / ZIP | `dist/hongguo-downloader-<版本>-mac-<架构>.dmg` 与 `.zip`；公开版本使用两段，内部格式见 `package.json`。正式 DMG 另以发行页中的名称提供 |
+1. **连同一局域网**：手机与电视连接同一 Wi-Fi / 局域网，避免访客网络或设备隔离；在电视上打开支持 DLNA 的无线投屏接收入口。
+2. **手机选电视**：在手机版打开剧集播放器，点击「投屏」，搜索并选择电视。片源先在手机准备，随后经局域网交给电视播放；这不是手机屏幕镜像。
+3. **手机控播放**：直接选集或上一集 / 下一集，按需打开「连播」。投屏菜单可管理连接、重试、查看诊断或停止；通知栏也能停止投屏。
 
-### FFmpeg 的准确对应源码
+### 想减少频繁换片？试试合并投屏
 
-Mac 包内置的 FFmpeg / FFprobe 基于 **FFmpeg 9.0.2** 与 **x264 `b35605ace3ddf7c1a5d67a2eb553f034aef41d55`** 的未修改源码编译。此构建为 **GPLv3-or-later**，仅静态链接 x264，保留 VideoToolbox，未启用 `nonfree`；动态依赖仅为 macOS 系统库，不依赖使用者的 Homebrew 环境。
+在投屏菜单选择每段 **2 / 3 / 5 集**，停止后重新连接 DLNA 生效。手机会先准备本季连续分集，再做样本级无损拼接；首次准备需要更久，不跨季拼接，也不新增编码转换。各集解码配置不一致时，自动回到逐集模式。
 
-[各版本的 Release](https://github.com/jackotom/hongguo-drama/releases) 附有**应用源码 ZIP**以及独立的 **FFmpeg/x264 完整对应源码包**，后者包含准确源码归档、构建脚本、清单与许可文本。请按需要的应用版本与平台选择对应附件。只下载 GitHub 自动生成的项目源码归档，不能代替这一媒体工具对应源码包。
+### 电视兼容性
 
-- [FFmpeg 来源、源码校验值与构建说明](build/ffmpeg/MACOS-NOTICE.txt)
-- [准确版本与构建配置](build/ffmpeg/MACOS-VERSIONS.txt)
-- [FFmpeg 源码构建脚本](scripts/build-ffmpeg-source-mac.sh)
-- [FFmpeg GPLv3 许可全文](build/ffmpeg/MACOS-LICENSE.txt) · [x264 许可全文](build/ffmpeg/MACOS-X264-LICENSE.txt)
+接收端需要支持 **DLNA MediaRenderer / AVTransport**。仅有 Miracast 镜像或仅有 Google Cast 不等于支持 DLNA；搜索、控播、定位和片尾状态表现因电视及接收应用而异。没有匹配所有型号的通用保证，遇到问题可复制应用内的投屏诊断。合并投屏的实体设备兼容性仍需实际验证。
 
-FFmpeg 二进制不提交到 Git。重新分发编译包时，请按 GPL 要求同时提供完整对应源码及构建材料。
+## Mac、iPhone、iPad：浏览器也能接收
 
-</details>
+手机版还保留「**投屏 → Mac / iPhone / iPad · 浏览器接收**」：
 
-## 从源码构建 Windows 版
+1. 两端连接同一局域网，安卓手机开启浏览器接收。
+2. 用 Safari 打开手机显示的接收地址，输入本次配对码。
+3. 在接收页点「开始播放」，随后用手机或接收页控制播放与同季连播。
 
-在 Windows x64 上构建安装版或便携 EXE，需准备匹配的 FFmpeg / FFprobe；完整依赖、媒体工具源码与构建命令见 [三平台发行与 Windows 构建说明](docs/RELEASING.md)。云端工作流同时生成 NSIS 安装版、更新清单与便携版。自行构建不会自动获得代码签名。
+视频仍走「**片源 → 安卓手机缓存 → 局域网 → 浏览器**」，无需另装 Mac 后端。接收页应保持可用，避免系统休眠或后台挂起。
+
+这不是安卓原生 AirPlay，也不是系统屏幕镜像。Safari 提供 AirPlay 按钮时，可由 Safari 再转投；项目未实现安卓端 Apple TV 发现与配对。Safari / Apple TV 的实体设备兼容性仍需验收。完整说明见 [Android 文档](ANDROID.md)。
 
 ## 贡献者
 
@@ -764,14 +767,53 @@ FFmpeg 二进制不提交到 Git。重新分发编译包时，请按 GPL 要求�
 
 ## 上游、许可证与使用边界
 
-本项目延续上游的 **[GPL-3.0](LICENSE)** 许可，并保留修改与来源声明。Mac 分支自 2026-10-07 开始适配，详细变更见 [NOTICE](NOTICE)，组件许可见 [第三方声明](THIRD-PARTY-NOTICES.md)。
+## 弹幕、账号与更新
 
-感谢以下项目提供的基础工作与参考：
+- 播放器内可主动开启只读时间轴弹幕，默认关闭；跟随暂停、拖动与换集。离线和投屏期间不叠加弹幕，读取失败不阻断播放。
+- 自建同步登录、导入和网络后台任务已撤下；原本机游客记录继续可用，历史账号文件留在原处但不再加载或自动合并。官方手机号登录、追加短信验证与云端收藏/历史/进度同步已接入；仅中国大陆+86，真实验证码在设备上输入。
+- 「关于 → 版本更新」检查我们自己的手机/TV发行渠道，下载经大小、SHA256、实际包名/版本/签名核验后交系统确认安装；正在播放、投屏或下载时不强行更新。
+- 0.12.10及更早版本先手动覆盖安装一次；0.12.11及后续版本从「关于 → 版本更新」读取本仓库手机/TV稳定清单。0.12.11首次授权安装来源后如停在等待状态，重新检查更新再继续安装；0.12.12已修复该返回分支。见[更新发布说明](docs/ANDROID-UPDATES.md)；官方账号操作见[账号说明](docs/ANDROID-ACCOUNT-SYNC.md)。
 
-- **[327044572/hongguo-downloader](https://github.com/327044572/hongguo-downloader)**：原始上游项目。
-- **[zhenyong97/hongguo-downloader](https://github.com/zhenyong97/hongguo-downloader)**：本次 Mac 移植的直接基础。
-- **[woshishiq1/drpys](https://github.com/woshishiq1/drpys)** 与 **[N3urda/hongguoTV](https://github.com/N3urda/hongguoTV)**：App 片源相关算法来源；准确提交与修改说明见 [算法来源声明](src/native/licenses/NOTICE.txt)。
-- **[Hululu007/drpy-node](https://github.com/Hululu007/drpy-node/tree/295f2b7047e14122d542a7736cb931e81abcf85c)**：西饭接口路径与返回结构参考；本项目独立编写适配器。
-- **Electron、React、FFmpeg 与 x264**：桌面运行、界面和媒体处理组件，许可详情见上述声明。
+## 从源码构建
 
-开源许可适用于软件，不授予剧集内容的再分发权。安装包不包含剧集媒体；作品版权归原平台及创作者所有。请仅处理你有权访问、下载或备份的内容，遵守平台条款与相关法律，勿用于未经授权的传播或商业盗版。平台接口可能调整，某次验证通过不保证后续片源持续可用。
+准备 Node.js **22.12+**、npm、JDK 17、Android SDK Platform 35，以及 Gradle 8.13 或项目 Gradle Wrapper。在仓库根目录执行：
+
+```sh
+npm ci
+
+# 手机 / TV WebView / 原生 TV debug 包
+npm run build:android
+
+# 非调试 release 构建，使用本机兼容证书
+npm run build:android:phone:release-compatible
+npm run build:android:tv:release-compatible
+bash scripts/build-android.sh --tvnative-release-compatible
+```
+
+结果写入 `dist/android/`。兼容证书默认读取 `~/.android/debug.keystore`，也可通过 `HONGGUO_COMPAT_KEYSTORE` 指定；新证书与发布包证书不一致时，需要卸载后安装，卸载前请保存所需数据。
+
+正式分发可使用自己的外部签名，设置 `HONGGUO_RELEASE_KEYSTORE`、`HONGGUO_RELEASE_STORE_PASSWORD`、`HONGGUO_RELEASE_KEY_ALIAS`，以及可选的 `HONGGUO_RELEASE_KEY_PASSWORD`，然后执行：
+
+```sh
+npm run build:android:phone:release
+npm run build:android:tv:release
+```
+
+签名私钥与密码不提交到仓库。依赖已缓存时可加 `GRADLE_OFFLINE=1` 离线构建。更多构建、测试与版本记录见 [ANDROID.md](ANDROID.md)。
+
+## 项目结构
+
+| 路径 | 内容 |
+| --- | --- |
+| `src/android/` | 手机 / TV WebView 界面、桥接与数据源解析 |
+| `android/app/src/tvNative/` | 独立原生 TV 启动配置；界面由 Java `Tv*` 类实现 |
+| `android/` | 原生播放器、DLNA、浏览器接收、缓存与本机记录 |
+| `server/login/` | 历史自建服务源码（Android 0.12.11 起不再连接） |
+| `src/native/` | 与桌面版共享的部分取源实现 |
+| `ANDROID.md` | Android 版本记录、功能说明与验证情况 |
+
+## 来源与许可
+
+基于 [jackotom/hongguo-drama](https://github.com/jackotom/hongguo-drama) 追加 Android 手机、TV 与局域网投屏实现，感谢上游作者。原项目及第三方声明继续保留，采用 [GPL-3.0](LICENSE)；请同时阅读 [NOTICE](NOTICE) 与 [第三方声明](THIRD-PARTY-NOTICES.md)。
+
+这是社区开源修改版，不是来源平台的官方客户端。剧集、清晰度和可播放范围由片源决定；自动化验证不等同于全部手机、电视或接收端上的实机播放验收。

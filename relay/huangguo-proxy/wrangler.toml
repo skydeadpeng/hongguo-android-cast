@@ -1,0 +1,12 @@
+name = "huangguo-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+routes = [
+  { pattern = "huoguo.skydeadpeng.xyz", custom_domain = true }
+]
+
+# 部署后建议绑定自定义域名（workers.dev 在国内基本不可达）：
+# 1. Cloudflare 控制台 → 你的域名 → DNS 添加 CNAME 指向 huangguo-proxy.<你的子域>.workers.dev
+# 2. Workers & Pages → huangguo-proxy → Settings → Domains & Routes → Add Custom Domain
+# 例如绑定 hgapi.你的域名 后，把 https://hgapi.你的域名 填入 App 备用线路

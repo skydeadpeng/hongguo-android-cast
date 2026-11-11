@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+const rows = new Map();
+globalThis.localStorage = { getItem: key => rows.get(key) ?? null, setItem: (key, value) => rows.set(key, value) };
+globalThis.window = { dispatchEvent() {}, AndroidBridge: { postMessage(raw) { const message = JSON.parse(raw); setTimeout(() => window.__androidResponse({ id: message.id, result: message.method === 'getPlaybackCache' ? { files: 2, bytes: 42, keepPreviousEpisodes: 1 } : { removed: 1, bytes: 20 } }), 0); } } };
+const { getPlaybackPreferences, setPlaybackPreference, nativeCall } = await import('../src/android/bridge.mjs');
+test('preferences default both switches on and keep one previous episode', () => { assert.deepEqual(getPlaybackPreferences(), { autoplay: true, cleanupPlaybackCache: true, keepPreviousEpisodes: 1 }); });
+test('false preferences persist without disabling unrelated switch', () => { setPlaybackPreference('autoplay', false); assert.deepEqual(getPlaybackPreferences(), { autoplay: false, cleanupPlaybackCache: true, keepPreviousEpisodes: 1 }); setPlaybackPreference('cleanupPlaybackCache', false); assert.equal(getPlaybackPreferences().cleanupPlaybackCache, false); });
+test('unknown preference key does not overwrite retention', () => { assert.equal(setPlaybackPreference('keepPreviousEpisodes', 0).keepPreviousEpisodes, 1); });
+test('invalid saved preferences recover defaults', () => { rows.set('hongguo.playbackPreferences', '{invalid'); assert.deepEqual(getPlaybackPreferences(), { autoplay: true, cleanupPlaybackCache: true, keepPreviousEpisodes: 1 }); });
+test('cache status and clearing use allowed bridge methods', async () => { assert.deepEqual(await nativeCall('getPlaybackCache'), { files: 2, bytes: 42, keepPreviousEpisodes: 1 }); assert.deepEqual(await nativeCall('clearPlaybackCache'), { removed: 1, bytes: 20 }); });
+test('unsupported bridge operation is rejected', async () => { await assert.rejects(nativeCall('deleteManualDownloads'), /未支持/); });

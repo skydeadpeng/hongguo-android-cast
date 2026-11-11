@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 64,
+  "versionName": "0.12.41",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.41/Hongguo-0.12.41-phone-release-compatible.apk",
+  "size": 643160,
+  "sha256": "690f9d10322889ce441ac48e2d755d01c302ef76f41fc44dd5997665152c687e",
+  "notes": "修复部分电视/盒子上首页封面全部「暂无封面」：个别电视系统（如 tc8000 方案）把系统图片解码接口列入限制名单，封面转码在解码第一步就静默失败。现在解码失败自动改用兼容路径处理 CDN 的 webp 同图，受限电视上封面恢复显示。详情页解析通道扩容（0.12.40）保持不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T13:55:14.893Z"
+}

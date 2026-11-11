@@ -38,24 +38,24 @@ const ipc = (name, ...args) => handlers[name]({}, ...args);
   for(const flags of [{draft:true},{prerelease:true}]){response={tag_name:'v2.0',...flags};assert.equal((await ipc('check-app-update')).release,null);}
   response={tag_name:'v1.2.1',html_url:'https://evil.invalid/download'};
   let result=await ipc('check-app-update');assert.equal(result.release.version,'1.2.1');
-  assert.equal(result.release.url,'https://github.com/jackotom/hongguo-drama/releases/tag/v1.2.1');
+  assert.equal(result.release.url,'https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v1.2.1');
   await ipc('open-app-update');assert.equal(opened[0],result.release.url);
-  assert.equal(requestOptions.url,'https://api.github.com/repos/jackotom/hongguo-drama/releases/latest');
+  assert.equal(requestOptions.url,'https://api.github.com/repos/skydeadpeng/hongguo-android-cast/releases/latest');
   assert.equal(requestOptions.timeout,10000);assert.equal(requestOptions.maxRedirects,0);
   response={tag_name:'v2.0'};result=await ipc('check-app-update');assert.equal(result.release.version,'2.0');
   for (const reason of ['HTTP 403', 'HTTP 429', 'network timeout']) {
     responses = [Error(reason), { tag_name: 'v2.0', html_url: 'https://evil.invalid' }];
     result = await ipc('check-app-update');
     assert.equal(result.release?.version, '2.0', `${reason} must use the quota-free official fallback`);
-    assert.equal(requestOptions.url, 'https://github.com/jackotom/hongguo-drama/releases/latest');
+    assert.equal(requestOptions.url, 'https://github.com/skydeadpeng/hongguo-android-cast/releases/latest');
     assert.equal(requestOptions.headers.Accept, 'application/json');
     assert.equal(requestOptions.maxRedirects, 0);
     assert.equal(requestOptions.timeout, 10000);
   }
-  responses=[Error('HTTP 403'),{httpResponse:{status:302,headers:{location:'https://github.com/jackotom/hongguo-drama/releases/tag/v2.0'}}}];
+  responses=[Error('HTTP 403'),{httpResponse:{status:302,headers:{location:'https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v2.0'}}}];
   result=await ipc('check-app-update');
   assert.equal(result.release?.version,'2.0','official latest redirect must provide stable version without following the URL');
-  for (const location of ['https://evil.invalid/releases/tag/v2.0','https://github.com/other/repo/releases/tag/v2.0','https://github.com/jackotom/hongguo-drama/releases/tag/v2.0-beta.1','https://github.com/jackotom/hongguo-drama/releases/tag/v2.0?evil=1']) {
+  for (const location of ['https://evil.invalid/releases/tag/v2.0','https://github.com/other/repo/releases/tag/v2.0','https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v2.0-beta.1','https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v2.0?evil=1']) {
     responses=[Error('HTTP 403'),{httpResponse:{status:302,headers:{location}}}];
     assert.equal((await ipc('check-app-update')).release,null,'untrusted redirect rejected');
   }
@@ -65,7 +65,7 @@ const ipc = (name, ...args) => handlers[name]({}, ...args);
   }
   response=Error('network timeout');assert.equal((await ipc('check-app-update')).release,null);
   assert.equal((await ipc('open-app-update')).success,true, 'failed checks must retain a fixed manual fallback');
-  assert.equal(opened.at(-1),'https://github.com/jackotom/hongguo-drama/releases/latest');
+  assert.equal(opened.at(-1),'https://github.com/skydeadpeng/hongguo-android-cast/releases/latest');
   let resolve;response=new Promise(r=>{resolve=r});const pending=ipc('check-app-update');
   await ipc('save-settings',{app_updates_enabled:false});resolve({tag_name:'v3.0'});
   assert.equal((await pending).enabled,false);assert.ok(events.some(([n,v])=>n==='app-update-preference'&&v===false));

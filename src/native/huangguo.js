@@ -63,7 +63,9 @@ async function request(apiPath, params, options = {}) {
       else if (/^黄果/.test(error.message)) lastError = error;
       else lastError = new Error(controller.signal.aborted || ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code)
         ? '黄果加载超时，请重试' : '黄果来源暂不可用，请稍后重试');
-      if (/^(黄果加载超时|请输入|搜索词)/.test(lastError.message)) throw lastError;
+      // 参数类错误立即失败；超时/网络错误继续轮换下一域名——部分运营商会把单个域名
+      // 黑洞化（连接挂着不回包），卡死在一个域等于整源不可用（安卓/webOS 端即此语义）。
+      if (/^(请输入|搜索词)/.test(lastError.message)) throw lastError;
     } finally { clearTimeout(timer); }
   }
   throw lastError || new Error('黄果来源暂不可用，请稍后重试');

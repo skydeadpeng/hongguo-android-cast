@@ -1,0 +1,11 @@
+from pathlib import Path
+import sys
+b=Path(sys.argv[1]); files={
+'android/content/Context.java':'''package android.content; public class Context {public static final String ACTIVITY_SERVICE="activity",DOWNLOAD_SERVICE="download";public java.util.Map<String,Object> services=new java.util.HashMap<>();public Object getSystemService(String key){return services.get(key);}}''',
+'android/content/ComponentName.java':'''package android.content; public class ComponentName {private String name;public ComponentName(String name){this.name=name;}public String getClassName(){return name;}}''',
+'android/app/ActivityManager.java':'''package android.app; public class ActivityManager {public java.util.List<RunningServiceInfo> running=new java.util.ArrayList<>();public java.util.List<RunningServiceInfo> getRunningServices(int max){return running;}public static class RunningServiceInfo{public android.content.ComponentName service;public RunningServiceInfo(String name){service=new android.content.ComponentName(name);}}}''',
+'android/database/Cursor.java':'''package android.database; public interface Cursor extends AutoCloseable {boolean moveToFirst();void close();}''',
+'android/app/DownloadManager.java':'''package android.app; public class DownloadManager {public static final int STATUS_PENDING=1,STATUS_RUNNING=2,STATUS_PAUSED=4; public android.database.Cursor cursor;public int filter;public android.database.Cursor query(Query query){filter=query.status;return cursor;}public static class Query{int status;public Query setFilterByStatus(int mask){status=mask;return this;}}}''',
+'io/github/jackotom/hongguo/android/CheckpointDoubles.java':'''package io.github.jackotom.hongguo.android; class PlayerActivity{static boolean live;static boolean hasLivePlayer(){return live;}}class DlnaCastService{}class BrowserCastService{}class OfficialLibrary{static int commits;static boolean fail;static void checkpointAll(android.content.Context c)throws java.io.IOException{commits++;if(fail)throw new java.io.IOException("official disk");}}class LibraryStore{static int commits;static boolean fail;static void checkpoint(android.content.Context c)throws java.io.IOException{commits++;if(fail)throw new java.io.IOException("disk");}}'''
+}
+for name,content in files.items():p=b/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(content)

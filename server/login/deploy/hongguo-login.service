@@ -1,0 +1,25 @@
+[Unit]
+Description=Hongguo Login API (Go Gin)
+After=network.target
+
+[Service]
+Type=simple
+User=hongguo-login
+Group=hongguo-login
+WorkingDirectory=/var/lib/hongguo-login
+EnvironmentFile=/etc/hongguo-login.env
+ExecStart=/opt/hongguo-login/hongguo-login serve
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=45
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/hongguo-login
+RestrictSUIDSGID=true
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 73,
+  "versionName": "0.12.50",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.50/Hongguo-0.12.50-phone-release-compatible.apk",
+  "size": 654752,
+  "sha256": "ccedf9f6557a3ea993e7a9c72701b6f124c1da4c5368c02a264c807f93cb3e30",
+  "notes": "新增黄果漫剧来源：底部导航新增「黄果」，可按漫剧/短剧分类浏览与搜索，选集在线播放，无需登录；片源来自黄果官方站，播放使用官方签名流。红果原有栏目、追剧、下载与账号功能不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-08T11:49:54.383Z"
+}

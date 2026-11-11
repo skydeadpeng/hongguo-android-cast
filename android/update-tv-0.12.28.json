@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 51,
+  "versionName": "0.12.28",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.28/Hongguo-0.12.28-tv-release-compatible.apk",
+  "size": 632008,
+  "sha256": "31343b4b3aa18769db1078fcd215e975d9eb5459544ae783bf373979c314ed9d",
+  "notes": "下载页改为按剧分组：每部剧一个可展开的分组头（剧名 · 完成集数/总集数 · 总大小），分集在组内列出，「合并本剧」移入组头一键可用；多部剧默认收起、首部展开。系统下载通知改为仅下载中显示，批量缓存多集不再每集留一条常驻通知。批量下载入口不变（详情页「批量下载」选起止集）。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T03:38:19.593Z"
+}

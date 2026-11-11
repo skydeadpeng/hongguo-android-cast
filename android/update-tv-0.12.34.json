@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 57,
+  "versionName": "0.12.34",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.34/Hongguo-0.12.34-tv-release-compatible.apk",
+  "size": 636400,
+  "sha256": "b05c5746c86b2f09e5a2fe0917162ea1b4e086c496e30adf0cd88f04a76a8821",
+  "notes": "修复「官网会话云端验证未通过」：扫码登录本身成功后，云端通道验证会拿官网返回的账号编号做比对，而官网近期把该字段改成了非数字的加密串，导致验证永远失败、收藏/历史/进度无法同步（这是模拟器里用真实扫码会话逐环节实测定位的）。现在验证逻辑改为同时识别加密串与请求编号里的数字账号，验证通过后云同步恢复正常。已用真实账号扫码会话验证：云端通道认证通过。另外官网二维码有效期已缩短到约 60 秒，出码后请尽快扫码。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-01T14:03:36.265Z"
+}

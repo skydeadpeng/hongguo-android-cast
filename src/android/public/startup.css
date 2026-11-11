@@ -1,0 +1,7 @@
+/* Independent of the module graph: even a parse failure has a visible screen. */
+html,body,#root{margin:0;min-height:100%;background:#f5f5f7;color:#1b1b1f;font-family:Arial,sans-serif}
+.startup-panel{box-sizing:border-box;max-width:780px;padding:64px 40px;margin:auto;line-height:1.7}
+.startup-panel h1{font-size:28px;margin:0 0 18px}.startup-panel p{font-size:18px;color:#5f5f66}
+.startup-panel button{min-width:140px;min-height:54px;margin-top:22px;padding:12px 24px;border:1px solid #e8503a;border-radius:999px;background:#e8503a;color:#fff;font-size:20px}
+.startup-panel button:focus{outline:4px solid #e8503a;outline-offset:4px}
+[hidden]{display:none!important}

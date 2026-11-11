@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "phone",
+  "packageName": "io.github.jackotom.hongguo.android",
+  "versionCode": 62,
+  "versionName": "0.12.39",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.39/Hongguo-0.12.39-phone-release-compatible.apk",
+  "size": 642756,
+  "sha256": "60d3807dc84a35c6ffaef9de051b0a2a9fb1072e7593cebf16ef97bb57534ddd",
+  "notes": "修复 TV 盒子首页封面不显示：上一版首页封面改用官方 HEIC 原图，且只在较新的系统（Android 9+）上转码内联，老电视/盒子会整页「暂无封面」。现在封面在任何受支持的系统上都先转成通用格式内联显示；无法内联时自动改用官方 CDN 的 webp 同图，网页层还有一道自动重试兜底，转码失败也不再把封面清空。手机版同样受益；0.12.38 的首页官方分类（真人剧/漫剧/AI剧）保持不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-02T11:55:16.967Z"
+}

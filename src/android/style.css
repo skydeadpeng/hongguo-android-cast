@@ -1,0 +1,503 @@
+:root{color-scheme:dark light;--bg:#f5f5f7;--surface:#ffffff;--inset:#f0f0f3;--sidebar:#ffffff;--border:#e5e5ea;--border-strong:#d5d5dc;--accent-border:#f2c6bb;--text:#1b1b1f;--muted:#5f5f66;--faint:#9a9aa2;--primary:#e8503a;--primary-hover:#d64531;--accent:#e8503a;--accent-soft:#fbe9e5;--error:#d63a2a;--ring:#e8503a;font-family:system-ui,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.5;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
+@media(prefers-color-scheme:dark){:root{--bg:#131516;--surface:#202325;--inset:#191b1d;--sidebar:#181a1c;--border:#2e3134;--border-strong:#3f4348;--accent-border:#5b332e;--text:#f2f2f2;--muted:#a9adb1;--faint:#6e7278;--primary:#e8503a;--primary-hover:#ef5a45;--accent:#ef5a45;--accent-soft:#3a211e;--error:#ef6a5b;--ring:#ef5a45}}
+*{box-sizing:border-box}[hidden]{display:none!important}html,body,#root{width:100%;height:100%;margin:0;overflow:hidden}body{background:var(--bg);color:var(--text)}button,input,select{font:inherit;color:inherit}button{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}button:disabled{cursor:default;opacity:.45}button,input,select,a{outline-offset:3px}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid var(--ring)}button{border-radius:7px}button svg{flex-shrink:0}h1,h2,p{margin:0}h1{font-size:27px;line-height:1.3;letter-spacing:-.03em;font-weight:700}h2{font-size:18px;font-weight:600}p{color:var(--muted)}.android-app{display:flex;height:100%;width:100%;overflow:hidden}.content-shell{min-width:0;flex:1;display:flex;flex-direction:column;overflow:hidden}.main-content{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:20px 16px 32px;scroll-padding:24px}.main-content>*{max-width:1320px;margin-left:auto;margin-right:auto}.phone-brand{display:flex;align-items:center;gap:9px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0;font-size:17px}.phone-brand>span,.nav-brand>span{width:31px;height:31px;display:flex;align-items:center;justify-content:center;background:var(--primary);color:#fff;border-radius:8px}.phone-brand svg,.nav-brand svg{fill:currentColor;margin-left:2px}.page-heading{margin-bottom:24px}.page-heading p{margin-top:6px;font-size:14px}.app-nav{display:flex;flex-shrink:0;background:var(--sidebar);z-index:5}.phone-layout{flex-direction:column-reverse}.phone-layout .app-nav{border-top:1px solid var(--border);padding:5px max(4px,env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left))}.nav-brand{display:none}.nav-items{display:flex;width:100%;gap:2px}.nav-items>button{flex:1;min-height:53px;padding:6px 2px;border:0;background:transparent;color:var(--faint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;white-space:nowrap}.nav-items>button[aria-current="page"]{color:var(--accent)}.nav-items>button:hover{background:var(--inset)}.button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:46px;padding:10px 15px;border:1px solid var(--border);background:var(--surface);font-size:14px;line-height:1.4;font-weight:500}.button:hover:not(:disabled){background:var(--inset);border-color:var(--border-strong)}.button.primary{background:var(--primary);border-color:var(--primary);color:#fff}.button.primary:hover:not(:disabled){background:var(--primary-hover)}.button.saved{color:var(--accent);border-color:var(--accent-border);background:var(--accent-soft)}.button.saved svg{fill:currentColor}.category-tabs{display:flex;gap:8px;overflow-x:auto;padding:3px 3px 13px;margin-bottom:20px;scrollbar-width:thin}.category-tabs button{flex-shrink:0;min-height:44px;padding:8px 18px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--muted);font-size:14px}.category-tabs button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-border);color:var(--accent);font-weight:600}.category-tabs button:hover{background:var(--inset)}.poster-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 10px}.poster{display:flex;flex-direction:column;text-align:left;min-width:0;padding:0;border:0;background:transparent;color:var(--text);border-radius:8px}.poster-art{display:block;position:relative;width:100%;aspect-ratio:3/4;border-radius:10px;overflow:hidden;background:var(--inset);border:1px solid transparent}.poster:hover .poster-art{border-color:var(--faint)}.poster-art img{width:100%;height:100%;object-fit:cover;display:block}.poster-fallback{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#7c7c86;font-size:11px}.poster-label{position:absolute;left:6px;bottom:6px;background:rgba(20,20,26,.66);color:#fff;font-size:10px;padding:2px 7px;border-radius:999px;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.poster>strong{font-size:14px;line-height:1.5;font-weight:600;margin-top:8px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:21px;width:100%}.poster-caption{color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}.pagination{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:30px}.pagination>span{color:var(--faint);font-size:12px;white-space:nowrap}.pagination .button{padding-inline:13px}.state-panel{padding:52px 16px;min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px}.state-panel>svg{color:var(--faint)}.state-panel>p{max-width:48ch;font-size:14px;overflow-wrap:anywhere}.error-state>p{color:var(--error)}.search-form{margin-bottom:20px}.search-form>label{display:block;font-size:13px;color:var(--muted);margin-bottom:8px}.search-controls{display:flex;gap:9px}.search-controls input{min-width:0;flex:1;height:48px;padding:10px 12px;border:1px solid var(--border-strong);border-radius:999px;background:var(--surface);font-size:15px}.search-controls input::placeholder{color:var(--faint)}.search-controls .button{padding-inline:15px}.result-caption{font-size:13px;color:var(--faint);margin-bottom:20px;overflow-wrap:anywhere}.section-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:24px;padding:3px 3px 0}.section-tabs>button{display:flex;align-items:center;gap:7px;min-height:46px;padding:8px 1px 12px;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;color:var(--faint);font-size:14px}.section-tabs>button[aria-pressed="true"]{border-bottom-color:var(--accent);color:var(--accent);font-weight:600}.heading-actions{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.heading-actions>.button{padding:10px}.heading-actions>.button span{display:none}.download-list{border-top:1px solid var(--border)}.download-row{display:flex;align-items:center;gap:14px;padding:20px 0;border-bottom:1px solid var(--border)}.download-icon{color:var(--faint)}.download-info{flex:1;min-width:0}.download-info h2{font-size:15px;overflow-wrap:anywhere}.download-info p{font-size:12px;margin-top:5px}.download-row .button{padding:8px 10px;min-width:64px}.download-row .button svg{display:none}.download-info progress{display:block;width:100%;height:5px;margin-top:10px;accent-color:var(--primary);border:none}.download-reason{color:var(--error);overflow-wrap:anywhere}.text-error{color:var(--error)!important}.about-section{border-top:1px solid var(--border);padding-top:22px;margin-top:24px;max-width:760px!important;margin-left:0!important}.about-section h2{margin-bottom:12px}.about-section p{font-size:14px;line-height:1.8;margin:10px 0}.about-section dl{margin:0}.about-section dl>div{display:flex;gap:20px;padding:10px 0;font-size:14px}.about-section dt{min-width:90px;color:var(--faint)}.about-section dd{margin:0;overflow-wrap:anywhere}.about-links{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.back-button{display:flex;align-items:center;gap:4px;min-height:44px;padding:7px 4px;border:0;background:transparent;color:var(--muted);margin:0 0 16px;font-size:14px}.back-button svg{transform:rotate(180deg)}.detail-summary{display:grid;grid-template-columns:100px minmax(0,1fr);gap:18px}.detail-cover{display:flex;align-items:center;justify-content:center;aspect-ratio:3/4;background:var(--inset);border-radius:7px;overflow:hidden;color:var(--faint)}.detail-cover img{width:100%;height:100%;object-fit:cover}.detail-copy h1{font-size:23px;overflow-wrap:anywhere}.detail-meta{color:var(--faint);font-size:12px;margin-top:8px}.detail-description{font-size:13px;line-height:1.8;margin:14px 0 16px;white-space:pre-line}.detail-copy>.text-error{font-size:13px;margin-top:10px}.episode-section{margin-top:28px;padding-top:22px;border-top:1px solid var(--border)}.episode-section>header{display:flex;align-items:center;justify-content:space-between;gap:12px}.episode-section>header>p{font-size:12px;color:var(--faint)}.episode-note{font-size:12px;color:var(--faint);margin:8px 0 16px}.episode-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:9px}.episode-grid>button{height:46px;background:var(--surface);border:1px solid var(--border);font-size:15px}.episode-grid>button[aria-pressed="true"]{color:var(--accent);background:var(--accent-soft);border-color:var(--accent)}.episode-grid>button:disabled{background:transparent;color:var(--faint)}.empty-episodes{padding:20px 0;color:var(--faint)}.play-actions{position:sticky;bottom:-32px;background:var(--bg);border-top:1px solid var(--border);margin:24px -20px -32px;padding:15px 20px 20px;z-index:2}.play-actions>p{font-size:12px;margin-bottom:10px;color:var(--faint)}.play-actions>div{display:flex;gap:10px}.play-actions .button{flex:1}.operation-error{padding:16px 0;display:flex;flex-wrap:wrap;gap:12px;align-items:center}.operation-error p{color:var(--error);font-size:13px;flex:1;min-width:180px;overflow-wrap:anywhere}.environment-error{padding:12px 20px;background:var(--accent-soft);color:var(--error);font-size:12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--accent-border)}.environment-error span{flex:1;overflow-wrap:anywhere}.environment-error button{min-height:44px;border:1px solid var(--accent-border);color:var(--error);background:var(--surface);padding:6px 10px;flex-shrink:0}.toast{position:fixed;bottom:calc(82px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);padding:13px 18px;background:#26262b;color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:999px;max-width:calc(100% - 36px);width:max-content;font-size:14px;z-index:20}.fatal-error{padding:40px 24px;max-width:680px;margin:auto}.fatal-error p{margin:16px 0 24px;overflow-wrap:anywhere}
+@media(min-width:600px){.main-content{padding:28px 28px 36px}.poster-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:26px 18px}.poster>strong{font-size:15px}.poster-caption{font-size:12px}.poster-label{font-size:11px}.detail-summary{grid-template-columns:160px minmax(0,1fr);gap:26px}.detail-copy h1{font-size:28px}.detail-description{font-size:14px}.play-actions{margin-inline:-28px;bottom:-36px;margin-bottom:-36px;padding-inline:28px}.play-actions>div{max-width:520px}.heading-actions>.button span{display:inline}.download-row .button svg{display:block}}
+@media(min-width:1000px){.phone-layout .poster-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.phone-layout .main-content{padding:32px}.phone-layout .play-actions{margin-inline:-32px;bottom:-32px;margin-bottom:-32px;padding-inline:32px}}
+.tv-layout .phone-brand{display:none}.tv-layout .app-nav{width:208px;border-right:1px solid var(--border);flex-direction:column;padding:32px 14px}.tv-layout .nav-brand{display:flex;align-items:center;gap:10px;padding:0 10px 34px;white-space:nowrap;font-size:21px}.tv-layout .nav-brand>span{width:36px;height:36px}.tv-layout .nav-items{flex-direction:column;gap:8px}.tv-layout .nav-items>button{min-height:60px;flex:none;flex-direction:row;justify-content:flex-start;gap:13px;font-size:19px;padding:12px 16px}.tv-layout .nav-version{color:var(--faint);font-size:13px;padding:20px 16px 0;margin-top:auto;line-height:1.8}.tv-layout .main-content{padding:36px 36px 40px;scroll-padding:36px}.tv-layout h1{font-size:32px}.tv-layout .page-heading p{font-size:17px}.tv-layout .page-heading{margin-bottom:28px}.tv-layout .poster-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:28px 22px}.tv-layout .poster>strong{font-size:18px;margin-top:11px}.tv-layout .poster-caption{font-size:14px}.tv-layout .poster-label{font-size:13px;padding:3px 7px}.tv-layout .poster:focus-visible{outline:4px solid var(--ring);outline-offset:6px}.tv-layout .button{min-height:54px;font-size:17px;padding:12px 18px}.tv-layout .category-tabs{gap:12px}.tv-layout .category-tabs button{min-height:52px;font-size:17px}.tv-layout .pagination>span{font-size:16px}.tv-layout .search-controls input{height:56px;font-size:19px}.tv-layout .search-form>label,.tv-layout .result-caption{font-size:16px}.tv-layout .section-tabs>button{font-size:18px;min-height:54px}.tv-layout .download-info h2{font-size:20px}.tv-layout .download-info p{font-size:16px}.tv-layout .download-row{gap:20px;padding:24px 0}.tv-layout .about-section p,.tv-layout .about-section dl>div{font-size:18px}.tv-layout .about-section dt{min-width:130px}.tv-layout .about-section h2{font-size:23px}.tv-layout .back-button{min-height:52px;font-size:18px}.tv-layout .detail-summary{grid-template-columns:190px minmax(0,1fr);gap:28px}.tv-layout .detail-copy h1{font-size:32px}.tv-layout .detail-meta{font-size:16px}.tv-layout .detail-description{font-size:18px}.tv-layout .episode-section>header h2{font-size:23px}.tv-layout .episode-section>header p,.tv-layout .episode-note{font-size:16px}.tv-layout .episode-grid{grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:14px}.tv-layout .episode-grid>button{height:56px;font-size:21px}.tv-layout .play-actions{bottom:-40px;margin-inline:-36px;margin-bottom:-40px;padding:18px 36px 24px}.tv-layout .play-actions>p{font-size:16px}.tv-layout .toast{bottom:36px;font-size:18px}.tv-layout .state-panel{min-height:320px}.tv-layout .state-panel p{font-size:18px}.tv-layout .state-panel h2{font-size:24px}.tv-layout .operation-error p{font-size:17px}
+@media(max-width:359px){.main-content{padding-inline:14px}.poster-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.nav-items>button{font-size:10px}.detail-summary{grid-template-columns:80px minmax(0,1fr);gap:13px}.detail-copy h1{font-size:21px}.play-actions{margin-inline:-16px;padding-inline:16px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+.license-details{margin-top:20px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+.license-details summary{min-height:46px;padding:12px 14px;cursor:pointer;font-size:14px;color:var(--text);border-radius:6px;outline-offset:3px}
+.license-details summary:focus-visible,.license-text:focus-visible{outline:3px solid var(--ring)}
+.license-details[open] summary{border-bottom:1px solid var(--border)}
+.license-text{margin:0;padding:16px;max-height:55vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);outline-offset:3px}
+.tv-layout .license-details summary{min-height:54px;font-size:18px;padding:14px 18px}
+.tv-layout .license-text{font-size:16px;padding:20px}
+.tv-layout .app-nav{min-height:0;overflow-y:auto;overscroll-behavior:contain;scroll-padding:16px}
+.tv-layout .nav-brand,.tv-layout .nav-items,.tv-layout .nav-version{flex-shrink:0}
+.episode-grid>button{height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.episode-status{font-size:9px;line-height:1.2;color:var(--faint);white-space:nowrap}
+.episode-grid>button[aria-pressed="true"] .episode-status{color:var(--accent)}
+.playback-settings{margin-top:24px;border-top:1px solid var(--border)}
+.playback-setting{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--border)}
+.playback-setting>div{min-width:0}
+.playback-setting h2{font-size:15px}
+.playback-setting p{font-size:12px;margin-top:4px;line-height:1.6}
+.setting-switch{flex-shrink:0;min-width:64px;min-height:44px;border:1px solid var(--border);background:var(--surface);color:var(--faint);padding:9px 12px;font-size:13px}
+.setting-switch[aria-checked="true"]{color:var(--accent);border-color:var(--accent-border);background:var(--accent-soft)}
+.tv-layout .episode-grid>button{height:72px;gap:3px}
+.tv-layout .episode-status{font-size:12px}
+.tv-layout .playback-setting h2{font-size:19px}
+.tv-layout .playback-setting p{font-size:16px}
+.tv-layout .setting-switch{min-width:88px;min-height:54px;font-size:17px}
+.episode-grid>button,.setting-switch{scroll-margin-block:24px 140px}
+.tv-layout .episode-grid>button,.tv-layout .setting-switch{scroll-margin-block:36px 180px}
+
+.playback-setting select{flex-shrink:0;max-width:46%;min-height:44px;padding:9px 10px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:14px;border-radius:4px}
+.tv-layout .playback-setting select{min-height:54px;font-size:17px}
+.playback-setting select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+.search-history{margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+.search-history>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.search-history h2{font-size:15px}
+.history-clear{min-height:44px;padding:8px 10px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:13px}
+.history-clear:hover:not(:disabled){border-color:var(--border);background:var(--surface)}
+.search-history-list{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:3px}
+.search-history-list>li{display:flex;max-width:100%;min-width:0;border:1px solid var(--border);border-radius:6px;background:var(--surface)}
+.history-keyword{min-width:0;min-height:44px;padding:9px 12px;border:0;background:transparent;text-align:left;font-size:14px;line-height:1.5;overflow-wrap:anywhere;border-radius:5px 0 0 5px}
+.history-remove{flex-shrink:0;min-width:44px;min-height:44px;padding:7px;border:0;border-left:1px solid var(--border);border-radius:0 5px 5px 0;background:transparent;color:var(--faint);font-size:21px}
+.history-keyword:hover,.history-remove:hover:not(:disabled){background:var(--inset)}
+.history-note{font-size:12px;color:var(--faint);margin:8px 0}
+.search-history-error{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0}
+.search-history-error>p{flex:1;min-width:160px;color:var(--error);font-size:13px;overflow-wrap:anywhere}
+.search-history-confirm{margin-bottom:12px;padding:12px;border:1px solid var(--border);border-radius:6px;background:var(--surface)}
+.search-history-confirm>p{font-size:13px;margin-bottom:10px}
+.search-history-confirm>div{display:flex;flex-wrap:wrap;gap:8px}
+.tv-layout .search-history h2{font-size:20px}
+.tv-layout .history-clear,.tv-layout .history-keyword{min-height:54px;font-size:17px}
+.tv-layout .history-remove{min-width:54px;min-height:54px;font-size:25px}
+.tv-layout .history-note{font-size:16px}
+.tv-layout .search-history-confirm>p,.tv-layout .search-history-error>p{font-size:17px}
+.history-keyword,.history-remove,.history-clear{scroll-margin-block:20px}
+
+/* Phone details own their scroll area. The action row occupies real space above
+   navigation, rather than floating over the last episode or playback setting. */
+.phone-layout .main-content.detail-open{padding:0;overflow:hidden}
+.phone-layout .detail-page{display:flex;flex-direction:column;height:100%;min-height:0;max-width:none}
+.phone-layout .detail-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:16px max(16px,env(safe-area-inset-right)) 24px max(16px,env(safe-area-inset-left));scroll-padding:20px}
+.phone-layout .detail-scroll>*{max-width:920px;margin-inline:auto}
+.phone-layout .detail-scroll>.back-button{margin-left:0}
+.phone-layout .play-actions{position:static;flex-shrink:0;margin:0;padding:10px max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left))}
+.phone-layout .play-actions>p{margin-bottom:8px;font-size:.8rem;overflow-wrap:anywhere}
+.phone-layout .play-actions>div{max-width:920px;margin-inline:auto}
+.phone-layout .play-actions .button{min-width:0;min-height:46px;padding:10px 8px;font-size:.94rem;overflow-wrap:anywhere}
+.phone-layout .play-actions .button svg{width:20px;height:20px}
+.phone-layout .detail-description{font-size:.9rem}
+.phone-layout .description-collapsed{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.description-toggle{display:block;min-height:44px;padding:8px 0;margin:-8px 0 8px;border:0;background:none;color:var(--accent);font-size:.9rem;text-align:left}
+.episode-browser{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin:0 0 16px}
+.episode-browser label{display:flex;flex:1 1 10rem;flex-direction:column;gap:6px;min-width:0;font-size:.8rem;color:var(--faint)}
+.episode-browser select{min-height:44px;max-width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:.94rem}
+.episode-browser>.button{font-size:.86rem;min-height:44px;padding:8px 10px;flex-shrink:0}
+.tv-layout .detail-scroll{display:contents}
+.phone-layout .episode-grid{grid-template-columns:repeat(auto-fill,minmax(48px,1fr))}
+.phone-layout .episode-grid>button{height:auto;min-height:56px;padding:7px 4px;font-size:1rem}
+.phone-layout .episode-status{font-size:.65rem;white-space:normal;overflow-wrap:anywhere}
+.phone-layout .playback-setting{flex-wrap:wrap;gap:12px}
+.phone-layout .playback-setting>div{flex:1 1 180px}
+.phone-layout .playback-setting h2{font-size:1rem}
+.phone-layout .playback-setting p{font-size:.8rem}
+.phone-layout .playback-setting select{font-size:.94rem;max-width:100%;min-width:94px}
+.phone-layout .setting-switch{font-size:.87rem}
+.phone-layout .operation-error p{font-size:.9rem;min-width:0;flex:1 1 180px}
+.phone-layout .episode-section>header{flex-wrap:wrap}
+.phone-layout .detail-meta,.phone-layout .episode-note{font-size:.8rem;overflow-wrap:anywhere}
+.phone-layout .detail-copy .button{font-size:.94rem;min-height:44px;padding:9px 10px}
+.phone-layout .episode-grid>button,.phone-layout .setting-switch{scroll-margin-block:20px}
+@media(max-width:359px){.phone-layout .detail-scroll{padding-inline:16px}.phone-layout .play-actions{padding-inline:16px}.phone-layout .episode-browser{flex-wrap:wrap}.phone-layout .episode-browser label{flex:1 1 10rem}.phone-layout .detail-summary{grid-template-columns:72px minmax(0,1fr);gap:12px}.phone-layout .playback-setting>div{flex-basis:100%}}
+@media(max-height:480px) and (orientation:landscape){.phone-layout .phone-brand{display:none}.phone-layout .main-content{padding-top:16px}.phone-layout .detail-scroll{padding-top:12px}.phone-layout .nav-items>button{min-height:44px;flex-direction:row;gap:6px}.phone-layout .nav-items>button svg{width:18px;height:18px}.phone-layout .play-actions{padding-top:7px;padding-bottom:8px}.phone-layout .play-actions>p{margin-bottom:5px}.phone-layout .detail-summary{grid-template-columns:86px minmax(0,1fr)}}
+/* Text-relative phone sizing respects enlarged WebView/default text settings. */
+.phone-layout h1{font-size:1.8rem}
+.phone-layout h2{font-size:1.2rem}
+.phone-layout .detail-copy h1{font-size:1.53rem}
+.phone-layout .button{font-size:.94rem}
+.phone-layout .phone-brand{font-size:1.13rem}
+.phone-layout .nav-items>button{min-width:0;font-size:.74rem;white-space:normal;line-height:1.25}
+.phone-layout .nav-items>button>span{overflow-wrap:anywhere}
+.phone-layout .poster>strong{font-size:.94rem}
+.phone-layout .poster-caption{font-size:.8rem}
+.phone-layout .page-heading p,.phone-layout .result-caption{font-size:.94rem}
+.phone-layout .search-controls input{font-size:1rem}
+.phone-layout .pagination{flex-wrap:wrap;gap:12px}
+.phone-layout .section-tabs{flex-wrap:wrap;gap:8px 20px}
+.phone-layout .section-tabs>button{font-size:.94rem}
+.phone-layout .heading-actions>.button{min-width:44px}
+
+.nav-word{display:inline-block}
+.phone-layout .back-button,.phone-layout .category-tabs button,.phone-layout .state-panel>p,.phone-layout .about-section p,.phone-layout .about-section dl>div,.phone-layout .history-keyword,.phone-layout .license-details summary,.phone-layout .toast{font-size:.94rem}
+.phone-layout .search-form>label,.phone-layout .history-clear,.phone-layout .history-note,.phone-layout .search-history-confirm>p,.phone-layout .search-history-error>p{font-size:.87rem}
+.phone-layout .download-info h2{font-size:1rem}
+.phone-layout .download-info p,.phone-layout .pagination>span,.phone-layout .license-text{font-size:.8rem}
+.phone-layout .about-section dl>div{flex-wrap:wrap;gap:4px 20px}
+.phone-layout .about-section dt{min-width:6rem}
+.phone-layout .about-section dd{flex:1 1 150px;min-width:0}
+
+/* Chromium 67 TV WebViews do not understand :focus-visible. Keep this rule
+   separate so an unknown selector cannot discard the remote focus outline. */
+.tv-layout button:focus,.tv-layout input:focus,.tv-layout select:focus,.tv-layout a:focus,.tv-layout summary:focus{outline:3px solid var(--ring);outline-offset:3px}
+.tv-layout .poster:focus{outline:4px solid var(--ring);outline-offset:6px}
+/* Preserve 3:4 covers before CSS aspect-ratio was added to WebView. Absolute
+   children also avoid stretching portrait images when the detail grid is tall. */
+.poster-art{height:0;padding-bottom:133.333333%}
+.poster-art>img,.poster-art>.poster-fallback{position:absolute;top:0;left:0;width:100%;height:100%}
+.detail-cover{position:relative;align-self:start;height:0;padding-bottom:133.333333%}
+.detail-cover>img{position:absolute;top:0;left:0;width:100%;height:100%}
+.detail-cover>svg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
+@supports(aspect-ratio:3/4){.poster-art,.detail-cover{height:auto;padding-bottom:0}}
+
+/* Season candidates are a separate directory, not a merged playback queue. */
+.season-selector{margin:0 0 24px;padding:0 0 20px;border-bottom:1px solid var(--border);min-width:0}
+.season-selector>header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin-bottom:12px}
+.season-selector>header h2{font-size:1.1rem}
+.season-selector>header .button,.season-more,.season-error .button{min-height:44px;font-size:.87rem;padding:8px 12px}
+.season-list{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;max-width:100%;min-width:0;padding:6px 6px 10px;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.season-choice{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:72px;padding:10px 12px;margin-right:8px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);line-height:1.4;white-space:nowrap;scroll-margin-block:24px;scroll-margin-inline:6px}
+.season-choice:last-child{margin-right:0}
+.season-choice[aria-selected="true"]{border-bottom-color:var(--accent);color:var(--accent)}
+.season-choice:hover:not(:disabled){background:var(--inset)}
+.season-label{font-size:.94rem;font-weight:600}
+.season-current{margin-top:12px;min-width:0;overflow-wrap:anywhere}
+.season-current>p+p{margin-top:4px}
+.season-title{color:var(--text);font-size:.94rem}
+.season-count{color:var(--faint);font-size:.8rem}
+.season-detail-panel{min-width:0}
+.season-note,.season-status{margin-top:10px;font-size:.8rem;line-height:1.6;color:var(--faint);overflow-wrap:anywhere}
+.season-error{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:12px}
+.season-error p{flex:1 1 180px;min-width:0;color:var(--error);font-size:.87rem;line-height:1.6;overflow-wrap:anywhere}
+.season-more{margin-top:12px}
+.tv-layout .season-selector>header h2{font-size:23px}
+.tv-layout .season-list{padding:6px 6px 12px}
+.tv-layout .season-choice{min-height:54px;min-width:96px;padding:12px 16px;margin-right:12px;scroll-margin-block:36px}
+.tv-layout .season-title{font-size:19px}
+.tv-layout .season-label{font-size:19px}
+.tv-layout .season-count,.tv-layout .season-note,.tv-layout .season-status{font-size:16px}
+.tv-layout .season-selector .button{min-height:54px;font-size:17px}
+.tv-layout .season-error p{font-size:17px}
+
+.season-version{font-size:.75rem;color:var(--faint);word-break:break-all}
+.tv-layout .season-version{font-size:15px}
+
+/* Cross-season progress is a reading aid, not an automatic navigation action. */
+.season-history{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;margin:8px 0 14px;padding:12px 0;border-bottom:1px solid var(--border);min-width:0}
+.season-history>div{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
+.season-history strong{font-size:.9rem;font-weight:600;line-height:1.6}
+.season-history p,.season-progress{font-size:.8rem;line-height:1.5;color:var(--faint);overflow-wrap:anywhere}
+.season-history .button{min-height:44px;font-size:.87rem}
+.season-preparation,.season-play-notice,.resume-error{font-size:.85rem;line-height:1.7;overflow-wrap:anywhere;margin-bottom:16px}
+.season-preparation{color:var(--accent)}.season-play-notice{color:var(--faint)}.resume-error{color:var(--error)}
+.tv-layout .season-history strong{font-size:19px}.tv-layout .season-history p,.tv-layout .season-progress{font-size:16px}
+.tv-layout .season-preparation,.tv-layout .season-play-notice,.tv-layout .resume-error{font-size:17px}
+
+/* Official-style light theme accents. Structure, touch targets and TV focus
+   rules above are unchanged; only color state and density adapt here. */
+.phone-layout .nav-items>button::before{content:"";width:18px;height:3px;border-radius:2px;background:transparent;flex-shrink:0}
+.phone-layout .nav-items>button[aria-current="page"]{color:var(--primary)}
+.phone-layout .nav-items>button[aria-current="page"]::before{background:var(--primary)}
+.tv-layout .nav-items>button[aria-current="page"]{background:var(--accent-soft);border-radius:8px}
+.brand-search{margin-left:auto;min-width:44px;min-height:44px;padding:0 12px;border:0;border-radius:999px;background:var(--inset);color:var(--muted)}
+.brand-search:focus-visible{outline:3px solid var(--ring)}
+.brand-search:hover{color:var(--primary)}
+.phone-layout .category-tabs{gap:8px;padding:3px 2px 13px}
+.phone-layout .detail-copy h1{color:var(--text)}
+.detail-cover{border:1px solid var(--border)}
+.poster:hover .poster-art{border-color:var(--border)}
+.season-list{scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.playback-setting select{border-radius:8px}
+.episode-browser select{border-radius:8px}
+.about-links .button{background:var(--surface)}
+
+/* Account controls share the existing About surface on phone and TV. */
+.account-section{scroll-margin-block:24px}
+.account-section .account-status{color:var(--text);margin:8px 0}
+.account-section .account-note{font-size:.87rem;line-height:1.7;margin:8px 0;overflow-wrap:anywhere}
+.account-form{max-width:640px;margin-top:20px}
+.account-form>label{display:flex;flex-direction:column;gap:8px;margin-top:16px;color:var(--text);font-size:.94rem}
+.account-form input{width:100%;min-width:0;min-height:46px;padding:10px 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface);font-size:1rem}
+.account-form input:disabled{opacity:.65}
+.account-form input::placeholder{color:var(--muted)}
+.account-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
+.account-actions>.button{min-width:110px}
+.account-details{margin:16px 0}
+.account-details dd{overflow-wrap:anywhere;word-break:break-word}
+.account-error{margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:7px;background:var(--surface);overflow-wrap:anywhere}
+.account-error>p{color:var(--error);overflow-wrap:anywhere}
+.account-error>.button{margin-top:12px}
+.account-confirm{margin-top:16px;padding:16px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+.account-section button,.account-section input{scroll-margin-block:24px}
+/* The website QR login is a separate official session from the SMS login. */
+.account-web{max-width:640px;margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
+.account-web-title{margin:0 0 4px;font-size:1rem;color:var(--text)}
+.account-qr{margin:16px 0;display:flex;justify-content:center}
+.account-qr img{width:min(280px,72vw);height:auto;aspect-ratio:1/1;object-fit:contain;padding:10px;border:1px solid var(--border);border-radius:9px;background:#fff}
+.tv-layout .account-web{max-width:720px}
+.tv-layout .account-web-title{font-size:19px}
+.tv-layout .account-qr img{width:min(360px,60vw)}
+
+/* Remote announcements share the dialog pattern and never block scrolling underneath. */
+.announcement-overlay{position:fixed;top:0;right:0;bottom:0;left:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
+.announcement-card{width:min(560px,92vw);max-height:82vh;overflow:auto;padding:20px;border:1px solid var(--border);border-radius:12px;background:var(--background)}
+.announcement-card h2{margin:8px 0;font-size:1.1rem;color:var(--text)}
+.announcement-tag{display:inline-block;margin:0;padding:3px 10px;border-radius:999px;background:var(--surface);font-size:.8rem;color:var(--muted)}
+.announcement-tag.urgent{background:#d8434330;color:#d84343}
+.announcement-body{margin:12px 0;white-space:pre-line;overflow-wrap:anywhere;line-height:1.7;color:var(--text)}
+.announcement-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+.announcement-count{margin-top:8px;font-size:.82rem;color:var(--muted)}
+.announcement-switches{display:flex;flex-direction:column;gap:10px;margin:12px 0;color:var(--text)}
+.announcement-switches label{display:flex;align-items:center;gap:10px;min-height:44px}
+.announcement-switches input[type=checkbox]{width:22px;height:22px;accent-color:var(--primary);flex-shrink:0}
+.announcement-manual{margin-top:16px;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
+
+/* Watch-history states: completed rows and same-series hints are captions, not actions. */
+.poster-hint{display:block;margin-top:4px;font-size:.78rem;line-height:1.5;color:var(--muted);text-align:left;overflow-wrap:anywhere}
+.heading-buttons{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.heading-actions{flex-wrap:wrap}
+.heading-actions>div{min-width:0;flex:1}
+/* Batch download and same-series merge controls. */
+.batch-toggle{padding:6px 12px;min-height:44px}
+.batch-panel{margin:14px 0;padding:14px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
+.batch-range{display:flex;gap:16px;flex-wrap:wrap}
+.batch-range label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+.batch-range input{width:110px;min-height:44px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:7px;background:var(--surface);font-size:15px}
+.batch-progress p{margin:8px 0}
+.batch-progress progress{width:100%;height:6px;accent-color:var(--primary)}
+.merge-bar{margin-bottom:18px;display:flex;flex-direction:column;gap:8px}
+.merge-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border:1px solid var(--accent-border);border-radius:9px;background:var(--accent-soft);flex-wrap:wrap}
+.merge-row span{color:var(--text);font-size:14px;overflow-wrap:anywhere}
+.tv-layout .account-form{max-width:720px}
+.tv-layout .account-form>label{font-size:18px}
+.tv-layout .account-form input{min-height:56px;font-size:19px}
+.tv-layout .account-section .account-note{font-size:17px}
+.tv-layout .account-section button,.tv-layout .account-section input{scroll-margin-block:36px}
+
+/* Refresh feedback stays beside the last successful list, not over it. */
+.state-inline{display:flex;align-items:center;gap:10px;margin:12px 0 18px;padding:12px 14px;border:1px solid var(--border);border-radius:7px;background:var(--surface);min-width:0}.state-inline>svg{flex-shrink:0;color:var(--muted)}.state-inline>p{flex:1;min-width:0;font-size:13px;overflow-wrap:anywhere}.state-inline>p strong,.state-inline>p span{display:block}.state-inline>p strong{font-weight:600;color:var(--text)}.state-inline.error-state>p span{color:var(--error)}.state-inline>.button{flex-shrink:0}.tv-layout .state-inline>p{font-size:17px}@media(max-width:359px){.state-inline{flex-wrap:wrap}.state-inline>.button{margin-left:auto}}
+
+/* Per-download removal keeps destructive confirmation distinct from playback. */
+.download-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;flex-shrink:0}.download-actions .button{min-height:44px}.download-confirm{padding:18px;margin-bottom:20px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}.download-confirm h2{font-size:17px}.download-confirm p{font-size:14px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}.download-confirm-actions{display:flex;gap:10px;margin-top:16px}.download-confirm-actions .button{min-height:44px}.download-delete-error,.download-destructive{color:var(--error)}.tv-layout .download-confirm h2{font-size:22px}.tv-layout .download-confirm p{font-size:18px}
+@media(max-width:599px){.download-row{flex-wrap:wrap}.download-info{flex-basis:calc(100% - 46px)}.download-actions{width:100%;padding-left:38px;justify-content:flex-start}}
+
+/* ==== Series detail redesign (phone + TV WebView + dark) ==========================
+   Streaming-app layout: blurred cover backdrop, tag chips, chip favorite,
+   episode tiles with the current one filled, one strong dock action. */
+.detail-summary{position:relative;display:grid;grid-template-columns:118px minmax(0,1fr);gap:18px;padding:14px 0 20px;overflow:hidden}
+.detail-summary>*{position:relative;z-index:1}
+.detail-cover{aspect-ratio:3/4;border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.22)}
+.detail-copy{min-width:0}
+.detail-copy h1{font-size:22px;line-height:1.35}
+.detail-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.chip{padding:4px 11px;border-radius:999px;background:var(--inset);color:var(--muted);font-size:12px;font-weight:500;line-height:1.4}
+.chip-strong{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.detail-actions-row{display:flex;gap:10px;margin-top:12px}
+.favorite-chip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 18px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);color:var(--muted);font-size:14px;font-weight:600}
+.favorite-chip:hover:not(:disabled){border-color:var(--accent-border);color:var(--accent)}
+.favorite-chip.on{border-color:var(--accent-border);background:var(--accent-soft);color:var(--accent)}
+.favorite-chip.on svg{fill:currentColor}
+.episode-section{margin-top:6px;padding-top:18px;border-top:1px solid var(--border)}
+.episode-section>header{gap:10px}
+.episode-section>header h2{font-size:19px}
+.episode-count{color:var(--faint);font-size:14px;font-weight:400;align-self:center}
+.text-toggle{margin-left:auto;background:none;border:0;color:var(--accent);font-size:14px;font-weight:600;min-height:44px;padding:0 10px}
+.text-toggle:hover:not(:disabled){opacity:.8}
+.episode-note{display:none}
+.batch-toggle{display:none}
+.episode-grid{gap:10px}
+.episode-grid>button{height:48px;border-radius:11px;border:1px solid transparent;background:var(--inset);color:var(--text);font-size:15px;font-weight:600}
+.episode-grid>button:hover:not(:disabled){background:var(--surface);border-color:var(--border-strong)}
+.episode-grid>button[aria-pressed="true"]{background:var(--primary);color:#fff;box-shadow:0 5px 14px rgba(232,80,58,.32)}
+.episode-grid>button:disabled{background:transparent;color:var(--faint)}
+.dock-play{flex:2;font-size:16px;font-weight:700;letter-spacing:.02em;box-shadow:0 6px 16px rgba(232,80,58,.3)}
+.dock-download{flex:1;max-width:150px}
+.play-actions>p{margin-bottom:8px}
+@media(min-width:600px){
+  .detail-summary{grid-template-columns:170px minmax(0,1fr);gap:26px;padding-top:20px}
+  .detail-copy h1{font-size:27px}
+  .episode-grid{gap:12px}
+  .episode-grid>button{height:52px;font-size:16px}
+}
+.tv-layout .detail-summary{grid-template-columns:210px minmax(0,1fr);gap:30px;padding-top:22px}
+.tv-layout .detail-cover{border-radius:14px}
+.tv-layout .detail-copy h1{font-size:32px}
+.tv-layout .chip{font-size:15px;padding:5px 14px}
+.tv-layout .favorite-chip{min-height:52px;font-size:17px;padding:10px 22px}
+.tv-layout .episode-section>header h2{font-size:23px}
+.tv-layout .episode-count{font-size:17px}
+.tv-layout .text-toggle{font-size:17px;min-height:52px}
+.tv-layout .episode-grid{gap:14px}
+.tv-layout .episode-grid>button{height:58px;font-size:21px;border-radius:12px}
+.tv-layout .dock-play{font-size:20px}
+@media(max-width:359px){
+  .detail-summary{grid-template-columns:88px minmax(0,1fr);gap:13px}
+  .detail-copy h1{font-size:19px}
+  .chip{font-size:11px;padding:3px 9px}
+  .episode-grid>button{height:44px;font-size:14px;border-radius:10px}
+  .dock-download{max-width:110px}
+}
+
+/* Detail redesign tweaks: the synopsis toggle is a full-row tap target. */
+.description-toggle{width:100%;text-align:center;font-weight:600}
+
+/* ==== Detail compact v2: video-app density ==========================================
+   Target: first episode row within ~260px of the top on a 390px phone. Everything
+   meta lives beside the poster; the grid starts immediately. */
+.back-button{margin:0 0 6px}
+.season-selector{margin:0 0 8px;padding:0 0 8px;border-bottom:0}
+.season-selector>header{margin-bottom:6px}
+.detail-summary{grid-template-columns:96px minmax(0,1fr);gap:14px;padding:6px 0 8px}
+.detail-cover{border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.18)}
+.title-clamp{font-size:19px;line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.detail-chips{margin-top:8px;gap:6px}
+.chip{font-size:11px;padding:3px 9px}
+.chip-fav{margin-left:auto;min-height:44px;height:44px;padding:6px 14px;font-size:13px}
+.desc-row{display:flex;align-items:center;gap:6px;margin-top:6px}
+.desc-row .detail-description{flex:1;min-width:0;margin:0}
+.description-collapsed{-webkit-line-clamp:1}
+.description-toggle{width:auto;min-height:44px;padding:0 8px;font-size:13px}
+.detail-description{font-size:13px;line-height:1.6;margin:6px 0 0}
+.episode-section{margin-top:2px;padding-top:8px;border-top:0}
+.episode-section>header{min-height:44px}
+.episode-section>header h2{font-size:17px}
+.episode-count{font-size:13px}
+.episode-grid{gap:8px}
+.episode-grid>button{height:44px;border-radius:9px;font-size:14px}
+.dock-play{font-size:15px}
+@media(min-width:600px){
+  .detail-summary{grid-template-columns:120px minmax(0,1fr);gap:18px}
+  .title-clamp{font-size:24px}
+  .episode-grid{gap:10px}
+  .episode-grid>button{height:50px;font-size:15px}
+}
+.tv-layout .season-selector{margin-bottom:10px;padding-bottom:10px}
+.tv-layout .detail-summary{padding-top:8px}
+.tv-layout .episode-section{padding-top:10px}
+.tv-layout .episode-grid{gap:12px}
+@media(max-width:359px){
+  .detail-summary{grid-template-columns:84px minmax(0,1fr);gap:11px}
+  .title-clamp{font-size:17px}
+  .chip{font-size:10px;padding:2px 8px}
+  .chip-fav{padding:4px 10px}
+}
+.description-toggle{min-width:48px;justify-content:center}
+
+/* Portrait detail: content first, secondary preferences behind one disclosure. */
+.detail-settings{margin-top:24px;border-top:1px solid var(--border)}
+.detail-settings>summary,.season-match-note>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;cursor:pointer;list-style:none;color:var(--muted);font-size:.88rem}
+.detail-settings>summary::-webkit-details-marker,.season-match-note>summary::-webkit-details-marker{display:none}
+.detail-settings>summary:focus-visible,.season-match-note>summary:focus-visible{outline:3px solid var(--ring);outline-offset:2px}
+.detail-settings>summary svg{transition:transform .18s ease}
+.detail-settings[open]>summary svg{transform:rotate(90deg)}
+.detail-settings .playback-settings{margin-top:0}
+.season-match-note>summary{justify-content:flex-start;font-size:.8rem}
+.season-version{font-size:.8rem;margin-top:6px;overflow-wrap:anywhere}
+.phone-layout .detail-scroll{padding-top:8px}
+.phone-layout .detail-scroll>.back-button{margin-bottom:4px}
+.phone-layout .detail-summary{grid-template-columns:72px minmax(0,1fr);gap:14px;padding:4px 0 16px;overflow:visible}
+.phone-layout .detail-cover{border-radius:8px;box-shadow:none}
+.phone-layout .detail-copy h1{font-size:1.18rem;line-height:1.4;letter-spacing:0}
+.phone-layout .detail-chips{align-items:center;gap:4px 8px;margin-top:4px}
+.phone-layout .chip{background:none;border-radius:0;padding:0;font-size:.75rem;color:var(--muted)}
+.phone-layout .chip-strong{color:var(--muted);font-weight:400}
+.phone-layout .chip-fav{min-width:64px;min-height:44px;height:auto;padding:6px 10px;font-size:.8rem;background:transparent;border-color:var(--border)}
+.phone-layout .desc-row{grid-column:1/-1;align-items:flex-start;margin-top:2px}
+.phone-layout .detail-description{font-size:.8rem;line-height:1.6;margin:0}
+.phone-layout .description-collapsed{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden}
+.phone-layout .description-toggle{min-width:48px;min-height:44px;padding:0 4px;font-size:.8rem}
+.phone-layout .season-selector{padding:8px 0;margin-bottom:8px;border-top:1px solid var(--border)}
+.phone-layout .season-selector>header h2{font-size:.94rem}
+.phone-layout .season-list{border-bottom:0;padding-bottom:4px}
+.phone-layout .season-choice{border-radius:6px;border-bottom:0;background:var(--inset);font-weight:500}
+.phone-layout .season-choice[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.phone-layout .episode-section{margin:0;padding:0;border-top:1px solid var(--border)}
+.phone-layout .episode-section>header{justify-content:flex-start;gap:8px;min-height:52px}
+.phone-layout .episode-section>header h2{font-size:1.05rem}
+.phone-layout .episode-count{font-size:.78rem}
+.phone-layout .text-toggle{color:var(--muted);font-size:.8rem;font-weight:400;padding:0 2px}
+.phone-layout .episode-browser{align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.phone-layout .episode-browser label{flex:1 1 100px}
+.phone-layout .episode-browser select{width:100%;background:transparent;border:0;padding:8px 0;font-size:.82rem}
+.phone-layout .episode-browser>.button{border:0;background:none;padding:8px 4px;color:var(--muted);font-size:.78rem}
+.phone-layout .episode-grid{grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:8px}
+.phone-layout .episode-grid>button{height:auto;min-height:48px;border-radius:6px;box-shadow:none;border:1px solid transparent;font-size:.94rem;font-weight:500;transition:background .15s ease,border-color .15s ease}
+.phone-layout .episode-grid>button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-border);font-weight:700}
+.phone-layout .play-actions{padding-top:10px;padding-bottom:10px}
+.phone-layout .play-actions .dock-play{flex:1;box-shadow:none;font-size:.88rem;letter-spacing:0}
+.phone-layout .play-actions .dock-download{flex:0 0 76px;max-width:none;background:transparent}
+.phone-layout .detail-settings>summary{min-height:52px}
+.tv-layout .detail-settings>summary{font-size:19px;min-height:54px}
+@media(min-width:600px){
+  .phone-layout .detail-summary{grid-template-columns:100px minmax(0,1fr);gap:20px}
+  .phone-layout .detail-copy h1{font-size:1.4rem}
+}
+@media(max-width:359px){
+  .phone-layout .detail-summary{grid-template-columns:64px minmax(0,1fr);gap:12px}
+  .phone-layout .detail-copy h1{font-size:1.08rem}
+  .phone-layout .episode-grid{grid-template-columns:repeat(auto-fill,minmax(44px,1fr))}
+}
+@media(prefers-reduced-motion:reduce){
+  .detail-settings>summary svg,.phone-layout .episode-grid>button{transition:none}
+}
+
+/* Downloads grouped by series: one header per 剧, episodes listed beneath. */
+.download-group{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;background:var(--surface)}
+.download-group-header{display:flex;align-items:center;gap:8px;padding:0 10px 0 0;min-height:56px}
+.download-group-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 12px;border:0;background:transparent;text-align:left}
+.download-group-toggle strong{flex:1;min-width:0;font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.download-group-meta{color:var(--faint);font-size:12px;flex-shrink:0}
+.download-group-chev{color:var(--accent);font-size:13px;font-weight:600;flex-shrink:0;min-width:32px;text-align:right}
+.download-group-merge{flex-shrink:0;min-height:44px}
+.download-group .download-row{padding:12px 12px 12px 16px;border-top:1px solid var(--border)}
+.download-group .download-row:last-child{border-bottom:0}
+@media(max-width:599px){.download-group-header{flex-wrap:wrap;padding-top:6px;padding-bottom:6px}.download-group-header .button{width:100%;justify-content:center}}
+.tv-layout .download-group-toggle strong{font-size:20px}
+.tv-layout .download-group-meta{font-size:16px}
+.tv-layout .download-group-toggle{min-height:64px}
+
+/* Whole-series delete + merged-video rows inside the downloads groups. */
+.download-group-delete{flex-shrink:0;min-height:44px}
+.merged-row .download-icon{color:var(--accent)}
+.merged-row .download-info h2{color:var(--accent)}
+
+/* Discover home, 红果-style: search pill, category strip, continue rail, dense grid. */
+.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.home-update{display:flex;align-items:center;gap:8px;width:calc(100% - 24px);margin:8px 12px 0;padding:10px 14px;min-height:40px;border:0;border-radius:10px;background:color-mix(in srgb,var(--accent) 14%,var(--surface));color:var(--accent);font-size:13px;font-weight:600;text-align:left}
+.home-search{display:flex;align-items:center;gap:8px;width:calc(100% - 24px);margin:10px 12px 2px;padding:0 14px;min-height:44px;border:0;border-radius:22px;background:var(--inset);color:var(--faint);font-size:14px;text-align:left}
+.category-tabs{display:flex;gap:8px;overflow-x:auto;padding:10px 12px 4px;scrollbar-width:none}
+.category-tabs::-webkit-scrollbar{display:none}
+.category-tabs button{flex:0 0 auto;min-height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px}
+.category-tabs button[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--accent);font-weight:700}
+.home-continue{margin:4px 0 0}
+.home-continue h2,.home-section-head h2{margin:0;padding:8px 14px 2px;font-size:16px;color:var(--text)}
+.home-continue-row .poster-grid{display:flex;gap:10px;overflow-x:auto;padding:6px 12px 10px;scrollbar-width:none}
+.home-continue-row .poster-grid::-webkit-scrollbar{display:none}
+.home-continue-row .poster{flex:0 0 104px;width:104px}
+.home-section-head{display:flex;align-items:center;justify-content:space-between;padding-right:12px}
+.home-next{display:flex;align-items:center;gap:5px;min-height:44px;padding:0 12px;border:0;background:transparent;color:var(--accent);font-size:13px;font-weight:600}
+.update-available{margin:10px 0 0;padding:12px 14px;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.update-available strong{color:var(--accent);font-size:14px}
+.update-available p{margin:6px 0 0;font-size:13px;color:var(--text);white-space:pre-line}
+.update-details{margin:10px 0 0;font-size:13px;color:var(--faint)}
+.update-details summary{cursor:pointer;min-height:32px;display:flex;align-items:center}
+.update-details p{margin:6px 0 0}
+.home-more{display:flex;justify-content:center;padding:6px 0 18px}
+.home-more-note{color:var(--faint);font-size:13px}
+
+/* ===== 黄果漫剧页（使用 App 主题变量，跟随系统深浅色） ===== */
+.huangguo-page { padding: 0 0 2rem; }
+.huangguo-head { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+.huangguo-head h1 { font-size: 1.25rem; margin: 0; }
+.huangguo-search { display: flex; gap: .5rem; flex: 1 1 16rem; max-width: 30rem; }
+.huangguo-search input { flex: 1; min-width: 0; min-height: 46px; padding: .55rem .9rem; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-size: .95rem; }
+.huangguo-search input::placeholder { color: var(--faint); }
+.feed-more { display: flex; justify-content: center; padding: 1rem 0; }
+.huangguo-detail { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; align-items: stretch; justify-content: center; }
+.huangguo-detail-panel { position: relative; width: min(56rem, 100%); height: 100%; overflow-y: auto; background: var(--bg); padding: 1rem 1.25rem 2rem; }
+.huangguo-back { margin-bottom: .75rem; }
+.huangguo-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.huangguo-meta img { width: 8.5rem; border-radius: .6rem; object-fit: cover; aspect-ratio: 3/4; background: var(--inset); }
+.huangguo-meta h2 { margin: 0 0 .5rem; font-size: 1.15rem; color: var(--text); }
+.huangguo-meta p { margin: 0 0 .5rem; font-size: .9rem; }
+.huangguo-count { color: var(--faint); }
+.huangguo-episodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: .5rem; }
+.huangguo-episodes button { min-height: 46px; padding: .6rem .25rem; border-radius: .55rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: .95rem; cursor: pointer; }
+.huangguo-episodes button:disabled { background: transparent; color: var(--faint); cursor: default; }
+.huangguo-pin { margin: auto; display: flex; flex-direction: column; gap: 12px; width: min(22rem, calc(100% - 3rem)); padding: 28px 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+.huangguo-pin h2 { color: var(--text); }
+.huangguo-pin input { min-height: 48px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); font-size: 17px; letter-spacing: .3em; }
+.huangguo-pin-actions { display: flex; gap: 10px; }
+.huangguo-pin-actions .button { flex: 1; }
+.huangguo-pin-setup { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.huangguo-pin-setup input { flex: 1 1 12rem; min-width: 0; min-height: 46px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--text); }
+.huangguo-origin { display: inline-block; margin-left: 10px; vertical-align: middle; font-size: 12px; font-weight: 400; color: var(--faint); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; }
+/* 观看记录卡片右上角删除入口：半透明圆底，触屏与遥控器均可命中。 */
+.poster-delete { position: absolute; top: 6px; right: 6px; z-index: 1; width: 30px; height: 30px; min-height: 0; padding: 0; border: 0; border-radius: 999px; background: rgba(20, 20, 26, .66); color: #fff; font-size: 17px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.poster-delete:hover { background: rgba(200, 40, 40, .82); }
+.poster-delete:focus-visible { outline: 3px solid var(--ring); }

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 47,
+  "versionName": "0.12.24",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.24/Hongguo-0.12.24-tv-release-compatible.apk",
+  "size": 631260,
+  "sha256": "af5dcfa24e0d4d6d463fd7c42364f9b1cc1e5863caf7160840aac488bfae9169",
+  "notes": "剧集详情页全新设计（手机/TV 网页版与原生 TV 三端统一）：封面模糊光晕背景、大圆角海报、集数与题材标签胶囊、追剧胶囊按钮；选集改为大圆角磁贴、当前集红色高亮；底部改为「立即播放」主按钮与「缓存」次按钮；移除界面内的操作说明文字。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-10-31T11:52:37.462Z"
+}

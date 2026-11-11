@@ -1,0 +1,73 @@
+package io.github.jackotom.hongguo.android;
+import java.io.*;import java.util.*;
+/** Runs actual Activity preparation, decoder recovery, choice, switching, and reservation methods. */
+public final class AdaptiveActivityTest {
+ static int checks;static void check(boolean v,String m){checks++;if(!v)throw new AssertionError(m);}
+ static AdaptiveActivityHarness fresh()throws Exception{PlaybackSources.reset();return new AdaptiveActivityHarness();}
+ static void ready(AdaptiveActivityHarness p,int pixels){p.pump();p.video.complete(pixels,pixels*2);p.main.flush();}
+ static IOException unavailable(){return new IOException("片源响应 HTTP 403");}
+ public static void main(String[]args)throws Exception{
+  AdaptiveActivityHarness p=fresh();p.cache.failures.put("1080p",unavailable());p.requestedSpeed=1.5f;p.loadAt(1,null,43000,true);p.pump();
+  check(p.cache.fetches.equals(Arrays.asList("v2:1080p","v2:1080p","v2:720p")),"real load consumes one1080 fresh retry then fetches exact720 key");
+  check(p.actualQuality.equals("720p")&&p.quality.equals("1080p")&&PlayerOptions.saved.isEmpty(),"automatic fallback updates session not saved preferred");
+  check(p.protectedQuality.equals("720p")&&p.cache.protectedKeys.size()==1&&p.cache.protectedKeys.containsKey("v2:720p")&&p.pendingMedia.isEmpty(),"only actual lower cache reservation transferred to current player");
+  p.video.complete(720,1280);check(p.prepared&&p.current==1&&p.video.position==43000&&p.userPaused&&!p.video.playing&&p.actualSpeed==1.5f,"fallback prepares selected episode, preserves resume pause and speed");
+  check(p.status.text.contains("720p")&&p.status.text.contains("1080p")&&p.status.text.contains("720×1280"),"status reports actual stage plus preferred and decoded pixels");
+  p.autoplay=true;p.video.completion.complete(p.video.player);p.pump();check(p.current==2&&p.actualQuality.equals("720p")&&p.cache.fetches.get(p.cache.fetches.size()-1).equals("v3:720p"),"completion advances once and retains successful lower session quality");
+  p.video.complete(720,1280);p.cache.failures.clear();p.video.position=81000;p.actualSpeed=2f;p.requestedSpeed=2f;p.userPaused=true;p.video.pause();VideoView old=p.video;p.switchQuality("1080p");p.pump();
+  check(p.qualitySwitch!=null&&p.video==old&&old.stops==2,"explicit same preferred retries high quality without replacing old video early");
+  VideoView candidate=p.qualitySwitch.view;candidate.complete(1080,1920);
+  check(p.video==candidate&&p.actualQuality.equals("1080p")&&p.quality.equals("1080p")&&PlayerOptions.saved.equals(Collections.singletonList("1080p")),"explicit retry promotes only after prepare and commits requested preference");
+  check(p.video.position==81000&&p.actualSpeed==2f&&p.userPaused&&!p.video.playing,"successful switch preserves exact paused progress and actual rate");
+  check(p.cache.protectedKeys.size()==1&&p.cache.protectedKeys.containsKey("v3:1080p")&&p.pendingMedia.isEmpty(),"switch releases old lower reservation without leaking candidate");
+
+  AdaptiveActivityHarness prefetch=fresh();prefetch.actualQuality="720p";prefetch.loadAt(0,null,0);ready(prefetch,720);prefetch.autoplay=true;PlaybackSources.calls.clear();prefetch.schedulePrefetch(prefetch.generation);prefetch.pump();check(PlaybackSources.calls.equals(Collections.singletonList("resolve:v2:720p"))&&prefetch.cache.backgroundFetches.contains("v2:720p"),"next prefetch uses successful session actual quality, not saved preferred 1080");
+  AdaptiveActivityHarness castPrefetch=fresh();castPrefetch.autoplay=true;castPrefetch.schedulePrefetch(castPrefetch.generation);castPrefetch.castWasActive=true;castPrefetch.pump();check(PlaybackSources.calls.isEmpty()&&castPrefetch.caching.isEmpty(),"queued local prefetch yields to cast service before resolving another source");
+  AdaptiveActivityHarness full=fresh();full.cache.failures.put("1080p",unavailable());full.cache.failures.put("720p",unavailable());full.cache.failures.put("auto",unavailable());full.cache.failures.put("480p",unavailable());full.cache.failures.put("360p",unavailable());full.loadAt(0,null,0);full.pump();
+  check(full.cache.fetches.equals(Arrays.asList("v1:1080p","v1:1080p","v1:720p","v1:480p","v1:360p"))&&full.errors==1&&full.current==0,"all four exhausted stages report failure once without skipping episode");
+  check(full.cache.protectedKeys.isEmpty()&&full.pendingMedia.isEmpty(),"exhausted stage chain releases every reservation");
+  AdaptiveActivityHarness tls=fresh();tls.cache.failures.put("1080p",new javax.net.ssl.SSLHandshakeException("certificate"));tls.loadAt(0,null,0);tls.pump();check(tls.cache.fetches.size()==1&&tls.errors==1,"TLS stage failure never requests lower quality");
+  AdaptiveActivityHarness missing=fresh();PlaybackSources.failures.put("1080p",new PlaybackSources.QualityUnavailableException("quality absent"));missing.loadAt(0,null,0);missing.pump();check(missing.actualQuality.equals("720p")&&missing.cache.fetches.equals(Collections.singletonList("v1:720p")),"typed missing high quality starts lower stage without mislabelling media");
+
+  AdaptiveActivityHarness decoder=fresh();decoder.requestedSpeed=1.25f;decoder.loadAt(0,null,20000);ready(decoder,1080);decoder.video.position=39000;decoder.userPaused=true;
+  decoder.video.fail(1,-1004);decoder.pump();decoder.video.complete(1080,1920);check(decoder.actualQuality.equals("1080p")&&decoder.video.position==39000,"first decoder IO keeps one existing same-quality reconnect");
+  decoder.video.fail(1,-1004);decoder.pump();decoder.video.complete(720,1280);check(decoder.actualQuality.equals("720p")&&decoder.current==0&&decoder.video.position==39000&&decoder.userPaused&&decoder.actualSpeed==1.25f,"reconnect exhausted then lower same episode and preserve state");
+  decoder.video.fail(1,-1004);decoder.pump();decoder.video.complete(480,854);check(decoder.actualQuality.equals("480p")&&decoder.current==0,"consumed reconnect allowance carries across lower stage, next error moves down again");
+  decoder.video.fail(1,-1004);decoder.pump();decoder.video.complete(360,640);check(decoder.actualQuality.equals("360p"),"last internal low stage remains bounded");
+  int transfers=decoder.cache.fetches.size();decoder.video.fail(1,-1004);decoder.pump();check(decoder.errors==1&&decoder.cache.fetches.size()==transfers,"lowest decoder failure terminates without quality/recovery loop");
+  check(decoder.cache.invalidations.contains("v1:1080p")&&decoder.cache.invalidations.contains("v1:720p"),"failed exact quality files invalidated before moving lower");
+  AdaptiveActivityHarness unsupported=fresh();unsupported.loadAt(0,null,0);ready(unsupported,1080);unsupported.video.fail(-1010,-1010);unsupported.pump();check(unsupported.actualQuality.equals("720p")&&unsupported.cache.fetches.size()==2,"unsupported decoder skips repeated same-quality reconnect and tries lower once");
+  AdaptiveActivityHarness size=fresh();size.loadAt(0,null,0);size.pump();size.video.complete(640,1138);size.pump();check(size.actualQuality.equals("1080p")&&!size.prepared&&size.errors==0,"actual pixel shortfall first requests a fresh same-quality source rather than fake success");size.video.complete(640,1138);size.pump();check(size.actualQuality.equals("480p")&&size.cache.invalidations.contains("v1:1080p")&&size.errors==0,"repeated pixel shortfall moves to a strictly lower grade than observed640");
+
+  AdaptiveActivityHarness switching=fresh();switching.quality="720p";switching.actualQuality="720p";switching.loadAt(0,null,0);ready(switching,720);switching.video.position=56000;switching.actualSpeed=1.5f;switching.userPaused=false;switching.video.start();old=switching.video;
+  switching.switchQuality("1080p");switching.pump();candidate=switching.qualitySwitch.view;candidate.fail(-1010,-1010);switching.pump();
+  check(switching.video==old&&old.playing&&switching.qualitySwitch.media.quality.equals("720p"),"candidate decode rejection retries lower while old video keeps playing");
+  switching.qualitySwitch.view.complete(480,854);switching.pump();check(switching.qualitySwitch.media.quality.equals("360p")&&switching.video==old&&old.playing,"candidate pixel shortfall skips nonlower observed480 to remaining360 stage");
+  candidate=switching.qualitySwitch.view;candidate.complete(360,640);check(switching.video==candidate&&switching.actualQuality.equals("360p")&&switching.quality.equals("1080p")&&PlayerOptions.saved.equals(Collections.singletonList("1080p")),"candidate fallback adopts actual360 but saves explicit preferred 1080");
+  check(switching.video.position==56000&&switching.actualSpeed==1.5f&&switching.video.playing,"fallback quality switch keeps moving playback position and rate");
+  AdaptiveActivityHarness timeout=fresh();timeout.quality="720p";timeout.actualQuality="720p";timeout.loadAt(0,null,0);ready(timeout,720);old=timeout.video;old.start();timeout.switchQuality("1080p");timeout.pump();
+  timeout.qualitySwitch.timeout.run();timeout.pump();check(timeout.qualitySwitch.media.quality.equals("720p")&&timeout.video==old&&old.playing,"candidate prepare timeout moves down without stopping old video");
+  timeout.qualitySwitch.timeout.run();timeout.pump();check(timeout.qualitySwitch.media.quality.equals("480p"),"second candidate timeout consumes internal480 stage");
+  timeout.qualitySwitch.timeout.run();timeout.pump();check(timeout.qualitySwitch.media.quality.equals("360p"),"third timeout consumes final360 stage");
+  int beforeTimeout=timeout.cache.fetches.size();timeout.qualitySwitch.timeout.run();timeout.pump();check(timeout.qualitySwitch==null&&timeout.video==old&&old.playing&&timeout.cache.fetches.size()==beforeTimeout&&PlayerOptions.saved.isEmpty(),"lowest candidate timeout terminates without repeated stages or preference change");
+  AdaptiveActivityHarness lateSeek=fresh();lateSeek.quality="720p";lateSeek.actualQuality="720p";lateSeek.loadAt(0,null,0);ready(lateSeek,720);lateSeek.video.position=45000;lateSeek.switchQuality("1080p");lateSeek.pump();
+  VideoView staleCandidate=lateSeek.qualitySwitch.view;staleCandidate.deferSeek=true;staleCandidate.complete(1080,1920);MediaPlayer stalePlayer=staleCandidate.player;MediaPlayer.Seek oldSeek=stalePlayer.seek;VideoView.Prepared oldPrepared=staleCandidate.prepared;VideoView.Error oldError=staleCandidate.error;Runnable oldTimeout=lateSeek.qualitySwitch.timeout;
+  check(oldSeek!=null&&lateSeek.qualitySwitch!=null,"candidate pending seek has not replaced old video");
+  staleCandidate.fail(1,-1004);lateSeek.pump();VideoView newCandidate=lateSeek.qualitySwitch.view;
+  check(stalePlayer.seek==null&&newCandidate!=staleCandidate,"lower stage detaches old decoder seek callback");
+  oldSeek.complete(stalePlayer);oldPrepared.prepared(stalePlayer);oldError.error(stalePlayer,1,-1004);oldTimeout.run();
+  check(lateSeek.qualitySwitch!=null&&lateSeek.qualitySwitch.view==newCandidate&&lateSeek.actualQuality.equals("720p")&&PlayerOptions.saved.isEmpty(),"late old seek/prepared/error/timeout cannot cancel or prematurely commit new stage");
+  newCandidate.complete(720,1280);check(lateSeek.qualitySwitch==null&&lateSeek.actualQuality.equals("720p")&&PlayerOptions.saved.equals(Collections.singletonList("1080p")),"new candidate commits only after its own prepare and seek");
+  AdaptiveActivityHarness rejected=fresh();rejected.quality="auto";rejected.actualQuality="auto";rejected.loadAt(0,null,0);ready(rejected,480);old=rejected.video;old.position=67000;rejected.video.start();rejected.actualSpeed=2;PlaybackSources.failures.put("1080p",new IllegalArgumentException("metadata invalid"));rejected.switchQuality("1080p");rejected.pump();
+  check(rejected.video==old&&old.playing&&old.position==67000&&rejected.quality.equals("auto")&&rejected.actualQuality.equals("auto")&&rejected.actualSpeed==2&&PlayerOptions.saved.isEmpty()&&rejected.qualitySwitch==null,"fatal switch failure preserves original video, progress, preference, speed");
+  AdaptiveActivityHarness commit=fresh();commit.quality="720p";commit.actualQuality="720p";commit.loadAt(0,null,0);ready(commit,720);old=commit.video;old.start();PlayerOptions.failSave=true;commit.switchQuality("1080p");commit.pump();commit.qualitySwitch.view.complete(1080,1920);check(commit.video==old&&old.playing&&commit.quality.equals("720p")&&commit.actualQuality.equals("720p")&&commit.qualitySwitch==null,"preference commit rejection stops candidate only, old video survives");
+
+  AdaptiveActivityHarness stale=fresh();stale.loadAt(0,null,0);stale.resolver.flush();check(!stale.pendingMedia.isEmpty(),"successful background stage holds reservation until UI callback");stale.loadAt(1,null,0);stale.pump();check(stale.current==1&&stale.cache.protectedKeys.size()==1&&stale.cache.protectedKeys.containsKey("v2:1080p")&&stale.pendingMedia.isEmpty(),"generation replacement discards completed old callback without leaking reservation");
+  stale.video.complete(1080,1920);stale.switchQuality("720p");stale.resolver.flush();stale.cancelQualitySwitch();stale.main.flush();check(stale.actualQuality.equals("1080p")&&stale.pendingMedia.isEmpty()&&stale.cache.protectedKeys.size()==1,"cancelled explicit switch cannot replace current video or leave protected lower cache");
+  AdaptiveActivityHarness destroyed=fresh();destroyed.loadAt(0,null,0);destroyed.resolver.flush();destroyed.destroyed=true;destroyed.generation++;destroyed.discardPendingMedia();destroyed.main.flush();check(destroyed.pendingMedia.isEmpty()&&destroyed.cache.protectedKeys.isEmpty()&&destroyed.video.uri==null,"destroy-style generation and reservation drain block late media publication");
+
+  AdaptiveActivityHarness manual=fresh();manual.offline=true;manual.manualFile=Uri.parse("file:manual-download.mp4");manual.loadAt(0,manual.manualFile.value,0);ready(manual,480);check(manual.currentManual&&manual.cache.fetches.isEmpty()&&PlaybackSources.calls.isEmpty(),"offline/manual source uses original file without quality stages or new downloads");manual.video.fail(-1010,-1010);manual.pump();check(manual.actualQuality.equals("1080p")&&manual.errors==1&&manual.cache.invalidations.isEmpty(),"manual decoder error never lowers, invalidates or removes manual file");
+  AdaptiveActivityHarness selection=fresh();selection.selectEpisode();check(selection.resolver.pending.isEmpty(),"opening native episode list/focus does not start playback");selection.dialog.click(0);selection.pump();check(selection.video.uri!=null&&selection.current==0,"confirm current selected episode directly retries playback in native TV list");
+  System.out.println("PASS AdaptiveActivityTest checks="+checks+" actualActivityMethods=true stageCacheKeyExact=true preferredPreserved=true decoderFallback=true tvConfirm=true generationGuard=true manualUntouched=true networkRequests=0 emulator=not_used");
+ }
+}

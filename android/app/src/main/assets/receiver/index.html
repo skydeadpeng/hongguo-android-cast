@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="referrer" content="no-referrer">
+  <title>红果 · 浏览器接收</title>
+  <link rel="stylesheet" href="/receiver.css">
+  <script type="module" src="/receiver.js"></script>
+</head>
+<body>
+  <main>
+    <header><h1>红果 · 浏览器接收</h1><span id="connection">等待连接</span></header>
+    <p id="status" role="status" aria-live="polite">输入安卓手机上显示的 6 位连接码。</p>
+    <section id="pair-section" aria-label="连接手机">
+      <form id="pair-form">
+        <label for="pair-code">连接码</label>
+        <div class="pair-input"><input id="pair-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" minlength="6" autocomplete="off" required aria-describedby="pair-help"><button id="pair-submit" type="submit" class="primary">连接</button></div>
+        <p id="pair-help" class="muted">手机与此设备连接同一局域网。连接码在手机的“浏览器投屏”中查看。</p>
+      </form>
+    </section>
+    <section id="player-section" aria-label="视频接收" hidden>
+      <div class="video-wrap"><video id="video" controls playsinline preload="metadata" aria-label="投屏视频"></video><button id="start-play" type="button" class="primary start-play" hidden>点按开始播放</button></div>
+      <div class="media-info"><h2 id="title">等待手机准备视频</h2><span id="quality"></span></div>
+      <div class="controls" aria-label="播放控制">
+        <button id="previous" type="button" disabled>上一集</button>
+        <button id="toggle" type="button" disabled>播放</button>
+        <button id="next" type="button" disabled>下一集</button>
+        <label class="autoplay"><input id="autoplay" type="checkbox">连续播放</label>
+        <button id="stop" type="button">结束投屏</button>
+      </div>
+      <div id="airplay-section" hidden><button id="airplay" type="button">Safari 转投 Apple TV</button><p class="muted">由 Safari 调用系统 AirPlay，选择同一网络中的 Apple TV。首次播放请先点按视频。</p></div>
+      <p class="muted help">切集、画质与缓存由安卓手机管理。请保持手机投屏服务运行；此接收页只播放当前集，不保存视频文件。</p>
+    </section>
+    <noscript>请在浏览器中启用 JavaScript 后连接。</noscript>
+  </main>
+</body>
+</html>

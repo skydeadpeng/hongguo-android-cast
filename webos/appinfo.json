@@ -1,0 +1,14 @@
+{
+  "id": "com.skydeadpeng.hongguo",
+  "version": "0.2.0",
+  "vendor": "skydeadpeng",
+  "type": "web",
+  "main": "index.html",
+  "title": "红果短剧",
+  "appCategory": "entertainment",
+  "icon": "icon.png",
+  "largeIcon": "icon130.png",
+  "uiRevision": 2,
+  "accessControlAllowOrigin": ["https://hongguoduanju.com", "https://*.hongguoduanju.com"],
+  "supportGIP": false
+}

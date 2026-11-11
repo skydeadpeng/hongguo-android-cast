@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 87,
+  "versionName": "0.12.64",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.64/Hongguo-0.12.64-tv-release-compatible.apk",
+  "size": 655700,
+  "sha256": "abd8327d6aca6ea3daf0c0aa8cbb9fdfd453625875ab854794fb8660ceae107a",
+  "notes": "新增观看记录删除：我的追剧·观看历史中，每张卡片右上角可单独删除该剧记录；页面右上「清空记录」可一次清空全部观看记录（带确认）。登录官方账号时删除本机显示的记录，收藏不受影响。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-08T21:09:43.485Z"
+}

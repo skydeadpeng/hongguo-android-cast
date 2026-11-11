@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 65,
+  "versionName": "0.12.42",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.42/Hongguo-0.12.42-tv-release-compatible.apk",
+  "size": 642028,
+  "sha256": "a86404a930bd8e8461cbfd1e81202ecfd5bc877ac52ab5cdf24ee68c311a8591",
+  "notes": "修复最小化后重新打开回到首页的问题：应用在后台被手机系统回收后，重新打开会恢复到退出前的页面（所在栏目与正在看的剧），不用重新找；正常启动和从最近任务划掉仍然从首页开始，播放器切后台的进度恢复保持不变。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-07T00:03:00.000Z"
+}

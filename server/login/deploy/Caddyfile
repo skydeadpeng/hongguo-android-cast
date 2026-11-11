@@ -1,0 +1,5 @@
+# Replace login.example.com with your domain, pointing to this server.
+# Caddy is installed/running separately, on the same host as the login binary.
+login.example.com {
+    reverse_proxy 127.0.0.1:8787
+}

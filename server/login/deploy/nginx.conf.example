@@ -1,0 +1,27 @@
+# Add within nginx's http {} context. Replace the domain/certificate paths.
+# This alternative is for an existing Nginx installation, not alongside Caddy.
+server {
+    listen 80;
+    server_name login.example.com;
+    return 308 https://login.example.com$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name login.example.com;
+    ssl_certificate /etc/letsencrypt/live/login.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/login.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    # Sync batches are capped at 1 MiB by the API; login still has its own 8 KiB cap.
+    client_max_body_size 1m;
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Overwrite, rather than trust, the incoming client-supplied value.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 20s;
+    }
+}
