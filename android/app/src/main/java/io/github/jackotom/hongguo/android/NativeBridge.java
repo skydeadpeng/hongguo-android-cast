@@ -618,6 +618,7 @@ final class NativeBridge {
                 PlayerOptions.validateSpeed(params.getDouble("speed"));
                 PlaybackSources.Plan plan = PlaybackSources.register(info, episode.getString("vid"), true);
                 String url = plan.url;
+                if (plan.guestPlayback) { downloadPrepared(id, series, episode, plan); break; }
                 if (!plan.source.equals("web")) { downloadPrepared(id, series, episode, plan); break; }
                 if (Uri.parse(url).getPath() != null && Uri.parse(url).getPath().toLowerCase(Locale.ROOT).endsWith(".m3u8")) throw new Exception("当前为流式播放列表，请在线播放；下载支持完整视频文件");
                 if (closed) return;
@@ -668,7 +669,7 @@ final class NativeBridge {
         java.io.File target = null; long downloadId = -1;
         cache.protect(sid, vid, index, plan.requestedQuality);
         try {
-            java.io.File prepared = cache.fetch(sid, vid, index, plan.url, plan.requestedQuality);
+            java.io.File prepared = cache.fetch(sid, vid, index, plan, plan.requestedQuality);
             java.io.File directory = activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
             if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new Exception("下载目录尚未准备");
             target = new java.io.File(directory, sid + "_" + index + "_" + UUID.randomUUID() + ".mp4");

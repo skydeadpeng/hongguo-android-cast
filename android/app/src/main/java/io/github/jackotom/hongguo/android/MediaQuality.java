@@ -15,6 +15,6 @@ final class MediaQuality {
         quality=normalize(quality);
         // Old auto files have no provenance: they may contain an SEO preview.
         // Rotate only this namespace; explicit-quality App files remain usable.
-        return quality.equals("auto")?vid+"|quality=auto|complete=1":vid+"|quality="+quality;
+        return quality.equals("auto")?vid+"|quality=auto|complete=2":vid+"|quality="+quality;
     }
 }

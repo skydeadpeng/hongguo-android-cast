@@ -31,6 +31,7 @@ package io.github.jackotom.hongguo.android;
 final class NetworkGuard {
     static final class Reply { final String body, url; final int status; Reply(String body, int status, String url) { this.body = body; this.status = status; this.url = url; } }
     // A queue entry is a Reply or a thrown exception (a synthetic transport timeout).
+    static Reply guestPlaybackPost(String id,long deadline) { throw new AssertionError("unexpected guest POST"); }
     static Object[] replies; static int totalRequests;
     static final java.util.concurrent.atomic.AtomicInteger requests = new java.util.concurrent.atomic.AtomicInteger();
     static final java.util.List<String> requested = new java.util.concurrent.CopyOnWriteArrayList<>();

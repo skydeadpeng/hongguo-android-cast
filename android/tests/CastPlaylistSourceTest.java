@@ -170,7 +170,7 @@ class CastPlaylistContext extends Context {
 /** Explicit synthetic source boundary. It never opens a socket or fetches a real video. */
 final class PlaybackSources {
     static final List<String> calls=new CopyOnWriteArrayList<>();static volatile String failVid="";static volatile byte[] mediaFixture;
-    static final class Plan {final String url,source="app",seriesId,vid,requestedQuality;final int playbackCeiling=0;Plan(String sid,String vid,String quality){seriesId=sid;this.vid=vid;requestedQuality=quality;url="https://media.invalid/"+sid+"/"+vid;}}
+    static final class Plan {final boolean guestPlayback=false;final String url,source="app",seriesId,vid,requestedQuality;final int playbackCeiling=0;Plan(String sid,String vid,String quality){seriesId=sid;this.vid=vid;requestedQuality=quality;url="https://media.invalid/"+sid+"/"+vid;}}
     static Plan resolve(String sid,String vid,String quality)throws Exception{calls.add(sid+"/"+vid+"/"+quality);if(vid.equals(failVid))throw new IOException("synthetic source unavailable");return new Plan(sid,vid,quality);}
     static Plan recover(String sid,String vid,String quality,boolean fresh)throws Exception{return resolve(sid,vid,quality);}
     static boolean canLowerQuality(Exception error){return false;}

@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "qa_commit": "55d0bd2ac50f008de170e1e49ce5625b4e3ea7a2",
+  "scope": "production_player_component_not_browse_ui",
+  "series_id": "7703410222160694296",
+  "vid": "7703412149342719001",
+  "episode_index": 1,
+  "title": "都说了，别惹那个乞丐",
+  "api_level": 30,
+  "source_selection": "production_resolve_in_player_no_url",
+  "quality": "auto",
+  "speed": 1,
+  "autoplay": false,
+  "queue_length": 1,
+  "overall_budget_ms": 240000,
+  "stages": [
+    {
+      "stage": "environment",
+      "status": "passed",
+      "elapsed_ms": 5,
+      "evidence": {
+        "isolated_avd": true,
+        "debug_target": true,
+        "cold_playback_cache": true
+      }
+    },
+    {
+      "stage": "mute_before_launch",
+      "status": "passed",
+      "elapsed_ms": 163,
+      "evidence": {
+        "music_volume": 0,
+        "music_stream_muted": true,
+        "silence_evidence": "android_media_output_stream_zero_and_muted"
+      }
+    },
+    {
+      "stage": "main_activity",
+      "status": "passed",
+      "elapsed_ms": 3581,
+      "evidence": {
+        "production_page_ready": true
+      }
+    },
+    {
+      "stage": "player_launch",
+      "status": "passed",
+      "elapsed_ms": 3900,
+      "evidence": {
+        "production_intent_builder": true,
+        "url_supplied": false,
+        "play_info_supplied": false
+      }
+    },
+    {
+      "stage": "first_rendered_frame",
+      "status": "passed",
+      "elapsed_ms": 14959,
+      "evidence": {
+        "position_ms": 199,
+        "duration_ms": 139034,
+        "video_width": 360,
+        "video_height": 640,
+        "generation": 1,
+        "playing": true,
+        "same_episode": true,
+        "buffering": false,
+        "historical_error_present": false,
+        "hud_dialog_present": false,
+        "terminal_dialog_state": false,
+        "music_volume": 0,
+        "music_stream_muted": true,
+        "renderer": {
+          "proof": "actual_video_surface_pixelcopy_buffer",
+          "pixelcopy_success": true,
+          "luma_range": 249,
+          "nonblack_permille": 682,
+          "frame_hash": "c868124e17c965b5"
+        },
+        "official_guest_plan": true,
+        "full_mp4_gate": "production_guest_cache_publication_requires_verifier",
+        "expected_duration_ms": 139034,
+        "screenshot": "first-frame.png"
+      }
+    },
+    {
+      "stage": "continued_30s",
+      "status": "passed",
+      "elapsed_ms": 44526,
+      "evidence": {
+        "position_ms": 30202,
+        "duration_ms": 139034,
+        "video_width": 360,
+        "video_height": 640,
+        "generation": 1,
+        "playing": true,
+        "same_episode": true,
+        "buffering": false,
+        "historical_error_present": false,
+        "hud_dialog_present": false,
+        "terminal_dialog_state": false,
+        "music_volume": 0,
+        "music_stream_muted": true,
+        "renderer": {
+          "proof": "actual_video_surface_pixelcopy_buffer",
+          "pixelcopy_success": true,
+          "luma_range": 239,
+          "nonblack_permille": 646,
+          "frame_hash": "f976fe6d5a57c5a9"
+        },
+        "wall_elapsed_ms": 30235,
+        "position_advance_ms": 30003,
+        "observations": 103,
+        "max_no_advance_ms": 2485,
+        "surface_observations": 28,
+        "frame_changes": 27,
+        "max_frame_unchanged_ms": 2529,
+        "same_episode_and_player": true,
+        "screenshot": "after-30s.png"
+      }
+    }
+  ],
+  "reason": "rendered_and_advanced_30s",
+  "final_stage": "continued_30s",
+  "elapsed_ms": 44527,
+  "guest_plan_observed": true,
+  "historical_error_observed_before_first_frame": false,
+  "playback_diagnostic": {
+    "status_text_present": true,
+    "last_media_error_present": false,
+    "hud_dialog_present": false,
+    "terminal_dialog_state": false,
+    "decoder_preparing": false,
+    "resolution_pending": false,
+    "status_category": "unknown",
+    "last_media_error_category": "none",
+    "status_error_classified": false,
+    "historical_error_classified": false
+  }
+}

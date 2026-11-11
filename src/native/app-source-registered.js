@@ -329,6 +329,27 @@ async function requestJson(url, options, deadline, signal, stage) {
     throw Object.assign(new Error('App 片源跳转次数过多'), { code: 'SECURITY_BLOCKED' });
 }
 
+// SaaSVideoModelData carries entitlement outside video_model. Validate each
+// envelope before projecting it away, and never let one success field mask a denial.
+function assertPlaybackAllowed(...objects) {
+    for (const object of objects) {
+        if (!object || typeof object !== 'object') continue;
+        for (const key of ['Code', 'code', 'error_code']) {
+            if (Object.prototype.hasOwnProperty.call(object, key) && object[key] !== 0 && object[key] !== '0') {
+                throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+            }
+        }
+        if (Object.prototype.hasOwnProperty.call(object, 'is_trial_video')) {
+            if (typeof object.is_trial_video !== 'boolean') {
+                throw Object.assign(new Error('App 片源试看状态无效'), { code: 'APP_INVALID_RESPONSE' });
+            }
+            if (object.is_trial_video) {
+                throw Object.assign(new Error('App 接口仅提供本集试看，请在官方 App 查看'), { code: 'BUSINESS_REJECTED' });
+            }
+        }
+    }
+}
+
 async function fetchAppPlayUrl(vid, options = {}) {
     const requestedQuality = normalizeDownloadQuality(options.quality);
     // Internal Android playback bounds are opt-in; normal desktop/manual downloads
@@ -377,13 +398,12 @@ async function fetchAppPlayUrl(vid, options = {}) {
             if (!reply || reply.vid !== vid || !reply.video_model || typeof reply.video_model !== 'object' || Array.isArray(reply.video_model)) {
                 throw Object.assign(new Error('App 已登记设备的单集模型与请求不一致'), { code: 'APP_INVALID_RESPONSE' });
             }
+            assertPlaybackAllowed(reply, reply.video_model);
             if (!acceptInline(reply.video_model)) {
                 const fallback = parseFallback(reply.video_model.fallback_api);
                 if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
                 const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
-                if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
-                    throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-                }
+                assertPlaybackAllowed(outer, outer.video_info, outer.video_info?.data);
                 info = outer?.video_info?.data; registered = true;
             }
             if (!info || !info.video_list || typeof info.video_list !== 'object') throw Object.assign(new Error('App 单集模型缺少有效片源列表'), { code: 'APP_INVALID_RESPONSE' });
@@ -399,10 +419,12 @@ async function fetchAppPlayUrl(vid, options = {}) {
     if (!info) {
         // Shared model parsing for the POST route and the video_tab recovery.
         const adoptModel = response => {
-            if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+            assertPlaybackAllowed(response);
             const entries = response.data?.video_model_data ?? response.data;
             const entry = entries?.[vid];
+            assertPlaybackAllowed(entries, entry);
             const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
+            assertPlaybackAllowed(model);
             if (!model || typeof model !== 'object' || Array.isArray(model)) {
                 throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
             }
@@ -417,9 +439,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
                 const fallback = parseFallback(model.fallback_api);
                 if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
                 const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
-                if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
-                    throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-                }
+                assertPlaybackAllowed(outer, outer.video_info, outer.video_info?.data);
                 info = outer?.video_info?.data;
                 if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
             }
@@ -435,9 +455,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
                 const fallback = parseFallback(model.fallback_api);
                 if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
                 const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
-                if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
-                    throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-                }
+                assertPlaybackAllowed(outer, outer.video_info, outer.video_info?.data);
                 info = outer?.video_info?.data;
                 if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
             }
