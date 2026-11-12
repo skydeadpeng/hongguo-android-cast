@@ -27,6 +27,7 @@ import java.io.FileOutputStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -42,17 +43,15 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class ProductionPlaybackInstrumentation extends Instrumentation {
     private static final String PACKAGE = "io.github.jackotom.hongguo.android";
-    private static final String SERIES = "7703410222160694296";
-    private static final String VID = "7703412149342719001";
+    private static final String SERIES = PlaybackProbeConfig.SERIES;
     private static final String TITLE = "都说了，别惹那个乞丐";
-    private static final long BUDGET_MS = 240_000;
-    private static final long ADVANCE_MS = 30_000;
     private static final long STALL_MS = 5_000;
     private final AtomicBoolean finished = new AtomicBoolean();
     private final JSONObject report = new JSONObject();
     private final JSONArray stages = new JSONArray();
     private final Handler main = new Handler(Looper.getMainLooper());
     private Bundle arguments;
+    private PlaybackProbeConfig config = PlaybackProbeConfig.original();
     private long started;
     private File output;
     private UiAutomation automation;
@@ -62,6 +61,8 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
     private volatile MainActivity host;
     private volatile boolean guestPlanObserved;
     private volatile boolean historyObservedBeforeFrame;
+    private volatile boolean actualFirstFrameObserved;
+    private volatile PlaybackSources.Plan acceptedAppPlan;
     private volatile Diagnostic diagnostic = new Diagnostic();
 
     @Override public void onCreate(Bundle args) {
@@ -72,39 +73,69 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
 
     @Override public void onStart() {
         started = SystemClock.elapsedRealtime();
-        Thread deadline = new Thread(() -> {
-            SystemClock.sleep(BUDGET_MS);
-            finishProbe("failed", "overall_deadline_exceeded");
-        }, "playback-qa-deadline");
-        deadline.setDaemon(true);
-        deadline.start();
         sendStatus(1, testStatus("started"));
         try {
+            Map<String, Object> supplied = new HashMap<>();
+            for (String key : arguments.keySet()) supplied.put(key, arguments.get(key));
+            try { config = PlaybackProbeConfig.parse(supplied); }
+            catch (IllegalArgumentException invalid) { throw blocked(invalid.getMessage()); }
+            Thread deadline = new Thread(() -> {
+                SystemClock.sleep(Math.max(0, started + config.budgetMs - SystemClock.elapsedRealtime()));
+                finishProbe("failed", "overall_deadline_exceeded");
+            }, "playback-qa-deadline");
+            deadline.setDaemon(true);
+            deadline.start();
             requireIsolatedAvd();
-            File freshOutput = new File(getTargetContext().getFilesDir(), "playback-qa");
+            File evidenceRoot = new File(getTargetContext().getFilesDir(), "playback-qa");
+            if (config.batch && config.episodeIndex == 1) {
+                String[] priorBatch = evidenceRoot.list();
+                if (priorBatch != null && priorBatch.length > 0)
+                    throw blocked("fresh_evidence_directory_required");
+            }
+            File freshOutput = new File(getTargetContext().getFilesDir(), config.outputRelativePath);
             String[] previousEvidence = freshOutput.list();
             if ((previousEvidence != null && previousEvidence.length > 0)
                     || (!freshOutput.isDirectory() && !freshOutput.mkdirs()))
                 throw blocked("fresh_evidence_directory_required");
             output = freshOutput;
             synchronized (report) {
-                report.put("schema", 1).put("status", "running")
+                report.put("schema", config.schema).put("status", "running")
                     .put("qa_commit", arguments.getString("qaCommit"))
-                    .put("scope", "production_player_component_not_browse_ui")
-                    .put("series_id", SERIES).put("vid", VID).put("episode_index", 1)
+                    .put("scope", config.scope).put("acceptance_mode", config.acceptanceMode)
+                    .put("test_scope", config.testScope).put("batch_ten_episodes", config.batch)
+                    .put("required_advance_ms", config.advanceMs)
+                    .put("minimum_surface_observations", config.minimumSurfaceObservations)
+                    .put("minimum_state_observations", config.minimumStateObservations)
+                    .put("minimum_frame_changes", config.minimumFrameChanges)
+                    .put("app_version_name", BuildConfig.VERSION_NAME)
+                    .put("app_version_code", BuildConfig.VERSION_CODE)
+                    .put("series_id", SERIES).put("vid", config.vid).put("episode_index", config.episodeIndex)
                     .put("title", TITLE).put("api_level", Build.VERSION.SDK_INT)
                     .put("source_selection", "production_resolve_in_player_no_url")
                     .put("quality", "auto").put("speed", 1)
                     .put("autoplay", false).put("queue_length", 1)
-                    .put("overall_budget_ms", BUDGET_MS).put("stages", stages);
+                    .put("overall_budget_ms", config.budgetMs).put("stages", stages);
+                if (config.batch) report.put("full_episode_verified", false).put("source_category", "unverified");
             }
-            // A fresh emulator install is required. Never clear or inspect an account.
+            // Only the first episode requires an empty global playback cache. The normal
+            // queue cleanup retains its current episode after close and prunes older entries
+            // when the next queue opens. Read names only, before opening that next queue.
+            // Never call cache.find (it mutates legacy entries), clear data, or delete caches.
             File cache = new File(getTargetContext().getCacheDir(), "playback-v2");
             String[] cacheFiles = cache.list();
-            if (cacheFiles != null && cacheFiles.length != 0)
+            if (cache.exists() && cacheFiles == null) throw blocked("playback_cache_not_readable");
+            boolean initial = !config.batch || config.episodeIndex == 1;
+            if (initial && cacheFiles != null && cacheFiles.length != 0)
                 throw blocked("fresh_playback_cache_required");
-            record("environment", new JSONObject().put("isolated_avd", true)
-                .put("debug_target", true).put("cold_playback_cache", true));
+            if (cacheFiles != null) for (String name : cacheFiles)
+                if (config.targetCacheEntry(name)) throw blocked("target_episode_cache_already_present");
+            JSONObject environment = new JSONObject().put("isolated_avd", true).put("debug_target", true)
+                .put("cache_scope", initial ? "cold_first_install" : "independent_episode_identity")
+                .put("target_playback_cache_absent", true)
+                .put("global_cache_empty", cacheFiles == null || cacheFiles.length == 0)
+                .put("production_cleanup_unchanged", true);
+            if (initial) environment.put("cold_playback_cache", true);
+            record("environment", environment);
 
             stage = "mute_before_launch";
             automation = getUiAutomation();
@@ -124,7 +155,7 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
 
             stage = "main_activity";
             host = (MainActivity) launch(new Intent(getTargetContext(), MainActivity.class), MainActivity.class);
-            long hostDeadline = Math.min(started + BUDGET_MS, SystemClock.elapsedRealtime() + 35_000);
+            long hostDeadline = Math.min(started + config.budgetMs, SystemClock.elapsedRealtime() + 35_000);
             while (!onMain(() -> (Boolean) read(host, "loaded"))) {
                 requireMuted();
                 if (host.isFinishing() || host.isDestroyed()) throw failed("main_activity_closed");
@@ -135,7 +166,7 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
 
             stage = "player_launch";
             JSONObject series = new JSONObject().put("seriesId", SERIES).put("title", TITLE);
-            JSONObject episode = new JSONObject().put("vid", VID).put("index", 1);
+            JSONObject episode = new JSONObject().put("vid", config.vid).put("index", config.episodeIndex);
             JSONObject options = new JSONObject().put("quality", "auto").put("speed", 1)
                 .put("autoplay", false).put("cleanupPlaybackCache", true);
             Intent intent = PlayLauncher.build(host, series, episode, new JSONArray().put(episode),
@@ -150,32 +181,66 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
             stage = "first_rendered_frame";
             Sample first = null;
             SurfaceEvidence firstSurface = null;
-            long frameDeadline = Math.min(started + BUDGET_MS - 45_000,
+            long frameDeadline = Math.min(started + config.budgetMs - config.continuousBudgetMs,
                 SystemClock.elapsedRealtime() + 150_000);
             while (SystemClock.elapsedRealtime() < frameDeadline) {
                 Sample sample = sample();
                 requireHealthy(sample, false);
                 if (sample.prepared && sample.playing && sample.position > 0
-                        && sample.duration > ADVANCE_MS + 2_000 && sample.width > 0 && sample.height > 0) {
+                        && sample.duration > config.advanceMs + 2_000 && sample.width > 0 && sample.height > 0) {
                     SurfaceEvidence surface = copyRenderedSurface(sample.view);
-                    if (surface.ready()) { first = sample; firstSurface = surface; break; }
+                    if (surface.ready()) {
+                        // Start both acceptance clocks only after a real decoder buffer was
+                        // observed, never before the asynchronous PixelCopy finishes.
+                        Sample afterSurface = sample();
+                        requireHealthy(afterSurface, true);
+                        requireStable(sample, afterSurface);
+                        first = afterSurface; firstSurface = surface; break;
+                    }
                 }
                 SystemClock.sleep(200);
             }
             if (first == null) throw failed("no_verified_rendered_frame");
+            actualFirstFrameObserved = true;
             GuestEvidence guest = guestEvidence();
-            if (!guest.verified || !first.cached || first.manual || first.remote)
-                throw failed("production_guest_verified_cache_not_observed");
-            if (first.width != guest.width || first.height != guest.height
-                    || Math.abs(first.duration - guest.durationMs) > Math.max(2_000, guest.durationMs / 50))
-                throw failed("decoded_media_metadata_mismatch");
+            boolean verifiedGuest = guest.verified && first.cached && !first.manual && !first.remote;
+            JSONObject firstEvidence = first.json().put("renderer", firstSurface.json());
+            if (verifiedGuest) {
+                if (first.width != guest.width || first.height != guest.height
+                        || Math.abs(first.duration - guest.durationMs) > Math.max(2_000, guest.durationMs / 50))
+                    throw failed("decoded_media_metadata_mismatch");
+                firstEvidence.put("official_guest_plan", true)
+                    .put("full_mp4_gate", "production_guest_cache_publication_requires_verifier")
+                    .put("expected_duration_ms", guest.durationMs)
+                    .put("source_category", "official_guest")
+                    .put("cache_gate", "production_guest_cache_publication_requires_verifier")
+                    .put("duration_validation", "guest_declared_and_complete_file_verified")
+                    .put("expected_width", guest.width).put("expected_height", guest.height);
+            } else {
+                if (!config.batch) throw failed("production_guest_verified_cache_not_observed");
+                PlaybackSources.Plan appPlan = appPlanEvidence(first);
+                if (appPlan == null) throw blocked("production_app_plan_or_cache_identity_unverified");
+                acceptedAppPlan = appPlan;
+                firstEvidence.put("official_guest_plan", false)
+                    .put("source_category", "production_app")
+                    .put("cache_gate", "production_app_cache_publication")
+                    .put("duration_validation", "decoder_reported_only")
+                    .put("plan_binding", "unique_registered_plan_and_protected_cache_identity")
+                    .put("plan_identity_stable", true)
+                    .put("expected_width", appPlan.width).put("expected_height", appPlan.height);
+            }
+            if (config.batch) {
+                firstEvidence.put("full_episode_verified", false);
+                synchronized (report) {
+                    report.put("source_category", firstEvidence.getString("source_category"))
+                        .put("cache_gate", firstEvidence.getString("cache_gate"))
+                        .put("duration_validation", firstEvidence.getString("duration_validation"));
+                }
+            }
             saveScreenshot("first-frame.png", first);
-            record(stage, first.json().put("renderer", firstSurface.json())
-                .put("official_guest_plan", true)
-                .put("full_mp4_gate", "production_guest_cache_publication_requires_verifier")
-                .put("expected_duration_ms", guest.durationMs).put("screenshot", "first-frame.png"));
+            record(stage, firstEvidence.put("screenshot", "first-frame.png"));
 
-            stage = "continued_30s";
+            stage = config.continuedStage;
             Sample last = first;
             long lastAdvance = first.elapsed, maxNoAdvance = 0;
             long lastSurfaceCheck = first.elapsed, lastFrameChange = first.elapsed;
@@ -215,26 +280,42 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
                     if (frameGap >= STALL_MS) throw failed("renderer_unchanged_or_unavailable_5s");
                 }
                 last = current;
-                if (current.elapsed - first.elapsed >= ADVANCE_MS && current.position - first.position >= ADVANCE_MS) break;
-                if (current.elapsed - first.elapsed > 45_000) throw failed("insufficient_30s_position_advance");
+                if (config.batch && current.elapsed - first.elapsed > config.continuousBudgetMs)
+                    throw failed("insufficient_5s_position_advance");
+                // Screenshot/readback overhead can reduce the sample count at exactly five
+                // seconds. Keep observing within the same bound instead of lowering a gate.
+                if (config.observationWindowSatisfied(current.elapsed - first.elapsed,
+                        current.position - first.position, sampleCount, surfaceObservations, frameChanges)) break;
+                if (current.elapsed - first.elapsed > config.continuousBudgetMs)
+                    throw failed(config.batch ? "insufficient_5s_position_advance" : "insufficient_30s_position_advance");
             }
             SurfaceEvidence finalSurface = copyRenderedSurface(last.view);
             if (!finalSurface.ready()) throw failed("final_surface_has_no_video_frame");
-            if (finalSurface.hash == firstSurface.hash) throw failed("unchanged_renderer_frame_after_30s");
+            if (finalSurface.hash == firstSurface.hash)
+                throw failed(config.batch ? "unchanged_renderer_frame_after_5s" : "unchanged_renderer_frame_after_30s");
             surfaceObservations++;
             long finalFrameGap = SystemClock.elapsedRealtime() - lastFrameChange;
             maxFrameUnchanged = Math.max(maxFrameUnchanged, finalFrameGap);
             if (finalFrameGap >= STALL_MS) throw failed("renderer_unchanged_or_unavailable_5s");
             if (finalSurface.hash != lastFrameHash) frameChanges++;
-            saveScreenshot("after-30s.png", first);
-            record(stage, last.json().put("renderer", finalSurface.json())
+            if (!config.enoughObservations(sampleCount, surfaceObservations, frameChanges))
+                throw failed("insufficient_actual_frame_observations");
+            saveScreenshot(config.finalScreenshot, first);
+            JSONObject continuedEvidence = last.json().put("renderer", finalSurface.json())
                 .put("wall_elapsed_ms", last.elapsed - first.elapsed)
                 .put("position_advance_ms", last.position - first.position)
                 .put("observations", sampleCount).put("max_no_advance_ms", maxNoAdvance)
                 .put("surface_observations", surfaceObservations).put("frame_changes", frameChanges)
                 .put("max_frame_unchanged_ms", maxFrameUnchanged)
-                .put("same_episode_and_player", true).put("screenshot", "after-30s.png"));
-            finishProbe("passed", "rendered_and_advanced_30s");
+                .put("same_episode_and_player", true).put("required_advance_ms", config.advanceMs)
+                .put("screenshot", config.finalScreenshot);
+            if (acceptedAppPlan != null) continuedEvidence.put("plan_identity_stable", true)
+                .put("source_category", "production_app").put("cache_gate", "production_app_cache_publication")
+                .put("plan_binding", "unique_registered_plan_and_protected_cache_identity")
+                .put("duration_validation", "decoder_reported_only").put("full_episode_verified", false)
+                .put("expected_width", acceptedAppPlan.width).put("expected_height", acceptedAppPlan.height);
+            record(stage, continuedEvidence);
+            finishProbe("passed", config.passReason);
         } catch (ProbeProblem problem) {
             finishProbe(problem.status, problem.code);
         } catch (Throwable problem) {
@@ -282,7 +363,7 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
             JSONObject series = (JSONObject) read(player, "series");
             JSONObject episode = (JSONObject) read(player, "episode");
             s.sameEpisode = series != null && episode != null && SERIES.equals(series.optString("seriesId"))
-                && VID.equals(episode.optString("vid")) && episode.optInt("index") == 1;
+                && config.vid.equals(episode.optString("vid")) && episode.optInt("index") == config.episodeIndex;
             s.prepared = (Boolean) read(player, "prepared");
             s.active = (Boolean) read(player, "active");
             s.completed = (Boolean) read(player, "completed");
@@ -311,6 +392,16 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
             s.cached = (Boolean) read(player, "currentCache");
             s.manual = (Boolean) read(player, "currentManual");
             s.remote = (Boolean) read(player, "currentWeb");
+            if (config.batch) synchronized (player) {
+                JSONObject protectedEpisode = (JSONObject) read(player, "protectedEpisode");
+                s.protectedCacheIdentity = (Boolean) read(player, "protectedCurrent")
+                    && SERIES.equals(read(player, "protectedSeriesId"))
+                    && protectedEpisode != null && config.vid.equals(protectedEpisode.optString("vid"))
+                    && config.episodeIndex == protectedEpisode.optInt("index")
+                    && "auto".equals(read(player, "actualQuality"))
+                    && "auto".equals(read(player, "protectedQuality"))
+                    && (Integer) read(player, "protectedCeiling") == 0;
+            }
             s.generation = (Integer) read(player, "generation");
             s.view = (VideoView) read(player, "video");
             s.player = (MediaPlayer) read(player, "mediaPlayer");
@@ -335,11 +426,38 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
             throw failed("playback_interrupted_after_first_frame");
     }
 
-    private void requireStable(Sample first, Sample current) throws ProbeProblem {
+    private void requireStable(Sample first, Sample current) throws Exception {
         if (current.player != first.player || current.view != first.view || current.generation != first.generation)
             throw failed("player_or_source_changed_after_first_frame");
         if (current.historyErrorIdentity != first.historyErrorIdentity)
             throw failed("new_media_error_after_first_frame");
+        if (acceptedAppPlan != null && !PlaybackProbeSourcePolicy.sameRegisteredPlan(acceptedAppPlan, appPlanEvidence(current)))
+            throw failed("production_app_plan_or_cache_identity_changed");
+    }
+
+    private PlaybackSources.Plan appPlanEvidence(Sample sample) throws Exception {
+        // The player does not retain its PreparedMedia Plan after adoption. Do not
+        // pretend to read a captured-plan field or inspect framework decoder internals.
+        // A single matching registry entry + the current protected cache identity is
+        // conservative opening evidence, not proof of the complete episode's duration.
+        Map<?, ?> plans = (Map<?, ?>) readStatic(PlaybackSources.class, "plans");
+        PlaybackSources.Plan only = null;
+        PlaybackProbeSourcePolicy.AppEvidence e = new PlaybackProbeSourcePolicy.AppEvidence();
+        synchronized (plans) {
+            for (Object value : plans.values()) {
+                PlaybackSources.Plan plan = (PlaybackSources.Plan) value;
+                if (!PlaybackProbeSourcePolicy.selectedIdentity(plan.seriesId, plan.vid, SERIES, config.vid)) continue;
+                e.matchingPlans++; only = plan;
+            }
+        }
+        if (only == null) return null;
+        e.batch = config.batch; e.source = only.source; e.guest = only.guestPlayback;
+        e.requestedQuality = only.requestedQuality; e.playbackCeiling = only.playbackCeiling;
+        e.planWidth = only.width; e.planHeight = only.height;
+        e.decodedWidth = sample.width; e.decodedHeight = sample.height;
+        e.protectedIdentity = sample.protectedCacheIdentity;
+        e.cached = sample.cached; e.manual = sample.manual; e.remote = sample.remote;
+        return PlaybackProbeSourcePolicy.acceptsApp(e) ? only : null;
     }
 
     private GuestEvidence guestEvidence() throws Exception {
@@ -350,7 +468,7 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
         synchronized (plans) {
             for (Object value : plans.values()) {
                 PlaybackSources.Plan plan = (PlaybackSources.Plan) value;
-                if (!SERIES.equals(plan.seriesId) || !VID.equals(plan.vid)) continue;
+                if (!SERIES.equals(plan.seriesId) || !config.vid.equals(plan.vid)) continue;
                 evidence.observed |= plan.guestPlayback;
                 if (!plan.guestPlayback || !"auto".equals(plan.requestedQuality)) {
                     conflictingPlan = true;
@@ -474,6 +592,7 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
                 report.put("status", status).put("reason", reason).put("final_stage", stage)
                     .put("elapsed_ms", SystemClock.elapsedRealtime() - started)
                     .put("guest_plan_observed", guestPlanObserved)
+                    .put("actual_first_frame_observed", actualFirstFrameObserved)
                     .put("historical_error_observed_before_first_frame", historyObservedBeforeFrame)
                     .put("playback_diagnostic", diagnostic.json());
                 if (!pass) stages.put(new JSONObject().put("stage", stage).put("status", status).put("reason", reason));
@@ -551,13 +670,15 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
         boolean closed, sameEpisode, prepared, active, completed, paused, buffering, playing;
         boolean historyErrorPresent, hudDialogPresent, terminalDialog, decoderPreparing, resolutionPending;
         Object historyErrorIdentity;
-        boolean cached, manual, remote;
+        boolean cached, manual, remote, protectedCacheIdentity;
         VideoView view;
         MediaPlayer player;
         JSONObject json() throws Exception {
             return new JSONObject().put("position_ms", position).put("duration_ms", duration)
                 .put("video_width", width).put("video_height", height).put("generation", generation)
                 .put("playing", playing).put("same_episode", sameEpisode).put("buffering", buffering)
+                .put("production_cache", cached).put("manual_source", manual).put("remote_source", remote)
+                .put("protected_cache_identity", protectedCacheIdentity)
                 .put("historical_error_present", historyErrorPresent).put("hud_dialog_present", hudDialogPresent)
                 .put("terminal_dialog_state", terminalDialog)
                 .put("music_volume", 0).put("music_stream_muted", true);

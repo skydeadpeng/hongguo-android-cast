@@ -63,6 +63,13 @@ timeout 5s "$ADB" -s "$SERIAL" shell input keyevent 82 > /dev/null
 status install_exact_debug_build
 timeout 60s "$ADB" -s "$SERIAL" install -t android/app/build/outputs/apk/phone/debug/app-phone-debug.apk > "$QA_PRIVATE/install-app.log" 2>&1
 timeout 60s "$ADB" -s "$SERIAL" install -t android/app/build/outputs/apk/androidTest/phone/debug/app-phone-debug-androidTest.apk > "$QA_PRIVATE/install-test.log" 2>&1
+if [ "${QA_EPISODE_MODE:-single}" = ten ]; then
+  status actual_ten_episode_players
+  bash scripts/android-playback-qa/run-ten-episodes.sh
+  STAGE=completed
+  exit 0
+fi
+[ "${QA_EPISODE_MODE:-single}" = single ] || { printf 'QA_ENVIRONMENT=INVALID_EPISODE_MODE\n'; exit 22; }
 status actual_production_player
 # The test runner constructs the normal production intent with no media URL.
 # Neither instrumentation output nor raw logcat is published to the repository.

@@ -1,0 +1,146 @@
+name: Android ten-episode QA
+
+# A single explicitly approved test-branch push. This does not grant ongoing
+# KVM permission to arbitrary future pushes, other branches, or user computers.
+'on':
+  push:
+    branches: [test/hongguo-ten-episode-opening]
+    paths:
+      - .github/workflows/android-playback-ten-qa.yml
+      - scripts/android-playback-qa/**
+      - android/app/src/androidTest/**
+      - android/app/build.gradle
+permissions:
+  contents: read
+concurrency:
+  group: android-playback-ten-qa-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  playback:
+    name: Ten isolated real Android episodes
+    if: >-
+      github.ref == 'refs/heads/test/hongguo-ten-episode-opening' &&
+      github.event.before == 'f9cd346d6de2fd086fee3c4c7771cf36f80eceaf' &&
+      contains(github.event.head_commit.message, '[run-approved-android-ten-20261111]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Prepare isolated evidence directory
+        env:
+          QA_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          export QA_OUT="$RUNNER_TEMP/hongguo-playback-qa"
+          export QA_PRIVATE="$RUNNER_TEMP/hongguo-playback-private"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/hongguo-playback-avd"
+          printf 'QA_RUNNER_ENVIRONMENT=%s\nQA_OUT=%s\nQA_PRIVATE=%s\nANDROID_AVD_HOME=%s\n' \
+            "$QA_RUNNER_ENVIRONMENT" "$QA_OUT" "$QA_PRIVATE" "$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          printf 'QA_EPISODE_MODE=ten\n' >> "$GITHUB_ENV"
+          mkdir -p "$QA_OUT" "$QA_PRIVATE" "$ANDROID_AVD_HOME"
+          printf '{"status":"NOT_RUN","apk_execution":false,"first_frame":false,"continuous_30_seconds":false}\n' > "$QA_OUT/workflow-status.json"
+      - name: Validate evidence acceptance rules (not device playback)
+        run: |
+          python3 scripts/android-playback-qa/test-evidence-contract.py
+          python3 scripts/android-playback-qa/test-ten-evidence-contract.py
+          python3 scripts/android-playback-qa/test-ten-orchestration.py
+          mkdir -p "$QA_PRIVATE/diagnostic-classes"
+          javac -encoding UTF-8 -source 17 -target 17 -d "$QA_PRIVATE/diagnostic-classes" \
+            android/app/src/androidTest/java/io/github/jackotom/hongguo/android/PlaybackFailureCategory.java \
+            android/app/src/androidTest/java/io/github/jackotom/hongguo/android/PlaybackFailureCategoryChecks.java \
+            android/app/src/androidTest/java/io/github/jackotom/hongguo/android/PlaybackProbeConfig.java \
+            android/app/src/androidTest/java/io/github/jackotom/hongguo/android/PlaybackProbeConfigChecks.java \
+            android/app/src/androidTest/java/io/github/jackotom/hongguo/android/PlaybackProbeSourcePolicy.java \
+            android/app/src/androidTest/java/io/github/jackotom/hongguo/android/PlaybackProbeSourcePolicyChecks.java
+          java -cp "$QA_PRIVATE/diagnostic-classes" io.github.jackotom.hongguo.android.PlaybackFailureCategoryChecks
+          java -cp "$QA_PRIVATE/diagnostic-classes" io.github.jackotom.hongguo.android.PlaybackProbeConfigChecks
+          java -cp "$QA_PRIVATE/diagnostic-classes" io.github.jackotom.hongguo.android.PlaybackProbeSourcePolicyChecks
+      - name: Install Google official emulator and system image
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          # Use the runner's existing SDK licences; do not blindly accept new terms.
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install \
+            'platform-tools' 'emulator' 'platforms;android-35' 'build-tools;35.0.0' \
+            'system-images;android-30;default;x86_64' </dev/null
+      - name: Build exact test-branch app and instrumentation
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build:android:ui
+          gradle -p android :app:assemblePhoneDebug :app:assemblePhoneDebugAndroidTest --no-daemon --console=plain
+      - name: Grant only the approved temporary runner KVM access
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$QA_RUNNER_ENVIRONMENT" = github-hosted
+          test "$(readlink -f /dev/kvm)" = /dev/kvm
+          test -c /dev/kvm
+          command -v getfacl >/dev/null
+          command -v setfacl >/dev/null
+          getfacl -p /dev/kvm > "$QA_PRIVATE/original-kvm.acl"
+          python3 - "$QA_PRIVATE/original-kvm.acl" <<'PYACL'
+          import sys
+          rows=[line.strip() for line in open(sys.argv[1]) if line.strip() and not line.startswith('#')]
+          if sorted(rows) != sorted(['user::rw-','group::rw-','other::---']):
+              raise SystemExit('Unexpected existing device ACL; no permission changed')
+          PYACL
+          touch "$QA_PRIVATE/restore-kvm-acl"
+          # Per-action owner approval covers only this ephemeral test machine.
+          # Add one named user; never chmod world access or modify group membership.
+          sudo setfacl -m "u:$(id -u):rw,m::rw" /dev/kvm
+          python3 scripts/android-playback-qa/check-runner-kvm.py --output "$QA_OUT/preflight"
+          python3 - "$QA_OUT/preflight/preflight.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          if data['verification_status'] != 'READY_FOR_PLAYBACK_TEST':
+              raise SystemExit('Approved KVM setup did not make official acceleration available')
+          PY
+      - name: Run isolated muted real-player acceptance
+        shell: bash
+        run: bash scripts/android-playback-qa/run-hosted-player.sh
+      - name: Stop only this test emulator and restore device ACL
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "$QA_PRIVATE/emulator.pid" ]; then
+            pid=$(cat "$QA_PRIVATE/emulator.pid")
+            if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then kill "$pid" 2>/dev/null || true; fi
+          fi
+          if [ -f "$QA_PRIVATE/restore-kvm-acl" ] && [ -s "$QA_PRIVATE/original-kvm.acl" ]; then
+            sudo setfacl --restore="$QA_PRIVATE/original-kvm.acl"
+            getfacl -p /dev/kvm > "$QA_PRIVATE/restored-kvm.acl"
+            cmp "$QA_PRIVATE/original-kvm.acl" "$QA_PRIVATE/restored-kvm.acl"
+            printf 'QA_KVM_ACL=RESTORED_AND_VERIFIED\n'
+          fi
+      - name: Preserve only sanitized evidence and App screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hongguo-ten-episode-playback
+          path: |
+            ${{ runner.temp }}/hongguo-playback-qa/workflow-status.json
+            ${{ runner.temp }}/hongguo-playback-qa/preflight/preflight.json
+            ${{ runner.temp }}/hongguo-playback-qa/preflight/summary.txt
+            ${{ runner.temp }}/hongguo-playback-qa/ten-episode-summary.json
+            ${{ runner.temp }}/hongguo-playback-qa/episode-*/report.json
+            ${{ runner.temp }}/hongguo-playback-qa/episode-*/result.json
+            ${{ runner.temp }}/hongguo-playback-qa/episode-*/first-frame.png
+            ${{ runner.temp }}/hongguo-playback-qa/episode-*/after-5s.png
+          if-no-files-found: error
+          retention-days: 3
