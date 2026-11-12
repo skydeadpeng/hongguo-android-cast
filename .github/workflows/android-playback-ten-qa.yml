@@ -20,7 +20,7 @@ jobs:
     name: Ten isolated real Android episodes
     if: >-
       github.ref == 'refs/heads/test/hongguo-ten-episode-opening' &&
-      github.event.before == 'f9cd346d6de2fd086fee3c4c7771cf36f80eceaf' &&
+      github.event.before == '4b45102833871c1b33bcac862b4a88793a071ff6' &&
       contains(github.event.head_commit.message, '[run-approved-android-ten-20261111]')
     runs-on: ubuntu-24.04
     timeout-minutes: 50

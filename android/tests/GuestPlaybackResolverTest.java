@@ -58,7 +58,7 @@ public final class GuestPlaybackResolverTest {
     private static void rejectPage(JSONObject page, String label) throws Exception {
         NetworkGuard.Reply reply = getReply(page);
         FixtureTransport.reset(new Object[]{reply, reply}, postReply(200, success()));
-        fails(IOException.class, null, () -> EpisodeResolver.resolveInfo(SID, VID), label);
+        fails(EpisodeResolver.GuestFailure.class, null, () -> EpisodeResolver.resolveInfo(SID, VID), label);
         check(FixtureTransport.posts.get() == 0, label + " never POSTs");
         check(FixtureTransport.gets.get() == 1, label + " terminal page denial does not try another route");
     }
@@ -68,7 +68,49 @@ public final class GuestPlaybackResolverTest {
         fails(failureType, null, () -> EpisodeResolver.resolveInfo(SID, VID), label);
         check(FixtureTransport.gets.get() == 1 && FixtureTransport.posts.get() == 1, label + " one GET and one POST, no retry/SEO fallback");
     }
+    private static List<JSONObject> missingMetadataDenials() throws Exception {
+        List<JSONObject> denied = new ArrayList<>();
+        for (String key : new String[]{"series_id", "vid", "isSuccess"}) {
+            JSONObject p=pageData();p.remove("publicVideoSeo");p.put(key, false);denied.add(p);
+        }
+        for (Object value : new Object[]{JSONObject.NULL, new JSONObject(), "malformed", false}) {
+            JSONObject p=pageData();p.put("publicVideoSeo",value);denied.add(p);
+        }
+        JSONObject p=pageData();p.remove("publicVideoSeo");p.getJSONObject("seriesDetail").put("series_id","999999");denied.add(p);
+        for (Object list : new Object[]{new JSONArray().put("999999"), new JSONArray().put(Long.parseLong(VID)), JSONObject.NULL}) {
+            p=pageData();p.remove("publicVideoSeo");p.getJSONObject("seriesDetail").put("vid_list",list);denied.add(p);
+        }
+        for (String key : new String[]{"pcLoginRequired", "pcAuthenticatedPlayback", "encryptedBrowserAllowed"}) {
+            for (Object value : new Object[]{JSONObject.NULL, "false", 0}) {
+                p=pageData();p.remove("publicVideoSeo");p.getJSONObject("req").put(key,value);denied.add(p);
+            }
+            p=pageData();p.remove("publicVideoSeo");p.getJSONObject("req").remove(key);denied.add(p);
+            if(!key.equals("encryptedBrowserAllowed")) {
+                p=pageData();p.remove("publicVideoSeo");p.getJSONObject("req").put(key,true);denied.add(p);
+            }
+        }
+        for(Object req : new Object[]{JSONObject.NULL, "malformed", new JSONObject()}) {
+            p=pageData();p.remove("publicVideoSeo");p.put("req",req);denied.add(p);
+        }
+        return denied;
+    }
+    private static void missingMetadataTests() throws Exception {
+        for(boolean capability : new boolean[]{false,true}) {
+            JSONObject p=pageData();p.remove("publicVideoSeo");p.getJSONObject("req").put("encryptedBrowserAllowed",capability);
+            fails(EpisodeResolver.MetadataUnavailable.class,null,()->resolve(p,new AssertionError("missing SEO must not POST")),"wholly absent metadata");
+            check(FixtureTransport.gets.get()==1&&FixtureTransport.posts.get()==0,"missing SEO stops web after one GET, without SEO/media/POST");
+        }
+        for(JSONObject p:missingMetadataDenials())rejectPage(p,"missing/malformed SEO cannot override page rejection");
+        JSONObject absent=pageData();absent.remove("publicVideoSeo");
+        FixtureTransport.reset(new Object[]{getReply(absent)},new AssertionError("cancelled missing SEO must not POST"));
+        FixtureTransport.afterGet=()->Thread.currentThread().interrupt();
+        try { fails(InterruptedIOException.class,null,()->EpisodeResolver.resolveInfo(SID,VID),"missing SEO cancellation after GET"); }
+        finally { Thread.interrupted(); }
+        check(FixtureTransport.gets.get()==1&&FixtureTransport.posts.get()==0,"cancelled metadata absence never becomes fallback signal");
+
+    }
     private static void resolverTests() throws Exception {
+        missingMetadataTests();
         JSONObject info = resolve(pageData(), postReply(200, success()));
         check(CLEAN_MEDIA.equals(info.getString("url")), "POST media used; signed query bytes preserved and Range removed");
         check(SID.equals(info.getString("seriesId")) && VID.equals(info.getString("vid")), "result retains requested series and episode");
@@ -271,7 +313,40 @@ public final class GuestPlaybackResolverTest {
         check(FixtureTransport.gets.get() == 2 && FixtureTransport.posts.get() == 0, label + " invalid JSON never reaches POST");
     }
 
+    private static boolean waitingIn(Thread thread,String method) {
+        if(thread==null||thread.getState()!=Thread.State.WAITING)return false;
+        for(StackTraceElement frame:thread.getStackTrace())if(method.equals(frame.getMethodName()))return true;
+        return false;
+    }
+    private static void missingMetadataHedgeTests() throws Exception {
+        JSONObject absent=pageData();absent.remove("publicVideoSeo");
+        JSONObject denied=pageData();denied.getJSONObject("req").put("pcLoginRequired",true);
+        for(Object peer:new Object[]{getReply(denied),getReply(absent),new SocketTimeoutException("peer timeout"),new InterruptedIOException("peer cancelled")}) {
+            FixtureTransport.reset(new Object[]{new SocketTimeoutException("edge 1"),new SocketTimeoutException("edge 2"),getReply(absent),peer},new AssertionError("missing metadata hedge must not POST"));
+            FixtureTransport.hedgeBarrier=new CountDownLatch(2);
+            FixtureTransport.holdSecondHedge=new CountDownLatch(1);
+            java.util.concurrent.atomic.AtomicReference<Throwable> result=new java.util.concurrent.atomic.AtomicReference<>();
+            Thread owner=new Thread(()->{try { EpisodeResolver.resolveInfo(SID,VID);result.set(new AssertionError("unexpected media")); }catch(Throwable failure){result.set(failure);}},"missing-metadata-hedge-owner");
+            owner.start();
+            try {
+                check(FixtureTransport.hedgeBarrier.await(3,TimeUnit.SECONDS),"both existing hedge GETs started");
+                long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
+                // Observe first worker idle after completing its future, while the
+                // owner still waits for the held peer. No sleep determines ordering.
+                while(owner.isAlive()&&System.nanoTime()<until&&!(waitingIn(FixtureTransport.firstHedgeThread,"getTask")&&waitingIn(owner,"take")))Thread.yield();
+                check(owner.isAlive()&&result.get()==null&&waitingIn(FixtureTransport.firstHedgeThread,"getTask")&&waitingIn(owner,"take"),"missing-first result must await already-running peer");
+                check(FixtureTransport.posts.get()==0,"waiting metadata hedge has no POST");
+                FixtureTransport.holdSecondHedge.countDown();owner.join(3000);
+                check(!owner.isAlive(),"metadata hedge completes after peer");
+                boolean refusal=peer instanceof NetworkGuard.Reply&&((NetworkGuard.Reply)peer).body.equals(html(denied));
+                boolean cancelled=peer instanceof InterruptedIOException&&!(peer instanceof SocketTimeoutException);
+                check(cancelled?result.get()==peer:refusal?result.get() instanceof EpisodeResolver.GuestFailure:result.get() instanceof EpisodeResolver.MetadataUnavailable,"peer cancellation or denial wins; otherwise metadata absence propagates");
+                check(FixtureTransport.gets.get()==4&&FixtureTransport.posts.get()==0,"no extra GET/POST after bounded hedge");
+            } finally {FixtureTransport.holdSecondHedge.countDown();owner.interrupt();owner.join(3000);}
+        }
+    }
     private static void cancellationAndHedgeTests() throws Exception {
+        missingMetadataHedgeTests();
         for (String[] ids : new String[][]{{"../1", VID}, {SID, "2x"}, {SID, ""}, {null, VID}}) {
             FixtureTransport.reset(new Object[0], null);
             fails(EpisodeResolver.ResolverException.class, null, () -> EpisodeResolver.resolveInfo(ids[0], ids[1]), "invalid IDs before transport");
@@ -326,10 +401,11 @@ public final class GuestPlaybackResolverTest {
         static final List<String> requested = new CopyOnWriteArrayList<>();
         static volatile String postedId; static volatile long postDeadline; static volatile Thread postThread;
         static volatile Runnable afterGet, afterPost;
-        static volatile CountDownLatch hedgeBarrier, holdHedge;
+        static volatile CountDownLatch hedgeBarrier, holdHedge, holdSecondHedge;
+        static volatile Thread firstHedgeThread;
         static void reset(Object[] next, Object nextPost) {
             replies = next; post = nextPost; gets.set(0); posts.set(0); requested.clear();
-            postedId = null; postDeadline = 0; postThread = null; afterGet = afterPost = null; hedgeBarrier = holdHedge = null;
+            postedId = null; postDeadline = 0; postThread = null; afterGet = afterPost = null; hedgeBarrier = holdHedge = holdSecondHedge = null;firstHedgeThread=null;
         }
         static NetworkGuard.Reply outcome(Object next) throws Exception {
             if (next instanceof Error) throw (Error) next;
@@ -349,6 +425,8 @@ public final class GuestPlaybackResolverTest {
                 if (!barrier.await(3, TimeUnit.SECONDS)) throw new AssertionError("hedge did not start both GETs");
                 if (hold != null) hold.await();
             }
+            if(at==2)firstHedgeThread=Thread.currentThread();
+            if(at==3&&holdSecondHedge!=null)holdSecondHedge.await();
             if (afterGet != null) afterGet.run();
             return outcome(next);
         }
@@ -412,6 +490,16 @@ public final class GuestPlaybackResolverTest {
                 check(result.status == status && "".equals(result.body) && ENDPOINT.equals(result.url), "real redirect returned as terminal HTTP rejection " + status);
                 assertWire();
             }
+        }
+        // Run the real resolver over the real transport with only TCP/TLS replaced.
+        JSONObject missing=pageData();missing.remove("publicVideoSeo");
+        Wire.reset(200,html(missing));
+        fails(EpisodeResolver.MetadataUnavailable.class,null,()->EpisodeResolver.resolveInfo(SID,VID),"real transport missing SEO");
+        check(Wire.connects.get()==1&&Wire.requests.size()==1&&Wire.requests.get(0).startsWith("GET /player/"+SID+"/"+VID+" "),"missing SEO only GET, never POST/SEO/media");
+        for(JSONObject denied:missingMetadataDenials()) {
+            Wire.reset(200,html(denied));
+            fails(EpisodeResolver.GuestFailure.class,null,()->EpisodeResolver.resolveInfo(SID,VID),"real transport rejected metadata");
+            check(Wire.connects.get()==1&&Wire.requests.size()==1&&Wire.requests.get(0).startsWith("GET "),"rejected metadata only GET");
         }
         NetworkGuard.dohProbe = null;
         System.out.println("PASS GuestPlaybackResolverTest real NetworkGuard checks=" + checks + " realNetworkRequests=0 fakeConnections=" + Wire.totalConnects.get());

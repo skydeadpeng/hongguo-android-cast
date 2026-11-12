@@ -240,6 +240,24 @@ public final class GuestPlaybackIntegrationTest {
         check(EpisodeResolver.calls==1&&NetworkGuard.transfers.isEmpty(),"resolver denial makes no media request");
         noEscape("resolver denial");
     }
+    private static void missingMetadataFallback() throws Exception {
+        EpisodeResolver.failure=new EpisodeResolver.MetadataUnavailable();
+        PlaybackSources.attachNative((sid,vid,quality,ceiling,timeout)->{
+            Fixture.appCalls++;
+            check(SID.equals(sid)&&VID.equals(vid)&&"auto".equals(quality)&&ceiling==0,"independent App lookup keeps exact request");
+            return basic("app");
+        });
+        PlaybackSources.Plan plan=PlaybackSources.resolve(SID,VID,"auto");
+        check(!plan.guestPlayback&&"app".equals(plan.source),"missing metadata uses normal App plan, not guest provenance");
+        check(EpisodeResolver.calls==1&&Fixture.appCalls==1,"one web resolution and exactly one normal App lookup");
+        check(NetworkGuard.transfers.isEmpty()&&CencDecryptor.calls==0,"no guest media or decryption");
+    }
+    private static void resolverCancellation() throws Exception {
+        EpisodeResolver.failure=new InterruptedIOException("cancelled page lookup");
+        Exception failure=fails(()->PlaybackSources.resolve(SID,VID,"auto"),"resolver cancellation");
+        check(failure==EpisodeResolver.failure,"resolver cancellation unchanged");
+        check(EpisodeResolver.calls==1,"one cancelled resolver call");noEscape("resolver cancellation");
+    }
     private static void fixedQuality() throws Exception {
         EpisodeResolver.info=guest(System.currentTimeMillis()/1000L+3600);
         List<String> requested=new ArrayList<>();
@@ -352,6 +370,8 @@ public final class GuestPlaybackIntegrationTest {
             for(String stage:new String[]{"before","download","verify","after-verify"})run("cancel-"+stage,()->cancelled(stage),failures);
             for(String kind:new String[]{"http403","http404","http500","dns","timeout","tls","generic","invalid"})run("direct-terminal-"+kind,()->directFailure(kind),failures);
             run("direct-validator-cancellation",GuestPlaybackIntegrationTest::directVerifierCancellation,failures);
+            run("missing-metadata-normal-app",GuestPlaybackIntegrationTest::missingMetadataFallback,failures);
+            run("resolver-cancellation-no-fallback",GuestPlaybackIntegrationTest::resolverCancellation,failures);
             run("resolver-denial-no-fallback",GuestPlaybackIntegrationTest::resolverRefusal,failures);
             run("fixed-quality-no-guest",GuestPlaybackIntegrationTest::fixedQuality,failures);
             run("complete2-cache-isolation",GuestPlaybackIntegrationTest::cacheRevision,failures);

@@ -26,6 +26,7 @@ final class MainActivity extends android.content.Context {
 }
 final class EpisodeResolver {
     static final class GuestFailure extends IOException {GuestFailure(String message){super(message);}}
+    static final class MetadataUnavailable extends IOException {}
     static int calls;static JSONObject info;static Exception failure;
     static JSONObject resolveInfo(String sid,String vid)throws Exception {
         calls++;if(failure!=null)throw failure;if(info==null)throw new AssertionError("unconfigured resolver boundary");return new JSONObject(info.toString());

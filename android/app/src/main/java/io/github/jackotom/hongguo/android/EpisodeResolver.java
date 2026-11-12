@@ -38,6 +38,10 @@ final class EpisodeResolver {
     static final class GuestFailure extends IOException {
         GuestFailure(String message) { super(message); }
     }
+    /** A verified page has no web metadata; only the independent normal App route may proceed. */
+    static final class MetadataUnavailable extends IOException {
+        MetadataUnavailable() { super("官网未提供本集播放元数据"); }
+    }
     private static final class GuestPage {
         final String sid, vid; final double duration; final int width, height;
         GuestPage(String sid, String vid, double duration, int width, int height) {
@@ -79,11 +83,13 @@ final class EpisodeResolver {
         catch (java.net.SocketTimeoutException timedOut) { failures[0] = timedOut; }
         catch (java.io.InterruptedIOException cancelled) { throw cancelled; }
         catch (GuestFailure denied) { throw denied; }
+        catch (MetadataUnavailable unavailable) { throw unavailable; }
         catch (Exception error) { failures[0] = error; }
         try { return attempt(underscore, seriesId, vid, boundedBudget(deadline, FIRST_BUDGET_MS)); }
         catch (java.net.SocketTimeoutException timedOut) { failures[1] = timedOut; }
         catch (java.io.InterruptedIOException cancelled) { throw cancelled; }
         catch (GuestFailure denied) { throw denied; }
+        catch (MetadataUnavailable unavailable) { throw unavailable; }
         catch (Exception error) { failures[1] = error; }
         if (!transportTimeout(failures[0]) || !transportTimeout(failures[1])) throw failures[1] != null ? failures[1] : failures[0];
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2, runnable -> {
@@ -102,13 +108,22 @@ final class EpisodeResolver {
                     catch (Exception failure) { hedge[which] = failure; throw failure; }
                 });
             }
+            MetadataUnavailable missingMetadata = null;
             for (int done = 0; done < 2; done++) {
                 java.util.concurrent.Future<Candidate> finished;
                 try { finished = service.take(); }
                 catch (InterruptedException stopped) { throw new java.io.InterruptedIOException("已切换分集"); }
                 try { return finished.get(); }
-                catch (java.util.concurrent.ExecutionException failed) { if (failed.getCause() instanceof GuestFailure) throw (GuestFailure) failed.getCause(); }
+                catch (java.util.concurrent.ExecutionException failed) {
+                    if (failed.getCause() instanceof GuestFailure) throw (GuestFailure) failed.getCause();
+                    if (failed.getCause() instanceof java.io.InterruptedIOException && !(failed.getCause() instanceof java.net.SocketTimeoutException))
+                        throw (java.io.InterruptedIOException) failed.getCause();
+                    if (failed.getCause() instanceof MetadataUnavailable) missingMetadata = (MetadataUnavailable) failed.getCause();
+                }
             }
+            // An already-running peer may still carry an explicit denial. Never
+            // cancel it merely because the first hedge lacks web metadata.
+            if (missingMetadata != null) throw missingMetadata;
             throw hedge[1] != null ? hedge[1] : hedge[0];
         } finally { pool.shutdownNow(); }
     }
@@ -135,7 +150,7 @@ final class EpisodeResolver {
             throw new GuestFailure("本集需要官网支持的登录播放流程，请在官方应用查看");
         if(!Boolean.TRUE.equals(data.opt("protectedPlayback")))return null;
         if(!Boolean.TRUE.equals(data.opt("isSuccess"))||!exact(data,"series_id",sid)||!exact(data,"vid",vid)||
-            !exact(detail,"series_id",sid)||!exact(seo,"seriesId",sid)||!exact(seo,"itemId",vid))
+            !exact(detail,"series_id",sid))
             throw new GuestFailure("官网播放信息与所选分集不一致");
         if(req!=null&&(Boolean.TRUE.equals(req.opt("pcLoginRequired"))||Boolean.TRUE.equals(req.opt("pcAuthenticatedPlayback"))))
             throw new GuestFailure("本集需要官网支持的登录播放流程，请在官方应用查看");
@@ -146,10 +161,18 @@ final class EpisodeResolver {
         // server POST and full unencrypted-file gate remain authoritative.
         if(req==null||!Boolean.FALSE.equals(req.opt("pcLoginRequired"))||!Boolean.FALSE.equals(req.opt("pcAuthenticatedPlayback"))||!(req.opt("encryptedBrowserAllowed") instanceof Boolean))
             throw new GuestFailure("官网未明确允许本集使用公开游客播放流程");
-        if(!Boolean.TRUE.equals(seo.opt("available")))throw new GuestFailure("官网暂未允许本集公开播放");
         JSONArray vids=detail.optJSONArray("vid_list");boolean present=false;
         for(int i=0;vids!=null&&i<vids.length();i++)if(vid.equals(vids.opt(i)))present=true;
         if(!present)throw new GuestFailure("官网分集不属于当前剧集");
+        // Absence is not a denial, but null, malformed or partial SEO is not absence.
+        // Stop here: no guest POST, SEO URL, guessed metadata or extra web request.
+        if(!data.has("publicVideoSeo")) {
+            if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("已切换分集");
+            throw new MetadataUnavailable();
+        }
+        if(!exact(seo,"seriesId",sid)||!exact(seo,"itemId",vid))
+            throw new GuestFailure("官网播放信息与所选分集不一致");
+        if(!Boolean.TRUE.equals(seo.opt("available")))throw new GuestFailure("官网暂未允许本集公开播放");
         Object raw=seo.opt("durationSeconds"),w=seo.opt("width"),h=seo.opt("height");
         if(!(raw instanceof Number)||!Double.isFinite(((Number)raw).doubleValue())||((Number)raw).doubleValue()<1||((Number)raw).doubleValue()>7200||
             !(w instanceof Number)||!(h instanceof Number))throw new GuestFailure("官网缺少可验证的分集时长或尺寸");
