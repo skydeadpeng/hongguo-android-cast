@@ -73,10 +73,16 @@ def episode(directory, commit, index, exit_code, private_log):
     print('QA_EPISODE_RESULT=' + json.dumps(result, ensure_ascii=False, separators=(',',':')))
 
 
-def summary(directory, commit, finished):
+def summary(directory, commit, finished, selection='all'):
+    if selection not in ('all', 'tenth-only'):
+        raise ValueError('Unknown fixed episode selection')
+    subset = selection == 'tenth-only'
+    requested = 1 if subset else 10
     rows=[]
     for index,vid in enumerate(contract.TEN_VIDS,1):
         try:
+            if subset and index != 10:
+                raise ValueError('outside_current_subset')
             row=strict(directory/f'episode-{index:02}'/'result.json')
             if row.get('episode_index')!=index or row.get('vid')!=vid or row.get('commit')!=commit:
                 raise ValueError('identity')
@@ -86,21 +92,27 @@ def summary(directory, commit, finished):
         rows.append(row)
     passed=sum(row.get('attempted') is True and row.get('status')=='PASSED' and row.get('five_seconds_verified') is True and row.get('required_advance_ms')==5000 and row.get('first_frame_observed') is True for row in rows)
     attempted=sum(row.get('attempted') is True for row in rows)
+    host_stop_confirmed = not (directory/'host-stop-failed').exists()
+    success = passed == requested and attempted == requested and host_stop_confirmed
+    all_ten = finished and not subset and success
     data={'schema':1,'commit':commit,'series_id':'7703410222160694296','title':'都说了，别惹那个乞丐',
           'scope':'first_ten_episodes_native_opening_and_5_seconds_not_full_episodes',
-          'requested_count':10,'attempted_count':attempted,'passed_count':passed,
+          'mode':selection,'retest_indices':[10] if subset else [],'host_stop_confirmed':host_stop_confirmed,
+          'requested_count':requested,'attempted_count':attempted,'passed_count':passed,
           'first_frame_observed_count':sum(row.get('first_frame_observed') is True for row in rows),
           'failed_count':attempted-passed,
-          'not_run_count':10-attempted,'status':'PASSED' if finished and passed==10 else 'COMPLETE_WITH_FAILURES' if finished else 'IN_PROGRESS',
-          'all_ten_opened_and_advanced':finished and passed==10,'episodes':rows}
+          'not_run_count':10-attempted,'status':'PASSED' if finished and success else 'COMPLETE_WITH_FAILURES' if finished else 'IN_PROGRESS',
+          'all_ten_opened_and_advanced':all_ten,'episodes':rows}
     (directory/'ten-episode-summary.json').write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
     if finished:
-        state={'status':'PASSED' if passed==10 else 'FAILED','commit':commit,'reason':'all_ten_verified' if passed==10 else 'one_or_more_episodes_not_verified',
-               'requested_count':10,'attempted_count':attempted,'passed_count':passed,
-          'first_frame_observed_count':sum(row.get('first_frame_observed') is True for row in rows),'all_ten_opened_and_advanced':passed==10}
+        state={'status':'PASSED' if success else 'FAILED','commit':commit,
+               'reason':('tenth_episode_subset_verified' if subset else 'all_ten_verified') if success else 'one_or_more_episodes_or_host_stop_not_verified',
+               'mode':selection,'retest_indices':[10] if subset else [],'host_stop_confirmed':host_stop_confirmed,
+               'requested_count':requested,'attempted_count':attempted,'passed_count':passed,
+          'first_frame_observed_count':sum(row.get('first_frame_observed') is True for row in rows),'all_ten_opened_and_advanced':all_ten}
         (directory/'workflow-status.json').write_text(json.dumps(state,indent=2)+'\n')
-    print(f'QA_BATCH_COUNTS attempted={attempted} passed={passed} requested=10 finished={str(finished).lower()}')
-    return passed==10
+    print(f'QA_BATCH_COUNTS attempted={attempted} passed={passed} requested={requested} mode={selection} finished={str(finished).lower()}')
+    return success
 
 
 def main():
@@ -117,8 +129,10 @@ def main():
         if not ok:raise SystemExit(1)
     elif mode=='--episode':
         episode(Path(sys.argv[2]),sys.argv[3],int(sys.argv[4]),int(sys.argv[5]),Path(sys.argv[6]))
-    elif mode in ('--summary','--finish'):
-        if not summary(Path(sys.argv[2]),sys.argv[3],mode=='--finish') and mode=='--finish':raise SystemExit(1)
+    elif mode in ('--summary','--finish','--summary-tenth-subset','--finish-tenth-subset'):
+        finished = mode in ('--finish', '--finish-tenth-subset')
+        selection = 'tenth-only' if mode.endswith('-tenth-subset') else 'all'
+        if not summary(Path(sys.argv[2]),sys.argv[3],finished,selection) and finished:raise SystemExit(1)
     else:raise SystemExit('Unknown fixed QA mode')
 
 if __name__=='__main__':main()

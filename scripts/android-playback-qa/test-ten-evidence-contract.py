@@ -105,6 +105,16 @@ with tempfile.TemporaryDirectory() as tmp:
         row={'episode_index':index,'vid':contract.TEN_VIDS[index-1],'commit':COMMIT,'status':'PASSED','attempted':True,'five_seconds_verified':True,'first_frame_observed':True,'required_advance_ms':5000}
         (ep/'result.json').write_text(json.dumps(row))
     assert batch.summary(directory,COMMIT,True);checks+=1
+    # A subset ignores even matching old results for the other nine identities.
+    assert batch.summary(directory,COMMIT,True,'tenth-only');checks+=1
+    data=json.loads((directory/'ten-episode-summary.json').read_text())
+    assert data['mode']=='tenth-only' and data['retest_indices']==[10] and data['requested_count']==1
+    assert data['attempted_count']==data['passed_count']==1 and data['not_run_count']==9
+    assert not data['all_ten_opened_and_advanced'] and all(r['status']=='NOT_RUN' for r in data['episodes'][:9]);checks+=1
+    (directory/'host-stop-failed').write_text('unconfirmed stop')
+    assert not batch.summary(directory,COMMIT,True,'tenth-only');checks+=1
+    assert not batch.summary(directory,COMMIT,True);checks+=1
+    (directory/'host-stop-failed').unlink()
     row['commit']='b'*40;(directory/'episode-10/result.json').write_text(json.dumps(row))
     assert not batch.summary(directory,COMMIT,True);checks+=1
     data=json.loads((directory/'ten-episode-summary.json').read_text());assert data['attempted_count']==9 and data['not_run_count']==1;checks+=1
@@ -112,4 +122,15 @@ with tempfile.TemporaryDirectory() as tmp:
     (directory/'episode-10/result.json').write_text(json.dumps(row))
     assert not batch.summary(directory,COMMIT,True);checks+=1
     data=json.loads((directory/'ten-episode-summary.json').read_text());assert data['attempted_count']==10 and data['failed_count']==1;checks+=1
+    assert not batch.summary(directory,COMMIT,True,'tenth-only');checks+=1
+    row.update(status='PASSED',five_seconds_verified=True)
+    (directory/'episode-10/result.json').write_text(json.dumps(row))
+    for index in range(1,10):(directory/f'episode-{index:02}'/'result.json').unlink()
+    assert batch.summary(directory,COMMIT,True,'tenth-only');checks+=1
+    assert not batch.summary(directory,COMMIT,True);checks+=1
+    data=json.loads((directory/'workflow-status.json').read_text())
+    assert data['status']=='FAILED' and not data['all_ten_opened_and_advanced'];checks+=1
+    try:batch.summary(directory,COMMIT,True,'ninth-only')
+    except ValueError:checks+=1
+    else:raise AssertionError('arbitrary subset accepted')
 print(f'TEN_EPISODE_EVIDENCE_CONTRACT_OK checks={checks} metadata_only=true android_execution=false network_requests=0')

@@ -172,3 +172,26 @@ network, media fixture or source injection.
 legacy/schema separation, both clock thresholds, observation minimums, target-cache name
 matching and rejected source/path/interval inputs. It complements
 `PlaybackFailureCategoryChecks`; neither claims live device playback.
+
+### Host-only tenth-episode retry
+
+`run-ten-episodes.sh` accepts only `QA_EPISODE_SELECTION=all` (default) or
+`QA_EPISODE_SELECTION=tenth-only`. The latter selects only the final fixed manifest row,
+with the unchanged batch index 10/VID, production instrumentation and evidence gates.
+It does not accept arbitrary episode identities, sources or retry counts. The hosted runner
+still creates and verifies a new isolated AVD; the target episode cache must be absent.
+
+`--summary-tenth-subset` / `--finish-tenth-subset` record `mode=tenth-only`,
+`retest_indices=[10]` and `requested_count=1`. All ten identities remain in the report,
+but the other nine are `NOT_RUN`, even if matching old result files exist. Subset success
+requires exactly one attempted and passing episode plus confirmed host process stops.
+`all_ten_opened_and_advanced` always remains false in this mode. Its `PASSED` workflow
+status and `QA_SUBSET_ACCEPTANCE=TENTH_EPISODE_REAL_FIRST_FRAME_AND_5_SECONDS` marker
+mean only that episode 10 passed; the full ten-episode acceptance marker is never emitted.
+The ordinary `--finish` still rejects a single passing episode as an incomplete batch.
+Both modes fail closed if either host force-stop fails, even with otherwise passing evidence.
+
+Offline fake-ADB tests exercise the fixed single invocation, caller-stdin isolation,
+instrumentation failure/timeout, both stop failures, unknown selection rejection, valid
+metadata fixtures and separation of subset success from full-batch success. These fixtures
+are not real device, source or playback evidence.

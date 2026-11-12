@@ -1,4 +1,4 @@
-name: Android ten-episode QA
+name: Android tenth-episode retry
 
 # A single explicitly approved test-branch push. This does not grant ongoing
 # KVM permission to arbitrary future pushes, other branches, or user computers.
@@ -17,13 +17,13 @@ concurrency:
   cancel-in-progress: false
 jobs:
   playback:
-    name: Ten isolated real Android episodes
+    name: Isolated tenth-episode retry
     if: >-
       github.ref == 'refs/heads/test/hongguo-ten-episode-opening' &&
-      github.event.before == '4b45102833871c1b33bcac862b4a88793a071ff6' &&
+      github.event.before == '112bd63bfd5031eedba7ba6a197d4d95dcfe98ad' &&
       contains(github.event.head_commit.message, '[run-approved-android-ten-20261111]')
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,7 +48,7 @@ jobs:
           export ANDROID_AVD_HOME="$RUNNER_TEMP/hongguo-playback-avd"
           printf 'QA_RUNNER_ENVIRONMENT=%s\nQA_OUT=%s\nQA_PRIVATE=%s\nANDROID_AVD_HOME=%s\n' \
             "$QA_RUNNER_ENVIRONMENT" "$QA_OUT" "$QA_PRIVATE" "$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
-          printf 'QA_EPISODE_MODE=ten\n' >> "$GITHUB_ENV"
+          printf 'QA_EPISODE_MODE=ten\nQA_EPISODE_SELECTION=tenth-only\n' >> "$GITHUB_ENV"
           mkdir -p "$QA_OUT" "$QA_PRIVATE" "$ANDROID_AVD_HOME"
           printf '{"status":"NOT_RUN","apk_execution":false,"first_frame":false,"continuous_30_seconds":false}\n' > "$QA_OUT/workflow-status.json"
       - name: Validate evidence acceptance rules (not device playback)
@@ -132,7 +132,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hongguo-ten-episode-playback
+          name: hongguo-tenth-episode-retry
           path: |
             ${{ runner.temp }}/hongguo-playback-qa/workflow-status.json
             ${{ runner.temp }}/hongguo-playback-qa/preflight/preflight.json
