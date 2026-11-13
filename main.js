@@ -42,6 +42,10 @@ const axios = require('axios');
 const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { randomUUID, createHash } = require('node:crypto');
+// 黄果线路：首次并发测速钉住最快线路并持久记忆；便携版资料目录迁移完成后 userData 已定型。
+try {
+  require('./src/native/huangguo').configureStateFile(path.join(app.getPath('userData'), 'huangguo-line.json'));
+} catch (error) { console.warn('[Config] 黄果线路记忆不可用:', error.message); }
 
 const hongguo = require('./src/native/hongguo');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./src/native/download-quality');
