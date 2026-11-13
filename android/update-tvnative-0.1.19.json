@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 20,
+  "versionName": "0.1.19",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.19/HongguoNative-0.1.19-tvNative-release-compatible.apk",
+  "size": 688024,
+  "sha256": "3a9a71e802e8ca76856faedf228c2534af25a6e137de8d4751ae8ff39aae9b42",
+  "notes": "修复部分剧集第二、三集无法播放：这些集的官网公开源使用了电视无法解码的视频编码（ByteVC2），旧版直接判定失败并终止。本版检测到该编码时不再终止，而是自动改走 App 片源链并更换新设备身份重新取源（App 片源为 H.264/HEVC 可正常播放），多数情况下一次即可恢复；若上游整体拒答仍会给出明确提示，稍后重试即可。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-13T15:10:00.000Z"
+}

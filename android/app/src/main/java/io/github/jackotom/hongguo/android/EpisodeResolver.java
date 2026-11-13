@@ -35,8 +35,14 @@ final class EpisodeResolver {
     /** Short first budget: a hung CDN edge must not consume the whole wait alone. */
     private static final int FIRST_BUDGET_MS = 2000, HEDGE_BUDGET_MS = 6000;
     /** Returns a lexically checked URL; the player's transport must run NetworkGuard.media before use. */
-    static final class GuestFailure extends IOException {
+    static class GuestFailure extends IOException {
         GuestFailure(String message) { super(message); }
+    }
+    /** The public guest file itself uses a codec this player cannot decode (e.g. ByteVC2).
+     *  Unlike other guest verdicts this is a property of the offered file, not a permission
+     *  decision, so the coordinator may retry the App model chain with a fresh identity. */
+    static final class GuestCodecFailure extends GuestFailure {
+        GuestCodecFailure(String message) { super(message); }
     }
     private static final class GuestPage {
         final String sid, vid; final double duration; final int width, height;

@@ -25,7 +25,8 @@ final class MainActivity extends android.content.Context {
     void script(String script)throws Exception{if(callback==null)throw new AssertionError("unexpected bridge request");callback.call(script);}
 }
 final class EpisodeResolver {
-    static final class GuestFailure extends IOException {GuestFailure(String message){super(message);}}
+    static class GuestFailure extends IOException {GuestFailure(String message){super(message);}}
+    static final class GuestCodecFailure extends GuestFailure {GuestCodecFailure(String message){super(message);}}
     static int calls;static JSONObject info;static Exception failure;
     static JSONObject resolveInfo(String sid,String vid)throws Exception {
         calls++;if(failure!=null)throw failure;if(info==null)throw new AssertionError("unconfigured resolver boundary");return new JSONObject(info.toString());

@@ -1,0 +1,31 @@
+tvNative 0.1.19 发行记录（2026-11-13）
+
+背景
+- 0.1.18 后真机《无声夫君锦绣妻》第 2/3 集仍失败；0.1.18 的详细错误文案定位到具体原因：
+  「官网视频编码或轨道类型不受支持」——官网公开源部分分集为 ByteVC2 编码（电视无法解码），
+  verify 拒绝正确，但拒绝后按终态处理直接失败。
+
+改动
+- EpisodeResolver：GuestFailure 去 final，新增 GuestCodecFailure（公开源文件本身为设备
+  不支持编码——文件属性而非权限判定）。
+- PlaybackSources：guest 下载/验证遇「编码或轨道类型不受支持」抛 GuestCodecFailure，
+  文案「本集官网公开源为电视不支持的视频编码，已改走 App 片源重试」。
+- canRecoverPlayback：GuestCodecFailure 可恢复（其余 GuestFailure 仍终态）→
+  PlayerActivity 恢复链以 recovering 分支重新走 App 模型（RegisteredPlaybackModel
+  每次取源自带三身份轮换），App 片源为 H.264/HEVC，电视可播。
+- 三个测试脚本的 EpisodeResolver 桩同步补 GuestCodecFailure。
+- versionCode 20 / versionName 0.1.19。
+
+验证
+- 回归：guest-resolver(223)、guest-integration(502)、initial-playback(98+104)、
+  http403(473) 全过。
+- 构建：--tvnative-release-compatible 通过。
+
+边界
+- 若 App 链三身份也被上游分级拒绝，最终仍失败（提示 App 片源准备未成功），稍后重试。
+- 真机安装仍走应用内更新通道（ROM 拦 adb 直装）。
+
+资产
+- dist/android/HongguoNative-0.1.19-tvNative-release-compatible.apk
+  size 688024, sha256 3a9a71e802e8ca76856faedf228c2534af25a6e137de8d4751ae8ff39aae9b42
+- feed：android/update-tvnative-0.1.19.json 与 android/update-tvnative.json（同步）

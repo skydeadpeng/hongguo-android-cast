@@ -436,6 +436,12 @@ final class PlaybackSources {
                 // Surface the concrete gate that rejected the file: dimension/timeline/
                 // container checks fail for different reasons and the fix differs.
                 String detail=failure.getMessage()==null||failure.getMessage().isEmpty()?failure.getClass().getSimpleName():failure.getMessage();
+                // A codec this device cannot decode is a property of the offered file, not a
+                // permission verdict: let the coordinator retry the App chain with a fresh identity.
+                if(detail.equals("官网视频编码或轨道类型不受支持")) {
+                    EpisodeResolver.GuestCodecFailure codec=new EpisodeResolver.GuestCodecFailure("本集官网公开源为电视不支持的视频编码，已改走 App 片源重试");
+                    codec.initCause(failure);throw codec;
+                }
                 EpisodeResolver.GuestFailure terminal=new EpisodeResolver.GuestFailure("官网视频未通过完整播放验证（"+detail+"），请重试或换一集");
                 terminal.initCause(failure);throw terminal;
             }
@@ -523,6 +529,7 @@ final class PlaybackSources {
         if(error==null||cancelled(error))return false;
         boolean recoverable=false;Set<Throwable> seen=Collections.newSetFromMap(new IdentityHashMap<Throwable,Boolean>());
         for(Throwable cause=error;cause!=null&&seen.add(cause);cause=cause.getCause()) {
+            if(cause instanceof EpisodeResolver.GuestCodecFailure)return true;
             if(cause instanceof EpisodeResolver.GuestFailure||cause instanceof javax.net.ssl.SSLException||cause instanceof java.security.cert.CertificateException||cause instanceof JSONException||cause instanceof IllegalArgumentException||cause instanceof java.net.URISyntaxException||cause instanceof SecurityException||cause instanceof CancellationException)return false;
             if(cause instanceof AppLookupException) {
                 String code=((AppLookupException)cause).code;
