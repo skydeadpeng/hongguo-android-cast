@@ -171,8 +171,9 @@ public final class PublicPlaybackVerifierTest {
         for (double seconds : new double[]{0, -1, Double.NaN, Double.POSITIVE_INFINITY, 21601}) {
             reset(); rejects("invalid expected duration", () -> PublicPlaybackVerifier.verify(source, seconds, 360, 640));
         }
-        for (int[] dims : new int[][]{{0,640},{360,-1},{8193,640},{8192,8192},{640,360}}) {
-            reset(); rejects("invalid or mismatched dimensions", () -> PublicPlaybackVerifier.verify(source, EXPECTED, dims[0], dims[1]));
+        // Declared dimensions are advisory since 0.1.18; only invalid ones are rejected up front.
+        for (int[] dims : new int[][]{{0,640},{360,-1},{8193,640},{8192,8192}}) {
+            reset(); rejects("invalid declared dimensions", () -> PublicPlaybackVerifier.verify(source, EXPECTED, dims[0], dims[1]));
         }
         reset(); active = false; rejects("cancel before open", PublicPlaybackVerifierTest::verify);
         reset(); Thread.currentThread().interrupt();
@@ -235,8 +236,10 @@ class MediaFormat {
         return key.equals(KEY_MAX_INPUT_SIZE);
     }
     int getInteger(String key) {
+        // Since 0.1.18 small or metadata-level dimension drift is accepted (declared values
+        // are advisory); only genuinely invalid dimensions are rejected.
         if (key.equals(KEY_WIDTH)) return MediaExtractor.mode.equals("bad-width") ? 0 : MediaExtractor.width;
-        if (key.equals(KEY_HEIGHT)) return MediaExtractor.mode.equals("bad-height") ? 641 : MediaExtractor.height;
+        if (key.equals(KEY_HEIGHT)) return MediaExtractor.mode.equals("bad-height") ? 0 : MediaExtractor.height;
         if (MediaExtractor.mode.equals("bad-input-size")) return -1;
         if (MediaExtractor.mode.equals("huge-input-size")) return 9 * 1024 * 1024;
         return 8192;

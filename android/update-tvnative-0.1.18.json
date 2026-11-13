@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 19,
+  "versionName": "0.1.18",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.18/HongguoNative-0.1.18-tvNative-release-compatible.apk",
+  "size": 687832,
+  "sha256": "5eb75e486005e441f62b93a335611c6fdc3c5fa93c0d1bc7a7142f662176bf66",
+  "notes": "修复部分剧集第一集「官网视频未通过完整播放验证」：官网公开预览的实际分辨率与页面声明可能不一致（如声明原片尺寸、实际下发预览转码），旧版按声明精确比对会误拒。本版不再要求实际尺寸与页面声明完全一致，仅要求实际尺寸有效；防错集仍由整集时长、完整未加密 MP4 结构与全样本校验保障。\n若仍有个别集失败，错误提示现在会显示具体未通过的原因，便于进一步定位。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-13T14:30:00.000Z"
+}

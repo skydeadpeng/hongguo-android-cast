@@ -89,8 +89,12 @@ final class PublicPlaybackVerifier {
                     video = i;
                     int width = format.getInteger(MediaFormat.KEY_WIDTH);
                     int height = format.getInteger(MediaFormat.KEY_HEIGHT);
-                    if (!validDimensions(width, height) || width != expectedWidth || height != expectedHeight)
-                        throw failure("官网视频实际尺寸与声明不符");
+                    // Since 0.1.18 the declared seo dimensions are advisory only: the public
+                    // preview transcode does not necessarily match the page metadata, while a
+                    // wrong-episode file is still excluded by the duration timeline gate and
+                    // the complete unencrypted-container checks below.
+                    if (!validDimensions(width, height))
+                        throw failure("官网视频实际尺寸无效");
                 }
                 for (String key : new String[]{"crypto-key", "crypto-mode", "crypto-default-iv-size",
                         "crypto-encrypted-byte-block", "crypto-skip-byte-block"}) {

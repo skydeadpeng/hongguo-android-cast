@@ -433,7 +433,10 @@ final class PlaybackSources {
             } catch(Exception failure) {
                 if(destination.exists()&&!destination.delete())throw new EpisodeResolver.GuestFailure("未完成的官网视频清理失败");
                 if(cancelled(failure))throw failure;
-                EpisodeResolver.GuestFailure terminal=new EpisodeResolver.GuestFailure("官网视频未通过完整播放验证，请在官方应用查看");
+                // Surface the concrete gate that rejected the file: dimension/timeline/
+                // container checks fail for different reasons and the fix differs.
+                String detail=failure.getMessage()==null||failure.getMessage().isEmpty()?failure.getClass().getSimpleName():failure.getMessage();
+                EpisodeResolver.GuestFailure terminal=new EpisodeResolver.GuestFailure("官网视频未通过完整播放验证（"+detail+"），请重试或换一集");
                 terminal.initCause(failure);throw terminal;
             }
         }

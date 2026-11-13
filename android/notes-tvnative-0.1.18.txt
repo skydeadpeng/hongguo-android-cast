@@ -1,0 +1,29 @@
+tvNative 0.1.18 发行记录（2026-11-13）
+
+背景
+- 真机（tc8000）上《无声夫君锦绣妻》第 1 集报「官网视频未通过完整播放验证，请在官方应用查看」。
+- 链路：App 链三身份被上游身份分级全拒 → 落官网游客公开链（guestPlayback plan）→ 整集下载
+  → PublicPlaybackVerifier.verify 拒绝；具体子检查原因被 catch 吞掉（UI 只显示笼统文案）。
+
+改动
+- PublicPlaybackVerifier：实际视频尺寸不再要求与页面声明的 seo 尺寸精确相等（公开预览转码
+  与页面元数据不一致是常态），仅要求实际尺寸有效；防错集保障不变（整集时长时间轴、完整
+  非碎片未加密 MP4 结构、全样本 demux、DRM/加密轨道拒绝）。
+- PlaybackSources guest 下载 catch：错误文案附带具体未通过原因（尺寸/时长/结构/网络），
+  便于后续定位与用户反馈。
+- versionCode 19 / versionName 0.1.18。
+
+验证
+- 回归：public-playback-verifier(66)、guest-resolver(223)、guest-integration(502) 全过；
+  测试中「声明与实际差 1 像素应拒」的用例按新语义更新为仅无效尺寸拒绝。
+- 模拟器 0.1.18 冒烟：《无声夫君锦绣妻》第 1 集本地缓存起播、连续播放正常（音量 0）。
+
+边界
+- 真机 adb 装包仍被 tc8000 ROM 的包校验拦截（INSTALL_FAILED_VERIFICATION_FAILURE），
+  本版经应用内更新通道安装验证。
+- 若根因并非尺寸声明不符（例如 fMP4 或时间轴），错误文案会显示具体原因，按反馈继续修。
+
+资产
+- dist/android/HongguoNative-0.1.18-tvNative-release-compatible.apk
+  size 687832, sha256 5eb75e486005e441f62b93a335611c6fdc3c5fa93c0d1bc7a7142f662176bf66
+- feed：android/update-tvnative-0.1.18.json 与 android/update-tvnative.json（同步）
