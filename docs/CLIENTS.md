@@ -9,17 +9,19 @@
 | Android 手机 | 0.12.x | [Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases) `Hongguo-*-phone-*.apk` | 触屏操作、本机播放、DLNA 投屏、按剧下载、扫码登录云同步 |
 | Android TV / 电视盒子 | 0.12.x | [Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases) `Hongguo-*-tv-*.apk` | 遥控器友好的 WebView 界面，原生解码播放 |
 | Android 原生 TV | 0.1.x | [Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases) `HongguoNative-*.apk` | 不依赖系统 WebView 的全原生电视界面 |
-| Windows 电脑 | 2.3.x | [Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases) `hongguo-downloader-*-win-x64-setup.exe` / `*-win-x64.zip` | 电脑看短剧，批量下载 + 一键合并导出 mp4 |
-| macOS 电脑（Apple Silicon / Intel） | 2.3.x | [Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases) `hongguo-downloader-*-mac-*.dmg` / `.zip` | 同 Windows 版功能，macOS 13+ |
-| Linux 电脑 | 2.3.x | [Releases](https://github.com/skydeadpeng/hongguo-android-cast/releases) `hongguo-downloader-*-linux-x86_64.AppImage` / `.tar.gz` | AppImage 双击即用 |
+| Windows 电脑 | 以上游为准 | [上游 Releases](https://github.com/jackotom/hongguo-drama/releases/latest) `hongguo-downloader-*-win-x64-setup.exe` / `*-win-x64.zip` | 电脑看短剧，批量下载 + 一键合并导出 mp4；由上游项目发布 |
+| macOS 电脑（Apple Silicon / Intel） | 以上游为准 | [上游 Releases](https://github.com/jackotom/hongguo-drama/releases/latest) `Hongguo-*-mac-*.dmg` / `.zip` | 同 Windows 版功能，macOS 13+；由上游项目发布 |
+| Linux 电脑 | 以上游为准 | [上游 Releases](https://github.com/jackotom/hongguo-drama/releases/latest) `hongguo-downloader-*-linux-x64.AppImage` | AppImage 双击即用；由上游项目发布 |
+
+Android 客户端由本仓库发布；桌面三端（Windows / macOS / Linux）由上游项目 [jackotom/hongguo-drama](https://github.com/jackotom/hongguo-drama) 构建与发布，版本与更新以上游为准。
 
 ### 安装要点
 
 - **Android 手机 / 平板**：下载 phone APK 直接安装（需允许安装未知来源应用）；覆盖安装保留本地记录；要求 Android 8.0+。
 - **Android TV / 投屏盒子 / 电视**：U 盘拷入 TV APK 用电视自带文件管理器安装，或通过 adb 安装：`adb install Hongguo-*-tv-*.apk`。TV 版与手机版应用 ID 不同，互不影响。
-- **Windows**：setup.exe 安装版（开始菜单 / 桌面快捷方式）或 zip 免安装绿色版（解压即用）。未做代码签名，SmartScreen 首次提示选「仍要运行」。
-- **macOS**：Apple Silicon 选 `mac-arm64`，Intel 选 `mac-x64`。未做公证，首次打开：右键 →「打开」。内置 ffmpeg，无需 Homebrew。
-- **Linux**：`chmod +x *.AppImage && ./…AppImage`；或解压 tar.gz 运行。内置 ffmpeg。
+- **Windows**：setup.exe 安装版（开始菜单 / 桌面快捷方式）或 zip 免安装绿色版（解压即用）。上游 EXE 未做代码签名，SmartScreen 首次提示选「仍要运行」。
+- **macOS**：Apple Silicon 选 `mac-arm64`，Intel 选 `mac-x64`。上游 Mac 包已完成开发者签名与公证，可直接打开。内置 ffmpeg，无需 Homebrew。
+- **Linux**：`chmod +x *.AppImage && ./…AppImage`。内置 ffmpeg。
 - 桌面三端的合并导出、兼容格式转码所需 ffmpeg / ffprobe 均已随包内置，来源与许可见各包 `resources/bin` 内说明文件。
 
 ## 开发中的客户端
