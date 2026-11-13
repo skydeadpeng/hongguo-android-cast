@@ -264,6 +264,75 @@ public final class GuestPlaybackIntegrationTest {
         check(rejected.getMessage().equals("fixture: upstream refused playback"),"App business denial remains the displayed reason");
         check(!PlaybackSources.canRecoverPlayback(rejected)&&Fixture.appCalls==2,"no retry after explicit App denial");
     }
+    private static void explicitPlaybackLookup() throws Exception {
+        PlaybackSources.attachNative(null);
+        MainActivity activity=new MainActivity();
+        List<String> webCalls=new ArrayList<>(),nativeCalls=new ArrayList<>();
+        String nativeUrl="https://fixture.qznovelvod.com/native-only.mp4";
+        activity.callback=script->{
+            check(script.startsWith("window.__androidAppResolve &&"),"manual lookup uses existing WebView callback");
+            JSONArray args=new JSONArray("["+script.substring(script.indexOf('(')+1,script.lastIndexOf(')'))+"]");
+            check(args.length()==4&&SID.equals(args.getString(1))&&VID.equals(args.getString(2)),"legacy WebView retains exact identities");
+            String quality=args.getString(3);webCalls.add(quality);
+            JSONObject playInfo=basic("app").put("requestedQuality",quality);
+            PlaybackSources.result(new JSONObject().put("requestId",args.getString(0)).put("seriesId",SID)
+                .put("vid",VID).put("requestedQuality",quality).put("playInfo",playInfo));
+        };
+        PlaybackSources.NativeLookup lookup=(sid,vid,quality,ceiling,timeout)->{
+            check(SID.equals(sid)&&VID.equals(vid),"explicit lookup retains exact series and episode");
+            check(timeout>0&&timeout<=28000,"explicit lookup receives a bounded timeout");
+            nativeCalls.add(quality+":"+ceiling);
+            return basic("app").put("url",nativeUrl).put("requestedQuality",quality).put("playbackCeiling",ceiling);
+        };
+        PlaybackSources.attach(activity);
+        try {
+            Exception missing=new EpisodeResolver.GuestPublicUnavailable("fixture: no verified public playback metadata");
+            EpisodeResolver.failure=missing;
+            check(fails(()->PlaybackSources.resolve(SID,VID,"auto"),"manual missing SEO")==missing,
+                    "manual auto does not use the new foreground-only fallback");
+            PlaybackSources.Plan playback=PlaybackSources.resolvePlayback(SID,VID,"auto",0,false,false,lookup);
+            check(playback.url.equals(nativeUrl)&&playback.source.equals("app")&&!playback.guestPlayback,
+                    "missing public data uses explicit native App model without inventing guest provenance");
+            check(nativeCalls.equals(List.of("auto:0"))&&webCalls.isEmpty()&&EpisodeResolver.calls==2,
+                    "one selected native model lookup and no WebView for foreground fallback");
+
+            PlaybackSources.Plan retry=PlaybackSources.resolvePlayback(SID,VID,"720p",1079,true,true,lookup);
+            check(retry.url.equals(nativeUrl)&&retry.playbackCeiling==1079&&retry.requestedQuality.equals("720p"),
+                    "fresh lower quality reconnect retains explicit native ownership and limits");
+            check(nativeCalls.equals(List.of("auto:0","720p:1079"))&&webCalls.isEmpty()&&EpisodeResolver.calls==2,
+                    "fresh reconnect uses no guest or WebView request");
+
+            PlaybackSources.Plan manual=PlaybackSources.resolve(SID,VID,"720p");
+            check(manual.url.equals(basic("app").getString("url"))&&!manual.url.equals(nativeUrl),
+                    "manual App source still resolves through the attached WebView");
+            check(webCalls.equals(List.of("720p"))&&nativeCalls.size()==2,
+                    "foreground strategy does not leak into legacy source calls");
+
+            // Clear the failed-web marker before checking the normal public-first route.
+            reset();PlaybackSources.attachNative(null);PlaybackSources.attach(activity);
+            EpisodeResolver.info=guest(System.currentTimeMillis()/1000L+3600);
+            PlaybackSources.Plan guest=PlaybackSources.resolvePlayback(SID,VID,"auto",0,false,false,lookup);
+            check(guest.guestPlayback&&guest.url.equals(URL),"valid public plan still wins before the explicit App lookup");
+            check(nativeCalls.size()==2&&webCalls.size()==1,"valid public plan makes no App lookup");
+
+            EpisodeResolver.failure=missing;
+            PlaybackSources.NativeLookup appDenied=(sid,vid,quality,ceiling,timeout)->{
+                Fixture.appCalls++;
+                throw new AppMediaSource.AppSourceException("fixture: App playback not authorized","BUSINESS_REJECTED");
+            };
+            Exception appError=fails(()->PlaybackSources.resolvePlayback(SID,VID,"auto",0,false,false,appDenied),"explicit App refusal");
+            check(appError.getMessage().equals("fixture: App playback not authorized"),"explicit App refusal retains its real reason");
+            check(Fixture.appCalls==1&&!PlaybackSources.canRecoverPlayback(appError)&&webCalls.size()==1,
+                    "explicit App refusal neither retries nor switches to the WebView");
+
+            Exception denied=new EpisodeResolver.GuestFailure("fixture: explicit public refusal");
+            EpisodeResolver.failure=denied;
+            check(fails(()->PlaybackSources.resolvePlayback(SID,VID,"auto",0,false,false,lookup),"public denial")==denied,
+                    "explicit public refusal still blocks foreground App fallback");
+            check(nativeCalls.size()==2&&webCalls.size()==1&&NetworkGuard.transfers.isEmpty()&&PublicPlaybackVerifier.calls==0,
+                    "denial invokes neither lookup nor transfer");
+        } finally { PlaybackSources.detach(activity); }
+    }
     private static void fixedQuality() throws Exception {
         EpisodeResolver.info=guest(System.currentTimeMillis()/1000L+3600);
         List<String> requested=new ArrayList<>();
@@ -379,6 +448,7 @@ public final class GuestPlaybackIntegrationTest {
             run("direct-validator-cancellation",GuestPlaybackIntegrationTest::directVerifierCancellation,failures);
             run("resolver-denial-no-fallback",GuestPlaybackIntegrationTest::resolverRefusal,failures);
             run("missing-public-playback-only",GuestPlaybackIntegrationTest::missingPublicPlaybackOnly,failures);
+            run("explicit-native-playback-lookup",GuestPlaybackIntegrationTest::explicitPlaybackLookup,failures);
             run("fixed-quality-no-guest",GuestPlaybackIntegrationTest::fixedQuality,failures);
             run("complete2-cache-isolation",GuestPlaybackIntegrationTest::cacheRevision,failures);
             run("activity-foreground-source-invariant",()->activityInvariant(Paths.get(args[0])),failures);

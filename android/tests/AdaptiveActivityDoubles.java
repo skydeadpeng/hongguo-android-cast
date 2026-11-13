@@ -62,7 +62,9 @@ class PlaybackCache {
 }
 class NetworkGuard {static final String UA="fixture-ua",REFERER="https://fixture.invalid/";interface TransferProgress {void onProgress(long bytes,long totalBytes);}}
 class HuangguoApi {static void recordResolution(String sid,int width,int height){}}
+class RegisteredPlaybackLookup {static JSONObject resolve(String sid,String vid,String quality,int ceiling,long timeoutMs){throw new AssertionError("lookup is owned by the source boundary in this fixture");}}
 class PlaybackSources {
+ interface NativeLookup {JSONObject lookup(String sid,String vid,String quality,int ceiling,long timeoutMs)throws Exception;}
  static final class QualityUnavailableException extends IOException {QualityUnavailableException(String m){super(m);}}
  static final class Plan {boolean guestPlayback;int width,height,playbackCeiling;String source="app",url="https://fixture.invalid/media",userAgent="fixture-ua",referer="https://fixture.invalid/";}
  static final List<String> calls=new ArrayList<>(),owners=new ArrayList<>();static final Map<String,Exception> failures=new HashMap<>(),onceFailures=new HashMap<>();static final Map<String,String> sourceKinds=new HashMap<>();static Runnable onResolve;static volatile Runnable onResolvedRetry;static final Map<String,Integer> ceilings=new HashMap<>(),pixelEdges=new HashMap<>();static final List<String> playbackRequests=new ArrayList<>();
@@ -71,6 +73,7 @@ class PlaybackSources {
  static Plan resolve(String sid,String vid,String q)throws Exception{calls.add("resolve:"+vid+":"+q);owners.add(sid+":"+vid+":"+q);Runnable action=onResolve;onResolve=null;if(action!=null)action.run();Exception e=onceFailures.remove(q);if(e==null)e=failures.get(q);if(e!=null)throw e;Plan p=new Plan();p.source=sourceKinds.getOrDefault(q,"app");return p;}
  static Plan recover(String sid,String vid,String q,boolean web)throws Exception{int index=calls.size();try{return resolve(sid,vid,q);}finally{if(calls.size()>index)calls.set(index,"recover:"+vid+":"+q);}}
  static Plan resolvePlayback(String sid,String vid,String q,int ceiling,boolean fresh,boolean failedWeb)throws Exception{playbackRequests.add(q+":"+ceiling+":"+fresh+":"+failedWeb);Plan p=fresh?recover(sid,vid,q,failedWeb):resolve(sid,vid,q);p.playbackCeiling=ceiling;p.width=pixelEdges.getOrDefault(q,0);p.height=p.width*2;ceilings.put(q,ceiling);if(fresh&&onResolvedRetry!=null)onResolvedRetry.run();return p;}
+ static Plan resolvePlayback(String sid,String vid,String q,int ceiling,boolean fresh,boolean failedWeb,NativeLookup lookup)throws Exception{if(lookup==null)throw new AssertionError("explicit registered playback strategy is required");return resolvePlayback(sid,vid,q,ceiling,fresh,failedWeb);}
  static boolean canRecoverPlayback(Exception e){return !(e instanceof java.io.InterruptedIOException)&&!(e instanceof javax.net.ssl.SSLException)&&canLowerQuality(e)||e instanceof java.net.SocketTimeoutException;}
  static Plan find(String u,String q){return null;}static Plan register(JSONObject info,String vid,boolean checked){return new Plan();}
  static boolean canLowerQuality(Exception e){return e instanceof QualityUnavailableException||e instanceof UnknownHostException||e instanceof SocketTimeoutException||e instanceof IOException&&"片源响应 HTTP 403".equals(e.getMessage());}

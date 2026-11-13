@@ -16,6 +16,7 @@ final class PlaybackSources {
         final boolean guestPlayback;
         final double expectedDurationSeconds;
         final long urlExpiresAt;
+        private final NativeLookup playbackLookup;
         Plan(String url, String key, String ua, String ref, String source, String vid, String seriesId, String requestedQuality, int width, int height, String quality, List<Plan> variants) {
             this(url,key,ua,ref,source,vid,seriesId,requestedQuality,width,height,quality,variants,0);
         }
@@ -23,11 +24,18 @@ final class PlaybackSources {
             this(url,key,ua,ref,source,vid,seriesId,requestedQuality,width,height,quality,variants,playbackCeiling,false,0,0);
         }
         private Plan(String url,String key,String ua,String ref,String source,String vid,String seriesId,String requestedQuality,int width,int height,String quality,List<Plan> variants,int playbackCeiling,boolean guestPlayback,double expectedDurationSeconds,long urlExpiresAt) {
+            this(url,key,ua,ref,source,vid,seriesId,requestedQuality,width,height,quality,variants,playbackCeiling,guestPlayback,expectedDurationSeconds,urlExpiresAt,null);
+        }
+        private Plan(String url,String key,String ua,String ref,String source,String vid,String seriesId,String requestedQuality,int width,int height,String quality,List<Plan> variants,int playbackCeiling,boolean guestPlayback,double expectedDurationSeconds,long urlExpiresAt,NativeLookup playbackLookup) {
             this.guestPlayback=guestPlayback;this.expectedDurationSeconds=expectedDurationSeconds;this.urlExpiresAt=urlExpiresAt;
             this.playbackCeiling=playbackCeiling;
+            this.playbackLookup=playbackLookup;
             this.url=url; contentKey=key; userAgent=ua; referer=ref; this.source=source; this.vid=vid; this.seriesId=seriesId;
             this.requestedQuality=requestedQuality;this.width=width;this.height=height;this.quality=quality;
             this.variants=Collections.unmodifiableList(new ArrayList<>(variants));
+        }
+        private Plan withPlaybackLookup(NativeLookup lookup) {
+            return lookup==null?this:new Plan(url,contentKey,userAgent,referer,source,vid,seriesId,requestedQuality,width,height,quality,variants,playbackCeiling,guestPlayback,expectedDurationSeconds,urlExpiresAt,lookup);
         }
         JSONObject json() throws JSONException {
             JSONObject result=new JSONObject().put("url",url).put("contentKey",contentKey==null?JSONObject.NULL:contentKey).put("userAgent",userAgent).put("referer",referer).put("source",source).put("vid",vid).put("requestedQuality",requestedQuality);
@@ -62,7 +70,7 @@ final class PlaybackSources {
         QualityUnavailableException(String message) { super(message); }
     }
     static synchronized void attach(MainActivity value) { activity = new WeakReference<>(value); }
-    /** Native-UI lookup used when no WebView page owns resolution; phone/tv keep the page path. */
+    /** Internal Java model strategy; playback can pin it without changing legacy callers. */
     interface NativeLookup { JSONObject lookup(String sid, String vid, String requestedQuality, int ceiling, long timeoutMs) throws Exception; }
     private static volatile NativeLookup nativeLookup;
     static void attachNative(NativeLookup lookup) { nativeLookup = lookup; }
@@ -197,15 +205,15 @@ final class PlaybackSources {
         return resolve(sid,vid,"auto");
     }
     static Plan resolve(String sid,String vid,String quality) throws Exception {
-        return resolve(sid,vid,quality,false);
+        return resolve(sid,vid,quality,false,null);
     }
-    private static Plan resolve(String sid,String vid,String quality,boolean allowUnavailablePublicFallback) throws Exception {
+    private static Plan resolve(String sid,String vid,String quality,boolean allowUnavailablePublicFallback,NativeLookup lookup) throws Exception {
         String requestedQuality=MediaQuality.normalize(quality);
         requireIdentity(sid,vid);
-        if (requestedQuality.equals("480p")||requestedQuality.equals("360p"))return resolvePlayback(sid,vid,requestedQuality,defaultPlaybackCeiling(requestedQuality),false,false);
-        if (!requestedQuality.equals("auto")) return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true);
+        if (requestedQuality.equals("480p")||requestedQuality.equals("360p"))return resolvePlayback(sid,vid,requestedQuality,defaultPlaybackCeiling(requestedQuality),false,false,lookup);
+        if (!requestedQuality.equals("auto")) return register(bindSeries(resolveApp(sid,vid,requestedQuality,true,0,lookup),sid),vid,true);
         if (webFailureActive(sid,vid)) {
-            try { return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true); }
+            try { return register(bindSeries(resolveApp(sid,vid,requestedQuality,true,0,lookup),sid),vid,true); }
             catch (Exception appError) {
                 if (cancelled(appError)) throw appError;
                 // Like the desktop, the penalty changes priority, not permanent availability.
@@ -220,7 +228,7 @@ final class PlaybackSources {
             return resolveWeb(sid,vid);
         } catch (Exception webError) {
             if (cancelled(webError) || terminalGuestFailure(webError,allowUnavailablePublicFallback)) throw webError;
-            try { return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true); }
+            try { return register(bindSeries(resolveApp(sid,vid,requestedQuality,true,0,lookup),sid),vid,true); }
             catch (Exception appError) {
                 if (!cancelled(appError) && appError != webError) appError.addSuppressed(webError);
                 throw appError;
@@ -236,15 +244,19 @@ final class PlaybackSources {
     }
     /** Fresh or bounded playback lookup; this opt-in path never changes manual download policy. */
     static Plan resolvePlayback(String sid,String vid,String quality,int ceiling,boolean fresh,boolean failedWeb) throws Exception {
+        return resolvePlayback(sid,vid,quality,ceiling,fresh,failedWeb,null);
+    }
+    /** The explicit strategy belongs only to this playback plan, never the URL index or bridge JSON. */
+    static Plan resolvePlayback(String sid,String vid,String quality,int ceiling,boolean fresh,boolean failedWeb,NativeLookup lookup) throws Exception {
         String requested=MediaQuality.normalize(quality);requireIdentity(sid,vid);
         if(isHuangguoVid(vid))return huangguoPlan(sid,vid);
         if(ceiling<0||ceiling>16384)throw new IllegalArgumentException("播放清晰度边界无效");
         if(ceiling==0&&(requested.equals("480p")||requested.equals("360p")))ceiling=defaultPlaybackCeiling(requested);
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
         if(failedWeb)markWebFailure(sid,vid);
-        if(ceiling==0&&!fresh)return resolve(sid,vid,requested,true);
+        if(ceiling==0&&!fresh)return resolve(sid,vid,requested,true,lookup).withPlaybackLookup(lookup);
         if(fresh)recoveryPause();
-        return register(bindSeries(resolveApp(sid,vid,requested,!fresh,ceiling),sid),vid,true);
+        return register(bindSeries(resolveApp(sid,vid,requested,!fresh,ceiling,lookup),sid),vid,true).withPlaybackLookup(lookup);
     }
     private static Plan resolveWeb(String sid,String vid) throws Exception {
         JSONObject info=EpisodeResolver.resolveInfo(sid,vid);
@@ -314,17 +326,17 @@ final class PlaybackSources {
         return new JSONObject(input.toString()).put("seriesId",sid);
     }
     private static JSONObject resolveApp(String sid,String vid,String requestedQuality) throws Exception {
-        return resolveApp(sid,vid,requestedQuality,true);
-    }
-    private static JSONObject resolveApp(String sid,String vid,String requestedQuality,boolean retryInitialLookup) throws Exception {
-        return resolveApp(sid,vid,requestedQuality,retryInitialLookup,0);
+        return resolveApp(sid,vid,requestedQuality,true,0,null);
     }
     private static JSONObject resolveApp(String sid,String vid,String requestedQuality,boolean retryInitialLookup,int ceiling) throws Exception {
+        return resolveApp(sid,vid,requestedQuality,retryInitialLookup,ceiling,null);
+    }
+    private static JSONObject resolveApp(String sid,String vid,String requestedQuality,boolean retryInitialLookup,int ceiling,NativeLookup lookup) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(30);
         for(int attempt=0;;attempt++) {
             long remaining=TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime());
             if(remaining<=0)throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT");
-            try {return resolveAppAttempt(sid,vid,requestedQuality,Math.min(28000,remaining),ceiling);}
+            try {return resolveAppAttempt(sid,vid,requestedQuality,Math.min(28000,remaining),ceiling,lookup);}
             catch(AppLookupException error) {
                 // Android 12 AddressCache retains negative DNS results for two seconds.
                 long delayMs=RESPONSE_RETRY_CODE.equals(error.code)?700:error.code.equals("ENOTFOUND")||error.code.equals("EAI_AGAIN")?2100:500;
@@ -338,11 +350,11 @@ final class PlaybackSources {
             }
         }
     }
-    private static JSONObject resolveAppAttempt(String sid,String vid,String requestedQuality,long timeoutMs,int ceiling) throws Exception {
+    private static JSONObject resolveAppAttempt(String sid,String vid,String requestedQuality,long timeoutMs,int ceiling,NativeLookup playbackLookup) throws Exception {
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
-        NativeLookup lookup = nativeLookup;
+        NativeLookup lookup = playbackLookup!=null?playbackLookup:nativeLookup;
         if (lookup != null) {
-            if (pending.size()>=8) throw new IOException("分集正在准备，请稍后重试");
+            if (playbackLookup==null&&pending.size()>=8) throw new IOException("分集正在准备，请稍后重试");
             JSONObject info;
             try { info = lookup.lookup(sid, vid, requestedQuality, ceiling, timeoutMs); }
             catch (AppMediaSource.AppSourceException error) { throw new AppLookupException(error.getMessage()==null?"App片源暂未取得":error.getMessage(), error.code); }
@@ -511,7 +523,7 @@ final class PlaybackSources {
             recoveryPause(dnsTransferFailure?2100:500L*(refreshes+1));
             // Refresh only this job's in-memory plan. The original URL remains its cache identity.
             ++refreshes;
-            current=preparePlan(bindSeries(resolveApp(plan.seriesId,plan.vid,plan.requestedQuality,false,plan.playbackCeiling),plan.seriesId),plan.vid,false);
+            current=preparePlan(bindSeries(resolveApp(plan.seriesId,plan.vid,plan.requestedQuality,false,plan.playbackCeiling,plan.playbackLookup),plan.seriesId),plan.vid,false);
         }
         String addressChange=refreshes==0?"":current.url.equals(plan.url)?"，主地址未变化":"，主地址已变化";
         throw new IOException("App片源准备未成功："+(last==null?"请重试":last.getMessage())+

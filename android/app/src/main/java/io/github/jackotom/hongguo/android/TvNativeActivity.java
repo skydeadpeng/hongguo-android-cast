@@ -57,18 +57,7 @@ public class TvNativeActivity extends Activity {
             handler.postDelayed(this, 1800);
         }
     };
-    private final PlaybackSources.NativeLookup lookup = (sid, vid, quality, ceiling, timeoutMs) ->
-        registeredSource().resolve(vid, quality, ceiling == 0 ? null : Integer.valueOf(ceiling));
-    /** Fresh anonymous registration per lookup, exactly like the production fallback path. */
-    static AppMediaSource registeredSource() {
-        return new AppMediaSource(vid -> {
-            try (RegisteredPlaybackModel model = new RegisteredPlaybackModel()) {
-                return model.fetch(vid);
-            } catch (RegisteredPlaybackModel.ModelError error) {
-                throw new AppMediaSource.AppSourceException(error.getMessage(), error.code);
-            }
-        });
-    }
+    private final PlaybackSources.NativeLookup lookup = RegisteredPlaybackLookup::resolve;
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         TvUi.prepareWindow(this);

@@ -29,7 +29,8 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     private volatile OfficialApiClient registering;
     private volatile Thread owner;
 
-    RegisteredPlaybackModel() { this(new OfficialTransport(), new ModelHttpTransport(), System.nanoTime() + MAX_NANOS); }
+    RegisteredPlaybackModel() { this(System.nanoTime() + MAX_NANOS); }
+    RegisteredPlaybackModel(long deadline) { this(new OfficialTransport(), new ModelHttpTransport(), deadline); }
     RegisteredPlaybackModel(OfficialApiClient.Transport registration, OfficialApiClient.Transport modelTransport, long deadline) {
         this.registration = Objects.requireNonNull(registration); this.modelTransport = Objects.requireNonNull(modelTransport);
         this.deadline = Math.min(deadline, System.nanoTime() + MAX_NANOS);

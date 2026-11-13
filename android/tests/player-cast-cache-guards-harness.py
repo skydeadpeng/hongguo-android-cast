@@ -62,12 +62,15 @@ final class GuardCache {
  void fetch(String series,String vid,int index,String url,String quality){fetches.add(vid+":"+quality);ownerFetches.add(series+":"+vid+":"+index+":"+quality);if(duringFetch!=null)duringFetch.run();}
  void prune(String series,int index,int ahead){prunes.add(index+":"+ahead);}
 }
+final class RegisteredPlaybackLookup {static JSONObject resolve(String series,String vid,String quality,int ceiling,long timeoutMs){throw new AssertionError("lookup is owned by the source boundary in this fixture");}}
 final class PlaybackSources {
+ interface NativeLookup {JSONObject lookup(String series,String vid,String quality,int ceiling,long timeoutMs)throws Exception;}
  static final class Plan {final String url;final int playbackCeiling;Plan(String url){this(url,0);}Plan(String url,int ceiling){this.url=url;this.playbackCeiling=ceiling;}}
  static final List<String> calls=new ArrayList<>(),owners=new ArrayList<>();static Runnable duringResolve;static boolean fail;
  static void reset(){calls.clear();owners.clear();duringResolve=null;fail=false;}
  static Plan find(String url,String quality){return null;}
  static Plan resolvePlayback(String series,String vid,String quality,int ceiling,boolean fresh,boolean failedWeb)throws IOException{Plan p=resolve(series,vid,quality);return new Plan(p.url,ceiling);}
+ static Plan resolvePlayback(String series,String vid,String quality,int ceiling,boolean fresh,boolean failedWeb,NativeLookup lookup)throws IOException{if(lookup==null)throw new AssertionError("explicit registered playback strategy is required");return resolvePlayback(series,vid,quality,ceiling,fresh,failedWeb);}
  static Plan resolve(String series,String vid,String quality)throws IOException{calls.add(vid+":"+quality);owners.add(series+":"+vid+":"+quality);if(duringResolve!=null)duringResolve.run();if(fail)throw new IOException("fixture lookup failure");return new Plan("https://fixture.invalid/"+vid+".mp4");}
 }
 '''

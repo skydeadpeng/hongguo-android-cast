@@ -1,6 +1,9 @@
 package io.github.jackotom.hongguo.android;
 
 import org.json.*;
+import java.io.File;
+import java.nio.file.Files;
+import java.util.Arrays;
 
 /** The native-UI lookup hook owns resolution without a WebView page; offline stubs only. */
 public final class PlaybackSourcesNativeLookupTest {
@@ -78,6 +81,49 @@ public final class PlaybackSourcesNativeLookupTest {
                 };
                 PlaybackSources.Plan plan = PlaybackSources.resolve(SID, VID, "1080p");
                 check(plan.url.endsWith("page.mp4") && calls[0] == 1, "page path resumes after detach");
+            });
+            group("explicit playback strategy is pinned across CDN refresh and never enters URL lookup or JSON", () -> {
+                NetworkGuard.reset();
+                PlaybackSources.NativeLookup unrelated = (sid, vid, quality, ceiling, timeoutMs) -> { throw new AssertionError("legacy lookup cannot replace captured playback strategy"); };
+                nativeAttach(unrelated);
+                host.callback = script -> { throw new AssertionError("explicit playback cannot call the WebView"); };
+                int[] calls = {0};
+                PlaybackSources.NativeLookup owner = (sid, vid, quality, ceiling, timeoutMs) -> {
+                    check(SID.equals(sid) && VID.equals(vid) && quality.equals("720p") && ceiling == 1079, "every attempt preserves playback identity, quality and ceiling");
+                    return model(calls[0]++ == 0 ? "expired" : "renewed", quality).put("playbackCeiling", ceiling);
+                };
+                PlaybackSources.Plan plan = PlaybackSources.resolvePlayback(SID, VID, "720p", 1079, true, false, owner);
+                check(calls[0] == 1 && plan.url.endsWith("expired.mp4"), "explicit strategy wins for original playback lookup");
+                PlaybackSources.Plan indexed = PlaybackSources.find(plan.url, "720p");
+                check(indexed != null && indexed != plan && indexed.json().toString().equals(plan.json().toString()), "plan strategy is private and not placed in the global URL index or serialized");
+                NetworkGuard.outcomes.put(plan.url, "eof");
+                File target = Files.createTempDirectory("hongguo-native-strategy").resolve("transfer.mp4").toFile();
+                try {
+                    PlaybackSources.download(plan, target, 1024);
+                    check(calls[0] == 2 && NetworkGuard.attempted.equals(Arrays.asList(plan.url, model("renewed", "720p").getString("url"))), "CDN failure refreshes via captured strategy exactly once");
+                    check(target.length() > 0, "fresh CDN bytes reach the destination");
+                } finally {
+                    Files.deleteIfExists(target.toPath()); Files.deleteIfExists(target.getParentFile().toPath());
+                }
+            });
+            group("explicit strategy is captured even when original public page has a valid direct URL", () -> {
+                NetworkGuard.reset();
+                String original = "https://cdn.qznovelvod.com/web-first.mp4";
+                EpisodeResolver.result = original;
+                int[] calls = {0};
+                PlaybackSources.Plan plan = PlaybackSources.resolvePlayback(SID, VID, "auto", 0, false, false, (sid, vid, quality, ceiling, timeoutMs) -> {
+                    calls[0]++;
+                    return model("web-refresh", quality);
+                });
+                check(original.equals(plan.url) && plan.source.equals("web") && calls[0] == 0, "valid public source still wins normal Auto lookup");
+                NetworkGuard.outcomes.put(original, "eof");
+                File target = Files.createTempDirectory("hongguo-web-strategy").resolve("transfer.mp4").toFile();
+                try {
+                    PlaybackSources.download(plan, target, 1024);
+                    check(calls[0] == 1 && NetworkGuard.attempted.equals(Arrays.asList(original, model("web-refresh", "auto").getString("url"))), "public CDN failure uses captured strategy instead of legacy owner");
+                } finally {
+                    Files.deleteIfExists(target.toPath()); Files.deleteIfExists(target.getParentFile().toPath());
+                }
             });
         } finally {
             nativeTeardown();

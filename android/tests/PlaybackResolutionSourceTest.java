@@ -12,13 +12,21 @@ public final class PlaybackResolutionSourceTest {
  static JSONObject envelope(JSONArray a)throws Exception{JSONObject p=new JSONObject().put("requestId",a.getString(0)).put("seriesId",a.getString(1)).put("vid",a.getString(2)).put("requestedQuality",a.getString(3));if(a.length()>4)p.put("playbackCeiling",a.getInt(4));return p;}
  static void callback(java.util.function.Consumer<JSONArray> reply){host.callback=script->{try{reply.accept(args(script));}catch(Exception e){throw new RuntimeException(e);}};}
  static void success(JSONArray a,int shortEdge){try{PlaybackSources.result(envelope(a).put("playInfo",model(a.getString(3),shortEdge,a.length()>4?a.getInt(4):0)));}catch(Exception e){throw new RuntimeException(e);}}
+ static void invokeLegacyAttempt(long timeout)throws Exception{
+  Method attempt;
+  try{attempt=PlaybackSources.class.getDeclaredMethod("resolveAppAttempt",String.class,String.class,String.class,long.class,int.class,PlaybackSources.NativeLookup.class);}
+  catch(NoSuchMethodException baseline){attempt=PlaybackSources.class.getDeclaredMethod("resolveAppAttempt",String.class,String.class,String.class,long.class,int.class);}
+  attempt.setAccessible(true);
+  try{if(attempt.getParameterCount()==6)attempt.invoke(null,SID,VID,"auto",timeout,0,null);else attempt.invoke(null,SID,VID,"auto",timeout,0);}
+  catch(InvocationTargetException e){throw(Exception)e.getCause();}
+ }
  public static void main(String[]args)throws Exception{
   try{resolve=PlaybackSources.class.getDeclaredMethod("resolvePlayback",String.class,String.class,String.class,int.class,boolean.class,boolean.class);classify=PlaybackSources.class.getDeclaredMethod("canRecoverPlayback",Exception.class);}catch(NoSuchMethodException absent){System.out.println("FAIL missing actual bounded fresh playback source API / resolution ceiling");System.exit(1);return;}
   PlaybackSources.attach(host);
   try{
    group("timed-out native waiter aborts only its matching registered model job",()->{
-    List<String> scripts=new ArrayList<>();host.callback=scripts::add;Method attempt=PlaybackSources.class.getDeclaredMethod("resolveAppAttempt",String.class,String.class,String.class,long.class,int.class);attempt.setAccessible(true);
-    Exception failure=reject(()->{try{attempt.invoke(null,SID,VID,"auto",25L,0);}catch(InvocationTargetException e){throw(Exception)e.getCause();}});
+    List<String> scripts=new ArrayList<>();host.callback=scripts::add;
+    Exception failure=reject(()->invokeLegacyAttempt(25L));
     check(failure.getMessage().contains("超时"),"actual future timeout is preserved");
     check(scripts.size()==2&&scripts.get(1).contains("__androidAppCancelResolve"),"native waiter cancels matching JavaScript model job");
     check(args(scripts.get(0)).getString(0).equals(args(scripts.get(1)).getString(0)),"cancel uses original opaque operation ID");
@@ -26,8 +34,8 @@ public final class PlaybackResolutionSourceTest {
    });
    group("interrupted native waiter cancels registered job without a later reply",()->{
     List<String>scripts=Collections.synchronizedList(new ArrayList<>());java.util.concurrent.CountDownLatch started=new java.util.concurrent.CountDownLatch(1);java.util.concurrent.atomic.AtomicReference<Throwable>failure=new java.util.concurrent.atomic.AtomicReference<>();java.util.concurrent.atomic.AtomicBoolean interrupted=new java.util.concurrent.atomic.AtomicBoolean();
-    host.callback=script->{scripts.add(script);if(script.contains("__androidAppResolve("))started.countDown();};Method attempt=PlaybackSources.class.getDeclaredMethod("resolveAppAttempt",String.class,String.class,String.class,long.class,int.class);attempt.setAccessible(true);
-    Thread thread=new Thread(()->{try{attempt.invoke(null,SID,VID,"auto",1000L,0);}catch(Throwable e){failure.set(e instanceof InvocationTargetException?e.getCause():e);interrupted.set(Thread.currentThread().isInterrupted());}});thread.start();check(started.await(1,java.util.concurrent.TimeUnit.SECONDS),"request started");thread.interrupt();thread.join(1000);
+    host.callback=script->{scripts.add(script);if(script.contains("__androidAppResolve("))started.countDown();};
+    Thread thread=new Thread(()->{try{invokeLegacyAttempt(1000L);}catch(Throwable e){failure.set(e);interrupted.set(Thread.currentThread().isInterrupted());}});thread.start();check(started.await(1,java.util.concurrent.TimeUnit.SECONDS),"request started");thread.interrupt();thread.join(1000);
     check(!thread.isAlive()&&failure.get() instanceof InterruptedException&&interrupted.get(),"interruption retained and waiter stopped");
     check(scripts.size()==2&&scripts.get(1).contains("__androidAppCancelResolve"),"interrupted waiter stops JavaScript and native operation");
     check(args(scripts.get(0)).getString(0).equals(args(scripts.get(1)).getString(0)),"interruption never cancels a new selection");

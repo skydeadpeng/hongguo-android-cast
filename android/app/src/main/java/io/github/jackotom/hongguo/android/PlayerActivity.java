@@ -502,10 +502,10 @@ public final class PlayerActivity extends Activity {
                 if (recovering) {
                     final String sid = media.seriesId, vid = target.optString("vid");
                     if (boundedRefetch) {
-                        media.plan = resolveRetry(() -> PlaybackSources.resolvePlayback(sid, vid, stageQuality, ceiling, true, failedWeb));
+                        media.plan = resolveRetry(() -> PlaybackSources.resolvePlayback(sid, vid, stageQuality, ceiling, true, failedWeb, RegisteredPlaybackLookup::resolve));
                     } else {
                         cache.invalidate(sid, vid, target.optInt("index"), stageQuality, ceiling);
-                        media.plan = PlaybackSources.resolvePlayback(sid, vid, stageQuality, ceiling, true, failedWeb);
+                        media.plan = PlaybackSources.resolvePlayback(sid, vid, stageQuality, ceiling, true, failedWeb, RegisteredPlaybackLookup::resolve);
                     }
                 } else if (initialUrl != null && ceiling == 0) {
                     media.plan = PlaybackSources.find(initialUrl, stageQuality);
@@ -515,7 +515,7 @@ public final class PlayerActivity extends Activity {
                         info.put("requestedQuality", stageQuality);
                         media.plan = PlaybackSources.register(info, target.optString("vid"), false);
                     }
-                } else media.plan = PlaybackSources.resolvePlayback(media.seriesId, target.optString("vid"), stageQuality, ceiling, false, failedWeb);
+                } else media.plan = PlaybackSources.resolvePlayback(media.seriesId, target.optString("vid"), stageQuality, ceiling, false, failedWeb, RegisteredPlaybackLookup::resolve);
                 if (destroyed || token != generation || Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("播放准备已取消");
                 if (media.plan.playbackCeiling != ceiling) throw new java.io.IOException("播放片源清晰度边界不匹配");
                 // 黄果为 AES-128 HLS 直链：无论画质档位恒走在线播放，不进入整文件缓存。
@@ -1050,7 +1050,7 @@ public final class PlayerActivity extends Activity {
                 if (token != generation || destroyed || !autoplay || castWasActive) return;
                 if (cache.find(sid, following.optString("vid"), following.optInt("index"), targetQuality, targetCeiling) != null
                         || (targetCeiling == 0 && "auto".equals(targetQuality) && downloaded(following) != null)) return;
-                PlaybackSources.Plan plan = PlaybackSources.resolvePlayback(sid, following.optString("vid"), targetQuality, targetCeiling, false, false);
+                PlaybackSources.Plan plan = PlaybackSources.resolvePlayback(sid, following.optString("vid"), targetQuality, targetCeiling, false, false, RegisteredPlaybackLookup::resolve);
                 if (token == generation && !destroyed && !castWasActive && autoplay && actualQuality.equals(targetQuality)
                         && stageCeiling(actualQuality, automaticCeiling) == targetCeiling) cacheEpisode(sid, following, plan, targetQuality, token);
             } catch (Exception ignored) { /* The next episode is checked again when requested. */ }
