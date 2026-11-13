@@ -322,18 +322,27 @@ final class NetworkGuard {
     public static void download(String value, File destination, long maxBytes) throws Exception {
         download(value, destination, maxBytes, UA, REFERER);
     }
+    /** Same defaults as above with a foreground progress sink (may be null). */
+    public static void download(String value, File destination, long maxBytes, TransferProgress progress) throws Exception {
+        download(value, destination, maxBytes, UA, REFERER, System.nanoTime() + 120_000_000_000L, progress);
+    }
     static void download(String value, File destination, long maxBytes, String userAgent, String referer) throws Exception {
         download(value, destination, maxBytes, userAgent, referer, System.nanoTime() + 120_000_000_000L);
     }
     /** Shared deadline keeps a multi-segment cast from receiving a fresh timeout per segment. */
     static void download(String value, File destination, long maxBytes, String userAgent, String referer, long deadline) throws Exception {
-        downloadResource(value,destination,maxBytes,userAgent,referer,deadline,true);
+        downloadResource(value,destination,maxBytes,userAgent,referer,deadline,true,null);
+    }
+    /** Foreground whole-file downloads surface transfer progress; totalBytes < 0 means the length is unknown. */
+    static void download(String value, File destination, long maxBytes, String userAgent, String referer, long deadline, TransferProgress progress) throws Exception {
+        downloadResource(value,destination,maxBytes,userAgent,referer,deadline,true,progress);
     }
     /** Binary identity AES-128 HLS key only; some origins label these 16 bytes text/plain. */
     static void downloadHlsKey(String value,File destination,long deadline) throws Exception {
-        downloadResource(value,destination,16,UA,"https://huangguoai.com/",deadline,false);
+        downloadResource(value,destination,16,UA,"https://huangguoai.com/",deadline,false,null);
     }
-    private static void downloadResource(String value,File destination,long maxBytes,String userAgent,String referer,long deadline,boolean media) throws Exception {
+    interface TransferProgress { void onProgress(long bytes, long totalBytes); }
+    private static void downloadResource(String value,File destination,long maxBytes,String userAgent,String referer,long deadline,boolean media,TransferProgress progress) throws Exception {
         remaining(deadline, Integer.MAX_VALUE);
         if (userAgent == null || referer == null || userAgent.length() > 2048 || referer.length() > 2048 || userAgent.indexOf('\r') >= 0 || userAgent.indexOf('\n') >= 0 || referer.indexOf('\r') >= 0 || referer.indexOf('\n') >= 0) throw new IOException("片源请求头无效");
         if (destination == null || maxBytes <= 0) throw new IllegalArgumentException("下载参数无效");
@@ -377,8 +386,8 @@ final class NetworkGuard {
                         if (status != 200) throw new IOException("片源响应 HTTP " + status);
                         touchedDestination = true;
                         try (FileOutputStream output = new FileOutputStream(destination)) {
-                            if(media)streamMediaBody(input, output, headers, maxBytes, deadline);
-                            else streamBody(input, output, headers, maxBytes, deadline);
+                            if(media)streamMediaBody(input, output, headers, maxBytes, deadline, progress);
+                            else streamBody(input, output, headers, maxBytes, deadline, progress);
                             output.flush();
                             output.getFD().sync();
                         }
@@ -413,14 +422,20 @@ final class NetworkGuard {
     }
     /** Media-only MIME check; AppTransport legitimately uses streamBody for JSON. */
     static long streamMediaBody(InputStream input, OutputStream output, Map<String, String> headers, long maxBytes, long deadline) throws IOException {
+        return streamMediaBody(input, output, headers, maxBytes, deadline, null);
+    }
+    static long streamMediaBody(InputStream input, OutputStream output, Map<String, String> headers, long maxBytes, long deadline, TransferProgress progress) throws IOException {
         String type = headers.getOrDefault("content-type", "").split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
         if (Arrays.asList("text/html", "application/xhtml+xml", "text/plain", "application/json", "application/xml", "text/xml").contains(type) || type.endsWith("+json")) {
             throw new MediaResponseException("片源返回了非视频内容，请重新连接片源");
         }
-        return streamBody(input, output, headers, maxBytes, deadline);
+        return streamBody(input, output, headers, maxBytes, deadline, progress);
     }
     /** Package-visible for offline framing tests and bounded App JSON bodies. */
     static long streamBody(InputStream input, OutputStream output, Map<String, String> headers, long maxBytes, long deadline) throws IOException {
+        return streamBody(input, output, headers, maxBytes, deadline, null);
+    }
+    static long streamBody(InputStream input, OutputStream output, Map<String, String> headers, long maxBytes, long deadline, TransferProgress progress) throws IOException {
         if (maxBytes <= 0) throw new IOException("播放缓存大小上限无效");
         if (!headers.getOrDefault("content-encoding", "identity").equalsIgnoreCase("identity")) throw new IOException("片源压缩编码不受支持");
         String transfer = headers.get("transfer-encoding");
@@ -444,7 +459,8 @@ final class NetworkGuard {
                         if (trailer.indexOf(':') <= 0) throw new IOException("片源分块尾部无效");
                     }
                 }
-                total += copyBinary(input, output, length, maxBytes - total, deadline);
+                final long base = total;
+                total += copyBinary(input, output, length, maxBytes - total, deadline, progress == null ? null : (bytes, ignored) -> progress.onProgress(base + bytes, -1));
                 if (!line(input, 2).isEmpty()) throw new IOException("片源响应分块格式无效");
             }
         }
@@ -454,11 +470,11 @@ final class NetworkGuard {
             try { length = Long.parseLong(contentLength); } catch (NumberFormatException error) { throw new IOException("片源响应长度无效", error); }
             if (length > maxBytes) throw new IOException("片源超过单集缓存上限");
         }
-        return copyBinary(input, output, length, maxBytes, deadline);
+        return copyBinary(input, output, length, maxBytes, deadline, progress);
     }
-    private static long copyBinary(InputStream input, OutputStream output, long length, long maxBytes, long deadline) throws IOException {
+    private static long copyBinary(InputStream input, OutputStream output, long length, long maxBytes, long deadline, TransferProgress progress) throws IOException {
         byte[] buffer = new byte[32 * 1024];
-        long total = 0, remaining = length;
+        long total = 0, remaining = length, lastReport = System.nanoTime();
         while (remaining != 0) {
             if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException("播放缓存任务已取消");
             if (System.nanoTime() > deadline) throw new IOException("播放缓存下载超时");
@@ -467,7 +483,13 @@ final class NetworkGuard {
             if (count > maxBytes - total) throw new IOException("片源超过单集缓存上限");
             output.write(buffer, 0, count); total += count;
             if (remaining > 0) remaining -= count;
+            // Throttled foreground reporting: at most one callback per 200 ms, always one for the final chunk.
+            if (progress != null && (remaining == 0 || System.nanoTime() - lastReport >= 200_000_000L)) {
+                lastReport = System.nanoTime();
+                progress.onProgress(total, length);
+            }
         }
+        if (progress != null) progress.onProgress(total, length);
         return total;
     }
     private static Reply request(String value, boolean officialOnly, boolean head) throws Exception {

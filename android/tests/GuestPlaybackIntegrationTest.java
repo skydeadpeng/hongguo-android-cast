@@ -286,9 +286,10 @@ public final class GuestPlaybackIntegrationTest {
     private static void activityInvariant(Path source) throws Exception {
         String text=Files.readString(source,StandardCharsets.UTF_8);
         String compact=text.replaceAll("\\s+","");
-        String condition="if(!huangguoStream&&(media.plan.guestPlayback||!media.plan.source.equals(\"web\")||!\"auto\".equals(stageQuality))){";
+        // Since 0.1.17 every non-Huangguo plan (guest included) takes the whole-file cache branch.
+        String condition="if(!huangguoStream){";
         int start=compact.indexOf(condition);
-        check(start>=0,"PlayerActivity includes guest in mandatory cache branch");
+        check(start>=0,"PlayerActivity sends every non-Huangguo plan (guest included) through the whole-file cache branch");
         int end=compact.indexOf("}else{media.remote=media.plan.url",start);
         check(end>start,"guest cache branch ends before direct URL playback");
         String branch=compact.substring(start,end);

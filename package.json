@@ -2,7 +2,7 @@
   "name": "hongguo-downloader",
   "version": "6.2.0",
   "description": "红果短剧播放与下载",
-  "main": "main.js",
+  "main": "main-android.js",
   "license": "GPL-3.0",
   "scripts": {
     "start": "electron .",

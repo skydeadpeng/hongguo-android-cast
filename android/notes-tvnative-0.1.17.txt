@@ -1,0 +1,34 @@
+tvNative 0.1.17 发行记录（2026-11-13）
+
+背景
+- 用户要求：所有集数统一用「下载后本地播放」方案；无缓存时把下载进度（百分比/MB/速度）
+  显示出来；后台预缓存（连播预取窗口）保留不动。
+
+改动
+- PlayerActivity.prepareMedia：缓存分支条件由「游客源 / 非 web 源 / 非 auto 画质」放宽为
+  「非黄果一律整集下载」；黄果 AES-128 HLS 直链仍恒在线播放（整文件缓存不适用）。
+- NetworkGuard：TransferProgress 回调（200ms 节流，chunked 传输按累计字节报告，总长未知时
+  totalBytes=-1）；download/streamMediaBody/streamBody 增带进度重载，旧签名不变（其他调用方零改动）。
+- PlaybackSources：ACTIVE_PROGRESS（ThreadLocal）——只有前台整集下载线程注册进度，队列预取
+  线程不注册，天然不污染前台显示；guest/App/直连三条下载路径全部透传进度。
+- PlayerActivity.reportDownloadProgress：状态栏显示「正在下载本集 N% · x.x/y.y MB · z.z MB/s」
+  （总长未知时显示已下 MB），完成显示「本集下载完成 · 正在准备播放」；差分测速，200ms 网络层节流。
+- versionCode 18 / versionName 0.1.17。
+
+验证
+- 回归：initial-playback(104)、http403(473)、cache-foreground-recovery(36)、guest-resolver(223)、
+  guest-integration(502，含改后的 PlayerActivity 源码不变式)、app-media-source(29)、
+  cast-cache-window(187) 全过；complete-source-cache 为并入 main 时的存量失败（stash 对照确认与本轮无关）。
+- 构建：--tvnative-release-compatible 通过。
+- 模拟器端到端（iptv_tv，pm clear 全新状态，音量 0）：详情页开始观看 → 状态栏出现
+  「本集下载完成 · 正在准备播放」→「片源已准备 · 缓存播放」本地起播，真实画面与字幕可见，
+  连播自动推进至第 4 集均正常。模拟器网速快，中间百分比态未捕获（真机慢网可见）。
+
+边界
+- 黄果剧集仍为在线 HLS（不变）；后台预取行为与预算不变；进度回调仅前台整集下载展示。
+- 「在线播放 · 滚动缓存」形态在红果线已不存在；流式转发（hkplay/投屏）链路不变。
+
+资产
+- dist/android/HongguoNative-0.1.17-tvNative-release-compatible.apk
+  size 687820, sha256 5a18a4eca62a0959a81c62f2a3b334688cba26dc6d8f6e2f334f279606ebf23e
+- feed：android/update-tvnative-0.1.17.json 与 android/update-tvnative.json（同步）

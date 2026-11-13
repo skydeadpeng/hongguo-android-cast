@@ -404,13 +404,16 @@ final class PlaybackSources {
     static void download(String url,File destination,long maxBytes) throws Exception {
         download(url,destination,maxBytes,"auto");
     }
+    /** Whole-file foreground downloads set a per-thread progress sink before calling in; the
+     *  queue prefetch threads never set it, so their transfers stay silent. */
+    static final ThreadLocal<NetworkGuard.TransferProgress> ACTIVE_PROGRESS = new ThreadLocal<>();
     static void download(String url,File destination,long maxBytes,String quality) throws Exception {
         String requestedQuality=MediaQuality.normalize(quality);
         Plan plan=find(url,requestedQuality);
         if (plan==null) {
             if (!requestedQuality.equals("auto")) throw new IOException("指定清晰度的片源准备信息已过期，请重新取源");
-            if (AppTransport.domain(new URI(url).getHost(),"qznovelvod.com","fqnovelvod.com","douyinvod.com")) throw new IOException("App片源准备信息已过期，请重新取源");
-            NetworkGuard.download(url,destination,maxBytes); return;
+            if (!AppTransport.domain(new URI(url).getHost(),"qznovelvod.com","fqnovelvod.com","douyinvod.com")) throw new IOException("App片源准备信息已过期，请重新取源");
+            NetworkGuard.download(url,destination,maxBytes,ACTIVE_PROGRESS.get()); return;
         }
         download(plan,destination,maxBytes);
     }
@@ -423,7 +426,7 @@ final class PlaybackSources {
             // toggling, App-model fallback, decryption, or retry after refusal.
             try {
                 if(plan.urlExpiresAt<=System.currentTimeMillis()/1000L)throw new EpisodeResolver.GuestFailure("官网播放地址已过期，请重新选择分集");
-                NetworkGuard.download(plan.url,destination,Math.min(maxBytes,PublicPlaybackVerifier.MAX_FILE_BYTES),plan.userAgent,plan.referer);
+                NetworkGuard.download(plan.url,destination,Math.min(maxBytes,PublicPlaybackVerifier.MAX_FILE_BYTES),plan.userAgent,plan.referer,System.nanoTime()+120_000_000_000L,ACTIVE_PROGRESS.get());
                 PublicPlaybackVerifier.verify(destination,plan.expectedDurationSeconds,plan.width,plan.height);
                 if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放准备已取消");
                 return;
@@ -448,7 +451,7 @@ final class PlaybackSources {
                     boolean transferred=false;
                     try {
                         ++transfers;
-                        NetworkGuard.download(candidate.url,destination,maxBytes,candidate.userAgent,requestReferer);
+                        NetworkGuard.download(candidate.url,destination,maxBytes,candidate.userAgent,requestReferer,System.nanoTime()+120_000_000_000L,ACTIVE_PROGRESS.get());
                         transferred=true;
                         if(candidate.contentKey!=null) {
                             byte[] key=new byte[16];for(int i=0;i<16;i++)key[i]=(byte)Integer.parseInt(candidate.contentKey.substring(i*2,i*2+2),16);

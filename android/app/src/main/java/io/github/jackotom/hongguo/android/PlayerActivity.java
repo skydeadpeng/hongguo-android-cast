@@ -510,14 +510,40 @@ public final class PlayerActivity extends Activity {
                 if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("播放准备已取消");
                 if (media.plan.playbackCeiling != ceiling) throw new java.io.IOException("播放片源清晰度边界不匹配");
                 // 黄果为 AES-128 HLS 直链：无论画质档位恒走在线播放，不进入整文件缓存。
+                // 其余片源自 0.1.17 起一律整集下载后本地播放；下载进度与速度直接展示在状态栏。
                 boolean huangguoStream = media.seriesId.length() == 10 && media.seriesId.startsWith("99");
-                if (!huangguoStream && (media.plan.guestPlayback || !media.plan.source.equals("web") || !"auto".equals(stageQuality))) {
-                    File ready = cache.fetchForeground(media.seriesId, target.optString("vid"), target.optInt("index"), media.plan, stageQuality);
+                if (!huangguoStream) {
+                    resetDownloadMarks();
+                    PlaybackSources.ACTIVE_PROGRESS.set((bytes, totalBytes) -> reportDownloadProgress(bytes, totalBytes));
+                    File ready;
+                    try { ready = cache.fetchForeground(media.seriesId, target.optString("vid"), target.optInt("index"), media.plan, stageQuality); }
+                    finally { PlaybackSources.ACTIVE_PROGRESS.remove(); }
                     media.uri = Uri.fromFile(ready); media.kind = "片源已准备 · 缓存播放"; media.cached = true;
                 } else { media.remote = media.plan.url; media.uri = Uri.parse(media.remote); media.kind = "在线播放 · 滚动缓存"; }
             }
             success = true; return media;
         } finally { if (!success) releasePrepared(media); }
+    }
+    /** Whole-file foreground download reporting: percentage, transferred MB and current speed. */
+    private long downloadMarkNano, downloadMarkBytes;
+    private void resetDownloadMarks() { downloadMarkNano = System.nanoTime(); downloadMarkBytes = 0; }
+    private void reportDownloadProgress(long bytes, long totalBytes) {
+        if (destroyed) return;
+        long now = System.nanoTime(), elapsed = now - downloadMarkNano;
+        double mbps = 0;
+        if (elapsed > 0 && downloadMarkBytes > 0 && bytes >= downloadMarkBytes) mbps = (bytes - downloadMarkBytes) * 1e9 / elapsed / (1024.0 * 1024.0);
+        downloadMarkNano = now; downloadMarkBytes = bytes;
+        final String text;
+        if (totalBytes > 0) {
+            int percent = (int) Math.min(100, bytes * 100 / totalBytes);
+            text = percent >= 100 ? "本集下载完成 · 正在准备播放"
+                : "正在下载本集 " + percent + "% · " + String.format(java.util.Locale.US, "%.1f/%.1f MB", bytes / 1048576.0, totalBytes / 1048576.0)
+                    + (mbps > 0 ? String.format(java.util.Locale.US, " · %.1f MB/s", mbps) : "");
+        } else {
+            text = "正在下载本集 · 已下 " + String.format(java.util.Locale.US, "%.1f MB", bytes / 1048576.0)
+                + (mbps > 0 ? String.format(java.util.Locale.US, " · %.1f MB/s", mbps) : "");
+        }
+        main.post(() -> { if (!destroyed) { status.setText(text); showControls(); } });
     }
     private static int stageCeiling(String quality, int maximumEdge) {
         int fixed = AdaptiveQuality.ceiling(quality);

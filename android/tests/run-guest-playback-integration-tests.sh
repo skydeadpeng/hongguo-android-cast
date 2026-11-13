@@ -45,6 +45,9 @@ final class NetworkGuard {
     }
     static String media(String url)throws Exception{heads++;return url;}
     static void download(String url,File file,long max)throws Exception{download(url,file,max,UA,REFERER);}
+    interface TransferProgress{void onProgress(long bytes,long totalBytes);}
+    static void download(String url,File file,long max,TransferProgress progress)throws Exception{download(url,file,max,UA,REFERER);}
+    static void download(String url,File file,long max,String ua,String ref,long deadline,TransferProgress progress)throws Exception{download(url,file,max,ua,ref);}
     static void download(String url,File file,long max,String ua,String ref)throws Exception {
         validate(url,false);if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("fixture cancelled before transfer");
         transfers.add(new Transfer(url,file,max,ua,ref));Files.write(file.toPath(),Fixture.BYTES);

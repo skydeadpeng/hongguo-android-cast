@@ -36,6 +36,9 @@ final class NetworkGuard {
  static URI validate(String value,boolean official)throws Exception{URI uri=new URI(value);if(!"https".equals(uri.getScheme())||uri.getHost()==null||uri.getUserInfo()!=null||uri.getPort()!=-1&&uri.getPort()!=443)throw new IOException("仅允许有效HTTPS服务地址");return uri;}
  static String media(String url)throws Exception{heads++;return url;}
  static void download(String url,File target,long max)throws Exception{download(url,target,max,UA,REFERER);}
+ interface TransferProgress{void onProgress(long bytes,long totalBytes);}
+ static void download(String url,File target,long max,TransferProgress progress)throws Exception{download(url,target,max,UA,REFERER);}
+ static void download(String url,File target,long max,String ua,String ref,long deadline,TransferProgress progress)throws Exception{download(url,target,max,ua,ref);}
  static void download(String url,File target,long max,String ua,String ref)throws Exception{
   validate(url,false);lastUrl=url;transfers.add(new Transfer(url,ua,ref,!target.exists()||target.length()==0));
   Files.write(target.toPath(),new byte[]{1,2,3,4});
