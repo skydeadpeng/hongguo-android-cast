@@ -8,12 +8,12 @@ import java.util.*;
 final class HuangguoApiTest {
     static int checks;
     static final String SID="9900000042", VID=SID+"0003";
-    static void check(boolean value,String label){checks++;if(!value)throw new AssertionError(label);}
+    static synchronized void check(boolean value,String label){checks++;if(!value)throw new AssertionError(label);}
     static JSONObject object(Object... pairs){JSONObject result=new JSONObject();for(int i=0;i<pairs.length;i+=2)result.put((String)pairs[i],pairs[i+1]);return result;}
     static JSONObject data(){return object("streams",object("main","https://cdn.example.test/full.m3u8?fixture=opaque%2Btoken&v=2"),"duration",10);}
     static NetworkGuard.Reply response(int status,JSONObject body){return new NetworkGuard.Reply(status,JSONObject.register(body));}
     static NetworkGuard.Reply ok(){return response(200,object("status",1,"data",data()));}
-    static void reset(){NetworkGuard.events.clear();NetworkGuard.urls.clear();NetworkGuard.posts.clear();NetworkGuard.deadlines.clear();HuangguoApi.originIndex=0;HuangguoApi.preferences.line="auto";HuangguoApi.preferences.writes=0;Thread.interrupted();}
+    static void reset(){NetworkGuard.events.clear();NetworkGuard.urls.clear();NetworkGuard.posts.clear();NetworkGuard.deadlines.clear();HuangguoApi.originIndex=0;HuangguoApi.preferences.line="auto";HuangguoApi.preferences.writes=0;HuangguoApi.preferences.remembered=false;Thread.interrupted();}
     static HuangguoApi.CastStream resolve()throws Exception{return HuangguoApi.episodeForCast(SID,VID,3);}
     static Exception rejected()throws Exception {
         try{resolve();throw new AssertionError("Unexpected acceptance");}catch(IOException|JSONException expected){return expected;}
@@ -92,6 +92,30 @@ final class HuangguoApiTest {
         reset();HuangguoApi.preferences.line="2";NetworkGuard.events.add(new NetworkGuard.Reply(500,"offline"));
         try{fetch.invoke(null,"/fixture",false,false);throw new AssertionError("non-strict fixed failure accepted");}catch(java.lang.reflect.InvocationTargetException expected){check(expected.getCause() instanceof IOException,"non-strict fixed failure propagated");}
         check(HuangguoApi.preferences.line.equals("auto")&&HuangguoApi.preferences.writes==1,"ordinary browsing retains legacy fixed-line reset");
+        // 黄果线路选择：auto 首次并发测速钉住并记忆；已有记忆或固定线路时不探测。
+        String[] origins={"https://huangguoai.com","https://l5f9m.rxzfszht.cc","https://blolhh.rxzfszht.cc","https://mxz58.rxzfszht.cc","https://huoguo.skydeadpeng.xyz"};
+        java.lang.reflect.Method get=HuangguoApi.class.getDeclaredMethod("get",String.class);get.setAccessible(true);
+        reset();HuangguoApi.preferences.remembered=true;NetworkGuard.events.add(ok());
+        Object rememberedBrowse=get.invoke(null,"/fixture");
+        check(rememberedBrowse instanceof JSONObject&&NetworkGuard.urls.size()==1,"remembered line browses without probing");
+        check(NetworkGuard.urls.get(0).equals(origins[0]+"/fixture"),"remembered line uses saved origin");
+        reset();HuangguoApi.preferences.line="3";NetworkGuard.events.add(ok());
+        get.invoke(null,"/fixture");
+        check(NetworkGuard.urls.size()==1&&NetworkGuard.urls.get(0).startsWith(origins[3]),"fixed line skips probe");
+        reset();for(int i=0;i<6;i++)NetworkGuard.events.add(ok());
+        Object firstBrowse=get.invoke(null,"/fixture");
+        check(firstBrowse instanceof JSONObject,"first use returns data after probe");
+        check(HuangguoApi.preferences.remembered,"first use pins the winning line persistently");
+        int pinned=HuangguoApi.originIndex;check(pinned>=0&&pinned<origins.length,"pinned index valid");
+        check(NetworkGuard.urls.get(NetworkGuard.urls.size()-1).equals(origins[pinned]+"/fixture"),"data request follows the pinned line");
+        int probes=0;for(String url:NetworkGuard.urls)if(url.endsWith("/api/videos/category/ai-manju?page=1&size=1&sort=latest"))probes++;
+        check(probes>=1&&probes<=origins.length&&NetworkGuard.urls.size()==probes+1,"probe raced the lines before the data request");
+        // 探测全线失败：按序尝试改从自建兜底线（下标 4）起步，成功后照常粘住并记忆。
+        reset();for(int i=0;i<origins.length;i++)NetworkGuard.events.add(new IOException("probe dead"));
+        NetworkGuard.events.add(ok());
+        get.invoke(null,"/fixture");
+        check(HuangguoApi.originIndex==4&&HuangguoApi.preferences.remembered,"failed probe restarts crawl at the fallback line and sticks on success");
+        check(NetworkGuard.urls.get(NetworkGuard.urls.size()-1).equals(origins[4]+"/fixture"),"fallback crawl begins at the proxy origin");
         System.out.println("Huangguo strict resolver boundary checks passed: "+checks+" (JSON parser is a registered-token double)");
     }
 }
@@ -111,8 +135,9 @@ class JSONObject {
     JSONObject getJSONObject(String key)throws JSONException {JSONObject value=optJSONObject(key);if(value==null)throw new JSONException("Not an object");return value;}
 }
 class TestPrefs {
-    String line="auto";int writes;
+    String line="auto";int writes;boolean remembered;
     String getString(String key,String fallback){return key.equals("line")?line:fallback;}
+    boolean contains(String key){return key.equals("origin2")&&remembered;}
     TestPrefs edit(){return this;}
     TestPrefs putString(String key,String value){if(key.equals("line")){line=value;writes++;}return this;}
     void apply(){}

@@ -21,6 +21,8 @@ final class HuangguoApi {
     /** 每域快速失败：丢包型阻断不等满长超时，尽快切到可达线路。 */
     private static final long PER_ORIGIN_MS = 6_000;
     private static volatile int originIndex = 0;
+    /** 首次探测全线失败的冷却截止（毫秒时钟），期间退回按序尝试，避免连环探测。 */
+    private static volatile long probeCooldownUntil = 0L;
     private static volatile android.content.Context appContext;
     /** 首次桥调用注入应用上下文；上次成功的线路持久保存，冷启动直接使用，不再重复试错。 */
     static void attach(android.content.Context context) {
@@ -143,9 +145,46 @@ final class HuangguoApi {
         return Integer.parseInt(vid.substring(10));
     }
 
-    private static JSONObject get(String path) throws Exception { return fetch(path, false); }
+    private static JSONObject get(String path) throws Exception { ensureOriginReady(); return fetch(path, false); }
     /** 2026-11-09 官方改版：取流端点只收 POST（空 JSON 体），其余接口仍为 GET。 */
-    private static JSONObject post(String path) throws Exception { return fetch(path, true); }
+    private static JSONObject post(String path) throws Exception { ensureOriginReady(); return fetch(path, true); }
+    /** auto 线路首次使用（尚无成功线路记忆）时并发探测全部线路，最先成功者钉住并持久保存；
+     *  之后一直沿用记忆线路（既有按序换线逻辑兜底）。固定线路尊重用户选择不探测；投屏取流不走这里。 */
+    private static void ensureOriginReady() {
+        if (pinnedOrigin() >= 0) return;
+        if (Thread.currentThread().isInterrupted()) return;
+        synchronized (HuangguoApi.class) {
+            try {
+                if (prefs().contains("origin2")) return;
+            } catch (Exception noPrefs) { return; }
+            if (probeCooldownUntil > System.currentTimeMillis()) return;
+            int winner = probeOrigins();
+            if (winner >= 0) stickOrigin(winner);
+            else {
+                probeCooldownUntil = System.currentTimeMillis() + 60_000L;
+                // 探测全败：按序尝试改从自建兜底线起步（不持久），避免再把首开预算耗在
+                // 四条官方线上；若兜底线成功会照常粘住并写入记忆。
+                originIndex = PROXY_INDEX;
+            }
+        }
+    }
+    /** 小分页 category 探测各线路；invokeAny 最先返回有效数据者即最快可用线路。 */
+    private static int probeOrigins() {
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(ORIGINS.length,
+            runnable -> { Thread thread = new Thread(runnable, "huangguo-line-probe"); thread.setDaemon(true); return thread; });
+        try {
+            java.util.List<java.util.concurrent.Callable<Integer>> tasks = new ArrayList<>();
+            for (int index = 0; index < ORIGINS.length; index++) {
+                final int line = index;
+                tasks.add(() -> {
+                    fetchFrom(ORIGINS[line], "/api/videos/category/ai-manju?page=1&size=1&sort=latest", false, false);
+                    return line;
+                });
+            }
+            return pool.invokeAny(tasks, PER_ORIGIN_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception error) { return -1; }
+        finally { pool.shutdownNow(); }
+    }
     private static JSONObject fetch(String path, boolean asPost) throws Exception {
         return fetch(path, asPost, false);
     }

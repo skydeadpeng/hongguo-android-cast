@@ -29,6 +29,11 @@ methods='\n'.join(block(marker) for marker in [
     'static String encodeSeries(', 'static String encodeEpisode(',
     'static long decodeSeries(', 'static int decodeEpisodeIndex(',
     'private static int pinnedOrigin(',
+    'private static JSONObject get(String path)',
+    'private static JSONObject post(String path)',
+    'private static JSONObject fetch(String path, boolean asPost)',
+    'private static void ensureOriginReady(',
+    'private static int probeOrigins(',
     'private static JSONObject fetch(String path, boolean asPost, boolean strict)',
     'private static JSONObject fetch(String path, boolean asPost, boolean strict, long deadline)',
     'private static JSONObject fetchFrom(String origin, String path, boolean asPost, boolean strict)',
@@ -38,6 +43,8 @@ methods='\n'.join(block(marker) for marker in [
     'static CastStream episodeForCast(String sid, String vid, int index, long deadline)'])
 origins=block('private static final String[] ORIGINS')+';'
 timeout=re.search(r'private static final long PER_ORIGIN_MS\s*=\s*[^;]+;',source).group()
+cooldown=re.search(r'private static volatile long probeCooldownUntil\s*=\s*[^;]+;',source).group()
+proxy=re.search(r'private static final int PROXY_INDEX\s*=\s*[^;]+;',source).group()
 (out/'HuangguoApi.java').write_text('''package io.github.jackotom.hongguo.android;
 import java.io.*;import java.util.*;
 final class HuangguoApi {
@@ -45,6 +52,6 @@ final class HuangguoApi {
  static final TestPrefs preferences=new TestPrefs();
  private static TestPrefs prefs(){return preferences;}
  // Persistent Android storage is a boundary, not emulated as production here.
- private static void stickOrigin(int index){originIndex=index;}
-'''+origins+'\n'+timeout+'\n'+methods+'\n}')
-print('HUANGGUO_API_BINDING strictFetch,fetchFrom,episodeForCast,IDs,pinnedOrigin=actual; transport,preferenceStorage,JSONParser=explicit doubles (registered tokens, not real JSON parsing)')
+ private static void stickOrigin(int index){originIndex=index;preferences.remembered=true;}
+'''+origins+'\n'+timeout+'\n'+cooldown+'\n'+proxy+'\n'+methods+'\n}')
+print('HUANGGUO_API_BINDING strictFetch,fetchFrom,episodeForCast,IDs,pinnedOrigin,lineProbe=actual; transport,preferenceStorage,JSONParser=explicit doubles (registered tokens, not real JSON parsing)')

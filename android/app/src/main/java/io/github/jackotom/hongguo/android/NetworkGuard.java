@@ -27,7 +27,9 @@ final class NetworkGuard {
     // than one concurrent resolution; two workers rejected every second parallel
     // request with "域名解析繁忙" whenever the first DoH lane was slow. No queue: a
     // saturated pool still aborts instead of building an unbounded resolver backlog.
-    private static final ExecutorService DNS = new ThreadPoolExecutor(0, 8, 30, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), runnable -> { Thread thread = new Thread(runnable, "hongguo-source-dns"); thread.setDaemon(true); return thread; }, new ThreadPoolExecutor.AbortPolicy());
+    // 黄果线路首次并发探测（5 线 × 双车道）叠加首页/公告并发解析时 8 线程会被抢满，
+    // 探测车道遭拒导致全线误判失败；上限提到 12 容纳该突发，仍保持无队列语义。
+    private static final ExecutorService DNS = new ThreadPoolExecutor(0, 12, 30, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), runnable -> { Thread thread = new Thread(runnable, "hongguo-source-dns"); thread.setDaemon(true); return thread; }, new ThreadPoolExecutor.AbortPolicy());
     /** One daemon timer closes stalled TCP/TLS/write/read operations on deadline or owner cancellation. */
     private static final ScheduledThreadPoolExecutor SOCKET_TIMEOUT = socketTimer();
     private static ScheduledThreadPoolExecutor socketTimer() {

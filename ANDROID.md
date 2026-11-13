@@ -6,15 +6,22 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.18 / code41 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.18 / code41 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.2 / code3 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.67 / code90 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.67 / code90 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.15 / code16 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 三个包均支持 Android 8.0（API26）及以上，可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.18](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.18) · [原生 TV 0.1.2](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.2)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.67](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.67) · [原生 TV 0.1.15](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.15)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+
+## 0.12.67 黄果线路首次测速钉住
+
+- 黄果来源首次使用时并发探测全部 5 条线路（小分页目录请求），最先返回有效数据的线路即被钉住并持久记忆，之后一直直接使用；冷启动不再从主站逐条换线试错。用户固定线路时不探测，升级用户已有线路记忆直接沿用。
+- 探测期间 DNS 解析池从 8 线程扩到 12：首启首页、公告与黄果探测并发时，探测车道曾被挤掉导致全线误判失败（表现为首开约 30 秒超时）。
+- 探测全线失败时按序尝试改从自建兜底线起步，不再把首开预算耗在四条官方线上；兜底线成功后照常写入记忆。
+- 修复 `android/app/build.gradle` 测试运行器行引号缺失导致的安卓构建中断；投屏取流路径不经探测，行为不变。模拟器实测：干净安装首开（含测速与钉线）约 0.9 秒，二次打开约 0.75–1.4 秒。
 
 ## 0.12.14 更新缓存状态修复
 
