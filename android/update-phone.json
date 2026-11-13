@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 91,
-  "versionName": "0.12.68",
+  "versionCode": 92,
+  "versionName": "0.12.69",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.68/Hongguo-0.12.68-phone-release-compatible.apk",
-  "size": 687768,
-  "sha256": "34ea67a714c08662fa549e5a7de63fac3080bf0003cfc268ece1ddc79ca40f61",
-  "notes": "修复红果播放：上游开始按匿名设备身份分级风控，旧版内置的原生取流组件在设备被拒时（接口返回 404 或空数据）直接失败，且页面层不再兜底重试，导致大概率无法播放。\n本版内置与 TV 原生版 0.1.16 相同的取流组件（按集接口优先、传统接口同身份兜底、被拒身份在内存中轮换重注册，最多三个身份），页面层对 HTTP 拒绝同样启用备用链路；实测取流成功率由约一成恢复到八至九成，个别时段仍可能需要重试一次。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-13T13:15:00.000Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.69/Hongguo-0.12.69-phone-release-compatible.apk",
+  "size": 693004,
+  "sha256": "3f7d35daa22409a5524b5a764a2354fe5d83cab5807d5f30ca4fd2eb6a64188c",
+  "notes": "红果 Android 0.12.69（手机与 TV WebView）\n\n- 在线播放器沿用原生电视版 0.1.21 的取源修复：官网缺公开播放信息且分集身份与归属匹配时，使用现有 App 片源；原有登录、身份及明确拒绝检查保持不变。\n- 初次播放、切集、预缓存及 CDN 地址重取都使用同一个 Java App 片源解析器，不依赖 WebView 的 JavaScript 回调。Android 11 签名兼容、GET 请求与 AAC 修复随包带入。\n- 手动下载、投屏、黄果和应用包名不变。原生电视版仍为 0.1.21。\n\n手机版与 TV WebView 版可在「关于 → 版本更新」覆盖升级。两包已在独立模拟器安装、冷启动；本版本尚未在实体手机或电视上试播。\n",
+  "publishedAt": "2026-11-13T21:53:59.330Z"
 }

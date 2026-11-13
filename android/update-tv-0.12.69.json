@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 92,
+  "versionName": "0.12.69",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.69/Hongguo-0.12.69-tv-release-compatible.apk",
+  "size": 691384,
+  "sha256": "ffcf5ca8c50403b0e0de7d4f57f3bcd515618c6c1b5016e0cb44b193868a50cf",
+  "notes": "红果 Android 0.12.69（手机与 TV WebView）\n\n- 在线播放器沿用原生电视版 0.1.21 的取源修复：官网缺公开播放信息且分集身份与归属匹配时，使用现有 App 片源；原有登录、身份及明确拒绝检查保持不变。\n- 初次播放、切集、预缓存及 CDN 地址重取都使用同一个 Java App 片源解析器，不依赖 WebView 的 JavaScript 回调。Android 11 签名兼容、GET 请求与 AAC 修复随包带入。\n- 手动下载、投屏、黄果和应用包名不变。原生电视版仍为 0.1.21。\n\n手机版与 TV WebView 版可在「关于 → 版本更新」覆盖升级。两包已在独立模拟器安装、冷启动；本版本尚未在实体手机或电视上试播。\n",
+  "publishedAt": "2026-11-13T21:54:00.074Z"
+}
