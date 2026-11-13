@@ -63,57 +63,97 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             String did = anonymous.optString("device_id"), iid = anonymous.optString("install_id");
             if (!anonymous.optBoolean("registered") || !OfficialApiClient.validID(did) || !OfficialApiClient.validID(iid))
                 throw new ModelError("App片源设备登记未完成", "APP_INVALID_RESPONSE");
-            TreeMap<String, String> query = query(did, iid, "74332", "7.4.3.32");
-            long ticket = System.currentTimeMillis(), khronos = ticket / 1000;
-            // The verified playback profile carries ts/_rticket inside the signed query itself.
-            query.put("ts", Long.toString(khronos)); query.put("_rticket", Long.toString(ticket));
-            JSONObject payload = new JSONObject()
-                .put("biz_param", new JSONObject().put("detail_page_version", 0).put("device_level", 3).put("disable_digg_stat", false)
-                    .put("need_all_video_definition", true).put("need_mp4_align", false).put("use_os_player", false).put("use_server_dns", false).put("video_platform", 1024))
-                .put("mixed_video_id_map", new JSONObject().put("1004", new JSONArray().put(vid)));
-            byte[] body = gzip(payload.toString().getBytes(StandardCharsets.UTF_8));
-            String queryString = PassportSigner.encode(query);
-            Map<String, String> headers = new LinkedHashMap<>(PlayerSigner.signPlayer(queryString, body, khronos));
-            headers.put("User-Agent", playbackUserAgent("74332")); headers.put("Accept", "application/json; charset=utf-8,application/x-protobuf");
-            headers.put("Content-Type", "application/json; charset=UTF-8"); headers.put("Content-Encoding", "gzip");
-            headers.put("X-XS-From-Web", "0"); headers.put("Passport-Sdk-Version", "5051452");
-            headers.put("Sdk-Version", "2"); headers.put("X-SS-DP", "8662");
-            headers.put("X-Tt-Store-Region", "cn"); headers.put("X-Tt-Store-Region-Src", "did");
-            check();
-            OfficialApiClient.Response response = modelTransport.execute(new OfficialApiClient.Request(API + "?" + queryString, "POST", headers, body, deadline));
-            check();
-            JSONObject projected;
-            try {
-                projected = adopt(response, vid, deadline);
-            } catch (ModelError empty) {
-                // The legacy multi-video POST can earn a persistent empty 200; recover once
-                // through the per-episode signed video_tab GET at the 7.3.9 profile.
-                if (!"APP_EMPTY_RESPONSE".equals(empty.code)) throw empty;
+            // The per-episode signed video_tab GET is the current API; since 2026-11-12 the
+            // upstream grades fresh synthetic identities and hollows both forms (empty 200 /
+            // HTTP 404) for a refused one. Each identity gets both forms once; a refused
+            // identity is replaced (in memory only) until the budget runs out.
+            JSONObject projected = null; ModelError lastFailure = null;
+            for (int attempt = 1; attempt <= 3 && projected == null; attempt++) {
+                if (attempt > 1) {
+                    String[] reRegistered = reRegister();
+                    if (reRegistered == null) break;
+                    did = reRegistered[0]; iid = reRegistered[1];
+                }
+                try { projected = videoTab(did, iid, vid); }
+                catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
                 check();
-                TreeMap<String, String> tabQuery = query(did, iid, "73932", "7.3.9.32");
-                long tabTicket = System.currentTimeMillis(), tabKhronos = tabTicket / 1000;
-                tabQuery.put("ts", Long.toString(tabKhronos)); tabQuery.put("_rticket", Long.toString(tabTicket));
-                tabQuery.put("video_id", vid); tabQuery.put("video_id_type", "0"); tabQuery.put("device_level", "1");
-                tabQuery.put("need_all_video_definition", "1"); tabQuery.put("need_mp4_align", "0"); tabQuery.put("use_os_player", "0");
-                tabQuery.put("video_platform", "1024"); tabQuery.put("source", "0"); tabQuery.put("from_video_id", "");
-                String tabString = PassportSigner.encode(tabQuery);
-                Map<String, String> tabHeaders = new LinkedHashMap<>(PlayerSigner.signPlayer(tabString, null, tabKhronos));
-                tabHeaders.put("User-Agent", playbackUserAgent("73932")); tabHeaders.put("Accept", "application/json; charset=utf-8,application/x-protobuf");
-                tabHeaders.put("X-XS-From-Web", "0"); tabHeaders.put("Passport-Sdk-Version", "50561");
-                tabHeaders.put("Sdk-Version", "2"); tabHeaders.put("X-SS-DP", "8662");
-                tabHeaders.put("X-Tt-Store-Region", "cn"); tabHeaders.put("X-Tt-Store-Region-Src", "did");
-                tabHeaders.put("X-Tt-Request-Tag", "t=0;n=0");
-                check();
-                OfficialApiClient.Response tabResponse = modelTransport.execute(new OfficialApiClient.Request(VIDEO_TAB_API + "?" + tabString, "GET", tabHeaders, new byte[0], deadline));
-                check();
-                projected = adopt(tabResponse, vid, deadline);
+                if (projected == null) {
+                    try { projected = multiPost(did, iid, vid); }
+                    catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
+                    check();
+                }
             }
+            if (projected == null) throw lastFailure;
             return new JSONObject().put("vid", vid).put("video_model", projected);
         } finally {
             registering = null; owner = null;
             if (client != null) client.close(); else try { registration.close(); } catch (RuntimeException ignored) { }
             try { modelTransport.close(); } catch (RuntimeException ignored) { }
         }
+    }
+    /** Empty 200s and HTTP refusals are transient endpoint routing; business denials and
+     * malformed models stay terminal for the alternate form as well. */
+    private static boolean recoverable(ModelError failure) {
+        return "APP_EMPTY_RESPONSE".equals(failure.code) || "HTTP_ERROR".equals(failure.code);
+    }
+    /** One fresh registration when the remaining budget allows a full extra identity attempt;
+     * any failure ends the identity rotation with the previous failure intact. The retry client
+     * is never closed here: it shares the injected registration transport, which the fetch
+     * boundary owns and closes once — closing it per attempt would kill later rotations. */
+    private String[] reRegister() throws IOException {
+        if (deadline - System.nanoTime() < TimeUnit.SECONDS.toNanos(6)) return null;
+        try {
+            OfficialApiClient retry = new OfficialApiClient(OfficialApiClient.newSession(), registration);
+            check(); retry.deadlineNanos(deadline); retry.registerDevice(); check();
+            JSONObject session = retry.session();
+            String did = session.optString("device_id"), iid = session.optString("install_id");
+            if (session.optBoolean("registered") && OfficialApiClient.validID(did) && OfficialApiClient.validID(iid)) return new String[]{did, iid};
+        } catch (Exception ignored) {
+            check(); // a cancellation must not surface as the previous business failure
+        }
+        return null;
+    }
+    private JSONObject videoTab(String did, String iid, String vid) throws Exception {
+        TreeMap<String, String> tabQuery = query(did, iid, "73932", "7.3.9.32");
+        long tabTicket = System.currentTimeMillis(), tabKhronos = tabTicket / 1000;
+        tabQuery.put("ts", Long.toString(tabKhronos)); tabQuery.put("_rticket", Long.toString(tabTicket));
+        tabQuery.put("video_id", vid); tabQuery.put("video_id_type", "0"); tabQuery.put("device_level", "1");
+        tabQuery.put("need_all_video_definition", "1"); tabQuery.put("need_mp4_align", "0"); tabQuery.put("use_os_player", "0");
+        tabQuery.put("video_platform", "1024"); tabQuery.put("source", "0"); tabQuery.put("from_video_id", "");
+        String tabString = PassportSigner.encode(tabQuery);
+        Map<String, String> tabHeaders = new LinkedHashMap<>(PlayerSigner.signPlayer(tabString, null, tabKhronos));
+        tabHeaders.put("User-Agent", playbackUserAgent("73932")); tabHeaders.put("Accept", "application/json; charset=utf-8,application/x-protobuf");
+        tabHeaders.put("X-XS-From-Web", "0"); tabHeaders.put("Passport-Sdk-Version", "50561");
+        tabHeaders.put("Sdk-Version", "2"); tabHeaders.put("X-SS-DP", "8662");
+        tabHeaders.put("X-Tt-Store-Region", "cn"); tabHeaders.put("X-Tt-Store-Region-Src", "did");
+        tabHeaders.put("X-Tt-Request-Tag", "t=0;n=0");
+        check();
+        OfficialApiClient.Response tabResponse = modelTransport.execute(new OfficialApiClient.Request(VIDEO_TAB_API + "?" + tabString, "GET", tabHeaders, new byte[0], deadline));
+        check();
+        return adopt(tabResponse, vid, deadline);
+    }
+    private JSONObject multiPost(String did, String iid, String vid) throws Exception {
+        TreeMap<String, String> query = query(did, iid, "74332", "7.4.3.32");
+        long ticket = System.currentTimeMillis(), khronos = ticket / 1000;
+        // The verified playback profile carries ts/_rticket inside the signed query itself.
+        query.put("ts", Long.toString(khronos)); query.put("_rticket", Long.toString(ticket));
+        JSONObject payload = new JSONObject()
+            .put("biz_param", new JSONObject().put("detail_page_version", 0).put("device_level", 3).put("disable_digg_stat", false)
+                .put("need_all_video_definition", true).put("need_mp4_align", false).put("use_os_player", false).put("use_server_dns", false).put("video_platform", 1024))
+            .put("mixed_video_id_map", new JSONObject().put("1004", new JSONArray().put(vid)));
+        byte[] body = gzip(payload.toString().getBytes(StandardCharsets.UTF_8));
+        String queryString = PassportSigner.encode(query);
+        Map<String, String> headers = new LinkedHashMap<>(PlayerSigner.signPlayer(queryString, body, khronos));
+        headers.put("User-Agent", playbackUserAgent("74332")); headers.put("Accept", "application/json; charset=utf-8,application/x-protobuf");
+        headers.put("Content-Type", "application/json; charset=UTF-8"); headers.put("Content-Encoding", "gzip");
+        headers.put("X-XS-From-Web", "0"); headers.put("Passport-Sdk-Version", "5051452");
+        headers.put("Sdk-Version", "2"); headers.put("X-SS-DP", "8662");
+        headers.put("X-Tt-Store-Region", "cn"); headers.put("X-Tt-Store-Region-Src", "did");
+        headers.put("Connection", "close");
+        check();
+        OfficialApiClient.Response response = modelTransport.execute(new OfficialApiClient.Request(API + "?" + queryString, "POST", headers, body, deadline));
+        check();
+        return adopt(response, vid, deadline);
     }
     private static TreeMap<String, String> query(String did, String iid, String versionCode, String versionName) {
         TreeMap<String, String> query = new TreeMap<>();

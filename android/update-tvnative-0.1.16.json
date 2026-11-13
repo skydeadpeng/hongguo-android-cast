@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 17,
+  "versionName": "0.1.16",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.16/HongguoNative-0.1.16-tvNative-release-compatible.apk",
+  "size": 686240,
+  "sha256": "3b129933931442ed6ff665276be55f735cd0036f1ef8e982e204cfe2591491ac",
+  "notes": "修复红果播放：上游开始按匿名设备身份分级风控，单次注册的设备常被整体拒答（模型接口返回 404 或空数据），导致 0.1.15 大概率无法播放。本版改为按集 video_tab 优先、传统 multi 接口同身份兜底、被拒身份在内存中轮换重注册（最多三个身份，两形态互补），实测取流成功率由约一成恢复到八至九成，个别时段仍可能需要重试一次。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-13T04:30:00.000Z"
+}
