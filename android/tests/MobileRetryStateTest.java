@@ -14,7 +14,7 @@ public final class MobileRetryStateTest {
         PlaybackSources.reset(); return new AdaptiveActivityHarness();
     }
     private static void failEveryStage(AdaptiveActivityHarness player) {
-        for (String quality : new String[]{"1080p", "720p", "auto"})
+        for (String quality : new String[]{"1080p", "720p", "480p", "360p"})
             player.cache.failures.put(quality, new IOException("片源响应 HTTP 403"));
     }
     private static void waiting(AdaptiveActivityHarness player, int selected, String boundary) {
@@ -34,14 +34,13 @@ public final class MobileRetryStateTest {
         check(exhausted.status.text.equals("正在连接片源") && exhausted.resumeAt == 37000, "request keeps connecting status and desired resume position");
         exhausted.resolver.flush();
         waiting(exhausted, 1, "all resolver attempts finished, main loop not delivered");
-        check(exhausted.cache.fetches.equals(Arrays.asList("v2:1080p", "v2:720p", "v2:auto")), "actual coordinator exhausted exactly three qualities of same episode");
-        check(exhausted.main.callbacks.size() == 4, "three progress callbacks precede sole terminal callback");
-        String[] stages = {"1080p", "720p", "自动"};
-        for (int stage = 0; stage < stages.length; stage++) {
+        check(exhausted.cache.fetches.equals(Arrays.asList("v2:1080p", "v2:1080p", "v2:720p", "v2:480p", "v2:360p")), "actual coordinator retries 1080p once then exhausts three strictly lower qualities of same episode");
+        check(exhausted.main.callbacks.size() == 7, "six progress callbacks precede sole terminal callback");
+        String[] stages = {"1080p", "正在自动重新取源 1080p", "片源已取得 · 正在准备本集下载", "自动降低至 720p", "自动降低至 480p", "自动降低至 360p"};
+        for (String stage : stages) {
             nextCallback(exhausted);
-            waiting(exhausted, 1, "main progress " + stages[stage]);
-            check(exhausted.status.text.contains(stages[stage]), "actual stageProgress identifies " + stages[stage]);
-            check(stage == 0 || exhausted.status.text.contains("自动降低至"), "lowering remains preparation, not ended");
+            waiting(exhausted, 1, "main progress " + stage);
+            check(exhausted.status.text.contains(stage), "actual stageProgress identifies " + stage);
         }
         check(exhausted.main.callbacks.size() == 1, "only final exhausted outcome remains after all progress");
         nextCallback(exhausted);
@@ -66,7 +65,7 @@ public final class MobileRetryStateTest {
         AdaptiveActivityHarness lateFailure = fresh(); failEveryStage(lateFailure);
         lateFailure.loadAt(0, null, 0); lateFailure.resolver.flush();
         int staleCallbacks = lateFailure.main.callbacks.size();
-        check(staleCallbacks == 4, "old generation has three progress plus terminal already queued");
+        check(staleCallbacks == 7, "old generation has six progress plus terminal already queued");
         lateFailure.cache.failures.clear(); lateFailure.loadAt(2, null, 61000);
         for (int i = 0; i < staleCallbacks; i++) {
             nextCallback(lateFailure);
@@ -89,9 +88,11 @@ public final class MobileRetryStateTest {
         success.requestedSpeed = 1.5f; success.loadAt(1, null, 47000, true);
         waiting(success, 1, "success chain before resolver"); success.resolver.flush();
         waiting(success, 1, "720 success resolved, UI still queued");
-        check(success.cache.fetches.equals(Arrays.asList("v2:1080p", "v2:720p")) && success.main.callbacks.size() == 3,
-            "successful 720 stops stage search and queues two progress plus publish");
+        check(success.cache.fetches.equals(Arrays.asList("v2:1080p", "v2:1080p", "v2:720p")) && success.main.callbacks.size() == 5,
+            "successful 720 stops stage search and queues four progress plus publish");
         nextCallback(success); waiting(success, 1, "success 1080 progress");
+        nextCallback(success); waiting(success, 1, "success 1080 automatic re-fetch progress");
+        nextCallback(success); waiting(success, 1, "success 1080 re-fetch completes and media transfer begins");
         nextCallback(success); waiting(success, 1, "success 720 progress");
         nextCallback(success); waiting(success, 1, "published 720 URI, decoder not prepared yet");
         check(!success.prepared && success.video.uri != null && success.actualQuality.equals("720p"),

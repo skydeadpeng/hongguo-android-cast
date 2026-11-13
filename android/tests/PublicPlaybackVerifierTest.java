@@ -68,13 +68,30 @@ public final class PublicPlaybackVerifierTest {
         byte[] payload = join(values);
         return join(bytes(payload.length + 8), name.getBytes("US-ASCII"), payload);
     }
+    static byte[] audioDescriptor() throws Exception {
+        // MPEG-4 Audio DecoderConfig + AAC-LC AudioSpecificConfig, 44.1 kHz/stereo.
+        // Four-byte expandable descriptor sizes match real FFmpeg MP4 files.
+        int objectType = boxMode.equals("mp3-description") ? 0x6b : 0x40;
+        int asc = boxMode.equals("non-aac-lc") ? 0x1a : 0x12;
+        return box("esds", bytes(0), new byte[]{
+            3, (byte) 0x80, (byte) 0x80, (byte) 0x80, 35, 0, 2, 0,
+            4, (byte) 0x80, (byte) 0x80, (byte) 0x80, 21,
+            (byte) objectType, 0x15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            5, (byte) 0x80, (byte) 0x80, (byte) 0x80, 3, (byte) asc, 0x10, 0,
+            6, (byte) 0x80, (byte) 0x80, (byte) 0x80, 1, 2
+        });
+    }
     static byte[] track(int index) throws Exception {
         boolean video = MediaExtractor.mimes[index].startsWith("video/");
         int count = 0;
         for (Packet p : MediaExtractor.packets) if (p.track == index) count++;
         byte[] stsz = box("stsz", bytes(0, 16,
                 boxMode.equals("table-count-limit") ? 250_001 : count));
-        byte[] codec = box(video ? "avcC" : "esds", new byte[]{1, 2, 3, 4});
+        byte[] codec = video ? box("avcC", new byte[]{1, 2, 3, 4}) : audioDescriptor();
+        if (!video && boxMode.equals("duplicate-esds")) codec = join(codec, audioDescriptor());
+        if (!video && boxMode.equals("truncated-esds")) codec = box("esds", bytes(0), new byte[]{3, (byte) 0x80});
+        if (!video && boxMode.equals("alternate-audio-config")) codec = join(codec, box("wave", box("esds", bytes(0))));
+        if (!video && boxMode.equals("bitrate-box")) codec = join(codec, box("btrt", bytes(0, 0, 0)));
         if (boxMode.equals("sinf")) codec = join(codec, box("sinf", box("schm", bytes(0))));
         String entry = video ? "avc1" : "mp4a";
         if (boxMode.equals("encrypted-entry")) entry = video ? "encv" : "enca";
@@ -127,6 +144,17 @@ public final class PublicPlaybackVerifierTest {
         check(MediaExtractor.released, "Extractor not released on success");
         check(Arrays.equals(before, Files.readAllBytes(source.toPath())), "Success changed bytes");
         passed++;
+        reset(); MediaExtractor.mode = "vendor-aac"; verify();
+        check(MediaExtractor.released, "Vendor AAC extractor not released");
+        passed++;
+        reset(); boxMode = "bitrate-box"; writeFixture(); MediaExtractor.mode = "vendor-aac"; verify(); passed++;
+        for (String unsupported : new String[]{"mp3-description", "non-aac-lc", "duplicate-esds", "truncated-esds", "alternate-audio-config", "sinf"}) {
+            reset(); boxMode = unsupported; writeFixture(); MediaExtractor.mode = "vendor-aac";
+            rejects("vendor alias with " + unsupported, PublicPlaybackVerifierTest::verify);
+        }
+        reset(); MediaExtractor.mode = "vendor-aac"; packets(10, EXPECTED); writeFixture();
+        rejects("vendor alias must not relax the full video timeline", PublicPlaybackVerifierTest::verify);
+        mode("vendor-video");
         reset(); packets(10, 0); writeFixture(); rejects("139s declared, 10s video", PublicPlaybackVerifierTest::verify);
         reset(); packets(10, EXPECTED); writeFixture(); rejects("long audio must not fill short video", PublicPlaybackVerifierTest::verify);
         reset(); packets(0, EXPECTED); writeFixture(); rejects("audio-only full duration", PublicPlaybackVerifierTest::verify);
@@ -229,7 +257,13 @@ class MediaFormat {
     static final String KEY_MIME = "mime", KEY_WIDTH = "width", KEY_HEIGHT = "height", KEY_MAX_INPUT_SIZE = "max-input-size";
     final String mime;
     MediaFormat(String mime) { this.mime = mime; }
-    String getString(String key) { return MediaExtractor.mode.equals("unsupported") ? "video/unknown" : mime; }
+    String getString(String key) {
+        if (MediaExtractor.mode.equals("unsupported")) return "video/unknown";
+        if ((MediaExtractor.mode.equals("vendor-aac") && mime.equals("audio/mp4a-latm"))
+                || (MediaExtractor.mode.equals("vendor-video") && mime.equals("video/avc")))
+            return "audio/ffmpeg";
+        return mime;
+    }
     boolean containsKey(String key) {
         if (key.equals("crypto-key")) return MediaExtractor.mode.equals("crypto-format");
         if (key.equals("csd-0")) return !MediaExtractor.mode.equals("missing-csd");

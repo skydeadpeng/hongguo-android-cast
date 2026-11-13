@@ -93,7 +93,7 @@ public final class SeasonPlaylistActivityTest {
         check(late.cache.invalidatedOwners.contains(key("111111","1001",1,"1080p")),"decoder fallback invalidates actual current season only");
 
         AdaptiveActivityHarness errors=fresh();errors.autoplay=true;ready(errors,1);
-        for(String q:new String[]{"1080p","720p","auto"})errors.cache.failures.put(q,new java.io.IOException("片源响应 HTTP 403"));
+        for(String q:new String[]{"1080p","720p","480p","360p"})errors.cache.failures.put(q,new java.io.IOException("片源响应 HTTP 403"));
         errors.video.completion.complete(errors.video.player);errors.pump();
         check(errors.current==2&&!errors.completed&&errors.errors==1,"next-season preparation failure stays on its first episode without false end/skip");
         check(errors.store.ownedHistories.stream().noneMatch(v->v.startsWith("222222:")),"failed next-season preparation never claims receiver/player confirmation in history");
@@ -112,7 +112,7 @@ public final class SeasonPlaylistActivityTest {
         AdaptiveActivityHarness replaced=fresh();replaced.loadAt(0,null,0);replaced.resolver.flush();
         AdaptiveActivityHarness.PreparedMedia held=replaced.pendingMedia.iterator().next();PlaybackCache.QueueWindow replacementWindow=replaced.localWindow;replaced.closeLocalWindow();
         replaced.localWindow=replaced.cache.openQueueWindow(replaced.queueSeries,replaced.queue,2,true,1,false);
-        AdaptiveActivityHarness.PreparedMedia nextHeld=replaced.reserveMedia(replaced.queue.get(2),"1080p",replaced.localWindow);
+        AdaptiveActivityHarness.PreparedMedia nextHeld=replaced.reserveMedia(replaced.queue.get(2),"1080p",0,replaced.localWindow);
         PlaybackCache.QueueWindow latestWindow=replaced.localWindow;int retiredCount=replacementWindow.prunes,latestCount=latestWindow.prunes;replaced.releasePrepared(held);
         check(replacementWindow.prunes==retiredCount+1&&latestWindow.prunes==latestCount+1,"late old-window release prunes both retired and new active window");
         check(replaced.cache.ownerReservations.size()==1&&replaced.cache.ownerReservations.containsKey(key("222222","1001",1,"1080p")),"late closed-window cleanup leaves next-season pending media reservation intact");

@@ -1,5 +1,5 @@
 package io.github.jackotom.hongguo.android;
-import java.io.*;import java.net.SocketTimeoutException;import java.util.*;
+import java.io.*;import java.net.SocketTimeoutException;import java.util.*;import java.util.concurrent.*;
 /** Executes production Activity methods; only Android/transport/cache boundaries are doubles. */
 public final class PlaybackFailureActivityTest {
  static int checks,groups;static void check(boolean value,String message){checks++;if(!value)throw new AssertionError(message);}
@@ -10,10 +10,53 @@ public final class PlaybackFailureActivityTest {
  static AdaptiveActivityHarness fresh()throws Exception{PlaybackSources.reset();return new AdaptiveActivityHarness();}
  static void ready(AdaptiveActivityHarness p,int pixels){p.pump();p.video.complete(pixels,pixels*2);p.main.flush();}
  static void failAll(){for(String q:new String[]{"auto","1080p","720p","480p","360p"})PlaybackSources.failures.put(q,new SocketTimeoutException("temporary source timeout"));}
+ static void blockUntilReleased(CountDownLatch release){for(;;)try{release.await();return;}catch(InterruptedException ignored){/* Model a native request ignoring cancellation. */}}
  public static void main(String[]args)throws Exception{
   AdaptiveActivityHarness initial=fresh();initial.quality="auto";initial.actualQuality="auto";initial.requestedSpeed=1.5f;PlaybackSources.onceFailures.put("auto",new SocketTimeoutException("temporary source timeout"));initial.loadAt(1,null,43000,true);initial.pump();
   check(initial.errors==0&&initial.current==1&&PlaybackSources.calls.equals(Arrays.asList("resolve:v2:auto","recover:v2:auto")),"initial prepare failure must re-resolve same selected episode once before final dialog; calls="+PlaybackSources.calls+" errors="+initial.errors);
   initial.video.complete(576,1024);check(initial.prepared&&initial.video.position==43000&&initial.userPaused&&!initial.video.playing&&initial.actualSpeed==1.5f,"fresh initial source retains resume pause and rate");check(initial.quality.equals("auto")&&PlayerOptions.saved.isEmpty(),"automatic recovery preserves preferred setting");group("initial source timeout gets exactly one same-quality fresh resolution");
+
+  AdaptiveActivityHarness frozen=fresh();frozen.actualQuality="auto";frozen.quality="auto";
+  long realRetryBudget=AdaptiveActivityHarness.RETRY_LOOKUP_TIMEOUT_MS;
+  check(realRetryBudget==30_000,"production retry lookup has a 30s phase budget");
+  CountDownLatch entered=new CountDownLatch(1), release=new CountDownLatch(1), finished=new CountDownLatch(1);
+  // An unbounded baseline fails its assertion instead of hanging this test process.
+  CompletableFuture.delayedExecutor(4,TimeUnit.SECONDS).execute(release::countDown);
+  AdaptiveActivityHarness.RETRY_LOOKUP_TIMEOUT_MS=200;
+  try {
+   PlaybackSources.onceFailures.put("auto",new SocketTimeoutException("https://fixture.invalid/signed?secret=1"));
+   PlaybackSources.onResolve=()->PlaybackSources.onResolve=()->{entered.countDown();blockUntilReleased(release);};
+   frozen.loadAt(0,null,17000,true);frozen.pump();
+   check(entered.getCount()==0&&frozen.errors==1&&frozen.status.text.contains("自动重新取源超时"),"a blocked automatic re-fetch must reach a clear terminal state");
+   check(frozen.resumeAt==17000&&frozen.userPaused&&frozen.pendingMedia.isEmpty()&&frozen.cache.fetches.isEmpty()&&frozen.video.uri==null,"timeout preserves playback intent, releases reservation and does not start a transfer");
+   check(PlayerLog.warnings.equals(Collections.singletonList("HongguoPlayer: sourceRefetch previous=SocketTimeoutException final=RetryLookupFailure")),"diagnostic log must contain classes only, no fixture secret or URL");
+   PlaybackSources.onceFailures.put("auto",new SocketTimeoutException("retry while lane occupied"));
+   frozen.loadAt(0,null,17000,true);frozen.pump();
+   check(frozen.errors==2&&frozen.status.text.contains("上一次重新取源尚未结束"),"busy retry lane rejects further automatic lookup without queuing");
+   frozen.loadAt(1,null,34000,true);frozen.pump();frozen.video.complete(540,960);
+   check(frozen.prepared&&frozen.current==1&&frozen.video.position==34000&&frozen.cache.fetches.equals(Collections.singletonList("v2:auto")),"a new ordinary selection can play while the stale retry is still blocked");
+   PlaybackSources.onResolvedRetry=finished::countDown;release.countDown();check(finished.await(2,TimeUnit.SECONDS),"late worker returned");frozen.pump();
+   check(frozen.errors==2&&frozen.current==1&&frozen.prepared&&frozen.cache.fetches.equals(Collections.singletonList("v2:auto")),"a late re-fetch may not download or replace the active selection");
+  } finally { release.countDown();AdaptiveActivityHarness.RETRY_LOOKUP_TIMEOUT_MS=realRetryBudget; }
+  group("stalled automatic re-fetch times out once without blocking the ordinary lane or adopting a stale result");
+
+  AdaptiveActivityHarness workerError=fresh();workerError.quality="auto";workerError.actualQuality="auto";
+  PlaybackSources.onceFailures.put("auto",new SocketTimeoutException("fixture initial timeout"));
+  PlaybackSources.onResolve=()->PlaybackSources.onResolve=()->{throw new UnsatisfiedLinkError("https://fixture.invalid/secret");};
+  workerError.loadAt(0,null,0);workerError.pump();
+  check(workerError.errors==1&&workerError.status.text.contains("片源准备异常")&&workerError.pendingMedia.isEmpty(),"linkage failure in retry Future becomes visible terminal state");
+  check(PlayerLog.warnings.equals(Arrays.asList("HongguoPlayer: sourceRefetch previous=SocketTimeoutException final=UnsatisfiedLinkError","HongguoPlayer: sourcePreparation failure=UnsatisfiedLinkError")),"both failures are captured diagnostically without raw throwable text");
+  group("unexpected non-VM retry worker errors no longer disappear inside a Future");
+
+  AdaptiveActivityHarness transfer=fresh();transfer.quality="auto";transfer.actualQuality="auto";
+  PlaybackSources.onceFailures.put("auto",new SocketTimeoutException("fixture initial timeout"));
+  transfer.cache.onForegroundTransfer=()->{
+   check(PlaybackSources.ACTIVE_PROGRESS.get()!=null,"foreground transfer retains its original progress callback");
+   PlaybackSources.ACTIVE_PROGRESS.get().onProgress(1048576,2097152);
+  };
+  transfer.loadAt(0,null,0);transfer.pump();transfer.video.complete(540,960);
+  check(transfer.prepared&&transfer.errors==0&&PlaybackSources.ACTIVE_PROGRESS.get()==null,"refetch timeout applies only to lookup and preserves subsequent transfer/progress");
+  group("successful re-fetch leaves media transfer and progress intact");
 
   AdaptiveActivityHarness chain=fresh();chain.quality="auto";chain.actualQuality="auto";failAll();chain.loadAt(2,null,26000);chain.pump();
   check(PlaybackSources.calls.equals(Arrays.asList("resolve:v3:auto","recover:v3:auto","recover:v3:720p","recover:v3:480p","recover:v3:360p")),"default auto finite grade chain, no high-quality restart: "+PlaybackSources.calls);

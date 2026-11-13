@@ -80,9 +80,13 @@ final class PublicPlaybackVerifier {
                 MediaFormat format = extractor.getTrackFormat(i);
                 String mime = format.getString(MediaFormat.KEY_MIME);
                 boolean isVideo = "video/avc".equals(mime) || "video/hevc".equals(mime);
-                if (!isVideo && !"audio/mp4a-latm".equals(mime))
+                LayoutTrack track = container.tracks.get(i);
+                // Some Amlogic extractors report AAC-LC as the generic audio/ffmpeg.
+                // This alias is accepted only for an independently identified AAC-LC track.
+                boolean vendorAac = "audio/ffmpeg".equals(mime) && !track.video && track.aacLc;
+                if (!isVideo && !"audio/mp4a-latm".equals(mime) && !vendorAac)
                     throw failure("官网视频编码或轨道类型不受支持");
-                if (isVideo != container.tracks.get(i).video)
+                if (isVideo != track.video)
                     throw failure("官网视频轨道标识不匹配");
                 if (isVideo) {
                     if (video >= 0) throw failure("官网视频含多个视频轨道");
@@ -215,7 +219,7 @@ final class PublicPlaybackVerifier {
     }
 
     private static final class LayoutTrack {
-        boolean video, handler;
+        boolean video, handler, description, aacLc;
         int samples = -1;
     }
 
@@ -306,9 +310,11 @@ final class PublicPlaybackVerifier {
                             throw failure("MP4 样本内容大小无效");
                     }
                 } else if ("stsd".equals(type) && track != null) {
-                    if (next - body < 8) throw failure("MP4 编码表不完整");
+                    if (track.description || next - body < 8) throw failure("MP4 编码表无效");
+                    track.description = true;
                     in.seek(body + 4);
                     if (in.readInt() != 1) throw failure("MP4 含多个编码描述");
+                    track.aacLc = declaredAacLc(in, body + 8, next);
                     walk(in, body + 8, next, depth + 1, track);
                 } else if ("avc1".equals(type) || "avc3".equals(type)
                         || "hvc1".equals(type) || "hev1".equals(type)) {
@@ -336,6 +342,75 @@ final class PublicPlaybackVerifier {
             }
             if (videos != 1) throw failure("官网 MP4 缺少唯一真实视频轨道");
         }
+    }
+
+    /** Recognize the ordinary mp4a/esds sample entry, not arbitrary FFmpeg audio.
+     * The normal box walker still checks the sample entry for encryption markers.
+     */
+    private static boolean declaredAacLc(RandomAccessFile in, long start, long end) throws IOException {
+        if (end - start < 36) return false;
+        in.seek(start);
+        long entrySize = unsigned(in.readInt());
+        if (entrySize != end - start || !"mp4a".equals(fourcc(in.readInt()))) return false;
+        in.seek(start + 16);
+        if (in.readUnsignedShort() != 0) return false;
+        boolean found = false;
+        for (long at = start + 36; at < end;) {
+            if (end - at < 8) return false;
+            in.seek(at);
+            long size = unsigned(in.readInt());
+            String type = fourcc(in.readInt());
+            if (size < 8 || size > end - at) return false;
+            if ("esds".equals(type)) {
+                if (found || size < 12 || size > 4096) return false;
+                byte[] data = new byte[(int) size - 8];
+                in.readFully(data);
+                if (!aacLcDescriptor(ByteBuffer.wrap(data))) return false;
+                found = true;
+            } else if (!"btrt".equals(type) || size != 20) return false;
+            at += size;
+        }
+        return found;
+    }
+
+    private static boolean aacLcDescriptor(ByteBuffer data) {
+        if (data.getInt() != 0) return false; // esds version and flags
+        ByteBuffer es = descriptor(data, 3);
+        // Common ES_Descriptor with no optional dependency, URL, or OCR fields.
+        if (es == null || data.hasRemaining() || es.remaining() < 3
+                || (es.get(2) & 0xe0) != 0) return false;
+        es.position(3);
+        ByteBuffer config = descriptor(es, 4);
+        if (config == null || config.remaining() < 13 || config.get(0) != 0x40
+                || ((config.get(1) & 0xff) >>> 2) != 5
+                || (config.get(1) & 1) == 0) return false; // MPEG-4 Audio stream
+        if (es.hasRemaining()) {
+            ByteBuffer sl = descriptor(es, 6);
+            if (sl == null || sl.remaining() != 1 || sl.get() != 2 || es.hasRemaining()) return false;
+        }
+        config.position(13);
+        ByteBuffer asc = descriptor(config, 5);
+        if (asc == null || asc.remaining() < 2 || config.hasRemaining()) return false;
+        int header = asc.getShort() & 0xffff;
+        int objectType = header >>> 11, sampleRateIndex = (header >>> 7) & 15, channels = (header >>> 3) & 15;
+        return objectType == 2 && sampleRateIndex < 13 && channels >= 1 && channels <= 7;
+    }
+
+    private static ByteBuffer descriptor(ByteBuffer data, int tag) {
+        if (!data.hasRemaining() || (data.get() & 0xff) != tag) return null;
+        int length = 0;
+        for (int i = 0; i < 4 && data.hasRemaining(); i++) {
+            int value = data.get() & 0xff;
+            length = (length << 7) | (value & 0x7f);
+            if ((value & 0x80) == 0) {
+                if (length > data.remaining()) return null;
+                ByteBuffer child = data.slice();
+                child.limit(length);
+                data.position(data.position() + length);
+                return child;
+            }
+        }
+        return null;
     }
 
     private static boolean encrypted(String type) {

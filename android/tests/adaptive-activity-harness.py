@@ -32,7 +32,7 @@ playlist='PlaybackPlaylist.' in source
 names=['selectEpisode']
 if modern:
     names+=['releaseCurrent','reserveMedia','releasePrepared','discardPendingMedia','adoptMedia','prepareMedia','stageProgress','loadAt','loadAtInternal','bindPlayback','recoverMedia','lowerCurrentMedia','validSwitch','releaseSwitch','cancelQualitySwitch','failQualitySwitch','selectQuality','switchQuality','resolveQualitySwitch','prepareQualitySwitch','validCandidate','lowerQualitySwitch','finishQualitySwitch','schedulePrefetch','renderStatus','qualityLabel']
-for extra in ['stageCeiling','prepareStage','cancelPlaybackWatchdogs','validPlaybackCallback','armPreparationTimeout','updateBufferingWatchdog','observedShortEdge','failCurrentMedia','restoreAutomaticCeiling','cacheEpisode']:
+for extra in ['resetDownloadMarks','reportDownloadProgress','stageCeiling','prepareStage','resolveRetry','logRefetch','cancelPlaybackWatchdogs','validPlaybackCallback','armPreparationTimeout','updateBufferingWatchdog','observedShortEdge','failCurrentMedia','restoreAutomaticCeiling','cacheEpisode']:
     if re.search(r'\b'+extra+r'\(',source): names.append(extra)
 if playlist: names+=['owner','mediaKey','closeLocalWindow','pruneReleasedWindow','saveProgress','restoreSelection','savePlaybackState']
 if 'void recordProgress(' in source: names+=['recordProgress','watchProgressSeeks']
@@ -40,23 +40,24 @@ methods=[]
 for name in names:
     found=blocks(r'^    (?:private|public|protected) (?:synchronized )?(?:static )?[^\n{]*\b'+re.escape(name)+r'\([^;\n]*\)(?: throws [^\n{]+)?\s*\{')
     if not found:raise SystemExit('MISSING_ACTUAL_ACTIVITY_METHOD '+name)
-    methods+=found
+    methods.extend(method.replace('android.util.Log.w(', 'PlayerLog.w(') for method in found)
 nested=[]
-for name in (['RecoveryBudget','PreparedMedia','QualitySwitch'] if modern else []):
-    found=blocks(r'^    (?:private )?static (?:final )?class '+name+r'\s*\{')
+for name in (['RecoveryBudget','PreparedMedia','QualitySwitch'] if modern else [])+(['RetryLookupFailure'] if 'class RetryLookupFailure' in source else []):
+    found=blocks(r'^    (?:private )?static (?:final )?class '+name+r'(?: extends [\w.]+)?\s*\{')
     if not found:raise SystemExit('MISSING_ACTUAL_ACTIVITY_CLASS '+name)
     nested+=found
 header='''package io.github.jackotom.hongguo.android;
 import java.io.*;import java.util.*;import java.util.concurrent.*;import org.json.*;
 final class AdaptiveActivityHarness {
  final MainLoop main=new MainLoop();final Worker resolver=new Worker(),cacheWorker=new Worker();Future<?> resolution;
+ RETRY_FIELDS
  final Set<String> caching=new HashSet<>();final PlaybackCache cache=new PlaybackCache();final LibraryStore store=new LibraryStore();
  VideoView video=new VideoView(this);FrameLayout playerRoot=new FrameLayout();MediaPlayer mediaPlayer;
  String quality="1080p",actualQuality="1080p",protectedQuality="auto",currentKind="fixture",lastMediaError;float requestedSpeed=1,actualSpeed=1;
  final Label title=new Label(),status=new Label(),time=new Label();final SeekBar seek=new SeekBar();
  JSONObject series,episode,queueSeries,protectedEpisode;String protectedSeriesId="",queueIdentity="";PlaybackCache.QueueWindow localWindow,protectedWindow;boolean cleanup=true;final List<JSONObject>queue=new ArrayList<>();int current,generation=7,resumeAt,lastGoodPosition,qualitySerial,videoWidth,videoHeight,sourceShortEdge,automaticCeiling,protectedCeiling;Runnable playbackPrepareTimeout,bufferingTimeout;boolean decoderPreparing;
  boolean destroyed,offline,autoplay,prepared,completed,userPaused,active=true,protectedCurrent,currentManual,currentCache,currentWeb,buffering,castWasActive;
- long lastProgressSavedAt;
+ long lastProgressSavedAt,downloadMarkNano,downloadMarkBytes;
  int loads,loadedAt,loadedPosition,errors,updates,saves,prunes;Uri manualFile;AlertDialog dialog;
  // Danmaku is an independent display boundary, certified by DanmakuControllerTest.
  DanmakuLayer danmaku;static final class DanmakuLayer{void suspend(){}}
@@ -78,6 +79,8 @@ final class AdaptiveActivityHarness {
 '''
 if playlist: header=header.replace('void saveProgress(){saves++;}','')
 header=header.replace('NESTED','\n'.join(nested))
+retry=re.search(r'^    private static final ExecutorService RETRY_LOOKUP = .*?; \}\);\n    private static final long RETRY_LOOKUP_TIMEOUT_MS = \d[\d_]*L;',source,re.M|re.S)
+header=header.replace('RETRY_FIELDS',retry[0].replace('private static final long RETRY_LOOKUP_TIMEOUT_MS', 'static long RETRY_LOOKUP_TIMEOUT_MS') if retry else 'static long RETRY_LOOKUP_TIMEOUT_MS = 30_000L;')
 header=header.replace('MODERN_FIELD','final Set<PreparedMedia> pendingMedia=new HashSet<>();QualitySwitch qualitySwitch;final RecoveryBudget recoveryBudget=new RecoveryBudget();' if modern else '')
 header=header.replace('MODERN_INIT','recoveryBudget.reset(generation);' if modern else '')
 header=header.replace('BASELINE_LOAD','' if modern else 'void loadAt(int index,String url,int position){loads++;loadedAt=index;loadedPosition=position;}')

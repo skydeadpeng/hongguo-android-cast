@@ -17,6 +17,10 @@ import org.json.*;
 /** A single native player owns the whole queue; Back never dismisses a media popup first. */
 public final class PlayerActivity extends Activity {
     private static final java.util.concurrent.atomic.AtomicInteger LIVE_PLAYERS = new java.util.concurrent.atomic.AtomicInteger();
+    // A stuck native lookup must not occupy the ordinary resolver or build a queue of retry threads.
+    private static final ExecutorService RETRY_LOOKUP = new ThreadPoolExecutor(0, 1, 10, TimeUnit.SECONDS,
+        new SynchronousQueue<>(), task -> { Thread thread = new Thread(task, "hongguo-source-retry"); thread.setDaemon(true); return thread; });
+    private static final long RETRY_LOOKUP_TIMEOUT_MS = 30_000L;
     private boolean registeredPlayer;
     static boolean hasLivePlayer() { return LIVE_PLAYERS.get() > 0; }
     private DanmakuController danmaku;
@@ -482,7 +486,7 @@ public final class PlayerActivity extends Activity {
         protectedEpisode = media.episode; protectedSeriesId = media.seriesId; protectedWindow = media.window; media.protectedKey = false;
         actualQuality = media.quality; automaticCeiling = media.ceiling;
     }
-    private PreparedMedia prepareMedia(JSONObject target, String stageQuality, String initialUrl, boolean recovering, boolean failedWeb, boolean allowDownloads, int maximumEdge, PlaybackCache.QueueWindow window) throws Exception {
+    private PreparedMedia prepareMedia(JSONObject target, String stageQuality, String initialUrl, boolean recovering, boolean failedWeb, boolean allowDownloads, int maximumEdge, PlaybackCache.QueueWindow window, int token, boolean boundedRefetch) throws Exception {
         int ceiling=stageCeiling(stageQuality, maximumEdge);
         PreparedMedia media = reserveMedia(target, stageQuality, ceiling, window);
         boolean success = false;
@@ -496,8 +500,13 @@ public final class PlayerActivity extends Activity {
             else {
                 if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("播放准备已取消");
                 if (recovering) {
-                    cache.invalidate(media.seriesId, target.optString("vid"), target.optInt("index"), stageQuality, ceiling);
-                    media.plan = PlaybackSources.resolvePlayback(media.seriesId, target.optString("vid"), stageQuality, ceiling, true, failedWeb);
+                    final String sid = media.seriesId, vid = target.optString("vid");
+                    if (boundedRefetch) {
+                        media.plan = resolveRetry(() -> PlaybackSources.resolvePlayback(sid, vid, stageQuality, ceiling, true, failedWeb));
+                    } else {
+                        cache.invalidate(sid, vid, target.optInt("index"), stageQuality, ceiling);
+                        media.plan = PlaybackSources.resolvePlayback(sid, vid, stageQuality, ceiling, true, failedWeb);
+                    }
                 } else if (initialUrl != null && ceiling == 0) {
                     media.plan = PlaybackSources.find(initialUrl, stageQuality);
                     if (media.plan == null) {
@@ -507,14 +516,22 @@ public final class PlayerActivity extends Activity {
                         media.plan = PlaybackSources.register(info, target.optString("vid"), false);
                     }
                 } else media.plan = PlaybackSources.resolvePlayback(media.seriesId, target.optString("vid"), stageQuality, ceiling, false, failedWeb);
-                if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("播放准备已取消");
+                if (destroyed || token != generation || Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("播放准备已取消");
                 if (media.plan.playbackCeiling != ceiling) throw new java.io.IOException("播放片源清晰度边界不匹配");
                 // 黄果为 AES-128 HLS 直链：无论画质档位恒走在线播放，不进入整文件缓存。
                 // 其余片源自 0.1.17 起一律整集下载后本地播放；下载进度与速度直接展示在状态栏。
                 boolean huangguoStream = media.seriesId.length() == 10 && media.seriesId.startsWith("99");
+                if (boundedRefetch) main.post(() -> {
+                    if (!destroyed && token == generation) {
+                        status.setText(huangguoStream ? "片源已取得 · 正在准备播放" : "片源已取得 · 正在准备本集下载");
+                        showControls();
+                    }
+                });
                 if (!huangguoStream) {
+                    // Do not invalidate a cache entry until a bounded fresh lookup has succeeded.
+                    if (boundedRefetch) cache.invalidate(media.seriesId, target.optString("vid"), target.optInt("index"), stageQuality, ceiling);
                     resetDownloadMarks();
-                    PlaybackSources.ACTIVE_PROGRESS.set((bytes, totalBytes) -> reportDownloadProgress(bytes, totalBytes));
+                    PlaybackSources.ACTIVE_PROGRESS.set((bytes, totalBytes) -> reportDownloadProgress(token, bytes, totalBytes));
                     File ready;
                     try { ready = cache.fetchForeground(media.seriesId, target.optString("vid"), target.optInt("index"), media.plan, stageQuality); }
                     finally { PlaybackSources.ACTIVE_PROGRESS.remove(); }
@@ -527,7 +544,7 @@ public final class PlayerActivity extends Activity {
     /** Whole-file foreground download reporting: percentage, transferred MB and current speed. */
     private long downloadMarkNano, downloadMarkBytes;
     private void resetDownloadMarks() { downloadMarkNano = System.nanoTime(); downloadMarkBytes = 0; }
-    private void reportDownloadProgress(long bytes, long totalBytes) {
+    private void reportDownloadProgress(int token, long bytes, long totalBytes) {
         if (destroyed) return;
         long now = System.nanoTime(), elapsed = now - downloadMarkNano;
         double mbps = 0;
@@ -543,7 +560,7 @@ public final class PlayerActivity extends Activity {
             text = "正在下载本集 · 已下 " + String.format(java.util.Locale.US, "%.1f MB", bytes / 1048576.0)
                 + (mbps > 0 ? String.format(java.util.Locale.US, " · %.1f MB/s", mbps) : "");
         }
-        main.post(() -> { if (!destroyed) { status.setText(text); showControls(); } });
+        main.post(() -> { if (!destroyed && token == generation) { status.setText(text); showControls(); } });
     }
     private static int stageCeiling(String quality, int maximumEdge) {
         int fixed = AdaptiveQuality.ceiling(quality);
@@ -552,15 +569,38 @@ public final class PlayerActivity extends Activity {
         if (maximumEdge <= 0 && !"480p".equals(quality) && !"360p".equals(quality)) return 0;
         return maximumEdge <= 0 ? fixed : fixed <= 0 ? maximumEdge : Math.min(fixed, maximumEdge);
     }
+    private static final class RetryLookupFailure extends java.io.IOException {
+        RetryLookupFailure(String message) { super(message); }
+    }
+    private static PlaybackSources.Plan resolveRetry(Callable<PlaybackSources.Plan> lookup) throws Exception {
+        final Future<PlaybackSources.Plan> task;
+        try { task = RETRY_LOOKUP.submit(lookup); }
+        catch (RejectedExecutionException busy) { throw new RetryLookupFailure("上一次重新取源尚未结束，请稍后重试或选择其他分集"); }
+        try { return task.get(RETRY_LOOKUP_TIMEOUT_MS, TimeUnit.MILLISECONDS); }
+        catch (TimeoutException expired) { throw new RetryLookupFailure("自动重新取源超时（30 秒），可重试或选择其他分集"); }
+        catch (InterruptedException cancelled) { Thread.currentThread().interrupt(); throw new java.io.InterruptedIOException("播放准备已取消"); }
+        catch (ExecutionException failed) {
+            Throwable cause = failed.getCause();
+            if (cause instanceof Exception) throw (Exception) cause;
+            if (cause instanceof Error) throw (Error) cause;
+            throw new RetryLookupFailure("自动重新取源未完成，可重试或选择其他分集");
+        } finally { task.cancel(true); }
+    }
+    private static void logRefetch(Throwable first, Throwable last) {
+        // Messages, URLs and raw response/throwable objects can contain signed or identifying data.
+        android.util.Log.w("HongguoPlayer", "sourceRefetch previous=" + first.getClass().getSimpleName()
+            + " final=" + last.getClass().getSimpleName());
+    }
     /** One fresh reconnect belongs to a logical selection, never to every lower stage. */
     private PreparedMedia prepareStage(JSONObject target, String stageQuality, String initialUrl, boolean fresh, boolean failedWeb, int token, int maximumEdge, PlaybackCache.QueueWindow window) throws Exception {
-        try { return prepareMedia(target, stageQuality, initialUrl, fresh, failedWeb, true, maximumEdge, window); }
+        try { return prepareMedia(target, stageQuality, initialUrl, fresh, failedWeb, true, maximumEdge, window, token, false); }
         catch (Exception first) {
             if (offline || fresh || !PlaybackSources.canRecoverPlayback(first) || destroyed || token != generation || Thread.currentThread().isInterrupted()
                     || !recoveryBudget.take(token, false, false, false)) throw first;
             main.post(() -> { if (!destroyed && token == generation) { status.setText("片源暂未取得 · 正在自动重新取源 " + qualityLabel(stageQuality)); showControls(); } });
-            try { return prepareMedia(target, stageQuality, null, true, failedWeb, true, maximumEdge, window); }
-            catch (Exception retry) { if (retry != first) retry.addSuppressed(first); throw retry; }
+            try { return prepareMedia(target, stageQuality, null, true, failedWeb, true, maximumEdge, window, token, true); }
+            catch (Exception retry) { if (retry != first) retry.addSuppressed(first); logRefetch(first, retry); throw retry; }
+            catch (LinkageError | AssertionError retry) { logRefetch(first, retry); throw retry; }
         }
     }
     private void cancelPlaybackWatchdogs() {
@@ -641,7 +681,7 @@ public final class PlayerActivity extends Activity {
             try {
                 AdaptiveQuality.Result<PreparedMedia> result = AdaptiveQuality.prepare(targetQuality,
                     stageQuality -> prepareStage(target, stageQuality, stageQuality.equals(targetQuality) ? initialUrl : null, recovering || !stageQuality.equals(targetQuality), failedWeb, token, stageQuality.equals(targetQuality) ? maximumEdge : stageCeiling(stageQuality, maximumEdge > 0 ? maximumEdge : AdaptiveQuality.ceiling(stageQuality)), targetWindow),
-                    error -> !offline && PlaybackSources.canRecoverPlayback(error),
+                    error -> !offline && !(error instanceof RetryLookupFailure) && PlaybackSources.canRecoverPlayback(error),
                     () -> !destroyed && token == generation,
                     (stageQuality, stage, error) -> stageProgress(token, stageQuality, stage, false), this::releasePrepared);
                 final PreparedMedia media = result.value; final String playedQuality = result.quality;
@@ -678,6 +718,10 @@ public final class PlayerActivity extends Activity {
                     catch (RuntimeException error) { failCurrentMedia(token, "设备打开视频未成功：" + error.getMessage(), false); }
                 });
             } catch (Exception error) { main.post(() -> playbackError(token, recovering ? "自动恢复未成功：" + error.getMessage() + "；原错误：" + lastMediaError : error.getMessage())); }
+            catch (LinkageError | AssertionError error) {
+                android.util.Log.w("HongguoPlayer", "sourcePreparation failure=" + error.getClass().getSimpleName());
+                main.post(() -> playbackError(token, "片源准备异常，可重试或选择其他分集"));
+            }
         });
     }
     private void bindPlayback(VideoView view, int token, JSONObject target, String remoteUrl, String targetQuality) {
@@ -806,7 +850,7 @@ public final class PlayerActivity extends Activity {
         try { job.work = resolver.submit(() -> {
             try {
                 AdaptiveQuality.Result<PreparedMedia> result = AdaptiveQuality.prepare(startQuality,
-                    stageQuality -> prepareMedia(job.episode, stageQuality, null, !stageQuality.equals(job.quality) || job.ceiling > 0, false, false, stageQuality.equals(job.quality) ? job.ceiling : stageCeiling(stageQuality, job.ceiling > 0 ? job.ceiling : AdaptiveQuality.ceiling(stageQuality)), job.window),
+                    stageQuality -> prepareMedia(job.episode, stageQuality, null, !stageQuality.equals(job.quality) || job.ceiling > 0, false, false, stageQuality.equals(job.quality) ? job.ceiling : stageCeiling(stageQuality, job.ceiling > 0 ? job.ceiling : AdaptiveQuality.ceiling(stageQuality)), job.window, job.generation, false),
                     PlaybackSources::canRecoverPlayback, () -> validSwitch(job),
                     (stageQuality, stage, error) -> main.post(() -> { if (validSwitch(job)) { status.setText((stage == 1 && startQuality.equals(job.quality) ? "后台准备 " : "当前档多次失败 · 自动降低至 ") + qualityLabel(stageQuality) + " 视频…；当前播放保持"); showControls(); } }), this::releasePrepared);
                 PreparedMedia media = result.value;
