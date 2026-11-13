@@ -6,15 +6,27 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.67 / code90 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.67 / code90 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.15 / code16 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.68 / code91 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.68 / code91 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.16 / code17 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 三个包均支持 Android 8.0（API26）及以上，可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.67](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.67) · [原生 TV 0.1.15](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.15)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.68](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.68) · [原生 TV 0.1.16](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.16)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+
+## 0.12.68 上游身份分级风控修复（手机 / TV WebView）
+
+- 2026-11-12 起番茄模型接口对匿名注册设备做身份分级风控：`multi_video_model` POST 约 3/4 概率 404、按集 `video_tab` GET 大概率空 200，被拒身份对两种形态同拒；旧版 APK 内置的原生取流组件（11-11 版）multi POST 优先且 404 不做任何恢复，页面层对 HTTP 拒绝也不落备用链路，导致红果播放大面积失败（实测成功率约一成）。
+- APK 打包与原生 TV 0.1.16 相同的取流组件：video_tab 优先、同身份 multi POST 兜底（`Connection: close`）、空 200 与 HTTP 错误均可恢复、被拒身份在内存中轮换重注册（最多三个身份，不落盘）；重注册不再关闭共享注册传输，保证第三次轮换可达。
+- 页面层（`app-source-registered.js`）回退白名单加入 `HTTP_ERROR` 作纵深兜底。
+- 验证：取流回归 16 组 222 项全过；phone/tv 双包过 release 检查 9 项；模拟器端到端 phone 包真实剧集连续播放（三帧推进，全程静音）；真网探针成功率约一成恢复至八至九成。边界：上游分级为概率性，个别时段需重试一次；`check-app-source-entitlement.cjs` 合成 fixture 存量失败与本版无关。发行记录见 `android/notes-0.12.68.txt`。
+
+## 0.1.16 上游身份分级风控修复（原生 TV 独立版）
+
+- 同一上游风控下，0.1.15 的 Java 取流链（multi POST 优先、仅空 200 走 video_tab 恢复）撞上被拒身份即失败；0.1.16 改为 video_tab GET 优先（current API）、同身份 multi POST 兜底、被拒身份内存轮换重注册（最多三个），错误分类保持业务拒绝终态、仅空 200 与 HTTP 错误可恢复。
+- 验证：回归 16 组 222 项 + JS 投影 golden + dispatch 全过；真网探针成功率约一成恢复至八至九成（单身份命中约 850ms，轮换一次约 1.6–2.0s）；模拟器端到端真实剧集连续播放（静音）。发行记录见 `android/notes-tvnative-0.1.16.txt`。
 
 ## 0.12.67 黄果线路首次测速钉住
 
