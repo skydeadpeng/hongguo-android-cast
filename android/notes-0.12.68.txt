@@ -1,0 +1,40 @@
+0.12.68 发行记录（2026-11-13，phone + tv 同版）
+
+背景
+- 0.1.16（tvNative）发布后用户报告手机/TV WebView 版红果播放也大面积失败。
+- 同网络桌面 JS 链 6/6 正常；上游本身可用。
+
+根因
+- phone/tv WebView 版的「App 取源」首选原生桥（NativeBridge appRegisteredModel →
+  RegisteredPlaybackModel）。0.12.67 APK 内仍是 11-11 版组件：multi POST 优先、
+  HTTP 404 不做任何恢复（详见 notes-tvnative-0.1.16.txt 的上游身份分级风控分析）。
+- 页面层（app-source-registered.js）对桥失败仅当 APP_EMPTY_RESPONSE/网络类错误才
+  落备用链路，HTTP_ERROR 直接抛出——404 大概率直接失败。
+
+修复
+- APK 打包 0.1.16 同款 RegisteredPlaybackModel（video_tab 优先 + 同身份 multi POST
+  兜底 + 内存轮换最多三身份；该组件已在 tvNative 0.1.16 端到端验收）。
+- 页面层回退白名单加入 HTTP_ERROR（src/native/app-source-registered.js）。
+- versionCode 91 / versionName 0.12.68。
+
+验证
+- 回归：run-registered-playback-model-tests.sh 全过（16 组 222 项，与 0.1.16 同套）。
+- 构建：phone/tv compatible 双包过 check-android-release 9 项。
+- 模拟器端到端（iptv_tv ATV64，phone 0.12.68 compatible 包）：发现页加载、详情页、
+  继续播放第 1 集真实视频画面（字幕可见），连续播放三帧哈希各不相同；
+  STREAM_MUSIC 音量 0 全程静音。首启发现页曾白屏约 40 秒（模拟器网络/DNS 首载），
+  重启后正常，未复现；非本轮改动引入。
+- check-app-source-entitlement.cjs 在改动前后同样失败（设备加密组件合成 fixture
+  存量问题，符合并入 main 时的存量失败边界，与本轮无关）。
+
+边界
+- 与 0.1.16 相同：上游身份分级为概率性，个别时段需重试一次。
+- 桌面版（app-source.js 桌面链）当前正常，未改动、未发版。
+- 存量失败的 entitlement 合成测试未修复。
+
+资产
+- Hongguo-0.12.68-phone-release-compatible.apk size 687768
+  sha256 34ea67a714c08662fa549e5a7de63fac3080bf0003cfc268ece1ddc79ca40f61
+- Hongguo-0.12.68-tv-release-compatible.apk size 686056
+  sha256 eb938c811c2295d9ea7b492eea009f2ba87ffafcb67bb3ab59c9606ae4da9167
+- feed：update-phone-0.12.68.json / update-tv-0.12.68.json（主 feed 已同步）

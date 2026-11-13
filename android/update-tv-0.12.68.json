@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 91,
+  "versionName": "0.12.68",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.68/Hongguo-0.12.68-tv-release-compatible.apk",
+  "size": 686056,
+  "sha256": "eb938c811c2295d9ea7b492eea009f2ba87ffafcb67bb3ab59c9606ae4da9167",
+  "notes": "修复红果播放：上游开始按匿名设备身份分级风控，旧版内置的原生取流组件在设备被拒时（接口返回 404 或空数据）直接失败，且页面层不再兜底重试，导致大概率无法播放。\n本版内置与 TV 原生版 0.1.16 相同的取流组件（按集接口优先、传统接口同身份兜底、被拒身份在内存中轮换重注册，最多三个身份），页面层对 HTTP 拒绝同样启用备用链路；实测取流成功率由约一成恢复到八至九成，个别时段仍可能需要重试一次。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-13T13:15:00.000Z"
+}

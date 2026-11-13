@@ -411,7 +411,9 @@ async function fetchAppPlayUrl(vid, options = {}) {
             // Only an explicitly transient/empty provider failure may try the existing
             // legacy path. Never turn refusal, cancellation or mismatched data into a
             // fresh request merely because that path now has its intended time budget.
-            if (registered || !['APP_EMPTY_RESPONSE', 'ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN',
+            // HTTP_ERROR joins the set since 2026-11-12: the graded upstream refuses
+            // whole fresh identities with 404s across both native forms.
+            if (registered || !['APP_EMPTY_RESPONSE', 'HTTP_ERROR', 'ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN',
                 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE'].includes(providerError?.code)) throw providerError;
             info = null;
         }
