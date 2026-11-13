@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 89,
-  "versionName": "0.12.66",
+  "versionCode": 90,
+  "versionName": "0.12.67",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.66/Hongguo-0.12.66-phone-release-compatible.apk",
-  "size": 675328,
-  "sha256": "e1a18527a80754897326cc46c9cb2b58d6b5d8619efbf1ded817e7db84f1baef",
-  "notes": "修复红果播放：红果官方开始校验真实播放签名，旧版本的占位签名被拒（模型接口返回空数据），红果剧集无法播放。本版改用真实 551 Argus/Ladon 签名并在空响应时按集号走备用接口恢复；播放取流改用已登记设备身份，恢复红果在线播放与下载。\n兼容原安装签名，可覆盖安装。\n",
-  "publishedAt": "2026-11-11T21:10:00.000Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.67/Hongguo-0.12.67-phone-release-compatible.apk",
+  "size": 687676,
+  "sha256": "73fe563db870d858327dc86606c7d9d6bc3626307f51ef7efe03cf75345e3528",
+  "notes": "黄果提速：首次打开黄果时自动测速全部线路，选中并记住最快可用线路，之后一直直接使用；部分网络下首开从约 30 秒降到 1 秒级。\n已有线路记忆或固定线路直接沿用，不重复探测；DNS 解析池扩容，修复首启并发时探测被挤掉导致的误判超时。\n兼容原安装签名，可覆盖安装。\n",
+  "publishedAt": "2026-11-13T01:33:40.851Z"
 }
