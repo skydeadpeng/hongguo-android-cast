@@ -239,6 +239,30 @@ public final class GuestPlaybackIntegrationTest {
         check(failure==EpisodeResolver.failure,"guest failure propagated unchanged");
         check(EpisodeResolver.calls==1&&NetworkGuard.transfers.isEmpty(),"resolver denial makes no media request");
         noEscape("resolver denial");
+        check(fails(()->PlaybackSources.resolvePlayback(SID,VID,"auto",0,false,false),"player denial")==failure,"foreground denial remains terminal");
+        noEscape("player denial");
+    }
+    private static void missingPublicPlaybackOnly() throws Exception {
+        Exception missing=new EpisodeResolver.GuestPublicUnavailable("fixture: no verified public playback metadata");
+        EpisodeResolver.failure=missing;
+        PlaybackSources.attachNative((sid,vid,quality,ceiling,timeout)->{
+            Fixture.appCalls++;
+            check(SID.equals(sid)&&VID.equals(vid)&&"auto".equals(quality)&&ceiling==0,"fallback retains exact request");
+            return basic("app");
+        });
+        check(fails(()->PlaybackSources.resolve(SID,VID,"auto"),"manual/cast public source missing")==missing,"non-playback callers do not opt into new route");
+        check(Fixture.appCalls==0,"generic resolve made no App request");
+        PlaybackSources.Plan plan=PlaybackSources.resolvePlayback(SID,VID,"auto",0,false,false);
+        check("app".equals(plan.source)&&!plan.guestPlayback&&VID.equals(plan.vid),"player received a normal App plan");
+        check(Fixture.appCalls==1&&EpisodeResolver.calls==2,"one App fallback for one foreground resolution");
+        check(NetworkGuard.transfers.isEmpty()&&PublicPlaybackVerifier.calls==0,"no guest MP4 or verification invented");
+        PlaybackSources.attachNative((sid,vid,quality,ceiling,timeout)->{
+            Fixture.appCalls++;
+            throw new AppMediaSource.AppSourceException("fixture: upstream refused playback","BUSINESS_REJECTED");
+        });
+        Exception rejected=fails(()->PlaybackSources.resolvePlayback(SID,VID,"auto",0,false,false),"App business denial");
+        check(rejected.getMessage().equals("fixture: upstream refused playback"),"App business denial remains the displayed reason");
+        check(!PlaybackSources.canRecoverPlayback(rejected)&&Fixture.appCalls==2,"no retry after explicit App denial");
     }
     private static void fixedQuality() throws Exception {
         EpisodeResolver.info=guest(System.currentTimeMillis()/1000L+3600);
@@ -354,6 +378,7 @@ public final class GuestPlaybackIntegrationTest {
             for(String kind:new String[]{"http403","http404","http500","dns","timeout","tls","generic","invalid"})run("direct-terminal-"+kind,()->directFailure(kind),failures);
             run("direct-validator-cancellation",GuestPlaybackIntegrationTest::directVerifierCancellation,failures);
             run("resolver-denial-no-fallback",GuestPlaybackIntegrationTest::resolverRefusal,failures);
+            run("missing-public-playback-only",GuestPlaybackIntegrationTest::missingPublicPlaybackOnly,failures);
             run("fixed-quality-no-guest",GuestPlaybackIntegrationTest::fixedQuality,failures);
             run("complete2-cache-isolation",GuestPlaybackIntegrationTest::cacheRevision,failures);
             run("activity-foreground-source-invariant",()->activityInvariant(Paths.get(args[0])),failures);

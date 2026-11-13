@@ -44,6 +44,11 @@ final class EpisodeResolver {
     static final class GuestCodecFailure extends GuestFailure {
         GuestCodecFailure(String message) { super(message); }
     }
+    /** A verified episode page has no public playback metadata, not a guest grant.
+     * A caller may offer its separate App source, subject to that source's own checks. */
+    static final class GuestPublicUnavailable extends GuestFailure {
+        GuestPublicUnavailable() { super("官网未提供本集公开片源"); }
+    }
     private static final class GuestPage {
         final String sid, vid; final double duration; final int width, height;
         GuestPage(String sid, String vid, double duration, int width, int height) {
@@ -81,12 +86,12 @@ final class EpisodeResolver {
         Exception[] failures = new Exception[2];
         // SocketTimeoutException extends InterruptedIOException, so the timeout must be
         // caught BEFORE cancellation or a hung first route aborts the whole resolution.
-        try { return attempt(canonical, seriesId, vid, boundedBudget(deadline, FIRST_BUDGET_MS)); }
+        try { return attempt(canonical, seriesId, vid, boundedBudget(deadline, FIRST_BUDGET_MS), true); }
         catch (java.net.SocketTimeoutException timedOut) { failures[0] = timedOut; }
         catch (java.io.InterruptedIOException cancelled) { throw cancelled; }
         catch (GuestFailure denied) { throw denied; }
         catch (Exception error) { failures[0] = error; }
-        try { return attempt(underscore, seriesId, vid, boundedBudget(deadline, FIRST_BUDGET_MS)); }
+        try { return attempt(underscore, seriesId, vid, boundedBudget(deadline, FIRST_BUDGET_MS), false); }
         catch (java.net.SocketTimeoutException timedOut) { failures[1] = timedOut; }
         catch (java.io.InterruptedIOException cancelled) { throw cancelled; }
         catch (GuestFailure denied) { throw denied; }
@@ -104,7 +109,7 @@ final class EpisodeResolver {
                 final int which = index;
                 final String url = index == 0 ? canonical : underscore;
                 service.submit(() -> {
-                    try { return attempt(url, seriesId, vid, boundedBudget(deadline, HEDGE_BUDGET_MS)); }
+                    try { return attempt(url, seriesId, vid, boundedBudget(deadline, HEDGE_BUDGET_MS), false); }
                     catch (Exception failure) { hedge[which] = failure; throw failure; }
                 });
             }
@@ -121,17 +126,20 @@ final class EpisodeResolver {
     private static boolean transportTimeout(Exception error) {
         return error instanceof java.net.SocketTimeoutException || error instanceof java.net.ConnectException || error instanceof java.net.SocketException;
     }
-    private static Candidate attempt(String url, String seriesId, String vid, int budgetMs) throws Exception {
+    private static Candidate attempt(String url, String seriesId, String vid, int budgetMs, boolean canonical) throws Exception {
         if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("已切换分集");
         NetworkGuard.Reply response = NetworkGuard.get(url, budgetMs, System.currentTimeMillis() + budgetMs);
         if (response.status == 404) throw error("EPISODE_UNAVAILABLE", "该分集未向官网提供公开播放页面，请在官方 App 查看");
         if (response.status < 200 || response.status >= 300) throw error("SOURCE_HTTP", "播放页面响应 HTTP " + response.status);
-        GuestPage guest=guestPage(response.body,seriesId,vid);
+        // Only a direct canonical page can report absent public metadata to the
+        // caller. Alternate/hedged responses cannot supersede another page's denial.
+        boolean allowMissingSeo = canonical && response.status == 200 && url.equals(response.url);
+        GuestPage guest=guestPage(response.body,seriesId,vid,allowMissingSeo);
         return guest==null?new Candidate(parse(response.body,seriesId,vid),null):new Candidate(null,guest);
     }
     /** Only the current official page can establish this explicit guest route.
      * Its SEO contentUrl is never used as a substitute for the server response. */
-    private static GuestPage guestPage(String html,String sid,String vid) throws Exception {
+    private static GuestPage guestPage(String html,String sid,String vid,boolean allowMissingSeo) throws Exception {
         JSONObject loaders=extractRouterData(html).optJSONObject("loaderData");
         JSONObject data=loaders==null?null:loaders.optJSONObject("player_(series_id)/(vid)/page");
         if(data==null&&loaders!=null)data=loaders.optJSONObject("player_(series_id)/page");
@@ -141,10 +149,8 @@ final class EpisodeResolver {
             throw new GuestFailure("本集需要官网支持的登录播放流程，请在官方应用查看");
         if(!Boolean.TRUE.equals(data.opt("protectedPlayback")))return null;
         if(!Boolean.TRUE.equals(data.opt("isSuccess"))||!exact(data,"series_id",sid)||!exact(data,"vid",vid)||
-            !exact(detail,"series_id",sid)||!exact(seo,"seriesId",sid)||!exact(seo,"itemId",vid))
+            !exact(detail,"series_id",sid))
             throw new GuestFailure("官网播放信息与所选分集不一致");
-        if(req!=null&&(Boolean.TRUE.equals(req.opt("pcLoginRequired"))||Boolean.TRUE.equals(req.opt("pcAuthenticatedPlayback"))))
-            throw new GuestFailure("本集需要官网支持的登录播放流程，请在官方应用查看");
         // Official browser routing is isEncryptSupported && encryptedBrowserAllowed.
         // This native public-MP4 path does not host that encrypted browser player, so
         // either explicit boolean selects its normal public fallback. The capability
@@ -152,10 +158,16 @@ final class EpisodeResolver {
         // server POST and full unencrypted-file gate remain authoritative.
         if(req==null||!Boolean.FALSE.equals(req.opt("pcLoginRequired"))||!Boolean.FALSE.equals(req.opt("pcAuthenticatedPlayback"))||!(req.opt("encryptedBrowserAllowed") instanceof Boolean))
             throw new GuestFailure("官网未明确允许本集使用公开游客播放流程");
-        if(!Boolean.TRUE.equals(seo.opt("available")))throw new GuestFailure("官网暂未允许本集公开播放");
         JSONArray vids=detail.optJSONArray("vid_list");boolean present=false;
         for(int i=0;vids!=null&&i<vids.length();i++)if(vid.equals(vids.opt(i)))present=true;
         if(!present)throw new GuestFailure("官网分集不属于当前剧集");
+        if(allowMissingSeo&&!data.has("publicVideoSeo")) {
+            if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("已切换分集");
+            throw new GuestPublicUnavailable();
+        }
+        if(!exact(seo,"seriesId",sid)||!exact(seo,"itemId",vid))
+            throw new GuestFailure("官网播放信息与所选分集不一致");
+        if(!Boolean.TRUE.equals(seo.opt("available")))throw new GuestFailure("官网暂未允许本集公开播放");
         Object raw=seo.opt("durationSeconds"),w=seo.opt("width"),h=seo.opt("height");
         if(!(raw instanceof Number)||!Double.isFinite(((Number)raw).doubleValue())||((Number)raw).doubleValue()<1||((Number)raw).doubleValue()>7200||
             !(w instanceof Number)||!(h instanceof Number))throw new GuestFailure("官网缺少可验证的分集时长或尺寸");

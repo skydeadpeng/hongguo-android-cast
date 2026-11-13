@@ -2,7 +2,7 @@ package io.github.jackotom.hongguo.android;
 
 import java.io.*;import java.net.*;import java.nio.charset.StandardCharsets;import java.util.*;import java.util.concurrent.*;import java.util.concurrent.atomic.*;import java.util.zip.GZIPOutputStream;import org.json.*;
 
-/** Real registration/signing/model class with synthetic transport. Never sends SMS or opens sockets. */
+/** Real registration/signing/model class and HTTP framing with offline boundary doubles. */
 public final class RegisteredPlaybackModelTest {
  static final JSONArray projectedFlags=new JSONArray();
  static int checks,groups; static final String VID="7694655440692448281",DID="7390000000000000001",IID="7390000000000000002";
@@ -17,6 +17,28 @@ public final class RegisteredPlaybackModelTest {
  static Map<String,String> query(String url)throws Exception{Map<String,String>out=new LinkedHashMap<>();for(String row:new URI(url).getRawQuery().split("&")){String[]p=row.split("=",2);out.put(URLDecoder.decode(p[0],"UTF-8"),URLDecoder.decode(p.length>1?p[1]:"","UTF-8"));}return out;}
  static RegisteredPlaybackModel operation(OfficialApiClient.Transport registration,OfficialApiClient.Transport model){return new RegisteredPlaybackModel(registration,model,System.nanoTime()+20_000_000_000L);}
  static byte[] gzip(byte[]raw)throws Exception{ByteArrayOutputStream output=new ByteArrayOutputStream();try(GZIPOutputStream gzip=new GZIPOutputStream(output)){gzip.write(raw);}return output.toByteArray();}
+ static final class WireConnection extends HttpURLConnection {
+  final String expectedMethod;final int status;final byte[] response;
+  final Map<String,String> sentHeaders=new LinkedHashMap<>();final ByteArrayOutputStream sentBody=new ByteArrayOutputStream();
+  int fixedLength=-1,outputOpens,reads;boolean disconnected,outputClosed;
+  WireConnection(URL url,String expectedMethod,int status,byte[] response){super(url);this.expectedMethod=expectedMethod;this.status=status;this.response=response;}
+  @Override public void connect(){throw new AssertionError("fixture never opens network connections");}
+  @Override public void disconnect(){disconnected=true;}
+  @Override public boolean usingProxy(){return false;}
+  @Override public void setDoOutput(boolean value){check("POST".equals(expectedMethod)&&value,"GET must not enable request output");super.setDoOutput(value);}
+  @Override public void setFixedLengthStreamingMode(int size){check("POST".equals(expectedMethod),"GET must not set body length");fixedLength=size;super.setFixedLengthStreamingMode(size);}
+  @Override public void setRequestProperty(String name,String value){sentHeaders.put(name,value);}
+  @Override public OutputStream getOutputStream(){
+   // Match HttpURLConnection behavior: touching a GET output stream rewrites the wire method.
+   if("GET".equals(method))method="POST";
+   check("POST".equals(expectedMethod)&&doOutput&&fixedLength>=0,"only configured POST opens an output stream");outputOpens++;
+   return new FilterOutputStream(sentBody){@Override public void close(){outputClosed=true;}};
+  }
+  @Override public int getResponseCode(){check(expectedMethod.equals(method),"wire method must match signed request");check(!getInstanceFollowRedirects()&&getConnectTimeout()>0&&getReadTimeout()>0,"transport preserves redirect and timeout rules");check("GET".equals(method)||outputClosed,"POST body is closed before reading response");return status;}
+  @Override public long getContentLengthLong(){return response.length;}
+  @Override public InputStream getInputStream(){check(status==200,"non-success response body must not be read");reads++;return new ByteArrayInputStream(response);}
+  @Override public Map<String,List<String>> getHeaderFields(){return Collections.singletonMap("Content-Type",Collections.singletonList("application/json"));}
+ }
  public static void main(String[]args)throws Exception{
   group("registered identity precedes current per-episode signed video_tab request",()->{
    List<OfficialApiClient.Request> requests=new ArrayList<>();AtomicInteger bootstrap=new AtomicInteger();long[] deadline={0};
@@ -120,6 +142,33 @@ public final class RegisteredPlaybackModelTest {
    }
   });
   group("fixed model transport rejects alternate host path scheme auth port method before network",()->{for(String url:new String[]{"http://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/","https://evil.invalid/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com/reading/user/info/v1/","https://a@api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com:443/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/#x"})reject(()->RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(url,"POST",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)));reject(()->RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(RegisteredPlaybackModel.API,"GET",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)));check(RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(RegisteredPlaybackModel.API+"?x=1","POST",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)).getHost().equals("api5-normal-sinfonlineb.fqnovel.com"),"only intended fixed model target accepted");});
+  group("validated video_tab GET never opens output and signed POST preserves its gzip bytes",()->{
+   List<WireConnection> wire=new ArrayList<>();byte[] payload=gzip("fixture-request".getBytes(StandardCharsets.UTF_8));
+   byte[] reply="fixture-response".getBytes(StandardCharsets.UTF_8);
+   String getUrl=RegisteredPlaybackModel.VIDEO_TAB_API+"?video_id="+VID+"&x=%2B",postUrl=RegisteredPlaybackModel.API+"?aid=8662&x=%20";
+   Map<String,String> tabHeaders=Collections.singletonMap("X-Argus","fixture-tab-signature");
+   Map<String,String> postHeaders=new LinkedHashMap<>();postHeaders.put("Content-Encoding","gzip");postHeaders.put("X-SS-STUB","fixture-body-signature");
+   try(RegisteredPlaybackModel.ModelHttpTransport transport=new RegisteredPlaybackModel.ModelHttpTransport(uri->{
+    int index=wire.size();check(index<2,"invalid input must never open another connection");
+    check(uri.toString().equals(index==0?getUrl:postUrl),"validated signed URL is forwarded without rewriting query");
+    WireConnection connection=new WireConnection(uri.toURL(),index==0?"GET":"POST",index==0?404:200,reply);wire.add(connection);return connection;
+   })){
+    long deadline=System.nanoTime()+5_000_000_000L;
+    Exception getBody=reject(()->transport.execute(new OfficialApiClient.Request(getUrl,"GET",tabHeaders,new byte[]{1},deadline)));
+    Exception wrongMethod=reject(()->transport.execute(new OfficialApiClient.Request(getUrl,"POST",tabHeaders,new byte[0],deadline)));
+    Exception wrongHost=reject(()->transport.execute(new OfficialApiClient.Request(postUrl.replace("api5-normal-sinfonlineb.fqnovel.com","fixture.invalid"),"POST",postHeaders,payload,deadline)));
+    for(Exception invalid:new Exception[]{getBody,wrongMethod,wrongHost})check(invalid instanceof RegisteredPlaybackModel.ModelError&&"INVALID_INPUT".equals(((RegisteredPlaybackModel.ModelError)invalid).code),"wire request validated before connection");
+    check(wire.isEmpty(),"invalid request opens zero connections");
+    OfficialApiClient.Response tab=transport.execute(new OfficialApiClient.Request(getUrl,"GET",tabHeaders,new byte[0],deadline));
+    WireConnection get=wire.get(0);check(tab.status==404&&tab.body.length==0&&get.reads==0,"GET returns HTTP refusal without reading a response body");
+    check(!get.getDoOutput()&&get.fixedLength==-1&&get.outputOpens==0&&get.sentBody.size()==0,"GET has no body, output, or streaming configuration");
+    check(get.sentHeaders.equals(Map.of("X-Argus","fixture-tab-signature","Accept-Encoding","gzip"))&&get.disconnected,"GET forwards only exact headers plus gzip and disconnects");
+    OfficialApiClient.Response post=transport.execute(new OfficialApiClient.Request(postUrl,"POST",postHeaders,payload,deadline));
+    WireConnection send=wire.get(1);check(post.status==200&&Arrays.equals(reply,post.body)&&send.reads==1&&"application/json".equals(post.header("Content-Type")),"POST keeps response body and headers");
+    check(send.getDoOutput()&&send.fixedLength==payload.length&&send.outputOpens==1&&send.outputClosed&&Arrays.equals(payload,send.sentBody.toByteArray()),"POST keeps exactly its signed gzip request bytes");
+    check(send.sentHeaders.equals(Map.of("Content-Encoding","gzip","X-SS-STUB","fixture-body-signature","Accept-Encoding","gzip"))&&send.disconnected,"POST forwards exact headers and disconnects");
+   }
+  });
   if(args.length==1)java.nio.file.Files.write(java.nio.file.Paths.get(args[0]),projectedFlags.toString().getBytes(StandardCharsets.UTF_8));
   System.out.println("REGISTERED_PLAYBACK_MODEL_OK groups="+groups+" checks="+checks+" actualRegistrationAndSigner=true oneSharedDeadline=true projectedModelOnly=true networkRequests=0");
  }

@@ -37,7 +37,7 @@ final class HuangguoApi {
  static String episodeUrl(String sid,int index){throw new AssertionError("Unexpected Huangguo request");}
 }
 final class PublicPlaybackVerifier {static final long MAX_FILE_BYTES=96L*1024*1024;static void verify(java.io.File f,double seconds,int w,int h)throws Exception{throw new AssertionError("Unexpected guest verification");}}
-final class EpisodeResolver {static final class GuestFailure extends java.io.IOException {GuestFailure(String message){super(message);}}
+final class EpisodeResolver {static class GuestFailure extends java.io.IOException {GuestFailure(String message){super(message);}}static final class GuestCodecFailure extends GuestFailure {GuestCodecFailure(String message){super(message);}}static final class GuestPublicUnavailable extends GuestFailure {GuestPublicUnavailable(String message){super(message);}}
  static org.json.JSONObject resolveInfo(String sid,String vid)throws Exception{return new org.json.JSONObject().put("url",resolve(sid,vid)).put("vid",vid).put("seriesId",sid).put("source","web");}
 static int calls;static String result;static void reset(){calls=0;result=null;}static String resolve(String sid,String vid)throws Exception{calls++;if(result!=null)return result;throw new IOException("synthetic web miss");}}
 final class AppTransport {static int heads;static boolean domain(String host,String...allowed){if(host==null)return false;host=host.toLowerCase(java.util.Locale.ROOT);for(String suffix:allowed)if(host.equals(suffix)||host.endsWith("."+suffix))return true;return false;}static String media(String url,String ua,String ref){heads++;return url;}}
@@ -51,6 +51,9 @@ final class NetworkGuard {
  static void reset(){downloads=0;heads=0;lastReferer=null;lastUrl=null;attempted.clear();cleanAtStart.clear();outcomes.clear();agents.clear();referers.clear();AppTransport.heads=0;EpisodeResolver.reset();CencDecryptor.reset();}
  static URI validate(String value,boolean official)throws Exception{URI uri=new URI(value);if(!uri.getScheme().equals("https")||uri.getHost()==null)throw new IOException("url");return uri;}
  static String media(String url){heads++;return url;}
+ interface TransferProgress {void onProgress(long bytes,long totalBytes);}
+ static void download(String url,File target,long max,TransferProgress progress)throws Exception{download(url,target,max);}
+ static void download(String url,File target,long max,String ua,String ref,long deadline,TransferProgress progress)throws Exception{download(url,target,max,ua,ref);}
  static void download(String url,File target,long max)throws Exception{download(url,target,max,UA,REFERER);}
  static void download(String url,File target,long max,String ua,String ref)throws Exception{
   downloads++;lastReferer=ref;lastUrl=url;attempted.add(url);agents.put(url,ua);referers.put(url,ref);cleanAtStart.add(!target.exists()||target.length()==0);

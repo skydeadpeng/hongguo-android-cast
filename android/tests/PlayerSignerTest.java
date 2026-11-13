@@ -3,6 +3,7 @@ package io.github.jackotom.hongguo.android;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Map;
@@ -81,6 +82,22 @@ public final class PlayerSignerTest {
         check(!withBody.get("X-Argus").equals(GOLDEN[3][3]), "argus changes with body");
         check(!PlayerSigner.signPlayer(GOLDEN[3][0], "{\" x\":1}".getBytes(StandardCharsets.UTF_8), 1700000000L, 420072733, PlayerSigner.hex("01020304")).get("X-SS-STUB").equals(withBody.get("X-SS-STUB")), "stub binds exact body bytes");
         check(!PlayerSigner.signPlayer(GOLDEN[3][0] + "&extra=%2A", null, 1700000000L, 420072733, PlayerSigner.hex("01020304")).get("X-Argus").equals(GOLDEN[3][3]), "argus binds encoded query bytes");
+
+        // 7. Pre-API-33 runtime linkage and encoded-query compatibility.
+        // Scan the compiled class descriptors, not the source or the host JDK's available methods.
+        try (InputStream compiled = PlayerSigner.class.getResourceAsStream("PlayerSigner.class")) {
+            check(compiled != null, "compiled signer is available for the API compatibility check");
+            String classFile = new String(compiled.readAllBytes(), StandardCharsets.ISO_8859_1);
+            check(!classFile.contains("(Ljava/lang/String;Ljava/nio/charset/Charset;)Ljava/lang/String;"),
+                "Android API 26–32 lacks URLDecoder.decode(String, Charset)");
+        }
+        String encoded = "%61id=1967&device%5Fid=%E7%BA%A2%E6%9E%9C+%2B&version_name=0.1.20%2Btv";
+        equal(PlayerSigner.queryParam(encoded, "aid"), "1967", "percent-encoded parameter name");
+        equal(PlayerSigner.queryParam(encoded, "device_id"), "红果 +", "UTF-8 and form plus handling");
+        equal(PlayerSigner.queryParam("device_id=bad%+value", "device_id"), "bad%+value", "invalid percent escape preserves original text");
+        Map<String, String> encodedHeaders = PlayerSigner.signPlayer(encoded, null, 1700000000L, 420072733, PlayerSigner.hex("01020304"));
+        equal(encodedHeaders.get("X-Argus"), "8oEOCRTb0LQf+M+MsliYu4M9kBzAlzXvFgL/Ub198hyoBGxYfNXLAENmH+K/10JQ+Ra0gXmHLAFH8GNh819d8QNawzUgjR0BmQ5TGizvBwV5Xlvr+io3wzIMQDTWeSQqUGy3hDaRqhINL8g/Zn3Hh5mg6UMMGvOQRE+V+68q6vke6exVDht30yiDCnpibW6ywGhf5eXuwzQtMOnSBipHhCf1ML2vSAM5lGn8oSFsOLcMkhxw6A1QLT8Y3hILYO1KbJxYCO+Rl4SzWXMhi0UKd5Tn", "encoded Argus pre-fix vector preserved");
+        equal(encodedHeaders.get("X-Ladon"), "AQIDBKM7Y7bWnOIUXmTybD6/MpGbuge4sBwUJsyHVivhtMsH", "encoded aid produces original Ladon vector");
 
         System.out.println("PLAYER_SIGNER_OK checks=" + checks);
     }

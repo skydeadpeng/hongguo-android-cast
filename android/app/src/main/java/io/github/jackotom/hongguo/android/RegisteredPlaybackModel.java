@@ -256,7 +256,11 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     }
     static final class ModelHttpTransport implements OfficialApiClient.Transport {
         private static final ScheduledExecutorService WATCHDOG = Executors.newSingleThreadScheduledExecutor(runnable -> { Thread thread = new Thread(runnable, "hongguo-model-deadline"); thread.setDaemon(true); return thread; });
+        interface ConnectionFactory { HttpURLConnection open(URI uri) throws IOException; }
+        private final ConnectionFactory connections;
         private volatile boolean closed; private volatile HttpURLConnection active;
+        ModelHttpTransport() { this(uri -> (HttpURLConnection) uri.toURL().openConnection()); }
+        ModelHttpTransport(ConnectionFactory connections) { this.connections = Objects.requireNonNull(connections); }
         @Override public void close() { closed = true; HttpURLConnection connection = active; if (connection != null) connection.disconnect(); }
         static URI validate(OfficialApiClient.Request request) throws Exception {
             URI uri = new URI(request.url);
@@ -271,15 +275,17 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             if (System.nanoTime() >= deadline) throw new SocketTimeoutException("App片源请求总等待超时");
         }
         @Override public OfficialApiClient.Response execute(OfficialApiClient.Request request) throws Exception {
-            check(request.deadlineNanos); URI uri = validate(request); HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection(); active = connection;
+            check(request.deadlineNanos); URI uri = validate(request); HttpURLConnection connection = connections.open(uri); active = connection;
             ScheduledFuture<?> alarm = WATCHDOG.schedule(connection::disconnect, Math.max(1, request.deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
             try {
                 check(request.deadlineNanos); int timeout = (int) Math.max(1, Math.min(7000, TimeUnit.NANOSECONDS.toMillis(request.deadlineNanos - System.nanoTime())));
                 connection.setRequestMethod(request.method); connection.setConnectTimeout(timeout); connection.setReadTimeout(timeout); connection.setInstanceFollowRedirects(false);
-                connection.setDoOutput(true); connection.setFixedLengthStreamingMode(request.body.length);
+                // Opening an output stream can rewrite GET to POST. Only the signed POST has a body.
+                boolean sendsBody = request.method.equals("POST");
+                if (sendsBody) { connection.setDoOutput(true); connection.setFixedLengthStreamingMode(request.body.length); }
                 for (Map.Entry<String, String> header : request.headers.entrySet()) connection.setRequestProperty(header.getKey(), header.getValue());
                 connection.setRequestProperty("Accept-Encoding", "gzip");
-                try (OutputStream out = connection.getOutputStream()) { check(request.deadlineNanos); out.write(request.body); }
+                if (sendsBody) try (OutputStream out = connection.getOutputStream()) { check(request.deadlineNanos); out.write(request.body); }
                 check(request.deadlineNanos); int status = connection.getResponseCode(); check(request.deadlineNanos);
                 if (status != 200) return new OfficialApiClient.Response(status, Collections.emptyMap(), new byte[0]);
                 long length = connection.getContentLengthLong(); if (length > MAX_BYTES) throw new ModelError("App片源模型响应超过大小限制", "APP_INVALID_RESPONSE");

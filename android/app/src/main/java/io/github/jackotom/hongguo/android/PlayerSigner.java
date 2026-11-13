@@ -96,7 +96,8 @@ final class PlayerSigner {
         return null;
     }
     private static String decode(String value) {
-        try { return java.net.URLDecoder.decode(value.replace("+", "%20"), StandardCharsets.UTF_8); }
+        // The Charset overload requires Android API 33; the name overload is available on our minSdk.
+        try { return java.net.URLDecoder.decode(value.replace("+", "%20"), StandardCharsets.UTF_8.name()); }
         catch (Exception ignored) { return value; }
     }
 

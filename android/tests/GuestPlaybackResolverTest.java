@@ -68,6 +68,65 @@ public final class GuestPlaybackResolverTest {
         fails(failureType, null, () -> EpisodeResolver.resolveInfo(SID, VID), label);
         check(FixtureTransport.gets.get() == 1 && FixtureTransport.posts.get() == 1, label + " one GET and one POST, no retry/SEO fallback");
     }
+    private static JSONObject missingSeoPage() throws Exception {
+        JSONObject page = pageData(); page.remove("publicVideoSeo"); return page;
+    }
+    private static void missingSeoRouting() throws Exception {
+        for (boolean browser : new boolean[]{false, true}) {
+            JSONObject page = missingSeoPage(); page.getJSONObject("req").put("encryptedBrowserAllowed", browser);
+            FixtureTransport.reset(new Object[]{getReply(page), getReply(pageData())}, postReply(200, success()));
+            fails(EpisodeResolver.GuestPublicUnavailable.class, "未提供本集公开片源",
+                    () -> EpisodeResolver.resolveInfo(SID, VID), "exact verified page without SEO is public-unavailable");
+            check(FixtureTransport.gets.get() == 1 && FixtureTransport.posts.get() == 0,
+                    "public-unavailable never retries another web route or makes a guest POST");
+        }
+        for (String key : new String[]{"series_id", "vid", "isSuccess"}) {
+            rejectMissingSeoFallback(missingSeoPage().put(key, false), "invalid page field " + key);
+        }
+        JSONObject page = missingSeoPage(); page.getJSONObject("seriesDetail").put("series_id", "999999");
+        rejectMissingSeoFallback(page, "mismatched series details");
+        page = missingSeoPage(); page.getJSONObject("seriesDetail").put("vid_list", new JSONArray().put("999999"));
+        rejectMissingSeoFallback(page, "episode absent from series membership");
+        page = missingSeoPage(); page.getJSONObject("seriesDetail").remove("vid_list");
+        rejectMissingSeoFallback(page, "episode membership unknown");
+        for (String key : new String[]{"pcLoginRequired", "pcAuthenticatedPlayback"}) {
+            page = missingSeoPage(); page.getJSONObject("req").put(key, true);
+            rejectMissingSeoFallback(page, "explicit login/authentication requirement " + key);
+            page = missingSeoPage(); page.getJSONObject("req").remove(key);
+            rejectMissingSeoFallback(page, "unknown login/authentication requirement " + key);
+        }
+        page = missingSeoPage(); page.remove("req"); rejectMissingSeoFallback(page, "missing request gates");
+        page = missingSeoPage(); page.getJSONObject("req").remove("encryptedBrowserAllowed");
+        rejectMissingSeoFallback(page, "unknown browser capability");
+        for (Object malformed : new Object[]{JSONObject.NULL, "", false, new JSONObject()})
+            rejectMissingSeoFallback(missingSeoPage().put("publicVideoSeo", malformed), "malformed SEO is not absent");
+        page = pageData(); page.getJSONObject("publicVideoSeo").put("available", false);
+        rejectMissingSeoFallback(page, "explicit availability denial");
+        NetworkGuard.Reply redirected = new NetworkGuard.Reply(html(missingSeoPage()), 200, "https://hongguoduanju.com/player/_/" + VID);
+        FixtureTransport.reset(new Object[]{redirected}, postReply(200, success()));
+        expectTerminalGuestFailure("redirected page");
+        check(FixtureTransport.gets.get() == 1 && FixtureTransport.posts.get() == 0, "redirected page produces no guest POST");
+        FixtureTransport.reset(new Object[]{new NetworkGuard.Reply("", 403, ""), getReply(missingSeoPage())}, postReply(200, success()));
+        expectTerminalGuestFailure("alternate route after HTTP refusal");
+        check(FixtureTransport.gets.get() == 2 && FixtureTransport.posts.get() == 0, "alternate route produces no guest POST");
+        FixtureTransport.reset(new Object[]{getReply(missingSeoPage())}, postReply(200, success()));
+        FixtureTransport.afterGet = () -> Thread.currentThread().interrupt();
+        try { fails(InterruptedIOException.class, null, () -> EpisodeResolver.resolveInfo(SID, VID), "missing SEO does not mask cancellation"); }
+        finally { Thread.interrupted(); }
+        check(FixtureTransport.gets.get() == 1 && FixtureTransport.posts.get() == 0, "cancelled missing SEO page produces no guest POST");
+    }
+    private static void expectTerminalGuestFailure(String label) throws Exception {
+        try { EpisodeResolver.resolveInfo(SID, VID); throw new AssertionError("unexpected media: " + label); }
+        catch (EpisodeResolver.GuestFailure failure) {
+            check(!(failure instanceof EpisodeResolver.GuestPublicUnavailable), "must not enable App fallback: " + label);
+        }
+    }
+    private static void rejectMissingSeoFallback(JSONObject page, String label) throws Exception {
+        FixtureTransport.reset(new Object[]{getReply(page), getReply(pageData())}, postReply(200, success()));
+        expectTerminalGuestFailure(label);
+        check(FixtureTransport.gets.get() == 1 && FixtureTransport.posts.get() == 0,
+                "page denial must not fetch another route or guest media: " + label);
+    }
     private static void resolverTests() throws Exception {
         JSONObject info = resolve(pageData(), postReply(200, success()));
         check(CLEAN_MEDIA.equals(info.getString("url")), "POST media used; signed query bytes preserved and Range removed");
@@ -78,6 +137,7 @@ public final class GuestPlaybackResolverTest {
         check(FixtureTransport.gets.get() == 1 && FixtureTransport.posts.get() == 1 && VID.equals(FixtureTransport.postedId), "single POST binds exact VID");
         check(FixtureTransport.postThread == Thread.currentThread(), "POST executes only after page selection on caller thread");
         check(FixtureTransport.postDeadline > System.nanoTime() && FixtureTransport.postDeadline <= System.nanoTime() + 25_000_000_000L, "POST receives shared monotonic deadline");
+        missingSeoRouting();
 
         String canonical = html(pageData()).replace("player_(series_id)/(vid)/page", "player_(series_id)/page");
         FixtureTransport.reset(new Object[]{new NetworkGuard.Reply(canonical, 200, "https://hongguoduanju.com/player/_/" + VID)}, postReply(200, success()));

@@ -197,6 +197,9 @@ final class PlaybackSources {
         return resolve(sid,vid,"auto");
     }
     static Plan resolve(String sid,String vid,String quality) throws Exception {
+        return resolve(sid,vid,quality,false);
+    }
+    private static Plan resolve(String sid,String vid,String quality,boolean allowUnavailablePublicFallback) throws Exception {
         String requestedQuality=MediaQuality.normalize(quality);
         requireIdentity(sid,vid);
         if (requestedQuality.equals("480p")||requestedQuality.equals("360p"))return resolvePlayback(sid,vid,requestedQuality,defaultPlaybackCeiling(requestedQuality),false,false);
@@ -207,15 +210,26 @@ final class PlaybackSources {
                 if (cancelled(appError)) throw appError;
                 // Like the desktop, the penalty changes priority, not permanent availability.
                 try { return resolveWeb(sid,vid); }
-                catch (Exception webError) { if(cancelled(webError)||webError instanceof EpisodeResolver.GuestFailure)throw webError;appError.addSuppressed(webError);throw appError; }
+                catch (Exception webError) {
+                    if(cancelled(webError)||terminalGuestFailure(webError,allowUnavailablePublicFallback))throw webError;
+                    appError.addSuppressed(webError);throw appError;
+                }
             }
         }
         try {
             return resolveWeb(sid,vid);
         } catch (Exception webError) {
-            if (cancelled(webError) || webError instanceof EpisodeResolver.GuestFailure) throw webError;
-            return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true);
+            if (cancelled(webError) || terminalGuestFailure(webError,allowUnavailablePublicFallback)) throw webError;
+            try { return register(bindSeries(resolveApp(sid,vid,requestedQuality),sid),vid,true); }
+            catch (Exception appError) {
+                if (!cancelled(appError) && appError != webError) appError.addSuppressed(webError);
+                throw appError;
+            }
         }
+    }
+    private static boolean terminalGuestFailure(Exception error,boolean allowUnavailablePublicFallback) {
+        return error instanceof EpisodeResolver.GuestFailure
+            && !(allowUnavailablePublicFallback && error instanceof EpisodeResolver.GuestPublicUnavailable);
     }
     static int defaultPlaybackCeiling(String quality) {
         switch(MediaQuality.normalize(quality)) {case "720p":return 1079;case "480p":return 719;case "360p":return 479;default:return 0;}
@@ -228,7 +242,7 @@ final class PlaybackSources {
         if(ceiling==0&&(requested.equals("480p")||requested.equals("360p")))ceiling=defaultPlaybackCeiling(requested);
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
         if(failedWeb)markWebFailure(sid,vid);
-        if(ceiling==0&&!fresh)return resolve(sid,vid,requested);
+        if(ceiling==0&&!fresh)return resolve(sid,vid,requested,true);
         if(fresh)recoveryPause();
         return register(bindSeries(resolveApp(sid,vid,requested,!fresh,ceiling),sid),vid,true);
     }
