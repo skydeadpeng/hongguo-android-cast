@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 21,
+  "versionName": "0.1.20",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.20/HongguoNative-0.1.20-tvNative-release-compatible.apk",
+  "size": 690464,
+  "sha256": "a66da441aba33c80ebc67577122aa9d91f88b854aadd8cbb95111cf8f5167796",
+  "notes": "### 红果原生电视版 0.1.20\n\n- 修复部分电视把标准 AAC 音轨误判为不支持，导致《无声夫君锦绣妻》第 1 集等片源触发重新取源的问题。\n- 自动重新取源最多等待 30 秒。若仍未取得片源，播放器会提示重试或换集；正常的整集下载不受该限制。\n\n仅更新原生电视版，沿用原安装签名。在电视上打开「设置 → 应用更新 → 检查新版本」即可覆盖升级。\n\n已在 TCL tc8000 上使用第 1 集真实片源验证：修复后通过完整片源校验，独立播放探针静音连续解出 107 帧。应用内覆盖安装和起播仍待电视端确认。\n",
+  "publishedAt": "2026-11-13T14:31:03.148Z"
+}
