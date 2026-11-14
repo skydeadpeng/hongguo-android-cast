@@ -166,7 +166,7 @@ final class AppTransport {
             try (SocketGuard ignored = guardSocket(raw, deadline)) {
                 raw.setSoTimeout(remaining(deadline, 12_000));
                 try (SSLSocket socket = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(raw, uri.getHost(), 443, true)) {
-                    SSLParameters ssl = socket.getSSLParameters(); ssl.setEndpointIdentificationAlgorithm("HTTPS"); socket.setSSLParameters(ssl); socket.startHandshake();
+                    if (android.os.Build.VERSION.SDK_INT >= 24) { SSLParameters ssl = socket.getSSLParameters(); ssl.setEndpointIdentificationAlgorithm("HTTPS"); socket.setSSLParameters(ssl); } socket.startHandshake();
                     String path = uri.getRawPath(); if (path == null || path.isEmpty()) path = "/"; if (uri.getRawQuery() != null) path += "?" + uri.getRawQuery();
                     StringBuilder request = new StringBuilder(method + " " + path + " HTTP/1.1\r\nHost: " + uri.getHost() + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n");
                     for (Map.Entry<String, String> header : requestHeaders.entrySet()) request.append(header.getKey()).append(": ").append(header.getValue()).append("\r\n");

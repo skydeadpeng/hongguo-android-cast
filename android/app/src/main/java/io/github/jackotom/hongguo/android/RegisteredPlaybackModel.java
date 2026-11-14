@@ -289,7 +289,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
                 if (sendsBody) try (OutputStream out = connection.getOutputStream()) { check(request.deadlineNanos); out.write(request.body); }
                 check(request.deadlineNanos); int status = connection.getResponseCode(); check(request.deadlineNanos);
                 if (status != 200) return new OfficialApiClient.Response(status, Collections.emptyMap(), new byte[0]);
-                long length = connection.getContentLengthLong(); if (length > MAX_BYTES) throw new ModelError("App片源模型响应超过大小限制", "APP_INVALID_RESPONSE");
+                long length = connection.getContentLength(); if (length > MAX_BYTES) throw new ModelError("App片源模型响应超过大小限制", "APP_INVALID_RESPONSE");
                 byte[] body; try (InputStream input = connection.getInputStream()) { body = read(input, request.deadlineNanos); }
                 check(request.deadlineNanos); return new OfficialApiClient.Response(status, connection.getHeaderFields(), body);
             } catch (Exception failure) { check(request.deadlineNanos); throw failure; }

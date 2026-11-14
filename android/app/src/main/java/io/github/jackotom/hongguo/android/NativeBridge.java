@@ -321,7 +321,7 @@ final class NativeBridge {
      *  (linking throws NoSuchMethodError, an Error, not an Exception). Every failure — including
      *  those — falls back to BitmapFactory, which decodes the CDN's webp twin on any API level. */
     private static android.graphics.Bitmap decodeCover(byte[] bytes) {
-        if (Build.VERSION.SDK_INT >= 28) {
+        if (Build.VERSION.SDK_INT >= 31) {
             try {
                 android.graphics.Bitmap bitmap = android.graphics.ImageDecoder.decodeBitmap(
                     android.graphics.ImageDecoder.createSource(bytes),
@@ -519,7 +519,7 @@ final class NativeBridge {
                 JSONObject row = store.mergedVideo(mergedId);
                 if (row == null) throw new Exception("合并记录不存在，请刷新后重试");
                 java.io.File target = LibraryStore.mergedFile(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), row);
-                if (target != null && !java.nio.file.Files.deleteIfExists(target.toPath()))
+                if (target != null && !LegacyFiles.deleteIfExists(target))
                     throw new Exception("合并视频文件删除未完成，请重试");
                 store.finishMergedVideo(mergedId);
                 respond(id, new JSONObject().put("id", mergedId).put("deleted", true), null); break;
@@ -673,7 +673,7 @@ final class NativeBridge {
             java.io.File directory = activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
             if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new Exception("下载目录尚未准备");
             target = new java.io.File(directory, sid + "_" + index + "_" + UUID.randomUUID() + ".mp4");
-            java.nio.file.Files.copy(prepared.toPath(), target.toPath());
+            LegacyFiles.copy(prepared, target, false);
             String title = series.getString("title") + " · 第 " + index + " 集";
             downloadId = downloads.addCompletedDownload(title, "红果 · 已准备的视频", false, "video/mp4", target.getAbsolutePath(), target.length(), true);
             if (downloadId < 0) throw new Exception("系统下载记录准备失败");

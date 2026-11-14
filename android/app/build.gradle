@@ -22,7 +22,7 @@ android {
     compileSdk 35
     defaultConfig {
         applicationId 'io.github.jackotom.hongguo.android'
-        minSdk 26
+        minSdk 23
         targetSdk 35
         versionCode 92
         versionName '0.12.69'
@@ -36,14 +36,24 @@ android {
         tvNative {
             dimension 'device'
             applicationIdSuffix '.tvnative'
-            versionCode 22
-            versionName '0.1.21'
+            versionCode 23
+            versionName '0.1.22'
             buildConfigField 'boolean', 'IS_TV', 'true'
             buildConfigField 'boolean', 'NATIVE_UI', 'true'
         }
     }
     buildFeatures { buildConfig true }
-    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    // Per-ABI APKs: libVLC ships ~60MB of native libraries per architecture, so the software
+    // decoder line ships one APK per ABI and the updater picks by the device's supported ABIs.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a'
+            universalApk true
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17; coreLibraryDesugaringEnabled true }
     signingConfigs {
         if (releaseSigning == 'compatible') {
             releaseCompatible {
@@ -71,3 +81,12 @@ android {
         }
     }
 }
+
+// Core library desugaring rewrites java.nio.file / java.time / java.util.stream calls in
+// bytecode so the same app runs on Android 6.0 (API 23); build-time tool, not a runtime dependency.
+dependencies { coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5' }
+
+// Built-in software decoder for the native TV line only: libVLC ships an HEVC software decoder,
+// so phones and TVs without hardware HEVC can still play H.265/ByteVC2 sources. Not a runtime
+// dependency of the phone/TV flavors; loaded from the tvNative source set only.
+dependencies { tvNativeImplementation 'org.videolan.android:libvlc-all:3.6.2' }

@@ -159,7 +159,7 @@ final class DlnaMediaServer implements AutoCloseable {
     }
 
     Publication publish(File input, String title, Runnable retain, Runnable release) throws IOException {
-        if (input == null || retain == null || release == null || Files.isSymbolicLink(input.toPath())) throw new IOException("投屏本地文件无效");
+        if (input == null || retain == null || release == null || LegacyFiles.isSymbolicLink(input)) throw new IOException("投屏本地文件无效");
         File file = input.getCanonicalFile();
         if (!file.isFile() || !file.canRead() || !file.getName().toLowerCase(Locale.ROOT).endsWith(".mp4") || file.length() <= 0) throw new IOException("投屏文件尚未准备完成");
         byte[] token = new byte[32]; RANDOM.nextBytes(token); StringBuilder hex = new StringBuilder(64);
@@ -260,7 +260,7 @@ final class DlnaMediaServer implements AutoCloseable {
             synchronized (publications) { item = publications.get(request.path); }
             if (item == null || !client.acquire(item)) { error(output, 404, "Not Found", ""); return; }
             phase = ConnectionError.LOCAL_MEDIA_IO;
-            FileChannel file = FileChannel.open(item.file.toPath(), StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS);
+            FileChannel file = new java.io.FileInputStream(item.file).getChannel();
             if (!client.attach(file)) return;
             if (file.size() != item.size) { phase = ConnectionError.RESPONSE_WRITE_IO; error(output, 410, "Gone", ""); return; }
             Range range;

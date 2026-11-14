@@ -32,8 +32,9 @@ public final class PlayerActivity extends Activity {
     private final ExecutorService resolver = Executors.newSingleThreadExecutor();
     private Future<?> resolution;
     private final ExecutorService cacheWorker = Executors.newFixedThreadPool(2);
-    private final Set<String> caching = ConcurrentHashMap.newKeySet();
+    private final Set<String> caching = Collections.newSetFromMap(new ConcurrentHashMap<String,Boolean>());
     private VideoView video;
+    private Object softLayer; private boolean softActive; private PreparedMedia adoptedMedia; private int softToken;
     private FrameLayout playerRoot;
     private MediaPlayer mediaPlayer;
     private String quality = "auto", actualQuality = "auto", protectedQuality = "auto";
@@ -659,6 +660,7 @@ public final class PlayerActivity extends Activity {
     }
     private void loadAtInternal(int position, String initialUrl, int startAt, boolean remainPaused, boolean recovering, boolean failedWeb) {
         if (destroyed || position < 0 || position >= queue.size()) return;
+        SoftDecoder.stop(softLayer); softLayer = null; softActive = false; adoptedMedia = null;
         cancelQualitySwitch(); cancelPlaybackWatchdogs(); decoderPreparing = false; if (!recovering) saveProgress(); video.stopPlayback(); releaseCurrent(); mediaPlayer = null;
         current = position; episode = queue.get(current); series = owner(episode); final JSONObject target = episode, targetSeries = series;
         if (!offline) {
@@ -701,6 +703,7 @@ public final class PlayerActivity extends Activity {
                             failCurrentMedia(token, "当前片源实际分辨率不符合 " + qualityLabel(playedQuality) + " 播放档位", false); return;
                         }
                         mediaPlayer = player; prepared = true; completed = false;
+                        adoptedMedia = media;
                         watchProgressSeeks(player, token, targetView);
                         videoWidth = player.getVideoWidth(); videoHeight = player.getVideoHeight();
                         player.setOnVideoSizeChangedListener((mp, width, height) -> { if (video == targetView && token == generation) { videoWidth = width; videoHeight = height; renderStatus(); } });
@@ -744,6 +747,7 @@ public final class PlayerActivity extends Activity {
         view.setOnErrorListener((player, what, extra) -> {
             if (token == generation && !destroyed && video == view) {
                 String reason = "当前片源或设备解码暂不可用（" + what + "/" + extra + "）";
+                if ((what == -38 || what == MediaPlayer.MEDIA_ERROR_UNSUPPORTED || extra == MediaPlayer.MEDIA_ERROR_UNSUPPORTED) && launchSoftDecoder(token)) return true;
                 failCurrentMedia(token, reason, what == MediaPlayer.MEDIA_ERROR_UNSUPPORTED || extra == MediaPlayer.MEDIA_ERROR_UNSUPPORTED);
             }
             return true;
@@ -972,9 +976,49 @@ public final class PlayerActivity extends Activity {
         prepared = false; video.stopPlayback(); status.setText(message == null ? "本集片源暂不可用" : message); updateButtons(); showControls();
         showPlayerDialog(new AlertDialog.Builder(this).setTitle("第 " + episode.optInt("index") + " 集暂未播放")
             .setMessage(status.getText()).setPositiveButton("重试", (dialog, which) -> loadAt(current, null, resumeAt))
-            .setNeutralButton("选集", (dialog, which) -> selectEpisode()).setNegativeButton("返回", (dialog, which) -> exitPlayer())
+            .setNeutralButton("内置软解", (dialog, which) -> launchSoftDecoder(token)).setNegativeButton("返回", (dialog, which) -> exitPlayer())
             .setOnCancelListener(dialog -> exitPlayer()).create());
     }
+    /** Falls back to the built-in software decoder (tvNative ships libVLC) when the device cannot
+     *  decode the source itself, e.g. H.265 on phones and TVs without hardware HEVC. Returns false
+     *  when the layer is unavailable so the regular error flow continues. */
+    private boolean launchSoftDecoder(int token) {
+        if (softActive || destroyed || token != generation || isFinishing()) return false;
+        if (!SoftDecoder.available() || adoptedMedia == null || adoptedMedia.uri == null) return false;
+        PlaybackSources.Plan plan = adoptedMedia.plan;
+        String userAgent = plan == null ? NetworkGuard.UA : plan.userAgent, referer = plan == null ? NetworkGuard.REFERER : plan.referer;
+        String caption = series.optString("title", "红果短剧") + " · 第 " + episode.optInt("index") + " 集";
+        Object layer = SoftDecoder.start(softHost, this, adoptedMedia.uri, userAgent, referer, Math.max(0, lastGoodPosition), caption);
+        if (layer == null) return false;
+        softLayer = layer; softActive = true; softToken = token;
+        try { video.stopPlayback(); } catch (RuntimeException ignored) { }
+        releaseCurrent(); mediaPlayer = null; decoderPreparing = false; cancelPlaybackWatchdogs();
+        currentKind = "内置软解播放中"; renderStatus(); showControls(); updateButtons();
+        return true;
+    }
+    private final SoftDecoder.Host softHost = new SoftDecoder.Host() {
+        @Override public JSONObject series() { return PlayerActivity.this.series; }
+        @Override public JSONObject episode() { return PlayerActivity.this.episode; }
+        @Override public void onSoftEnded() {
+            softActive = false; SoftDecoder.stop(softLayer); softLayer = null;
+            completed = true;
+            recordProgress(PlayerActivity.this.series, PlayerActivity.this.episode, 0);
+            if (autoplay && current + 1 < queue.size()) loadAt(current + 1, null, 0);
+            else { currentKind = current + 1 == queue.size() ? "本剧已播完" : "本集已播完 · 可点击下一集"; renderStatus(); showControls(); updateButtons(); }
+        }
+        @Override public void onSoftClosed() {
+            softActive = false; softLayer = null;
+            if (!destroyed) { renderStatus(); showControls(); updateButtons(); }
+        }
+        @Override public void onSoftProgress(long positionMs, long durationMs) {
+            recordProgress(PlayerActivity.this.series, PlayerActivity.this.episode, Math.max(0, positionMs));
+        }
+        @Override public void onSoftFailed(String message) {
+            softActive = false; SoftDecoder.stop(softLayer); softLayer = null;
+            if (destroyed) return;
+            main.post(() -> { if (!destroyed && !softActive) playbackError(softToken, message + "；原错误：" + lastMediaError); });
+        }
+    };
     private void updateDanmakuButton() {
         if (danmakuButton == null) return;
         String value = !danmakuEnabled ? "关" : offline ? "离线停用" : casting() || castWasActive ? "投屏停用" : danmakuNotice.contains("未载入") ? "未载入" : danmakuNotice.contains("正在") ? "读取中" : danmakuNotice.contains("暂无") ? "本段无" : "开";
@@ -1468,6 +1512,7 @@ public final class PlayerActivity extends Activity {
     @Override protected void onSaveInstanceState(Bundle state) { savePlaybackState(state); super.onSaveInstanceState(state); }
     @Override protected void onDestroy() {
         // Keep file deletion/update blocked until all media handles have been released.
+        SoftDecoder.stop(softLayer); softLayer = null; softActive = false;
         if (danmaku != null) danmaku.close();
         detachCast();
         if (controlsHud != null) controlsHud.destroy();

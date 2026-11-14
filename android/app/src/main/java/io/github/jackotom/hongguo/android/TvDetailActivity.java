@@ -266,15 +266,25 @@ public class TvDetailActivity extends Activity {
             });
         });
     }
+    /** Offers the completed download of the selected episode to an external player (MX Player/VLC
+     *  decode H.265 in software where the device lacks hardware support). */
+    private void externalOpen() {
+        if (detail == null || episodes == null || selectedPosition >= episodes.length()) return;
+        try {
+            String hint = TvDownloads.external(this, LibraryStore.series(detail), LibraryStore.episode(episodes.getJSONObject(selectedPosition)));
+            if (hint != null) TvUi.error(this, hint, null);
+        } catch (Exception error) { TvUi.error(this, TvUi.message(error), null); }
+    }
     private void showMore() {
         if (detail == null || downloadBusy) return;
-        new AlertDialog.Builder(this).setTitle("剧集操作").setItems(new String[]{ "完整简介", "从第 1 集播放", "定位续看集", "刷新剧集与记录" }, (dialog, which) -> {
+        new AlertDialog.Builder(this).setTitle("剧集操作").setItems(new String[]{ "完整简介", "从第 1 集播放", "定位续看集", "外部播放器打开本集", "刷新剧集与记录" }, (dialog, which) -> {
             if (which == 0) {
                 ScrollView scroll = new ScrollView(this); TextView text = TvUi.text(this, detail.optString("description", "暂无剧情简介"), 16, TvUi.TEXT);
                 text.setPadding(TvUi.dp(this, 24), TvUi.dp(this, 12), TvUi.dp(this, 24), TvUi.dp(this, 12)); scroll.addView(text);
                 new AlertDialog.Builder(this).setTitle("剧情简介").setView(scroll).setPositiveButton("关闭", null).show();
             } else if (which == 1) play(0);
             else if (which == 2) { selectedPosition = resolveResume(); grid.setSelection(selectedPosition); grid.requestFocus(); }
+            else if (which == 3) externalOpen();
             else load(seriesId);
         }).show();
     }

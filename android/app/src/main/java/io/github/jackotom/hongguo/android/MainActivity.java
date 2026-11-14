@@ -274,7 +274,7 @@ public final class MainActivity extends Activity {
     private String startupDiagnostics() {
         String webView = "系统未报告版本";
         try {
-            PackageInfo info = WebView.getCurrentWebViewPackage();
+            PackageInfo info = Build.VERSION.SDK_INT >= 26 ? WebView.getCurrentWebViewPackage() : null;
             if (info != null) webView = diagnosticText(info.packageName) + " " + diagnosticText(info.versionName);
         } catch (RuntimeException ignored) { webView = "版本读取失败"; }
         return "Android API " + Build.VERSION.SDK_INT + " · WebView " + webView + "\n网页渲染：" + (softwareRendering ? "软件" : "系统默认") + " · App " + diagnosticText(BuildConfig.VERSION_NAME);

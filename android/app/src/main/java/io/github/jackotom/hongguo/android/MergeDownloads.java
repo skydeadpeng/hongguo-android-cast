@@ -84,7 +84,7 @@ final class MergeDownloads {
         if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new IOException("下载目录尚未准备");
         File target = new File(directory, seriesId + "_merged_" + UUID.randomUUID() + ".mp4");
         if (!merged.renameTo(target)) {
-            try { java.nio.file.Files.copy(merged.toPath(), target.toPath()); }
+            try { LegacyFiles.copy(merged, target, false); }
             catch (IOException error) { target.delete(); throw new IOException("合并结果落盘失败", error); }
             if (!merged.delete()) { /* The temporary copy is cleaned up by the caller. */ }
         }

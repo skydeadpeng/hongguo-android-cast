@@ -229,10 +229,10 @@ final class PlaybackCachePolicy {
         return hash(sid) + "_" + index + "_" + hash(vid) + ".mp4";
     }
     private boolean withinDirectory(File file) throws IOException {
-        return !Files.isSymbolicLink(file.toPath()) && directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile());
+        return !LegacyFiles.isSymbolicLink(file) && directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile());
     }
     private void ensureDirectory() throws IOException {
-        if (Files.isSymbolicLink(directory.toPath())) throw new IOException("缓存目录无效");
+        if (LegacyFiles.isSymbolicLink(directory)) throw new IOException("缓存目录无效");
         if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory()) throw new IOException("创建播放缓存失败");
         if (!initialized) {
             File[] entries = directory.listFiles();
@@ -345,8 +345,7 @@ final class PlaybackCachePolicy {
                 if (flight.invalidated) throw new IOException("播放缓存已失效");
                 if (flight.obsolete && !protectedKeys.containsKey(key)) throw new IOException("播放缓存预取已过期");
                 if (!withinDirectory(part) || !part.isFile() || part.length() <= 0 || part.length() > maxFileBytes) throw new IOException("播放缓存大小无效");
-                try { Files.move(part.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
-                catch (AtomicMoveNotSupportedException error) { Files.move(part.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING); }
+                LegacyFiles.move(part, target, true);
                 target.setLastModified(System.currentTimeMillis());
                 result = target;
             }

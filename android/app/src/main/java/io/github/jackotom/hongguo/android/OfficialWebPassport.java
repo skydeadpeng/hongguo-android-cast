@@ -161,7 +161,7 @@ final class OfficialWebPassport {
                 }catch(IOException error){candidate.close();last=error;if(!connected)continue;}
                 try(NetworkGuard.SocketGuard ignored=NetworkGuard.guardSocket(candidate,deadline);
                     SSLSocket tls=(SSLSocket)((SSLSocketFactory)SSLSocketFactory.getDefault()).createSocket(candidate,uri.getHost(),443,true)){
-                    SSLParameters parameters=tls.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");tls.setSSLParameters(parameters);
+                    if(android.os.Build.VERSION.SDK_INT>=24){SSLParameters parameters=tls.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");tls.setSSLParameters(parameters);}
                     tls.setSoTimeout(NetworkGuard.remaining(deadline,15000));tls.startHandshake();
                     String path=uri.getRawPath();if(path==null||path.isEmpty())path="/";if(uri.getRawQuery()!=null)path+="?"+uri.getRawQuery();
                     StringBuilder message=new StringBuilder("GET ").append(path).append(" HTTP/1.1\r\nHost: ").append(uri.getHost()).append("\r\n");

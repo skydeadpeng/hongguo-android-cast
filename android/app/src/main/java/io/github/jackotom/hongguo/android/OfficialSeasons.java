@@ -43,7 +43,7 @@ final class OfficialSeasons {
                 List<String> subtitles=labels(row.optJSONArray("sub_title_list"));
                 out.put(new JSONObject().put("seriesId",sid).put("title",title).put("coverUrl",cover).put("description",first(row,500,"series_intro","video_desc","description"))
                     .put("episodeCount",episodes).put("episodeLabel",upcoming?"待上线":episodes+" 集").put("seasonNumber",number>0?number:JSONObject.NULL).put("seasonLabel",label)
-                    .put("official",true).put("playable",playable).put("upcoming",upcoming).put("vid",upcoming?"":vid).put("subtitle",String.join(" · ",subtitles)).put("tags",new JSONArray()));
+                    .put("official",true).put("playable",playable).put("upcoming",upcoming).put("vid",upcoming?"":vid).put("subtitle",LegacyText.join(" · ",subtitles)).put("tags",new JSONArray()));
             }
         }
         if(out.length()>0&&!containsCurrent)throw new IOException("官方季关系尚未确认当前剧集，请重试或按标题查找");

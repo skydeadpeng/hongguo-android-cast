@@ -12,7 +12,6 @@ import android.webkit.JavascriptInterface;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.*;
@@ -144,7 +143,7 @@ final class AppUpdater {
         if (!busy && prefs.getBoolean("waiting_permission", false)) {
             prefs.edit().putBoolean("waiting_permission", false).apply();
             state = "ready";
-            if (host.getPackageManager().canRequestPackageInstalls()) install();
+            if (Build.VERSION.SDK_INT >= 26 && host.getPackageManager().canRequestPackageInstalls()) install();
             else { state = "ready"; message = "安装权限尚未开启，可稍后继续安装"; publish(); }
         } else if (!busy && state.equals("installing")) {
             state = "ready"; message = "安装尚未完成，已保留验证过的更新包"; publish();
@@ -221,7 +220,7 @@ final class AppUpdater {
                     downloadSource=completed.source.label;downloadRouteIndex=completed.route;downloadRouteCount=completed.total;
                 }
                 finish(operation,this::publish);
-                live(operation);Files.move(partial.toPath(), apk.toPath(), StandardCopyOption.REPLACE_EXISTING);moved=true;live(operation);
+                live(operation);LegacyFiles.move(partial, apk, true);moved=true;live(operation);
                 if (!prefs.edit().putString("manifest", target.json.toString()).commit()) throw new IOException("更新状态保存失败，请重新下载");
                 live(operation);
                 finish(operation, () -> { completingDownload=false; verifiedCandidate = target; state = "ready"; downloaded = target.bytes; message = "校验通过，确认后安装 " + target.name; busy = false; publish(); maybePrompt(); });
@@ -268,7 +267,7 @@ final class AppUpdater {
     }
     private void handoff(Candidate target) throws Exception {
         if (!foreground || destroyed) throw new IOException("请回到应用后继续安装");
-        if (!host.getPackageManager().canRequestPackageInstalls()) {
+        if (Build.VERSION.SDK_INT >= 26 && !host.getPackageManager().canRequestPackageInstalls()) {
             if (!prefs.edit().putBoolean("waiting_permission", true).commit()) throw new IOException("安装状态保存失败");
             state = "waiting_permission"; message = "请允许红果安装更新，返回后继续"; publish();
             try { host.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + host.getPackageName()))); }
@@ -406,7 +405,7 @@ final class AppUpdater {
         try{
             liveDownload(operation,attempt);
             try(InputStream input=current.getInputStream();ByteArrayOutputStream output=new ByteArrayOutputStream()){
-                long declared=current.getContentLengthLong();if(declared>128*1024)throw new IOException("更新清单过大");
+                long declared=current.getContentLength();if(declared>128*1024)throw new IOException("更新清单过大");
                 byte[] buffer=new byte[4096];int n;
                 for(;;){liveDownload(operation,attempt);current.setReadTimeout(remainingTimeout(attempt.deadline,15000));n=input.read(buffer);liveDownload(operation,attempt);if(n<0)break;if(output.size()+n>128*1024)throw new IOException("更新清单过大");output.write(buffer,0,n);}
                 return output.toByteArray();
@@ -458,7 +457,7 @@ final class AppUpdater {
         try {
           liveDownload(operation,attempt);
           try(InputStream input=current.getInputStream();FileOutputStream output=new FileOutputStream(partial)) {
-            long declared=current.getContentLengthLong();if(declared>=0&&declared!=target.bytes)throw new IOException("更新包大小与清单不一致");
+            long declared=current.getContentLength();if(declared>=0&&declared!=target.bytes)throw new IOException("更新包大小与清单不一致");
             UpdateIntegrity.copy(input,output,target.bytes,()->{liveDownload(operation,attempt);current.setReadTimeout(remainingTimeout(attempt.deadline,15000));},count->{
                 long now=SystemClock.elapsedRealtime();
                 if(now-lastProgress[0]>=250){lastProgress[0]=now;finishDownload(operation,attempt.serial,()->{if(state.equals("downloading")&&count>=downloaded){downloaded=count;publish();}});}
@@ -477,7 +476,7 @@ final class AppUpdater {
         PackageManager manager = host.getPackageManager(); int flag = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
         PackageInfo installed = manager.getPackageInfo(host.getPackageName(), flag), archive = manager.getPackageArchiveInfo(file.getPath(), flag);
         if (archive == null || !UpdatePolicy.matchingArchive(installed.packageName, installed.versionCode, archive.packageName, archive.versionCode, archive.versionName, target.code, target.name, signerHashes(installed), signerHashes(archive))
-                || archive.applicationInfo == null || archive.applicationInfo.minSdkVersion != target.minSdk || archive.applicationInfo.minSdkVersion > Build.VERSION.SDK_INT) throw new IOException("安装包的应用、版本、系统要求或签名不匹配");
+                || archive.applicationInfo == null || (Build.VERSION.SDK_INT >= 24 && (archive.applicationInfo.minSdkVersion != target.minSdk || archive.applicationInfo.minSdkVersion > Build.VERSION.SDK_INT))) throw new IOException("安装包的应用、版本、系统要求或签名不匹配");
         guard.check();
     }
     private static String[] signerHashes(PackageInfo value) throws Exception {
@@ -495,6 +494,18 @@ final class AppUpdater {
         static Candidate parse(JSONObject value, int installedCode, String installedName) throws Exception {
             int schema = (int) integer(value, "schemaVersion"), code = (int) integer(value, "versionCode"), min = (int) integer(value, "minSdk"); long bytes = integer(value, "size");
             String flavor = value.getString("flavor"), pkg = value.getString("packageName"), name = value.getString("versionName"), hash = value.getString("sha256").toLowerCase(Locale.ROOT), url = value.getString("apkUrl");
+            // Per-ABI manifests: pick the first entry matching a supported ABI; plain manifests fall back to apkUrl.
+            JSONObject variants = value.optJSONObject("abis");
+            if (variants != null) {
+                boolean picked = false;
+                for (String abi : Build.SUPPORTED_ABIS) {
+                    JSONObject pick = variants.optJSONObject(abi);
+                    if (pick == null) continue;
+                    url = pick.getString("apkUrl"); bytes = integer(pick, "size"); hash = pick.getString("sha256").toLowerCase(Locale.ROOT);
+                    picked = true; break;
+                }
+                if (!picked) throw new JSONException("更新清单缺少本机架构的安装包");
+            }
             UpdatePolicy.validate(schema, value.getString("channel"), flavor, pkg, code, name, min, bytes, hash, url, BuildConfig.NATIVE_UI ? "io.github.jackotom.hongguo.android.tvnative" : BuildConfig.IS_TV ? "io.github.jackotom.hongguo.android.tv" : "io.github.jackotom.hongguo.android", installedCode, installedName, Build.VERSION.SDK_INT);
             String notes = value.optString("notes", ""); if (notes.length() > 4000) notes = notes.substring(0, 4000);
             return new Candidate(new JSONObject(value.toString()), code, name, min, bytes, url, hash, notes);

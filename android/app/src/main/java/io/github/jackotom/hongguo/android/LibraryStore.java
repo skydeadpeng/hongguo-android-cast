@@ -298,9 +298,9 @@ final class LibraryStore {
             if(directory==null||row==null||!(row.opt("mergedFile") instanceof String))return null;
             String seriesId=row.optString("seriesId"),name=row.getString("mergedFile");
             if(!seriesId.matches("[0-9]{6,30}")||!name.matches(java.util.regex.Pattern.quote(seriesId)+"_merged_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.mp4"))return null;
-            if(Files.isSymbolicLink(directory.toPath())||!directory.isDirectory())return null;
+            if(LegacyFiles.isSymbolicLink(directory)||!directory.isDirectory())return null;
             File file=new File(directory,name);
-            if(Files.isSymbolicLink(file.toPath())||!directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile())||!file.isFile()||!file.canRead())return null;
+            if(LegacyFiles.isSymbolicLink(file)||!directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile())||!file.isFile()||!file.canRead())return null;
             return file;
         }catch(Exception ignored){return null;}
     }
@@ -383,9 +383,9 @@ final class LibraryStore {
         return name.startsWith(prefix)&&name.substring(prefix.length()).matches("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}\\.mp4");
     }
     private static File ownedPreparedFile(File directory,JSONObject row,String name,long expectedBytes) throws Exception {
-        if(directory==null||!directory.isDirectory()||Files.isSymbolicLink(directory.toPath())||!preparedName(row,name)||expectedBytes<=0||expectedBytes>96L*1024*1024)return null;
+        if(directory==null||!directory.isDirectory()||LegacyFiles.isSymbolicLink(directory)||!preparedName(row,name)||expectedBytes<=0||expectedBytes>96L*1024*1024)return null;
         File file=new File(directory,name);
-        if(Files.isSymbolicLink(file.toPath())||!directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile())||!file.isFile()||!file.canRead()||file.length()!=expectedBytes||!completePreparedMp4(file))return null;
+        if(LegacyFiles.isSymbolicLink(file)||!directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile())||!file.isFile()||!file.canRead()||file.length()!=expectedBytes||!completePreparedMp4(file))return null;
         return file;
     }
     static JSONObject preparedMetadata(File directory,JSONObject row,File target) throws Exception {
@@ -397,7 +397,7 @@ final class LibraryStore {
     /** Recover pre-mapping addCompletedDownload records only from this module's UUID filenames. */
     static File recoverPreparedFile(File directory,JSONObject row,String localUri,long providerSize,String description) {
         try {
-            if(!"红果 · 已准备的视频".equals(description)||directory==null||!directory.isDirectory()||Files.isSymbolicLink(directory.toPath()))return null;
+            if(!"红果 · 已准备的视频".equals(description)||directory==null||!directory.isDirectory()||LegacyFiles.isSymbolicLink(directory))return null;
             if(localUri!=null&&!localUri.isEmpty()) {
                 URI uri=new URI(localUri);
                 if("file".equals(uri.getScheme())&&uri.getRawAuthority()==null) {

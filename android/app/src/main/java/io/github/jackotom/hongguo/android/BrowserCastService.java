@@ -35,7 +35,7 @@ public final class BrowserCastService extends Service {
         Request(String bind,JSONObject series,List<JSONObject> episodes,int current,String quality,boolean autoplay,boolean cleanup,long resume)throws JSONException{this.bind=bind;this.series=series;this.episodes=episodes;this.current=current;this.quality=quality;this.autoplay=autoplay;this.cleanup=cleanup;this.resume=resume;this.identity=PlaybackPlaylist.identity(series,episodes);}
     }
     @Override public IBinder onBind(Intent intent){return binder;}
-    @Override public int onStartCommand(Intent intent,int flags,int startId){if(intent!=null&&STOP.equals(intent.getAction()))stopCast();else if(snapshot.active)ensureForeground();else{stopForeground(STOP_FOREGROUND_REMOVE);stopSelf(startId);}return START_NOT_STICKY;}
+    @Override public int onStartCommand(Intent intent,int flags,int startId){if(intent!=null&&STOP.equals(intent.getAction()))stopCast();else if(snapshot.active)ensureForeground();else{stopForeground(true);stopSelf(startId);}return START_NOT_STICKY;}
     public DlnaSession.Snapshot snapshot(){return snapshot;}
     public String landingUrl(){BrowserCastServer value=server;return value==null?"":value.landingUrl();}
     public String pairCode(){BrowserCastServer value=server;return value==null?"":value.pairCode();}
@@ -59,7 +59,7 @@ public final class BrowserCastService extends Service {
     private void begin(Request request){
         final int token=++serial;pending=null;diagnosticReader=null;server=null;
         if(connecting!=null)connecting.cancel(true);
-        try{startForegroundService(new Intent(this,BrowserCastService.class).setAction(KEEP));ensureForeground();acquireLocks();}
+        try{Intent keep=new Intent(this,BrowserCastService.class).setAction(KEEP);if(Build.VERSION.SDK_INT>=26)startForegroundService(keep);else startService(keep);ensureForeground();acquireLocks();}
         catch(RuntimeException failure){publish(DlnaSession.Snapshot.idle("浏览器投屏前台服务启动未完成"));releaseLocks();stopSelf();return;}
         publish(DlnaSession.Snapshot.opening(request.identity,request.series.optString("title"),"苹果／浏览器接收端",request.current,request.quality,request.autoplay));
         connecting=lifecycle.submit(()->{
@@ -77,7 +77,7 @@ public final class BrowserCastService extends Service {
                 BrowserCastSession created=new BrowserCastSession(new RuntimeScheduler(),fileSource,madeServer,value->main.post(()->accept(token,value)),request.identity,request.series.optString("title"),request.episodes.size(),request.quality,request.autoplay,request.cleanup);
                 madeSession=created;ref.set(created);final BrowserCastServer supply=madeServer;final FileSource source=fileSource;
                 main.post(()->{if(destroyed||token!=serial){created.close();return;}session=created;server=supply;diagnosticReader=()->supply.diagnostics()+"\n"+source.diagnostics()+"\n"+created.diagnostics();created.start(request.current,request.resume);});
-            }catch(Exception failure){if(madeSession!=null)madeSession.close();else{if(madeServer!=null)madeServer.close();if(fileSource!=null)fileSource.close();}main.post(()->{if(token==serial&&!destroyed){publish(DlnaSession.Snapshot.idle("浏览器投屏连接未完成："+cleanMessage(failure)));releaseLocks();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}});}
+            }catch(Exception failure){if(madeSession!=null)madeSession.close();else{if(madeServer!=null)madeServer.close();if(fileSource!=null)fileSource.close();}main.post(()->{if(token==serial&&!destroyed){publish(DlnaSession.Snapshot.idle("浏览器投屏连接未完成："+cleanMessage(failure)));releaseLocks();stopForeground(true);stopSelf();}});}
         });
     }
     private byte[] readAsset(String name)throws IOException{try(InputStream in=getAssets().open(name);ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(out.size()+n>256*1024)throw new IOException("接收页面过大");out.write(buffer,0,n);}return out.toByteArray();}}
@@ -85,7 +85,7 @@ public final class BrowserCastService extends Service {
         if(destroyed||token!=serial)return;
         if(!value.active&&pending!=null){session=null;server=null;Request next=pending;pending=null;begin(next);return;}
         publish(value);
-        if(!value.active){session=null;server=null;releaseLocks();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}
+        if(!value.active){session=null;server=null;releaseLocks();stopForeground(true);stopSelf();}
     }
     private void publish(DlnaSession.Snapshot value){snapshot=value;main.post(()->{if(destroyed||value!=snapshot)return;for(Listener listener:listeners)try{listener.onSnapshot(value);}catch(RuntimeException ignored){}if(value.active)ensureForeground();});}
     public void select(int value){BrowserCastSession current=session;if(current!=null)current.select(value);}
@@ -93,7 +93,7 @@ public final class BrowserCastService extends Service {
     public void pause(){BrowserCastSession current=session;if(current!=null)current.pause();}
     public void seek(long value){BrowserCastSession current=session;if(current!=null)current.seek(value);}
     public void setAutoplay(boolean value){BrowserCastSession current=session;if(current!=null)current.setAutoplay(value);}
-    public void stopCast(){pending=null;if(connecting!=null)connecting.cancel(true);BrowserCastSession current=session;if(current!=null)current.stop();else{++serial;server=null;publish(DlnaSession.Snapshot.idle("本机供流已关闭"));releaseLocks();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}}
+    public void stopCast(){pending=null;if(connecting!=null)connecting.cancel(true);BrowserCastSession current=session;if(current!=null)current.stop();else{++serial;server=null;publish(DlnaSession.Snapshot.idle("本机供流已关闭"));releaseLocks();stopForeground(true);stopSelf();}}
     private final class FileSource implements DlnaSession.Source {
         private final Request request;private final PlaybackCache cache=PlaybackCache.get(BrowserCastService.this);private final LibraryStore store=new LibraryStore(BrowserCastService.this);
         private final PlaybackCache.QueueWindow window;
@@ -155,10 +155,10 @@ public final class BrowserCastService extends Service {
     }
     private void ensureForeground(){
         if(destroyed)return;
-        NotificationManager manager=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);if(!channelCreated){manager.createNotificationChannel(new NotificationChannel(CHANNEL,"红果浏览器投屏",NotificationManager.IMPORTANCE_LOW));channelCreated=true;}
+        NotificationManager manager=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);if(!channelCreated){if(Build.VERSION.SDK_INT>=26)manager.createNotificationChannel(new NotificationChannel(CHANNEL,"红果浏览器投屏",NotificationManager.IMPORTANCE_LOW));channelCreated=true;}
         PendingIntent stop=PendingIntent.getService(this,0,new Intent(this,BrowserCastService.class).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         PendingIntent open=PendingIntent.getActivity(this,1,new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-        Notification notification=new Notification.Builder(this,CHANNEL).setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("红果 · 浏览器投屏").setContentText(snapshot.deviceName+" · "+snapshot.title).setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(android.R.drawable.ic_media_pause,"停止投屏",stop).build()).build();
+        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL):new Notification.Builder(this);Notification notification=builder.setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("红果 · 浏览器投屏").setContentText(snapshot.deviceName+" · "+snapshot.title).setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(android.R.drawable.ic_media_pause,"停止投屏",stop).build()).build();
         if(Build.VERSION.SDK_INT>=29)startForeground(NOTIFICATION,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);else startForeground(NOTIFICATION,notification);
     }
     private void acquireLocks(){
@@ -168,5 +168,5 @@ public final class BrowserCastService extends Service {
     }
     private void releaseLocks(){if(wifi!=null){if(wifi.isHeld())wifi.release();wifi=null;}if(cpu!=null){if(cpu.isHeld())cpu.release();cpu=null;}}
     private static String cleanMessage(Exception failure){String text=failure.getMessage();if(text==null)return "操作未完成";text=text.replaceAll("https?://[^\\s\"'<>]+","[地址]").replaceAll("[\\p{Cntrl}]"," ");return text.substring(0,Math.min(160,text.length()));}
-    @Override public void onDestroy(){destroyed=true;++serial;pending=null;if(connecting!=null)connecting.cancel(true);BrowserCastSession current=session;session=null;server=null;if(current!=null)current.close();snapshot=DlnaSession.Snapshot.idle("本机浏览器投屏服务已关闭");lifecycle.shutdownNow();releaseLocks();listeners.clear();stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy();}
+    @Override public void onDestroy(){destroyed=true;++serial;pending=null;if(connecting!=null)connecting.cancel(true);BrowserCastSession current=session;session=null;server=null;if(current!=null)current.close();snapshot=DlnaSession.Snapshot.idle("本机浏览器投屏服务已关闭");lifecycle.shutdownNow();releaseLocks();listeners.clear();stopForeground(true);super.onDestroy();}
 }

@@ -50,7 +50,9 @@ final class PlaybackSources {
         }
     }
     private static final class Pending {
-        final String sid, vid, requestedQuality; final int playbackCeiling; final CompletableFuture<JSONObject> future = new CompletableFuture<>();
+        final String sid, vid, requestedQuality; final int playbackCeiling;
+        volatile JSONObject reply; volatile Exception failure;
+        final FutureTask<JSONObject> future = new FutureTask<>(() -> { Exception blocked=failure; if(blocked!=null)throw blocked; return reply; });
         Pending(String sid, String vid, String requestedQuality,int playbackCeiling) { this.sid=sid;this.vid=vid;this.requestedQuality=requestedQuality;this.playbackCeiling=playbackCeiling; }
     }
     private static WeakReference<MainActivity> activity = new WeakReference<>(null);
@@ -78,7 +80,7 @@ final class PlaybackSources {
     static synchronized void detach(MainActivity value) {
         if (activity.get() != value) return;
         activity.clear();
-        for (Pending request : pending.values()) request.future.completeExceptionally(new IOException("片源页面已关闭"));
+        for (Pending request : pending.values()) { request.failure = new IOException("片源页面已关闭"); request.future.run(); }
         pending.clear();
     }
     static Plan register(JSONObject input, String vid, boolean preflight) throws Exception {
@@ -403,7 +405,7 @@ final class PlaybackSources {
         String error=params.isNull("error")?"":params.optString("error","");
         if (!error.isEmpty()) {
             String code=params.optString("errorCode","");
-            request.future.completeExceptionally(new AppLookupException(error.length()>300?"App片源暂未取得":error,LOOKUP_TRANSIENT_CODES.contains(code)||code.equals("QUALITY_UNAVAILABLE")||RESPONSE_RETRY_CODE.equals(code)||code.equals("APP_INVALID_RESPONSE")?code:""));
+            request.failure=new AppLookupException(error.length()>300?"App片源暂未取得":error,LOOKUP_TRANSIENT_CODES.contains(code)||code.equals("QUALITY_UNAVAILABLE")||RESPONSE_RETRY_CODE.equals(code)||code.equals("APP_INVALID_RESPONSE")?code:"");request.future.run();
         }
         else {
             JSONObject info=params.getJSONObject("playInfo");
@@ -417,12 +419,12 @@ final class PlaybackSources {
                     if(candidate.has("playbackCeiling")&&candidate.optInt("playbackCeiling",-1)!=request.playbackCeiling)throw new IOException("备用片源边界结果不匹配");
                 }
             }
-            request.future.complete(new JSONObject(info.toString()).put("requestedQuality",request.requestedQuality));
+            request.reply=new JSONObject(info.toString()).put("requestedQuality",request.requestedQuality);request.future.run();
         }
         } catch (Exception invalid) {
             // A malformed callback is a terminal contract error, not a future
             // timeout that may later masquerade as a recoverable network failure.
-            request.future.completeExceptionally(invalid);
+            request.failure=invalid;request.future.run();
             throw invalid;
         }
     }

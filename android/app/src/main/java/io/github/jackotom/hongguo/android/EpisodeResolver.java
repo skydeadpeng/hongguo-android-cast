@@ -343,7 +343,7 @@ final class EpisodeResolver {
             }
             String path = normalizedPath(uri.getRawPath());
             if (path == null || path.isEmpty()) path = "/";
-            String joined = String.join("&", kept);
+            String joined = LegacyText.join("&", kept);
             String result = "https://" + host + path + (!joined.isEmpty() ? "?" + joined : "");
             return new URI(result).toASCIIString();
         } catch (Exception ignored) { return ""; }
@@ -371,7 +371,7 @@ final class EpisodeResolver {
                 if (i == segments.length - 1) out.add("");
             } else out.add(segment);
         }
-        return "/" + String.join("/", out);
+        return "/" + LegacyText.join("/", out);
     }
     private static String decodeComponent(String value) throws Exception {
         StringBuilder out = new StringBuilder();

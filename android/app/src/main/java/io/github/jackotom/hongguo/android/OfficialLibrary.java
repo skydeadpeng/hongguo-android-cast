@@ -4,7 +4,6 @@ import android.content.Context;
 import java.io.*;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.function.BooleanSupplier;
@@ -202,7 +201,7 @@ final class OfficialLibrary {
         if(remote.size()>MAX_ENTRIES)throw new IOException("云端剧库条目超过读取上限");
         List<String> missing=new ArrayList<>();for(Map.Entry<String,JSONObject> entry:remote.entrySet())if(entry.getValue().optString("title").isEmpty()||entry.getValue().optBoolean("metadataPending"))missing.add(entry.getKey());
         for(int start=0;start<missing.size();start+=20){List<String> batch=missing.subList(start,Math.min(start+20,missing.size()));JSONObject metadata=null;
-            try{JSONObject body=new JSONObject().put("dr_scene","preload").put("series_id",String.join(",",batch)).put("biz_param",new JSONObject().put("detail_page_version",0).put("disable_digg_stat",false).put("disable_video_relate_book",false).put("need_all_video_definition",false).put("need_mp4_align",false).put("source",7).put("use_os_player",false).put("use_server_dns",false));metadata=data(call(api,uid,current,deadline,"/novel/player/multi_video_detail/preload/v1","POST",null,body));}
+            try{JSONObject body=new JSONObject().put("dr_scene","preload").put("series_id",LegacyText.join(",",batch)).put("biz_param",new JSONObject().put("detail_page_version",0).put("disable_digg_stat",false).put("disable_video_relate_book",false).put("need_all_video_definition",false).put("need_mp4_align",false).put("source",7).put("use_os_player",false).put("use_server_dns",false));metadata=data(call(api,uid,current,deadline,"/novel/player/multi_video_detail/preload/v1","POST",null,body));}
             catch(Exception error){synchronized(lock){checkCurrent(uid,current);}if(error instanceof AuthExpiredException||error instanceof InterruptedIOException||error instanceof OfficialApiClient.HTTPError&&(((OfficialApiClient.HTTPError)error).status==401||((OfficialApiClient.HTTPError)error).status==403))throw error;}
             for(String id:batch){JSONObject row=remote.get(id),holder=metadata==null?null:metadata.optJSONObject(id),raw=holder==null?null:holder.optJSONObject("video_data");
                 if(raw!=null&&raw.length()>0){String actual=requiredId(raw.opt("series_id"));if(!id.equals(actual))throw new IOException("云端详情身份不一致");String title=raw.optString("series_title","");if(!title.isEmpty()){mergeMetadata(row,card(id,title,first(raw,"series_cover","cover","cover_url"),Math.max(raw.optInt("episode_cnt"),raw.optInt("episode_total_cnt"))));row.put("metadataPending",false);}}
@@ -290,6 +289,6 @@ final class OfficialLibrary {
         final File directory;FilePersistence(File directory){this.directory=directory;}
         private File file(String uid)throws Exception{if(!validId(uid))throw new IOException("官方账号身份无效");return new File(directory,digest(uid)+".json");}
         public JSONObject read(String uid)throws Exception{File file=file(uid);if(!file.exists())return null;if(!file.isFile()||file.length()>MAX_FILE_BYTES)throw new IOException("官方本机剧库文件无效");ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(InputStream in=new FileInputStream(file)){byte[] b=new byte[32768];int n;while((n=in.read(b))!=-1){if(bytes.size()+n>MAX_FILE_BYTES)throw new IOException("官方本机剧库文件过大");bytes.write(b,0,n);}}return new JSONObject(bytes.toString("UTF-8"));}
-        public void write(String uid,JSONObject value)throws Exception{if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("官方本机剧库目录创建失败");byte[] bytes=value.toString().getBytes(StandardCharsets.UTF_8);if(bytes.length>MAX_FILE_BYTES)throw new IOException("官方本机剧库超过存储上限");File target=file(uid),part=new File(directory,target.getName()+"."+UUID.randomUUID()+".part");try{try(FileOutputStream out=new FileOutputStream(part)){out.write(bytes);out.getFD().sync();}Files.move(part.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}finally{part.delete();}}
+        public void write(String uid,JSONObject value)throws Exception{if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("官方本机剧库目录创建失败");byte[] bytes=value.toString().getBytes(StandardCharsets.UTF_8);if(bytes.length>MAX_FILE_BYTES)throw new IOException("官方本机剧库超过存储上限");File target=file(uid),part=new File(directory,target.getName()+"."+UUID.randomUUID()+".part");try{try(FileOutputStream out=new FileOutputStream(part)){out.write(bytes);out.getFD().sync();}LegacyFiles.move(part,target,true);}finally{part.delete();}}
     }
 }

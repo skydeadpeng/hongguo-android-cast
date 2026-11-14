@@ -35,9 +35,9 @@ final class HuangguoCastSource {
             // One global staging area bounds extra disk usage to source + one segment. A process death
             // leaves only these three owned names, which the next job removes before downloading.
             File scratch=new File(target.getParentFile(),"huangguo-hls-work");
-            if(Files.isSymbolicLink(scratch.toPath())||(!scratch.isDirectory()&&!scratch.mkdir()))throw new IOException("黄果投屏临时目录无效");
+            if(LegacyFiles.isSymbolicLink(scratch)||(!scratch.isDirectory()&&!scratch.mkdir()))throw new IOException("黄果投屏临时目录无效");
             for(String name:new String[]{"source.ts","segment.part","key.part"}) {
-                File owned=new File(scratch,name);if(Files.isSymbolicLink(owned.toPath()))throw new IOException("黄果投屏临时路径无效");HuangguoHls.remove(owned);
+                File owned=new File(scratch,name);if(LegacyFiles.isSymbolicLink(owned))throw new IOException("黄果投屏临时路径无效");HuangguoHls.remove(owned);
             }
             HuangguoApi.CastStream stream=HuangguoApi.episodeForCast(sid,vid,index,deadline);HuangguoHls.check(alive,deadline);
             HuangguoHls.Transport transport=new HuangguoHls.Transport(){

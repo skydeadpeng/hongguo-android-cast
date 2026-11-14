@@ -131,7 +131,7 @@ final class HuangguoHls {
                         keyBytes=null;keyVersion=-1;
                         transport.key(segment.key,keyFile,deadline);check(alive,deadline);
                         if(keyFile.length()!=16)throw new IOException("黄果 AES 密钥长度无效");
-                        keyBytes=Files.readAllBytes(keyFile.toPath());remove(keyFile);keyVersion=segment.keyVersion;
+                        keyBytes=LegacyFiles.readAllBytes(keyFile);remove(keyFile);keyVersion=segment.keyVersion;
                     }
                     long remaining=maxBytes-downloaded;
                     if(remaining<=0)throw new IOException("黄果投屏缓存超出单集大小限制");
@@ -140,7 +140,7 @@ final class HuangguoHls {
                     Cipher cipher=null;
                     if(segment.key!=null) { cipher=Cipher.getInstance("AES/CBC/PKCS5Padding");cipher.init(Cipher.DECRYPT_MODE,new SecretKeySpec(keyBytes,"AES"),new IvParameterSpec(segment.iv)); }
                     // One bounded segment in memory simplifies validating TS sync before any bytes are appended.
-                    byte[] bytes=Files.readAllBytes(part.toPath());check(alive,deadline);
+                    byte[] bytes=LegacyFiles.readAllBytes(part);check(alive,deadline);
                     try {
                         if(cipher!=null)bytes=cipher.doFinal(bytes);
                         if(bytes.length==0||bytes.length%188!=0)throw new IOException("黄果分片不是完整 MPEG-TS");

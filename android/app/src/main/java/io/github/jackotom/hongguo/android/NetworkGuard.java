@@ -356,9 +356,11 @@ final class NetworkGuard {
                 try (SocketGuard ignored = guardSocket(raw, deadline)) {
                     raw.setSoTimeout(remaining(deadline, 15_000));
                     try (SSLSocket socket = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(raw, uri.getHost(), 443, true)) {
-                        SSLParameters ssl = socket.getSSLParameters();
-                        ssl.setEndpointIdentificationAlgorithm("HTTPS");
-                        socket.setSSLParameters(ssl);
+                        if (android.os.Build.VERSION.SDK_INT >= 24) {
+                            SSLParameters ssl = socket.getSSLParameters();
+                            ssl.setEndpointIdentificationAlgorithm("HTTPS");
+                            socket.setSSLParameters(ssl);
+                        }
                         socket.startHandshake();
                         writeMediaRequest(socket.getOutputStream(),uri,userAgent,referer);
                         InputStream input = new DeadlineInputStream(new BufferedInputStream(socket.getInputStream()), socket, deadline);
@@ -512,9 +514,11 @@ final class NetworkGuard {
             try (SocketGuard ignored = guardSocket(raw, deadline)) {
                 raw.setSoTimeout(remaining(deadline, 15_000));
                 try (SSLSocket socket = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(raw, uri.getHost(), 443, true)) {
-                    SSLParameters ssl = socket.getSSLParameters();
-                    ssl.setEndpointIdentificationAlgorithm("HTTPS");
-                    socket.setSSLParameters(ssl);
+                    if (android.os.Build.VERSION.SDK_INT >= 24) {
+                        SSLParameters ssl = socket.getSSLParameters();
+                        ssl.setEndpointIdentificationAlgorithm("HTTPS");
+                        socket.setSSLParameters(ssl);
+                    }
                     socket.startHandshake();
                     String path = uri.getRawPath();
                     if (path == null || path.isEmpty()) path = "/";

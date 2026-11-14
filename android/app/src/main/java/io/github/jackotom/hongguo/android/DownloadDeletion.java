@@ -20,7 +20,7 @@ final class DownloadDeletion {
         Record(String localUri,String description){this(8,localUri,description);}
         Record(int status,String localUri,String description){this.status=status;this.localUri=localUri;this.description=description;}
     }
-    private static final FileRemoval FILES=file->Files.deleteIfExists(file.toPath());
+    private static final FileRemoval FILES=file->LegacyFiles.deleteIfExists(file);
     static long confirmedId(JSONObject params) throws Exception {
         Object raw=params.opt("id");
         if(!Boolean.TRUE.equals(params.opt("confirmed")))throw new IOException("请先确认删除此下载");
@@ -55,7 +55,7 @@ final class DownloadDeletion {
                 // Recheck after provider work: never follow a replaced symlink or directory.
                 target=owned(directory,row,target.getName());
                 try {removal.delete(target);}catch(Exception error){throw new IOException("视频文件删除未完成，请重试",error);}
-                if(Files.exists(target.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS))throw new IOException("视频文件仍存在，请重试删除");
+                if(target.exists())throw new IOException("视频文件仍存在，请重试删除");
             }
             store.finishDownloadDeletion(id);
             return new JSONObject().put("id",id).put("deleted",true);
@@ -68,10 +68,10 @@ final class DownloadDeletion {
         return name!=null&&(LibraryStore.preparedName(row,name)||managedName(row,name));
     }
     private static File owned(File directory,JSONObject row,String name) throws Exception {
-        if(directory==null||Files.isSymbolicLink(directory.toPath())||directory.exists()&&!directory.isDirectory()||!boundName(row,name))
+        if(directory==null||LegacyFiles.isSymbolicLink(directory)||directory.exists()&&!directory.isDirectory()||!boundName(row,name))
             throw new IOException("下载文件归属校验未通过，未删除文件");
         File file=new File(directory,name);
-        if(Files.isSymbolicLink(file.toPath())||!directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile())||file.exists()&&!file.isFile())
+        if(LegacyFiles.isSymbolicLink(file)||!directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile())||file.exists()&&!file.isFile())
             throw new IOException("下载文件路径校验未通过，未删除文件");
         return file;
     }
@@ -105,7 +105,7 @@ final class DownloadDeletion {
         if(target==null)target=providerTarget;
         if(target==null&&managed!=null&&"红果 · 已准备的视频".equals(managed.description)) {
             // Legacy addCompletedDownload can omit local_uri. Only a unique exact UUID is recoverable.
-            if(directory==null||!directory.isDirectory()||Files.isSymbolicLink(directory.toPath()))throw new IOException("下载目录暂不可用，请重试");
+            if(directory==null||!directory.isDirectory()||LegacyFiles.isSymbolicLink(directory))throw new IOException("下载目录暂不可用，请重试");
             File[] files=directory.listFiles();if(files==null||files.length>512)throw new IOException("旧下载文件定位未完成，请重试");
             String prefix=LibraryStore.preparedPrefix(row);
             for(int i=0;i<rows.length();i++){JSONObject other=rows.optJSONObject(i);if(other==null||other.optLong("id",-1)==id)continue;

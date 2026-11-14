@@ -322,7 +322,7 @@ public final class DlnaSession implements AutoCloseable {
         long now=scheduler.nowMs(),delta=previousSampleAt<0?-1:now-previousSampleAt;previousSampleAt=now;
         recentSamples.addLast(name+own+":"+status.positionMs+"/"+status.durationMs+"@"+delta);
         while(recentSamples.size()>6)recentSamples.removeFirst();
-        sampleTrace=String.join(" > ",recentSamples);
+        sampleTrace=LegacyText.join(" > ",recentSamples);
     }
     private static boolean isNearEnd(long position,long duration){return duration>0&&position>=duration-endTolerance(duration)&&position<=duration+endTolerance(duration);}
     private static long endTolerance(long duration){return Math.min(Math.max(1,duration/4),Math.min(2500,Math.max(500,duration/50)));}

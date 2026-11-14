@@ -157,7 +157,7 @@ final class BrowserCastServer implements DlnaSession.Server, AutoCloseable {
         synchronized void revoke() { if (!revoked) { revoked = true; quietly(release); } }
     }
     @Override public DlnaSession.Publication publish(DlnaSession.Prepared prepared) throws IOException {
-        if (prepared == null || prepared.file == null || prepared.retain == null || prepared.release == null || Files.isSymbolicLink(prepared.file.toPath())) throw new IOException("网页投屏本地媒体无效");
+        if (prepared == null || prepared.file == null || prepared.retain == null || prepared.release == null || LegacyFiles.isSymbolicLink(prepared.file)) throw new IOException("网页投屏本地媒体无效");
         File file = prepared.file.getCanonicalFile(); long size = file.length();
         if (!file.isFile() || !file.canRead() || !file.getName().toLowerCase(Locale.ROOT).endsWith(".mp4") || size <= 0 || size > MAX_MEDIA_BYTES) throw new IOException("网页投屏媒体尚未准备完成");
         synchronized (publications) {
@@ -349,7 +349,7 @@ final class BrowserCastServer implements DlnaSession.Server, AutoCloseable {
         Media media; synchronized (publications) { media = publications.get(request.path); }
         if (media == null || !client.acquire(media)) throw new HttpFailure(404);
         FileChannel file;
-        try { file = FileChannel.open(media.file.toPath(), StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS); }
+        try { file = new java.io.FileInputStream(media.file).getChannel(); }
         catch (IOException error) { failure(Failure.MEDIA_IO); throw new HttpFailure(410); }
         if (!client.attach(file)) return;
         if (file.size() != media.size) throw new HttpFailure(410);

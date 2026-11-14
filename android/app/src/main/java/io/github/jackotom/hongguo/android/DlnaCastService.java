@@ -32,7 +32,7 @@ public final class DlnaCastService extends Service {
         Request(DlnaDevice device,JSONObject series,List<JSONObject> episodes,int current,String quality,boolean autoplay,boolean cleanup,long resume,int mergeWindow)throws JSONException{this.device=device;this.series=series;this.episodes=episodes;this.current=current;this.quality=quality;this.autoplay=autoplay;this.cleanup=cleanup;this.resume=resume;this.mergeWindow=Math.max(1,mergeWindow);this.identity=PlaybackPlaylist.identity(series,episodes);}
     }
     @Override public IBinder onBind(Intent intent){return binder;}
-    @Override public int onStartCommand(Intent intent,int flags,int startId){if(intent!=null&&STOP.equals(intent.getAction()))stopCast();else if(snapshot.active)ensureForeground();else{stopForeground(STOP_FOREGROUND_REMOVE);stopSelf(startId);}return START_NOT_STICKY;}
+    @Override public int onStartCommand(Intent intent,int flags,int startId){if(intent!=null&&STOP.equals(intent.getAction()))stopCast();else if(snapshot.active)ensureForeground();else{stopForeground(true);stopSelf(startId);}return START_NOT_STICKY;}
     public DlnaSession.Snapshot snapshot(){return snapshot;}
     /** Read counters only; never sends a control request or changes the current cast. */
     public String diagnostics(){java.util.function.Supplier<String> reader=diagnosticReader;return reader==null?"控制/供流：会话尚未连接":reader.get();}
@@ -55,7 +55,7 @@ public final class DlnaCastService extends Service {
     private void begin(Request request) {
         final int token=++serial;pending=null;diagnosticReader=null;
         if(connecting!=null)connecting.cancel(true);
-        try {startForegroundService(new Intent(this,DlnaCastService.class).setAction(KEEP));ensureForeground();acquireLocks();}
+        try {Intent keep=new Intent(this,DlnaCastService.class).setAction(KEEP);if(Build.VERSION.SDK_INT>=26)startForegroundService(keep);else startService(keep);ensureForeground();acquireLocks();}
         catch(RuntimeException failure){publish(DlnaSession.Snapshot.idle("投屏前台服务启动未完成"));releaseLocks();stopSelf();return;}
         publish(DlnaSession.Snapshot.opening(request.identity,request.series.optString("title"),request.device.name,request.current,request.quality,request.autoplay));
         connecting=lifecycle.submit(()->{
@@ -76,14 +76,14 @@ public final class DlnaCastService extends Service {
                 FileSource fileSource=new FileSource(request);
                 DlnaSession created=new DlnaSession(new RuntimeScheduler(),controller,fileSource,supply,value->main.post(()->accept(token,value)),request.identity,request.series.optString("title"),request.device.name,request.episodes.size(),request.quality,request.autoplay,request.cleanup);made=created;
                 main.post(()->{if(destroyed||token!=serial){created.close();return;}diagnosticReader=()->remote.diagnostics()+"\n"+server.diagnostics()+"\n"+fileSource.diagnostics()+"\n"+created.diagnostics();session=created;created.start(request.current,request.resume);});
-            }catch(Exception failure){if(made!=null)made.close();else if(mediaServer!=null)mediaServer.close();main.post(()->{if(token==serial&&!destroyed){publish(DlnaSession.Snapshot.idle("投屏连接未完成："+cleanMessage(failure)));releaseLocks();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}});}
+            }catch(Exception failure){if(made!=null)made.close();else if(mediaServer!=null)mediaServer.close();main.post(()->{if(token==serial&&!destroyed){publish(DlnaSession.Snapshot.idle("投屏连接未完成："+cleanMessage(failure)));releaseLocks();stopForeground(true);stopSelf();}});}
         });
     }
     private void accept(int token,DlnaSession.Snapshot value){
         if(destroyed||token!=serial)return;
         if(!value.active&&pending!=null){session=null;Request next=pending;pending=null;begin(next);return;}
         publish(value);
-        if(!value.active){session=null;releaseLocks();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}
+        if(!value.active){session=null;releaseLocks();stopForeground(true);stopSelf();}
     }
     private void publish(DlnaSession.Snapshot value){snapshot=value;main.post(()->{if(destroyed||value!=snapshot)return;for(Listener listener:listeners)try{listener.onSnapshot(value);}catch(RuntimeException ignored){}if(value.active)ensureForeground();});}
     public void select(int queuePosition){DlnaSession current=session;if(current!=null)current.select(queuePosition);}
@@ -91,7 +91,7 @@ public final class DlnaCastService extends Service {
     public void pause(){DlnaSession current=session;if(current!=null)current.pause();}
     public void seek(long ms){DlnaSession current=session;if(current!=null)current.seek(ms);}
     public void setAutoplay(boolean value){DlnaSession current=session;if(current!=null)current.setAutoplay(value);}
-    public void stopCast(){pending=null;if(connecting!=null)connecting.cancel(true);DlnaSession current=session;if(current!=null)current.stop();else{++serial;publish(DlnaSession.Snapshot.idle("本机供流已关闭"));releaseLocks();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}}
+    public void stopCast(){pending=null;if(connecting!=null)connecting.cancel(true);DlnaSession current=session;if(current!=null)current.stop();else{++serial;publish(DlnaSession.Snapshot.idle("本机供流已关闭"));releaseLocks();stopForeground(true);stopSelf();}}
     private final class FileSource implements DlnaSession.Source {
         private final Request request;private final PlaybackCache cache=PlaybackCache.get(DlnaCastService.this);private final LibraryStore store=new LibraryStore(DlnaCastService.this);
         private final PlaybackCache.QueueWindow window;
@@ -225,11 +225,11 @@ public final class DlnaCastService extends Service {
     private static InetAddress privateAddress(String host)throws Exception{if(!DlnaNetwork.isPrivateIpv4(host))throw new IOException("设备不在支持的局域网 IPv4 地址范围");String[] parts=host.split("\\.");byte[] bytes=new byte[4];for(int i=0;i<4;i++)bytes[i]=(byte)Integer.parseInt(parts[i]);return InetAddress.getByAddress(bytes);}
     private void ensureForeground(){
         if(destroyed)return;
-        NotificationManager manager=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);if(!channelCreated){manager.createNotificationChannel(new NotificationChannel(CHANNEL,"红果投屏",NotificationManager.IMPORTANCE_LOW));channelCreated=true;}
+        NotificationManager manager=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);if(!channelCreated){if(Build.VERSION.SDK_INT>=26)manager.createNotificationChannel(new NotificationChannel(CHANNEL,"红果投屏",NotificationManager.IMPORTANCE_LOW));channelCreated=true;}
         PendingIntent stop=PendingIntent.getService(this,0,new Intent(this,DlnaCastService.class).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         PendingIntent open=PendingIntent.getActivity(this,1,new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         String text=snapshot.title.isEmpty()?"正在连接电视":snapshot.deviceName+" · "+snapshot.title;
-        Notification notification=new Notification.Builder(this,CHANNEL).setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("红果 · 局域网投屏").setContentText(text).setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(android.R.drawable.ic_media_pause,"停止投屏",stop).build()).build();
+        Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL):new Notification.Builder(this);Notification notification=builder.setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("红果 · 局域网投屏").setContentText(text).setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(android.R.drawable.ic_media_pause,"停止投屏",stop).build()).build();
         if(Build.VERSION.SDK_INT>=29)startForeground(NOTIFICATION,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);else startForeground(NOTIFICATION,notification);
     }
     private void acquireLocks(){
@@ -239,5 +239,5 @@ public final class DlnaCastService extends Service {
     }
     private void releaseLocks(){if(multicast!=null){if(multicast.isHeld())multicast.release();multicast=null;}if(wifi!=null){if(wifi.isHeld())wifi.release();wifi=null;}if(cpu!=null){if(cpu.isHeld())cpu.release();cpu=null;}}
     private static String cleanMessage(Exception failure){String text=failure.getMessage();if(text==null)return "操作未完成";text=text.replaceAll("https?://[^\\s\"'<>]+","[地址]").replaceAll("[\\p{Cntrl}]"," ");return text.substring(0,Math.min(160,text.length()));}
-    @Override public void onDestroy(){destroyed=true;++serial;pending=null;if(connecting!=null)connecting.cancel(true);DlnaSession current=session;session=null;if(current!=null){current.close();snapshot=current.snapshot();}else snapshot=DlnaSession.Snapshot.idle("本机投屏服务已关闭");lifecycle.shutdownNow();releaseLocks();listeners.clear();stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy();}
+    @Override public void onDestroy(){destroyed=true;++serial;pending=null;if(connecting!=null)connecting.cancel(true);DlnaSession current=session;session=null;if(current!=null){current.close();snapshot=current.snapshot();}else snapshot=DlnaSession.Snapshot.idle("本机投屏服务已关闭");lifecycle.shutdownNow();releaseLocks();listeners.clear();stopForeground(true);super.onDestroy();}
 }

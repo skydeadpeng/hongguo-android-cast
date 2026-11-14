@@ -3,6 +3,7 @@ package io.github.jackotom.hongguo.android;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
@@ -67,7 +68,7 @@ final class TvDownloads {
             File directory = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
             if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new IOException("下载目录尚未准备");
             target = new File(directory, sid + "_" + index + "_" + UUID.randomUUID() + ".mp4");
-            Files.copy(ready.toPath(), target.toPath());
+            LegacyFiles.copy(ready, target, false);
             if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("下载准备已取消");
             id = service.addCompletedDownload(series.getString("title") + " · 第 " + index + " 集", "红果 · 已准备的视频", false, "video/mp4", target.getAbsolutePath(), target.length(), true);
             if (id < 0) throw new IOException("系统下载记录准备失败");
@@ -76,7 +77,7 @@ final class TvDownloads {
             return id;
         } catch (Exception error) {
             if (id >= 0) try { service.remove(id); } catch (Exception cleanup) { error.addSuppressed(cleanup); }
-            if (target != null) try { Files.deleteIfExists(target.toPath()); } catch (Exception cleanup) { error.addSuppressed(cleanup); }
+            if (target != null) try { LegacyFiles.deleteIfExists(target); } catch (Exception cleanup) { error.addSuppressed(cleanup); }
             throw error;
         } finally { cache.release(sid, vid, index, plan.requestedQuality); }
     }
@@ -111,6 +112,43 @@ final class TvDownloads {
             result.put(row);
         }
         return result;
+    }
+    /** Opens this series' completed downloads in an external player (MX Player/VLC decode HEVC
+     *  in software where the device lacks hardware support). Two or more completed episodes go
+     *  through the generated m3u playlist so the player queues them back to back; one goes as a
+     *  single file. Returns null on success, or a user-facing hint why nothing was opened. */
+    static String external(Activity activity, JSONObject seriesInput, JSONObject episodeInput) {
+        try {
+            LibraryStore store = new LibraryStore(activity);
+            String sid = LibraryStore.series(seriesInput).getString("seriesId"), vid = LibraryStore.episode(episodeInput).getString("vid");
+            DownloadManager service = manager(activity);
+            JSONArray records = store.downloads();
+            Uri single = null; JSONObject matched = null; int completed = 0;
+            for (int i = 0; i < records.length(); i++) {
+                JSONObject row = records.optJSONObject(i);
+                if (row == null || row.optBoolean("deleting") || row.optJSONObject("series") == null || row.optJSONObject("episode") == null) continue;
+                if (!sid.equals(row.optJSONObject("series").optString("seriesId"))) continue;
+                Uri uri = downloadedUri(activity, service, store, row);
+                if (uri == null) continue;
+                completed++;
+                if (vid.equals(row.optJSONObject("episode").optString("vid"))) { single = uri; matched = row; }
+            }
+            Uri target; String mime; String label;
+            if (completed >= 2) {
+                target = new Uri.Builder().scheme("content").authority(activity.getPackageName() + ".media").path("/playlist").appendQueryParameter("sid", sid).build();
+                // Players resolve content m3u only as video/mp4 here (VLC sniffs #EXTM3U content);
+                // the strict mpegurl MIME matches no installed player on Android 6.0.
+                mime = "video/mp4"; label = "连续播放已下载的 " + completed + " 集";
+            } else if (single != null) {
+                target = matched.has("preparedFile")
+                    ? new Uri.Builder().scheme("content").authority(activity.getPackageName() + ".media").path("/media").appendQueryParameter("id", String.valueOf(matched.getLong("id"))).build()
+                    : single;
+                mime = "video/mp4"; label = "用外部播放器打开第 " + LibraryStore.episode(matched.getJSONObject("episode")).optInt("index") + " 集";
+            } else return "本集尚未完整下载：先在详情页点「下载」，完成后再用外部播放器打开。";
+            Intent view = new Intent(Intent.ACTION_VIEW).setDataAndType(target, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            activity.startActivity(Intent.createChooser(view, label));
+            return null;
+        } catch (Exception error) { return TvUi.message(error); }
     }
     static JSONObject delete(Context context, long id) throws Exception {
         DownloadManager service = manager(context); Object owner = new Object();
