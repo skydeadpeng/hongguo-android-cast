@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 93,
-  "versionName": "0.12.70",
+  "versionCode": 94,
+  "versionName": "0.12.71",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.70/Hongguo-0.12.70-phone-release-compatible.apk",
-  "size": 696316,
-  "sha256": "288f6a61447ca06ffaea092213804456b6a70885400db262870adf7ff76c820d",
-  "notes": "红果 Android 0.12.70（手机与 TV WebView）\n\n- TV 遥控器上下键改为按屏幕视觉行序移动焦点：最近的下一行/上一行优先，行内取最近的列，稀疏行、区块之间按钮（如“换一批”）不再被同列的远处控件跳过；按下去与按回来落在同一控件。\n- 焦点在内容区时上下键不再被左侧导航栏抢走；侧边栏内部上下仍在列表内移动，左右键进出内容区的规则保持不变（网格到边停住、首按落海报区）。\n- 手机版共用同一界面包，触屏行为不变；手动下载、投屏、黄果与应用包名不变。原生电视版仍为 0.1.23。\n\n手机版与 TV WebView 版可在「关于 → 版本更新」覆盖升级（自动检查有 24 小时冷却，手动检查立即生效）。TV 包已在 TV 模拟器安装并通过遥控器方向键走查（首页、详情、关于页）；手机包构建与检查通过，本版本未做实体设备试播。\n",
-  "publishedAt": "2026-11-14T14:35:47.000Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.71/Hongguo-0.12.71-phone-release-compatible.apk",
+  "size": 696380,
+  "sha256": "d869384b5e4e5c1305572ce3cd2e305bfbf810354118f60e0cc3cc449049fd9c",
+  "notes": "红果 Android 0.12.71（手机与 TV WebView）\n\n- 修复 0.12.70 的遥控器可达性回退：海报 / 选集 / 分类网格的最左列按 ← 现在进入左侧导航菜单（按纵向就近落位），菜单里 ↑↓ 在列表内移动、→ 回到内容区离开时的位置。\n- 网格中间按 ← 仍在网格内移动（保持“到边不乱跳”）；上下键的视觉行序修复保持不变：稀疏行与区块间按钮不再被跳过、上下来回落在同一控件、内容区上下不被菜单抢焦点。\n- 手机版共用界面包，触屏行为不变；手动下载、投屏、黄果与应用包名不变。原生电视版仍为 0.1.23。\n\n手机版与 TV WebView 版可在「关于 → 版本更新」覆盖升级（自动检查有 24 小时冷却，手动检查立即生效）。TV 包已在 TV 模拟器通过遥控器方向键走查（网格左缘进菜单、菜单内上下、原路返回、上下视觉行序）；手机包构建与检查通过，本版本未做实体设备试播。\n",
+  "publishedAt": "2026-11-14T14:58:24.000Z"
 }
