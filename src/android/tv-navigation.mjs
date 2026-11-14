@@ -24,6 +24,18 @@ export function pickSpatialCandidate(controls, focused, key) {
   const pool = focused.boundary
     ? controls.filter(control => control !== focused && control.boundary === focused.boundary)
     : controls.filter(control => control !== focused);
+  let best = scoreHorizontalPool(pool, focused, key);
+  // Left edge of a grid: the sidebar is the deliberate destination. 0.12.70
+  // confined left/right inside the boundary, which left no way back to the
+  // menu from the content; the first column (or leftmost chip) falls through
+  // to the nav rail, mid-grid lefts never do.
+  if (!best && key === 'ArrowLeft') {
+    best = scoreHorizontalPool(controls.filter(control => control !== focused && control.nav), focused, key);
+  }
+  return best ? best.control : null;
+}
+
+function scoreHorizontalPool(pool, focused, key) {
   const origin = center(focused.rect);
   let best = null;
   for (const control of pool) {
@@ -34,7 +46,7 @@ export function pickSpatialCandidate(controls, focused, key) {
     const score = Math.abs(along) + Math.abs(across) * 3 + across * across / Math.max(Math.abs(along), 1);
     if (!best || score < best.score) best = { control, score };
   }
-  return best ? best.control : null;
+  return best;
 }
 
 /** Vertical moves walk visual rows (bands): candidates strictly above/below

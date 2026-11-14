@@ -27,8 +27,8 @@ android {
         // it must stay a plain number here rather than moving fully to flavors.
         minSdk 23
         targetSdk 35
-        versionCode 93
-        versionName '0.12.70'
+        versionCode 94
+        versionName '0.12.71'
         testInstrumentationRunner 'io.github.jackotom.hongguo.android.ProductionPlaybackInstrumentation'
     }
     flavorDimensions 'device'

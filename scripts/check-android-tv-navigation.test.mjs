@@ -24,9 +24,18 @@ test('poster grid moves within the row and stops at the edge instead of leaving 
   const at = name => page.find(control => control.element === name);
   assert.equal(pickSpatialCandidate(page, at('p11'), 'ArrowRight')?.element, 'p12');
   assert.equal(pickSpatialCandidate(page, at('p11'), 'ArrowLeft')?.element, 'p10');
-  // Edge of the grid: stop. The sidebar chip must not capture the focus.
-  assert.equal(pickSpatialCandidate(page, at('p10'), 'ArrowLeft'), null);
+  // Right edge stops; the left edge deliberately enters the sidebar (below).
   assert.equal(pickSpatialCandidate(page, at('p04'), 'ArrowRight'), null);
+});
+
+test('left edge of a grid deliberately enters the sidebar, nearest menu item first', () => {
+  const at = name => page.find(control => control.element === name);
+  // 0.12.70 made the menu unreachable from content: left/right stayed inside
+  // the boundary and vertical keys excluded nav. The first column falls back
+  // to the nav rail; mid-grid lefts never do.
+  assert.equal(pickSpatialCandidate(page, at('p00'), 'ArrowLeft')?.element, '追剧');
+  assert.equal(pickSpatialCandidate(page, at('p10'), 'ArrowLeft')?.element, '关于');
+  assert.equal(pickSpatialCandidate(page, at('真人剧'), 'ArrowLeft')?.element, '黄果');
 });
 
 test('vertical moves stay spatial and cross containers as before', () => {
@@ -42,7 +51,8 @@ test('category chips move inside their own strip and stop at both ends', () => {
   const at = name => page.find(control => control.element === name);
   assert.equal(pickSpatialCandidate(page, at('真人剧'), 'ArrowRight')?.element, '漫剧');
   assert.equal(pickSpatialCandidate(page, at('漫剧'), 'ArrowLeft')?.element, '真人剧');
-  assert.equal(pickSpatialCandidate(page, at('真人剧'), 'ArrowLeft'), null);
+  // Left edge of the strip enters the sidebar (deliberate menu access).
+  assert.equal(pickSpatialCandidate(page, at('真人剧'), 'ArrowLeft')?.element, '黄果');
   assert.equal(pickSpatialCandidate(page, at('AI剧'), 'ArrowRight'), null);
 });
 
