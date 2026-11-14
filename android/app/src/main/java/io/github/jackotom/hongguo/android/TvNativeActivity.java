@@ -552,6 +552,8 @@ public class TvNativeActivity extends Activity {
                 try { boolean next = !PlayerOptions.read(this).getBoolean("danmaku"); saveOption("danmaku", next, danmaku, next ? "开启" : "关闭"); }
                 catch (Exception error) { state(TvUi.message(error), false, null); }
             });
+            Button decoder = settingRow("解码方式", decoderLabel(options.optString("decoder", "auto")));
+            decoder.setOnClickListener(view -> chooseDecoder(decoder));
             section("存储");
             cacheStatus = note("正在读取播放缓存…");
             Button clear = settingRow("播放缓存", "清除");
@@ -596,8 +598,18 @@ public class TvNativeActivity extends Activity {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.bottomMargin = dp(4);
         pagePanel.addView(row, params); return button;
     }
-    private void chooseQuality(Button button) {
+    private String decoderLabel(String value) {
+        return "hw".equals(value) ? "硬解优先" : "sw".equals(value) ? "软解优先" : "自动";
+    }
+    private void chooseDecoder(Button button) {
         try {
+            String[] values = { "auto", "hw", "sw" }, labels = { "自动（硬解失败时软解）", "硬解优先", "软解优先" };
+            String current = PlayerOptions.read(this).optString("decoder", "auto"); int selected = 0;
+            for (int i = 0; i < values.length; i++) if (values[i].equals(current)) selected = i;
+            new AlertDialog.Builder(this).setTitle("解码方式").setSingleChoiceItems(labels, selected, (dialog, which) -> { dialog.dismiss(); saveOption("decoder", values[which], button, labels[which]); }).setNegativeButton("取消", null).show();
+        } catch (Exception error) { state(TvUi.message(error), false, null); }
+    }
+    private void chooseQuality(Button button) {        try {
             String[] values = { "auto", "720p", "1080p" }, labels = { "自动", "720p 及以上", "1080p 及以上" };
             String current = PlayerOptions.read(this).getString("quality"); int selected = 0;
             for (int i = 0; i < values.length; i++) if (values[i].equals(current)) selected = i;

@@ -20,6 +20,12 @@ final class PlayerOptions {
         Context app = context.getApplicationContext();
         return (app == null ? context : app).getSharedPreferences(FILE, Context.MODE_PRIVATE);
     }
+    /** auto: hardware first, fall back to the built-in software decoder on device decode errors;
+     *  hw: never engage the software decoder; sw: software decode online sources directly. */
+    static String decoder(String input) {
+        if ("hw".equals(input) || "sw".equals(input)) return input;
+        return "auto";
+    }
     static String quality(String input) {
         if (!"auto".equals(input) && !"720p".equals(input) && !"1080p".equals(input)) throw new IllegalArgumentException("清晰度仅支持自动、720p 或 1080p");
         return input;
@@ -69,21 +75,27 @@ final class PlayerOptions {
     }
     static synchronized JSONObject read(Context context) throws JSONException {
         SharedPreferences prefs = preferences(context);
-        String selected = "auto"; float rate = 1f; boolean danmaku = false;
+        String selected = "auto"; float rate = 1f; boolean danmaku = false; String decoder = "auto";
         try { selected = quality(prefs.getString("quality", "auto")); } catch (RuntimeException ignored) { }
         try { rate = speed(Double.parseDouble(prefs.getString("speed", "1.0"))); } catch (RuntimeException ignored) { }
         try { danmaku = "true".equals(prefs.getString("danmaku", "false")); } catch (RuntimeException ignored) { }
-        return new JSONObject().put("quality", selected).put("speed", (double) rate).put("danmaku", danmaku);
+        try { decoder = decoder(prefs.getString("decoder", "auto")); } catch (RuntimeException ignored) { }
+        return new JSONObject().put("quality", selected).put("speed", (double) rate).put("danmaku", danmaku).put("decoder", decoder);
     }
     /** Validate the whole update before committing either field. A failed commit is not success. */
     static synchronized JSONObject update(Context context, JSONObject changes) throws Exception {
         if (changes == null) throw new IllegalArgumentException("播放设置无效");
         JSONObject prior = read(context);
-        String selected = prior.getString("quality"); float rate = (float) prior.getDouble("speed"); boolean danmaku = prior.getBoolean("danmaku");
+        String selected = prior.getString("quality"); float rate = (float) prior.getDouble("speed"); boolean danmaku = prior.getBoolean("danmaku"); String decoder = prior.getString("decoder");
         if (changes.has("quality")) {
             Object value = changes.get("quality");
             if (!(value instanceof String)) throw new IllegalArgumentException("清晰度设置无效");
             selected = quality((String) value);
+        }
+        if (changes.has("decoder")) {
+            Object value = changes.get("decoder");
+            if (!(value instanceof String)) throw new IllegalArgumentException("解码方式设置无效");
+            decoder = decoder((String) value);
         }
         if (changes.has("speed")) {
             Object value = changes.get("speed");
@@ -96,13 +108,13 @@ final class PlayerOptions {
         }
         SharedPreferences prefs = preferences(context);
         boolean committed = false;
-        try { committed = prefs.edit().putString("quality", selected).putString("speed", Float.toString(rate)).putString("danmaku", Boolean.toString(danmaku)).commit(); }
+        try { committed = prefs.edit().putString("quality", selected).putString("speed", Float.toString(rate)).putString("danmaku", Boolean.toString(danmaku)).putString("decoder", decoder).commit(); }
         finally {
             // Android updates memory before reporting a disk-write failure. Restore that memory
             // too, so another Activity never observes a change which this call rejected.
-            if (!committed) try { prefs.edit().putString("quality", prior.getString("quality")).putString("speed", Float.toString((float) prior.getDouble("speed"))).putString("danmaku", prior.getBoolean("danmaku") ? "true" : "false").commit(); } catch (RuntimeException ignored) { }
+            if (!committed) try { prefs.edit().putString("quality", prior.getString("quality")).putString("speed", Float.toString((float) prior.getDouble("speed"))).putString("danmaku", prior.getBoolean("danmaku") ? "true" : "false").putString("decoder", prior.getString("decoder")).commit(); } catch (RuntimeException ignored) { }
         }
         if (!committed) throw new IllegalStateException("播放设置保存未成功");
-        return new JSONObject().put("quality", selected).put("speed", (double) rate).put("danmaku", danmaku);
+        return new JSONObject().put("quality", selected).put("speed", (double) rate).put("danmaku", danmaku).put("decoder", decoder);
     }
 }

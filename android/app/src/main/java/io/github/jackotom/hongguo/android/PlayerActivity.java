@@ -380,10 +380,10 @@ public final class PlayerActivity extends Activity {
         if (castButton != null) { castButton.setText("投屏"); castButton.setContentDescription("选择 DLNA 电视投屏"); }
         previous.setEnabled(current > 0); next.setEnabled(current + 1 < queue.size());
         toggle.setEnabled(prepared); toggle.setText(prepared && video.isPlaying() ? "暂停" : completed ? "重播" : "播放");
-        qualityButton.setEnabled(prepared && !offline);
-        qualityButton.setText(offline ? "本地 · 清晰度不可切" : "清晰度 " + qualityLabel(quality) + (quality.equals(actualQuality) ? "" : " · 当前 " + qualityLabel(actualQuality)) + (qualitySwitch == null ? "" : " · 准备中"));
+        qualityButton.setEnabled(prepared && !offline && !softActive);
+        qualityButton.setText(offline ? "本地 · 清晰度不可切" : softActive ? "软解播放 · 清晰度不可切" : "清晰度 " + qualityLabel(quality) + (quality.equals(actualQuality) ? "" : " · 当前 " + qualityLabel(actualQuality)) + (qualitySwitch == null ? "" : " · 准备中"));
         qualityButton.setContentDescription(qualityButton.getText());
-        speedButton.setEnabled(prepared);
+        speedButton.setEnabled(prepared && !softActive);
         speedButton.setText(Float.isNaN(actualSpeed) ? prepared ? "倍速 设备未确认" : "倍速 待确认" : "倍速 " + rateLabel(actualSpeed));
         speedButton.setContentDescription(speedButton.getText());
         autoplayButton.setText(autoplay ? "连播 开" : "连播 关"); autoplayButton.setContentDescription(autoplay ? "自动连播已开启" : "自动连播已关闭");
@@ -693,6 +693,9 @@ public final class PlayerActivity extends Activity {
                     currentKind = media.kind; currentManual = media.manual; currentCache = media.cached; currentWeb = media.remote != null;
                     sourceShortEdge = media.plan != null && media.plan.width > 0 && media.plan.height > 0 ? Math.min(media.plan.width, media.plan.height) : 0; renderStatus();
                     VideoView targetView = video;
+                    // Software-decoder preference: skip the hardware player entirely (auto/hw keep
+                    // the hardware player and fall back to software decoding on device errors).
+                    if ("sw".equals(decoderMode()) && launchSoftDecoder(token, media)) return;
                     bindPlayback(targetView, token, target, media.remote, playedQuality);
                     targetView.setOnPreparedListener(player -> {
                         if (destroyed || token != generation || video != targetView) return;
@@ -747,7 +750,7 @@ public final class PlayerActivity extends Activity {
         view.setOnErrorListener((player, what, extra) -> {
             if (token == generation && !destroyed && video == view) {
                 String reason = "当前片源或设备解码暂不可用（" + what + "/" + extra + "）";
-                if ((what == -38 || what == MediaPlayer.MEDIA_ERROR_UNSUPPORTED || extra == MediaPlayer.MEDIA_ERROR_UNSUPPORTED) && launchSoftDecoder(token)) return true;
+                if ((what == -38 || what == MediaPlayer.MEDIA_ERROR_UNSUPPORTED || extra == MediaPlayer.MEDIA_ERROR_UNSUPPORTED) && !"hw".equals(decoderMode()) && launchSoftDecoder(token, adoptedMedia)) return true;
                 failCurrentMedia(token, reason, what == MediaPlayer.MEDIA_ERROR_UNSUPPORTED || extra == MediaPlayer.MEDIA_ERROR_UNSUPPORTED);
             }
             return true;
@@ -976,25 +979,29 @@ public final class PlayerActivity extends Activity {
         prepared = false; video.stopPlayback(); status.setText(message == null ? "本集片源暂不可用" : message); updateButtons(); showControls();
         showPlayerDialog(new AlertDialog.Builder(this).setTitle("第 " + episode.optInt("index") + " 集暂未播放")
             .setMessage(status.getText()).setPositiveButton("重试", (dialog, which) -> loadAt(current, null, resumeAt))
-            .setNeutralButton("内置软解", (dialog, which) -> launchSoftDecoder(token)).setNegativeButton("返回", (dialog, which) -> exitPlayer())
+            .setNeutralButton("内置软解", (dialog, which) -> launchSoftDecoder(token, adoptedMedia)).setNegativeButton("返回", (dialog, which) -> exitPlayer())
             .setOnCancelListener(dialog -> exitPlayer()).create());
     }
     /** Falls back to the built-in software decoder (tvNative ships libVLC) when the device cannot
      *  decode the source itself, e.g. H.265 on phones and TVs without hardware HEVC. Returns false
      *  when the layer is unavailable so the regular error flow continues. */
-    private boolean launchSoftDecoder(int token) {
+    private boolean launchSoftDecoder(int token, PreparedMedia media) {
         if (softActive || destroyed || token != generation || isFinishing()) return false;
-        if (!SoftDecoder.available() || adoptedMedia == null || adoptedMedia.uri == null) return false;
-        PlaybackSources.Plan plan = adoptedMedia.plan;
+        if (!SoftDecoder.available() || media == null || media.uri == null) return false;
+        PlaybackSources.Plan plan = media.plan;
         String userAgent = plan == null ? NetworkGuard.UA : plan.userAgent, referer = plan == null ? NetworkGuard.REFERER : plan.referer;
         String caption = series.optString("title", "红果短剧") + " · 第 " + episode.optInt("index") + " 集";
-        Object layer = SoftDecoder.start(softHost, this, adoptedMedia.uri, userAgent, referer, Math.max(0, lastGoodPosition), caption);
+        Object layer = SoftDecoder.start(softHost, this, media.uri, userAgent, referer, Math.max(0, lastGoodPosition), caption);
         if (layer == null) return false;
-        softLayer = layer; softActive = true; softToken = token;
+        softLayer = layer; softActive = true; softToken = token; adoptedMedia = media;
         try { video.stopPlayback(); } catch (RuntimeException ignored) { }
         releaseCurrent(); mediaPlayer = null; decoderPreparing = false; cancelPlaybackWatchdogs();
         currentKind = "内置软解播放中"; renderStatus(); showControls(); updateButtons();
         return true;
+    }
+    private String decoderMode() {
+        try { return PlayerOptions.decoder(PlayerOptions.read(this).optString("decoder", "auto")); }
+        catch (Exception error) { return "auto"; }
     }
     private final SoftDecoder.Host softHost = new SoftDecoder.Host() {
         @Override public JSONObject series() { return PlayerActivity.this.series; }
