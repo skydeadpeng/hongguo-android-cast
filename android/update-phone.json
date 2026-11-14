@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 92,
-  "versionName": "0.12.69",
+  "versionCode": 93,
+  "versionName": "0.12.70",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.69/Hongguo-0.12.69-phone-release-compatible.apk",
-  "size": 693004,
-  "sha256": "3f7d35daa22409a5524b5a764a2354fe5d83cab5807d5f30ca4fd2eb6a64188c",
-  "notes": "红果 Android 0.12.69（手机与 TV WebView）\n\n- 在线播放器沿用原生电视版 0.1.21 的取源修复：官网缺公开播放信息且分集身份与归属匹配时，使用现有 App 片源；原有登录、身份及明确拒绝检查保持不变。\n- 初次播放、切集、预缓存及 CDN 地址重取都使用同一个 Java App 片源解析器，不依赖 WebView 的 JavaScript 回调。Android 11 签名兼容、GET 请求与 AAC 修复随包带入。\n- 手动下载、投屏、黄果和应用包名不变。原生电视版仍为 0.1.21。\n\n手机版与 TV WebView 版可在「关于 → 版本更新」覆盖升级。两包已在独立模拟器安装、冷启动；本版本尚未在实体手机或电视上试播。\n",
-  "publishedAt": "2026-11-13T21:53:59.330Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.70/Hongguo-0.12.70-phone-release-compatible.apk",
+  "size": 696316,
+  "sha256": "288f6a61447ca06ffaea092213804456b6a70885400db262870adf7ff76c820d",
+  "notes": "红果 Android 0.12.70（手机与 TV WebView）\n\n- TV 遥控器上下键改为按屏幕视觉行序移动焦点：最近的下一行/上一行优先，行内取最近的列，稀疏行、区块之间按钮（如“换一批”）不再被同列的远处控件跳过；按下去与按回来落在同一控件。\n- 焦点在内容区时上下键不再被左侧导航栏抢走；侧边栏内部上下仍在列表内移动，左右键进出内容区的规则保持不变（网格到边停住、首按落海报区）。\n- 手机版共用同一界面包，触屏行为不变；手动下载、投屏、黄果与应用包名不变。原生电视版仍为 0.1.23。\n\n手机版与 TV WebView 版可在「关于 → 版本更新」覆盖升级（自动检查有 24 小时冷却，手动检查立即生效）。TV 包已在 TV 模拟器安装并通过遥控器方向键走查（首页、详情、关于页）；手机包构建与检查通过，本版本未做实体设备试播。\n",
+  "publishedAt": "2026-11-14T14:35:47.000Z"
 }
