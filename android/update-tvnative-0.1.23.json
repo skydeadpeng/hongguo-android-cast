@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 24,
+  "versionName": "0.1.23",
+  "minSdk": 23,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.23/HongguoNative-0.1.23-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 46578374,
+  "sha256": "b425f633221321688ca04ac1f90aa8ed8ad9995d95891f71a53fe5e346d3af4b",
+  "abis": {
+    "arm64-v8a": {
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.23/HongguoNative-0.1.23-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 46578374,
+      "sha256": "b425f633221321688ca04ac1f90aa8ed8ad9995d95891f71a53fe5e346d3af4b"
+    },
+    "armeabi-v7a": {
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.23/HongguoNative-0.1.23-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 42850776,
+      "sha256": "fb81e51069ac555d9339cb4f4000461330a819c700e196e806694c7dfd4cd760"
+    }
+  },
+  "notes": "红果原生电视版 0.1.23\n\n- 设置 → 播放新增「解码方式」：自动（默认，硬解失败时软解）/ 硬解优先 / 软解优先。软解优先可直接播放 H.265/ByteVC2 片源，不再依赖设备硬件解码器；软解激活期间清晰度与倍速按钮暂不可调。\n- 其余与 0.1.22 相同：Android 6.0 支持、内置软解自动连播、按设备架构分发 arm64 / 32 位安装包、修复高密度屏图标导致的系统界面崩溃循环。\n- 在 Android 6.0 模拟器（API 23）验证三种解码方式的实际行为：自动档硬解失败后自动软解、软解优先生跳过系统解码器、硬解优先不触发软解。仅更新原生电视版，打开「设置 → 应用更新 → 检查新版本」即可覆盖升级。\n",
+  "publishedAt": "2026-11-14T06:10:13.000Z"
+}

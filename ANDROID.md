@@ -8,13 +8,18 @@
 | --- | --- | --- | --- |
 | 手机 | 0.12.69 / code92 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
 | TV WebView | 0.12.69 / code92 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.22 / code23 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 原生 TV 独立版 | 0.1.23 / code24 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.69](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.69) · [原生 TV 0.1.22](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.22)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.69](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.69) · [原生 TV 0.1.23](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.23)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+
+## 0.1.23 解码方式设置（原生 TV 独立版）
+
+- 设置 → 播放新增「解码方式」：自动（默认，硬解失败时自动软解）/ 硬解优先（永不软解）/ 软解优先（在线播放直接软解，跳过系统解码器）。存于 PlayerOptions（`decoder`），覆盖默认。软解激活期间清晰度与倍速按钮禁用（软解内核暂不支持），上一集 / 下一集 / 选集 / 连播正常。
+- Android 6.0 模拟器实测三档行为：自动档硬解失败（-38）后自动进入软解；软解优先模式 NuPlayer 零启动、libVLC 直接工作；硬解优先模式软解零触发。
 
 ## 0.1.22 Android 6.0 支持与内置软解（原生 TV 独立版）
 
