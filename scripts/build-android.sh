@@ -117,7 +117,9 @@ else
   SUFFIX="$DEVICE-release"
   [[ "$MODE" != *-release-compatible ]] || SUFFIX="$DEVICE-release-compatible"
   OUTPUT="dist/android/Hongguo-$VERSION-$SUFFIX.apk"
-  cp "android/app/build/outputs/apk/$DEVICE/release/app-$DEVICE-release.apk" "$OUTPUT"
+  # ABI splits (added for tvNative 0.1.22) apply to every flavor; the phone/TV
+  # WebView channels ship one universal APK, same as before the splits existed.
+  cp "android/app/build/outputs/apk/$DEVICE/release/app-$DEVICE-universal-release.apk" "$OUTPUT"
   CHECK_ARGS=(--apk "$OUTPUT" --device "$DEVICE")
   if [[ "$MODE" == *-release-compatible && -n "${HONGGUO_COMPAT_REFERENCE_APK:-}" ]]; then
     CHECK_ARGS+=(--compatible-with "$HONGGUO_COMPAT_REFERENCE_APK")

@@ -22,16 +22,21 @@ android {
     compileSdk 35
     defaultConfig {
         applicationId 'io.github.jackotom.hongguo.android'
+        // tvNative's Android 6.0 envelope; phone/tv override to their shipped API26.
+        // AGP reads this value at configuration time for the desugaring check, so
+        // it must stay a plain number here rather than moving fully to flavors.
         minSdk 23
         targetSdk 35
-        versionCode 92
-        versionName '0.12.69'
+        versionCode 93
+        versionName '0.12.70'
         testInstrumentationRunner 'io.github.jackotom.hongguo.android.ProductionPlaybackInstrumentation'
     }
     flavorDimensions 'device'
     productFlavors {
-        phone { dimension 'device'; buildConfigField 'boolean', 'IS_TV', 'false'; buildConfigField 'boolean', 'NATIVE_UI', 'false' }
-        tv { dimension 'device'; applicationIdSuffix '.tv'; buildConfigField 'boolean', 'IS_TV', 'true'; buildConfigField 'boolean', 'NATIVE_UI', 'false' }
+        // WebView lines keep their shipped API26 envelope; minSdk 23 belongs to
+        // the tvNative Android 6.0 compat line only.
+        phone { dimension 'device'; minSdk 26; buildConfigField 'boolean', 'IS_TV', 'false'; buildConfigField 'boolean', 'NATIVE_UI', 'false' }
+        tv { dimension 'device'; minSdk 26; applicationIdSuffix '.tv'; buildConfigField 'boolean', 'IS_TV', 'true'; buildConfigField 'boolean', 'NATIVE_UI', 'false' }
         // Independent WebView-free TV line: own applicationId and version series.
         tvNative {
             dimension 'device'

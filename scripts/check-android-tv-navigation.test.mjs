@@ -78,3 +78,38 @@ test('non-direction keys and unknown focus are inert', () => {
   assert.equal(pickSpatialCandidate(page, poster(0, 0), 'Enter'), null);
   assert.equal(pickSpatialCandidate(page, { element: 'x', rect: rect(0, 0, 1, 1) }, 'ArrowRight'), null);
 });
+
+// A sparse middle row (partial row or a between-sections action) must never be
+// skipped: vertical moves follow the visual row order, nearest row first, then
+// nearest column inside that row.
+const sparse = [
+  nav('发现', 40), nav('黄果', 116), nav('搜索', 192), nav('追剧', 268), nav('下载', 344), nav('关于', 420),
+  { element: 'search', kind: 'input', rect: rect(250, 24, 520, 56) },
+  chip('真人剧', 0), chip('漫剧', 1), chip('AI剧', 2),
+  poster(0, 0), poster(0, 1), poster(0, 2), poster(0, 3), poster(0, 4),
+  poster(1, 0), poster(1, 1), // partial middle row: only columns 0-1 exist
+  { element: 'homeNext', kind: 'button', rect: rect(250, 770, 160, 54) },
+  poster(2, 0), poster(2, 1), poster(2, 2), poster(2, 3), poster(2, 4),
+];
+
+test('vertical down lands in the nearest visual row, never skips a sparse row', () => {
+  const at = name => sparse.find(control => control.element === name);
+  // Row 1 only has columns 0-1: down from p02 must land in row 1 (p11),
+  // not jump to the same column two rows down (p22).
+  assert.equal(pickSpatialCandidate(sparse, at('p02'), 'ArrowDown')?.element, 'p11');
+  // Row 1 still wins from a column that row 1 covers directly.
+  assert.equal(pickSpatialCandidate(sparse, at('p00'), 'ArrowDown')?.element, 'p10');
+});
+
+test('vertical down reaches the between-sections action before the next section', () => {
+  const at = name => sparse.find(control => control.element === name);
+  // 换一批 sits between row 1 and row 2: down from p11 must take it first.
+  assert.equal(pickSpatialCandidate(sparse, at('p11'), 'ArrowDown')?.element, 'homeNext');
+});
+
+test('vertical up retraces through the between-sections action in reverse', () => {
+  const at = name => sparse.find(control => control.element === name);
+  // Back up from row 2: 换一批 first, then out of row 1 to row 0.
+  assert.equal(pickSpatialCandidate(sparse, at('p21'), 'ArrowUp')?.element, 'homeNext');
+  assert.equal(pickSpatialCandidate(sparse, at('p11'), 'ArrowUp')?.element, 'p01');
+});
