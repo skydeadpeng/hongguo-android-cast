@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 23,
+  "versionName": "0.1.22",
+  "minSdk": 23,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.22/HongguoNative-0.1.22-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 46578379,
+  "sha256": "1e3958af0942fbd1e81e981a29ecc34eae1d7f9df7b96ce8a81e0208f1ca6675",
+  "abis": {
+    "arm64-v8a": {
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.22/HongguoNative-0.1.22-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 46578379,
+      "sha256": "1e3958af0942fbd1e81e981a29ecc34eae1d7f9df7b96ce8a81e0208f1ca6675"
+    },
+    "armeabi-v7a": {
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.22/HongguoNative-0.1.22-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 42850776,
+      "sha256": "c9051098030b2f31f2e3fb4faff5dae7b1046b15f59b5044abee0f341d7006f3"
+    }
+  },
+  "notes": "红果原生电视版 0.1.22\n\n- 支持 Android 6.0 及更早系统：最低系统要求由 Android 8.0 降到 Android 6.0（API 23），同版三端（原生 TV / 手机网页版 / TV 网页版）源码共用本轮兼容改造。\n- 新增内置软解（libVLC）：设备缺少硬件解码器时自动切换软解播放 H.265/ByteVC2 片源，播完自动连播下一集，播放进度照常记录。按设备架构分发 arm64 / 32 位安装包。\n- 修复高密度屏上系统界面读取应用图标导致的内存溢出崩溃循环。\n- 已知边界：1080P H.265 在低性能 CPU 上软解起播较慢，播放器会在起播超时后自动降档重试；网页版界面（手机 / TV WebView）在 Android 6.0 上仍要求系统 WebView 支持 Chromium 67+。\n- 本版本在 Android 6.0 模拟器（API 23）完成真实取源、下载、软解播放与连播验收；实机表现以真机为准。仅更新原生电视版，打开「设置 → 应用更新 → 检查新版本」即可覆盖升级；Android 6.0 设备请直接安装下载的 APK。\n",
+  "publishedAt": "2026-11-14T05:44:18.000Z"
+}

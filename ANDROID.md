@@ -8,13 +8,21 @@
 | --- | --- | --- | --- |
 | 手机 | 0.12.69 / code92 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
 | TV WebView | 0.12.69 / code92 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.21 / code22 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 原生 TV 独立版 | 0.1.22 / code23 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
-三个包均支持 Android 8.0（API26）及以上，可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。
+手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.69](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.69) · [原生 TV 0.1.21](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.21)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.69](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.69) · [原生 TV 0.1.22](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.22)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+
+## 0.1.22 Android 6.0 支持与内置软解（原生 TV 独立版）
+
+- 最低系统要求由 Android 8.0（API26）降到 Android 6.0（API23）：`minSdk 23` + core library desugaring（`desugar_jdk_libs 2.1.5`）；`String.join`（API26）等 desugar 不可回移植的调用以 `LegacyText` / `LegacyFiles` 垫片替换。phone / TV WebView 版源码同轮兼容改造，其公开版本仍为 0.12.69。
+- 新增内置软解：tvNative flavor 内置 libVLC 3.6.2（`VlcSoftLayer`，全屏浮层 + 简洁控制条），系统解码器缺失（H.265/ByteVC2 无硬件 HEVC）或播放报设备解码错误（如 -38）时自动切换软解，播完按连播逻辑接下一集，进度照常写入观看历史；起播超过 30 秒自动报失败走降档。仅 tvNative flavor 打包，经 `SoftDecoder` 反射桥接，phone / TV 不携带该依赖。
+- 按 ABI 分发：splits 生成 arm64-v8a / armeabi-v7a 两个安装包（约 47MB / 43MB，libVLC 原生库为主），应用内更新清单新增 `abis` 字段，AppUpdater 按设备 `SUPPORTED_ABIS` 顺序选择，无匹配架构时报「缺少本机架构安装包」；旧清单（仅 apkUrl）兼容不变。
+- 修复应用图标密度缩放导致的 SystemUI 内存溢出崩溃循环：1024×1024 图标自 `res/drawable/`（按 mdpi 基准被高密度屏放大至 31.7MB 位图）移入 `res/drawable-nodpi/`。
+- Android 6.0 模拟器（API23，hongguo_api23）验收：真实取源、播放缓存、下载（DownloadManager）、离线播放、软解自动切换与播放（360P/720P）、看门狗降档、进度写入观看历史；零崩溃。已知边界：模拟器横屏下软解画面 letterbox 偏移待真机确认；1080P H.265 软解起播慢（看门狗自动降档）；手机 / TV WebView 版在 Android 6.0 上要求系统 WebView 支持 Chromium 67+（BigInt），系统 WebView 不可升级的设备无法使用网页界面。
 
 ## 0.12.69 分集取源和 Android 11 兼容修复（手机 / TV WebView）
 

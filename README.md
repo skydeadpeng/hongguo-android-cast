@@ -35,7 +35,7 @@
 |---|---|---|---|
 | Android 手机 / 平板 | 0.12.69 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.69/Hongguo-0.12.69-phone-release-compatible.apk) | 触屏操作、本机播放、DLNA 投屏、扫码登录云同步 |
 | Android TV / 盒子（WebView） | 0.12.69 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.69/Hongguo-0.12.69-tv-release-compatible.apk) | 遥控器友好的 WebView 界面，原生解码播放 |
-| Android 原生 TV | 0.1.21 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.21/HongguoNative-0.1.21-tvNative-release-compatible.apk) | 不依赖系统 WebView 的全原生电视界面 |
+| Android 原生 TV | 0.1.22 | [下载 APK（arm64）](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.22/HongguoNative-0.1.22-tvNative-release-compatible-arm64-v8a.apk) · [32 位](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.22/HongguoNative-0.1.22-tvNative-release-compatible-armeabi-v7a.apk) | 不依赖系统 WebView 的全原生电视界面，支持 Android 6.0+，内置软解 |
 
 [查看全部版本](https://github.com/skydeadpeng/hongguo-android-cast/releases) · [版本记录与验证情况](ANDROID.md)
 
