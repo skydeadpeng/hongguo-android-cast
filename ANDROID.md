@@ -6,15 +6,21 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.71 / code94 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.71 / code94 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.23 / code24 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.72 / code95 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.72 / code95 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.24 / code25 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.71](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.71) · [原生 TV 0.1.23](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.23)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.72](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.72) · [原生 TV 0.1.24](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.24)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+
+## 0.12.72 / 0.1.24 播放 v5 签名修复（手机 / TV WebView / 原生 TV）
+
+- 修复 2026-11-16 起番茄（红果官方）在线播放与下载取源全部失效的问题：服务端当日升级了模型接口的签名校验，旧 551 签名 POST 与 video_tab GET 一律返回空 HTTP 200。本版按 N3urda/hongguoTV 0.16.5（GPL-3.0-only）的 SIGNING_V5 规格移植 Android 04.10.03 v5 三头签名（x-khronos/x-helios/x-medusa），请求改为 sinfonlinea `/novel/player/multi_video_model/player/v1`（gzip JSON、_rticket 搜索绑定 branch 12），旧签名梯子保留为有界回退；目录与搜索签名不变。
+- JS 与 Java 双实现全部通过官方测试向量（F13 32 时间戳旋转类、carrier 4 变体、32 轮签名旋转，共 362 项检查）；黄果线不受影响。
+- 验证：TV 模拟器 TV WebView 与 tvNative 分别真实播放通过；0.12.71 → 0.12.72 应用内在线升级全链路（检测、加速线路下载、校验、未知来源权限、系统安装、升级后播放）在 TV 模拟器通过。手机包构建与检查通过，未做实体设备试播；真机兼容性待用户回测。
 
 ## 0.12.71 网格左缘回到导航菜单（手机 / TV WebView）
 
