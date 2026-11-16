@@ -186,7 +186,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         query.put("cdid", PlaybackSignerV5.newCdid());
         query.put("device_id", did);
         JSONObject payload = new JSONObject()
-            .put("biz_param", new JSONObject().put("detail_page_version", 0).put("device_level", 3).put("disable_digg_stat", false)
+            .put("biz_param", new JSONObject().put("detail_page_version", 0).put("device_level", 1).put("disable_digg_stat", false)
                 .put("disable_video_relate_book", false).put("need_all_video_definition", true).put("need_mp4_align", false)
                 .put("use_os_player", false).put("use_server_dns", false).put("video_platform", 1024))
             .put("mixed_video_id_map", new JSONObject().put("1004", new JSONArray().put(vid)))

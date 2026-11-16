@@ -471,7 +471,9 @@ async function fetchAppPlayUrl(vid, options = {}) {
         // The v5 form signs the exact gzip bytes, so the attempt needs zlib; the WebView
         // bundle has none and always supplies a native registered provider instead.
         const playerV1Payload = JSON.stringify({
-            biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
+            // device_level=1 negotiates bytevc1 (playable) renditions; level 3 earns
+            // bytevc2-only models that every consumer excludes (hongguoTV 0.16.6, issue 61).
+            biz_param: { detail_page_version: 0, device_level: 1, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
             mixed_video_id_map: { '1004': [vid] },
             dr_scene: 'player',
         });

@@ -326,7 +326,7 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, openExterna
           // 服务端只应答 v5 三头签名，551 POST/video_tab 全空 200），且不带任何 Cookie。
           setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
           try {            const payload = JSON.stringify({
-              biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
+              biz_param: { detail_page_version: 0, device_level: 1, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
               mixed_video_id_map: { '1004': [vid] },
               dr_scene: 'player',
             });
