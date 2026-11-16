@@ -40,40 +40,41 @@ public final class RegisteredPlaybackModelTest {
   @Override public Map<String,List<String>> getHeaderFields(){return Collections.singletonMap("Content-Type",Collections.singletonList("application/json"));}
  }
  public static void main(String[]args)throws Exception{
-  group("registered identity precedes current per-episode signed video_tab request",()->{
+  group("registered identity precedes current v5 player/v1 signed request",()->{
    List<OfficialApiClient.Request> requests=new ArrayList<>();AtomicInteger bootstrap=new AtomicInteger();long[] deadline={0};
    RegisteredPlaybackModel op=operation(r->{requests.add(r);bootstrap.incrementAndGet();deadline[0]=r.deadlineNanos;check(new URI(r.url).getHost().equals("log.snssdk.com"),"only anonymous official register first");check(!r.headers.containsKey("Cookie")&&!r.headers.containsKey("X-Tt-Token"),"registration has no account credentials");check(OfficialApiClient.parse(PassportDevice.decrypt(r.body)).has("header"),"real encrypted registration payload");return registration();},r->{
-    requests.add(r);check(bootstrap.get()==1,"register exactly once before model");check(new URI(r.url).getHost().equals("api5-normal-sinfonlineb.fqnovel.com")&&new URI(r.url).getPath().equals("/reading/bookapi/video_tab/multi_video_model/v1/")&&r.method.equals("GET")&&r.body.length==0,"current per-episode tab target first");check(r.deadlineNanos==deadline[0],"registration and model share absolute deadline");
-    Map<String,String> q=query(r.url);check(DID.equals(q.get("device_id"))&&IID.equals(q.get("iid")),"only registered response identity signs model");check(!q.containsKey("cdid")&&!q.containsKey("openudid"),"probe profile excludes extra passport fields");check(q.get("version_code").equals("73932")&&q.get("aid").equals("8662")&&VID.equals(q.get("video_id"))&&q.containsKey("ts")&&q.containsKey("_rticket"),"tab profile and per-episode query exact");
-    for(String header:new String[]{"X-Khronos","X-Ladon","X-Argus","X-SS-Req-Ticket"})check(r.headers.get(header)!=null&&!r.headers.get(header).isEmpty(),"full signing header "+header);
-    for(String retired:new String[]{"X-Helios","X-Medusa","X-Gorgon"})check(!r.headers.containsKey(retired),"placeholder header retired: "+retired);
-    check(r.headers.get("X-SS-Req-Ticket").equals(Long.toString(Long.parseLong(q.get("ts"))*1000)),"signed ticket derives from signed ts");check(!r.headers.containsKey("Cookie")&&!r.headers.containsKey("X-Tt-Token"),"anonymous model never copies registration/account cookies");return response(200,envelope(model()));});
-   JSONObject result=op.fetch(VID);check(requests.size()==2&&result.length()==2&&result.getString("vid").equals(VID),"one registration plus one tab model only");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"real model projected");check(reject(()->op.fetch(VID)) instanceof IOException,"one lookup instance cannot reuse consumed identity");
+    requests.add(r);check(bootstrap.get()==1,"register exactly once before model");check(new URI(r.url).getHost().equals("api5-normal-sinfonlinea.fqnovel.com")&&new URI(r.url).getPath().equals("/novel/player/multi_video_model/player/v1")&&r.method.equals("POST")&&r.body.length>0,"current v5 player/v1 target first");check(r.deadlineNanos==deadline[0],"registration and model share absolute deadline");
+    Map<String,String> q=query(r.url);check(DID.equals(q.get("device_id"))&&IID.equals(q.get("iid")),"only registered response identity signs model");check(!q.containsKey("openudid"),"probe profile excludes extra passport fields");check(q.get("cdid")!=null&&q.get("cdid").matches("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),"v5 carries a local cdid UUID");check(q.get("version_code").equals("74332")&&q.get("aid").equals("8662")&&q.get("video_id")==null&&!q.containsKey("ts")&&q.containsKey("_rticket"),"v5 profile exact with no ts parameter");
+    for(String header:new String[]{"x-khronos","x-helios","x-medusa","x-ss-stub"})check(r.headers.get(header)!=null&&!r.headers.get(header).isEmpty(),"v5 signing header "+header);
+    for(String retired:new String[]{"X-Ladon","X-Argus","X-SS-Req-Ticket","X-Gorgon"})check(!r.headers.containsKey(retired),"v3-era header retired: "+retired);
+    long khronos=Long.parseLong(r.headers.get("x-khronos")),ticket=Long.parseLong(q.get("_rticket"));check(ticket>=khronos*1000&&ticket<khronos*1000+1024,"v5 ticket search stays within the signed second");check(r.headers.get("x-ss-stub").equalsIgnoreCase(DanmakuSigner.hex(DanmakuSigner.md5(r.body))),"v5 signature hashes actual gzip body");check(PlaybackSignerV5.PLAYER_V1_UA.equals(r.headers.get("User-Agent")),"v5 player UA exact");check(!r.headers.containsKey("Cookie")&&!r.headers.containsKey("X-Tt-Token"),"anonymous model never copies registration/account cookies");return response(200,envelope(model()));});
+   JSONObject result=op.fetch(VID);check(requests.size()==2&&result.length()==2&&result.getString("vid").equals(VID),"one registration plus one v5 model only");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"real model projected");check(reject(()->op.fetch(VID)) instanceof IOException,"one lookup instance cannot reuse consumed identity");
   });
-  group("hollowed tab recovers once through the same identity's legacy signed POST",()->{
+  group("hollowed v5 and tab recover once through the same identity's legacy signed POST",()->{
    AtomicInteger registrations=new AtomicInteger();List<OfficialApiClient.Request> requests=new ArrayList<>();
    RegisteredPlaybackModel op=operation(r->{requests.add(r);registrations.incrementAndGet();return registration();},r->{
     requests.add(r);
+    if(new URI(r.url).getPath().endsWith("/player/v1"))return response(200," ");
     if(r.method.equals("GET"))return response(200," ");
-    check(new URI(r.url).getPath().equals("/novel/player/multi_video_model/v1/"),"legacy POST recovers hollowed tab");
+    check(new URI(r.url).getPath().equals("/novel/player/multi_video_model/v1/"),"legacy POST recovers hollowed v5 and tab");
     try(java.io.ByteArrayInputStream bytes=new java.io.ByteArrayInputStream(r.body);java.util.zip.GZIPInputStream in=new java.util.zip.GZIPInputStream(bytes)){check(new String(in.readAllBytes(),StandardCharsets.UTF_8).equals(new JSONObject().put("biz_param",new JSONObject().put("detail_page_version",0).put("device_level",3).put("disable_digg_stat",false).put("need_all_video_definition",true).put("need_mp4_align",false).put("use_os_player",false).put("use_server_dns",false).put("video_platform",1024)).put("mixed_video_id_map",new JSONObject().put("1004",new org.json.JSONArray().put(VID))).toString()),"successful probe body byte exact after gzip");}
     Map<String,String> q=query(r.url);check(DID.equals(q.get("device_id"))&&IID.equals(q.get("iid")),"recovery POST signs with the same registered identity");check(q.get("version_code").equals("74332")&&q.get("video_id")==null,"legacy POST profile exact");
     for(String header:new String[]{"X-Khronos","X-Ladon","X-Argus","X-SS-Req-Ticket","X-SS-STUB"})check(r.headers.get(header)!=null&&!r.headers.get(header).isEmpty(),"full signing header "+header);
-    for(String retired:new String[]{"X-Helios","X-Medusa","X-Gorgon"})check(!r.headers.containsKey(retired),"placeholder header retired: "+retired);
     check(r.headers.get("X-SS-STUB").equalsIgnoreCase(DanmakuSigner.hex(DanmakuSigner.md5(r.body))),"signature hashes actual model body");check("close".equalsIgnoreCase(r.headers.get("Connection")),"recovery POST closes the connection");check(!r.headers.containsKey("Cookie")&&!r.headers.containsKey("X-Tt-Token"),"anonymous model never copies registration/account cookies");return response(200,envelope(model()));});
-   JSONObject result=op.fetch(VID);check(registrations.get()==1&&requests.size()==3,"register, tab, POST within one identity");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"recovered model projected");
+   JSONObject result=op.fetch(VID);check(registrations.get()==1&&requests.size()==4,"register, v5, tab, legacy POST within one identity");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"recovered model projected");
   });
   group("refused identity is replaced in memory until a model arrives",()->{
    AtomicInteger models=new AtomicInteger(),registrations=new AtomicInteger();
-   JSONObject result=operation(r->{registrations.incrementAndGet();return registration();},r->{int call=models.incrementAndGet();return response(200,call<=2?" ":envelope(model()));}).fetch(VID);
-   check(models.get()==3&&registrations.get()==2,"two forms on the first identity, then one tab on the fresh one");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"rotated identity model projected");
+   JSONObject result=operation(r->{registrations.incrementAndGet();return registration();},r->{int call=models.incrementAndGet();return response(200,call<=3?" ":envelope(model()));}).fetch(VID);
+   check(models.get()==4&&registrations.get()==2,"three forms on the first identity, then v5 on the fresh one");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"rotated identity model projected");
   });
-  group("HTTP refusals recover once across the two forms and then fail typed",()->{
-   check(operation(r->registration(),r->r.method.equals("GET")?response(404,""):response(200,envelope(model()))).fetch(VID).has("video_model"),"tab HTTP refusal recovered by legacy POST");
+  group("HTTP refusals recover once across the forms and then fail typed",()->{
+   AtomicInteger seen=new AtomicInteger();
+   check(operation(r->registration(),r->{int call=seen.incrementAndGet();return call==1?response(404,""):response(200,envelope(model()));}).fetch(VID).has("video_model"),"player/v1 HTTP refusal recovered by the next form");
    AtomicInteger both=new AtomicInteger();
    Exception failure=reject(()->operation(r->registration(),r->{both.incrementAndGet();return response(404,"");}).fetch(VID));
-   check(failure instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)failure).code.equals("HTTP_ERROR"),"dual refusal stays typed");
-   check(both.get()==6,"each form tried once per identity, at most three identities");
+   check(failure instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)failure).code.equals("HTTP_ERROR"),"triple refusal stays typed");
+   check(both.get()==9,"each form tried once per identity, at most three identities");
   });
   group("only media projection reaches RPC and source objects are deeply isolated",()->{
    JSONObject source=model();source.put("device_id",DID).put("token","private-token").put("cookies",new JSONObject().put("sessionid","private-session"));JSONObject row=source.getJSONArray("video_list").getJSONObject(0);row.put("install_id",IID);row.getJSONObject("video_meta").put("session","private-meta");row.getJSONObject("encrypt_info").put("token","private-encryption-token");
@@ -124,7 +125,7 @@ public final class RegisteredPlaybackModelTest {
    List<String> bad=new ArrayList<>(Arrays.asList("{}","[]","{bad}","{\"code\":1,\"data\":{}}","{\"code\":false,\"data\":{}}","{\"code\":0,\"error_code\":1,\"data\":{}}","{\"code\":0,\"data\":{\"error_code\":1}}"));
    for(String key:new String[]{"item_id","episode_id"}){bad.add(new JSONObject().put("code",0).put(key,"123").put("data",new JSONObject().put("video_model",model())).toString());bad.add(envelope(model().put(key,"123")));}
    for(String body:bad)check(reject(()->operation(r->registration(),r->response(200,body)).fetch(VID)) instanceof RegisteredPlaybackModel.ModelError,"invalid response cannot appear successful");
-   for(int status:new int[]{301,302,307,403,500}){AtomicInteger calls=new AtomicInteger();check(reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(status,envelope(model()));}).fetch(VID)) instanceof RegisteredPlaybackModel.ModelError,"non200 refused");check(calls.get()==6,"each form tried once per identity for an HTTP refusal, never more");}
+   for(int status:new int[]{301,302,307,403,500}){AtomicInteger calls=new AtomicInteger();check(reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(status,envelope(model()));}).fetch(VID)) instanceof RegisteredPlaybackModel.ModelError,"non200 refused");check(calls.get()==9,"each form tried once per identity for an HTTP refusal, never more");}
   });
   group("empty and oversized raw or gzip model bodies have precise bounded failures",()->{
    Exception empty=reject(()->operation(r->registration(),r->response(200,"  ")).fetch(VID));check(empty instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)empty).code.equals("APP_EMPTY_RESPONSE"),"empty model typed not success");
@@ -141,23 +142,24 @@ public final class RegisteredPlaybackModelTest {
     RegisteredPlaybackModel op=operation(duringModel?r->registration():blocking,duringModel?blocking:r->{modelCalls.incrementAndGet();return response(200,envelope(model()));});Thread worker=new Thread(()->{try{op.fetch(VID);result.set(new AssertionError("late success"));}catch(Throwable failure){result.set(failure);}});worker.start();check(entered.await(2,TimeUnit.SECONDS),"stage reached");op.close();worker.join(2000);check(!worker.isAlive()&&result.get() instanceof InterruptedIOException&&transportClosed.get(),"cancel promptly closes real operation boundary and rejects late body");check(modelCalls.get()==0&&!op.current(),"canceled registration never reaches model and operation inactive");
    }
   });
-  group("fixed model transport rejects alternate host path scheme auth port method before network",()->{for(String url:new String[]{"http://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/","https://evil.invalid/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com/reading/user/info/v1/","https://a@api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com:443/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/#x"})reject(()->RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(url,"POST",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)));reject(()->RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(RegisteredPlaybackModel.API,"GET",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)));check(RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(RegisteredPlaybackModel.API+"?x=1","POST",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)).getHost().equals("api5-normal-sinfonlineb.fqnovel.com"),"only intended fixed model target accepted");});
+  group("fixed model transport rejects alternate host path scheme auth port method before network",()->{for(String url:new String[]{"http://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/","https://evil.invalid/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com/reading/user/info/v1/","https://a@api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com:443/novel/player/video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/#x","https://api5-normal-sinfonlinea.fqnovel.com/novel/player/multi_video_model/v1/","https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/player/v1"})reject(()->RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(url,"POST",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)));reject(()->RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(RegisteredPlaybackModel.API,"GET",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)));reject(()->RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(PlaybackSignerV5.PLAYER_V1_API+"?x=1","GET",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)));check(RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(RegisteredPlaybackModel.API+"?x=1","POST",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)).getHost().equals("api5-normal-sinfonlineb.fqnovel.com"),"only intended fixed model target accepted");check(RegisteredPlaybackModel.ModelHttpTransport.validate(new OfficialApiClient.Request(PlaybackSignerV5.PLAYER_V1_API+"?x=1","POST",Collections.emptyMap(),new byte[0],Long.MAX_VALUE)).getHost().equals("api5-normal-sinfonlinea.fqnovel.com"),"v5 player target accepted on its own host");});
   group("validated video_tab GET never opens output and signed POST preserves its gzip bytes",()->{
    List<WireConnection> wire=new ArrayList<>();byte[] payload=gzip("fixture-request".getBytes(StandardCharsets.UTF_8));
    byte[] reply="fixture-response".getBytes(StandardCharsets.UTF_8);
-   String getUrl=RegisteredPlaybackModel.VIDEO_TAB_API+"?video_id="+VID+"&x=%2B",postUrl=RegisteredPlaybackModel.API+"?aid=8662&x=%20";
+   String getUrl=RegisteredPlaybackModel.VIDEO_TAB_API+"?video_id="+VID+"&x=%2B",postUrl=RegisteredPlaybackModel.API+"?aid=8662&x=%20",playerUrl=PlaybackSignerV5.PLAYER_V1_API+"?aid=8662&x=%20";
    Map<String,String> tabHeaders=Collections.singletonMap("X-Argus","fixture-tab-signature");
    Map<String,String> postHeaders=new LinkedHashMap<>();postHeaders.put("Content-Encoding","gzip");postHeaders.put("X-SS-STUB","fixture-body-signature");
    try(RegisteredPlaybackModel.ModelHttpTransport transport=new RegisteredPlaybackModel.ModelHttpTransport(uri->{
-    int index=wire.size();check(index<2,"invalid input must never open another connection");
-    check(uri.toString().equals(index==0?getUrl:postUrl),"validated signed URL is forwarded without rewriting query");
+    int index=wire.size();check(index<3,"invalid input must never open another connection");
+    check(uri.toString().equals(index==0?getUrl:index==1?postUrl:playerUrl),"validated signed URL is forwarded without rewriting query");
     WireConnection connection=new WireConnection(uri.toURL(),index==0?"GET":"POST",index==0?404:200,reply);wire.add(connection);return connection;
    })){
     long deadline=System.nanoTime()+5_000_000_000L;
     Exception getBody=reject(()->transport.execute(new OfficialApiClient.Request(getUrl,"GET",tabHeaders,new byte[]{1},deadline)));
     Exception wrongMethod=reject(()->transport.execute(new OfficialApiClient.Request(getUrl,"POST",tabHeaders,new byte[0],deadline)));
     Exception wrongHost=reject(()->transport.execute(new OfficialApiClient.Request(postUrl.replace("api5-normal-sinfonlineb.fqnovel.com","fixture.invalid"),"POST",postHeaders,payload,deadline)));
-    for(Exception invalid:new Exception[]{getBody,wrongMethod,wrongHost})check(invalid instanceof RegisteredPlaybackModel.ModelError&&"INVALID_INPUT".equals(((RegisteredPlaybackModel.ModelError)invalid).code),"wire request validated before connection");
+    Exception wrongPlayerHost=reject(()->transport.execute(new OfficialApiClient.Request(playerUrl.replace("api5-normal-sinfonlinea.fqnovel.com","api5-normal-sinfonlineb.fqnovel.com"),"POST",postHeaders,payload,deadline)));
+    for(Exception invalid:new Exception[]{getBody,wrongMethod,wrongHost,wrongPlayerHost})check(invalid instanceof RegisteredPlaybackModel.ModelError&&"INVALID_INPUT".equals(((RegisteredPlaybackModel.ModelError)invalid).code),"wire request validated before connection");
     check(wire.isEmpty(),"invalid request opens zero connections");
     OfficialApiClient.Response tab=transport.execute(new OfficialApiClient.Request(getUrl,"GET",tabHeaders,new byte[0],deadline));
     WireConnection get=wire.get(0);check(tab.status==404&&tab.body.length==0&&get.reads==0,"GET returns HTTP refusal without reading a response body");
@@ -167,6 +169,8 @@ public final class RegisteredPlaybackModelTest {
     WireConnection send=wire.get(1);check(post.status==200&&Arrays.equals(reply,post.body)&&send.reads==1&&"application/json".equals(post.header("Content-Type")),"POST keeps response body and headers");
     check(send.getDoOutput()&&send.fixedLength==payload.length&&send.outputOpens==1&&send.outputClosed&&Arrays.equals(payload,send.sentBody.toByteArray()),"POST keeps exactly its signed gzip request bytes");
     check(send.sentHeaders.equals(Map.of("Content-Encoding","gzip","X-SS-STUB","fixture-body-signature","Accept-Encoding","gzip"))&&send.disconnected,"POST forwards exact headers and disconnects");
+    OfficialApiClient.Response player=transport.execute(new OfficialApiClient.Request(playerUrl,"POST",postHeaders,payload,deadline));
+    WireConnection v5=wire.get(2);check(player.status==200&&Arrays.equals(reply,player.body)&&v5.outputOpens==1&&v5.outputClosed&&Arrays.equals(payload,v5.sentBody.toByteArray()),"v5 POST keeps exactly its signed gzip request bytes");
    }
   });
   if(args.length==1)java.nio.file.Files.write(java.nio.file.Paths.get(args[0]),projectedFlags.toString().getBytes(StandardCharsets.UTF_8));

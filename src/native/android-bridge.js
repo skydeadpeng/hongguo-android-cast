@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 // 安卓线的登记身份签名/取流链独立于桌面 app-source（签名头集与 branch 策略有协议差异），勿混用。
-const { fetchAppPlayUrl, signedAppRequest, signedModelRequest, setDeviceIdentity } = require('./app-source-registered');
+const { fetchAppPlayUrl, signedAppRequest, signedModelRequest, signedPlayerV1Request, setDeviceIdentity } = require('./app-source-registered');
 const passport = require('./passport-register.cjs');
 const hongguo = require('./hongguo');
 
@@ -177,13 +177,25 @@ class Library {
 
 // ===== 简单键值存储（播放偏好/搜索历史）=====
 class KeyValue {
-  constructor(file) { this.file = file; this.data = {}; try { this.data = JSON.parse(fs.readFileSync(file, 'utf8')) || {}; } catch { } }
-  save() { try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file, JSON.stringify(this.data)); } catch { } }
+  constructor(file) {
+    this.file = file; this.data = {}; this.touched = new Set();
+    try { this.data = JSON.parse(fs.readFileSync(file, 'utf8')) || {}; } catch { }
+  }
+  // android-prefs.json 另有一个写者（main-android.js 的 player-option IPC 只写 autoplay）。
+  // 保存前重读文件、只覆盖本实例显式写过的键，避免整文件内存快照把对方的写入抹掉。
+  save() {
+    try {
+      fs.mkdirSync(path.dirname(this.file), { recursive: true });
+      let merged = {}; try { merged = JSON.parse(fs.readFileSync(this.file, 'utf8')) || {}; } catch { }
+      for (const key of this.touched) merged[key] = this.data[key];
+      fs.writeFileSync(this.file, JSON.stringify(merged));
+    } catch { }
+  }
   get(key, fallback) { return this.data[key] === undefined ? fallback : this.data[key]; }
-  set(key, value) { this.data[key] = value; this.save(); return value; }
+  set(key, value) { this.data[key] = value; this.touched.add(key); this.save(); return value; }
 }
 
-function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
+function createAndroidBridge({ userDataDir, onPlay, onResolveResult, openExternal, log }) {
   const library = new Library(path.join(userDataDir, 'android-library.json'));
   const prefs = new KeyValue(path.join(userDataDir, 'android-prefs.json'));
   const say = message => { if (log) log(message); };
@@ -278,7 +290,14 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
         }
         case 'clearSearchHistory': prefs.set('searchKeywords', []); return { keywords: [] };
         case 'getAnnouncements': return { items: [] };
-        case 'openExternal': return { opened: true, url: String(params && params.url || '') };
+        case 'openExternal': {
+          // 公告/说明里的网页链接：只放行 http(s)，真正交给系统浏览器（此前是只回执成功的空操作）。
+          const url = String(params && params.url || '');
+          if (!/^https?:\/\//i.test(url)) throw new Error('仅支持在浏览器打开网页链接');
+          if (!openExternal) throw new Error('桌面版暂不支持在浏览器打开链接');
+          await openExternal(url);
+          return { opened: true, url };
+        }
         case 'getAccount': {
           // 桌面版未接账号同步：返回未登录的合法投影，UI 显示未登录状态（扫码等动作在后续版本开放）。
           return { provider: 'hongguo', authenticated: false, officialLoginAvailable: true, phase: 'logged_in', revision: 1, busy: false, maskedPhone: '', sync: {}, web: {}, counts: {} };
@@ -303,12 +322,13 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
           const vid = String(params && params.vid || '');
           if (!/^\d{1,30}$/.test(vid)) throw new Error('App 分集请求参数无效');
           let identity = await ensureRegisteredDevice();
-          // 已登记身份：只覆盖 device_id/iid；档案版本由 signedModelRequest 按接口形态决定
-          // （POST 7.4.x / video_tab GET 7.3.9——2026-11 起服务端按此校验）。
+          // 已登记身份：只覆盖 device_id/iid；请求形态固定为 v5 player/v1（2026-11-16 起
+          // 服务端只应答 v5 三头签名，551 POST/video_tab 全空 200），且不带任何 Cookie。
           setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
           try {            const payload = JSON.stringify({
-              biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
+              biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
               mixed_video_id_map: { '1004': [vid] },
+              dr_scene: 'player',
             });
             let lastError = null;
             for (let attempt = 0; attempt < 3; attempt++) {
@@ -320,13 +340,9 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
                 if (fresh) { identity.deviceId = fresh.deviceId; identity.installId = fresh.installId; identity.cookie = fresh.cookie; identity.deviceToken = fresh.deviceToken; }
                 setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
               }
-              const signed = signedModelRequest(payload);
-              const cookieParts = [];
-              if (identity.cookie) cookieParts.push(identity.cookie);
-              if (identity.deviceToken) cookieParts.push('device_token=' + identity.deviceToken);
-              cookieParts.push('install_id=' + identity.installId);
+              const signed = signedPlayerV1Request(payload, vid);
               const response = await axios.post(signed.url, signed.body, {
-                headers: { ...signed.headers, Cookie: cookieParts.join('; ') },
+                headers: { ...signed.headers },
                 timeout: 15000, responseType: 'text', validateStatus: () => true,
                 maxContentLength: 8 * 1024 * 1024,
               });
@@ -335,7 +351,8 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, log }) {
               let body;
               try { body = JSON.parse(text); } catch { throw Object.assign(new Error('App 已登记模型响应无效'), { code: 'APP_INVALID_RESPONSE' }); }
               if (Number(body.Code ?? body.code ?? -1) !== 0) throw Object.assign(new Error('App 已登记模型请求未通过'), { code: 'BUSINESS_REJECTED' });
-              const entry = body.data && body.data[vid];
+              // player/v1 把条目嵌在 data["1004"] 下；兼容旧 data[vid] 形态。
+              const entry = body.data && (body.data['1004'] || body.data)[vid];
               const model = entry ? (typeof entry.video_model === 'string' ? JSON.parse(entry.video_model) : entry.video_model) : null;
               if (!model || typeof model !== 'object') { lastError = Object.assign(new Error('App 已登记模型未返回本集'), { code: 'APP_EMPTY_RESPONSE' }); continue; }
               return { vid, video_model: model };

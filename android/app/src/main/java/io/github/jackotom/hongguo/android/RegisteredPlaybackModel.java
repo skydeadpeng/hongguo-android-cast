@@ -64,10 +64,10 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             String did = anonymous.optString("device_id"), iid = anonymous.optString("install_id");
             if (!anonymous.optBoolean("registered") || !OfficialApiClient.validID(did) || !OfficialApiClient.validID(iid))
                 throw new ModelError("App片源设备登记未完成", "APP_INVALID_RESPONSE");
-            // The per-episode signed video_tab GET is the current API; since 2026-11-12 the
-            // upstream grades fresh synthetic identities and hollows both forms (empty 200 /
-            // HTTP 404) for a refused one. Each identity gets both forms once; a refused
-            // identity is replaced (in memory only) until the budget runs out.
+            // 2026-11-16: the model endpoint answers only the v5 three-header player/v1 form;
+            // the older 551-signed POST and the video_tab GET earn empty 200s. Each identity
+            // tries v5 first, then the legacy forms once; a refused identity is replaced
+            // (in memory only) until the budget runs out.
             JSONObject projected = null; ModelError lastFailure = null;
             for (int attempt = 1; attempt <= 3 && projected == null; attempt++) {
                 if (attempt > 1) {
@@ -75,13 +75,18 @@ final class RegisteredPlaybackModel implements AutoCloseable {
                     if (reRegistered == null) break;
                     did = reRegistered[0]; iid = reRegistered[1];
                 }
-                try { projected = videoTab(did, iid, vid); }
+                try { projected = playerV1(did, iid, vid); }
                 catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
                 check();
                 if (projected == null) {
-                    try { projected = multiPost(did, iid, vid); }
+                    try { projected = videoTab(did, iid, vid); }
                     catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
                     check();
+                    if (projected == null) {
+                        try { projected = multiPost(did, iid, vid); }
+                        catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
+                        check();
+                    }
                 }
             }
             if (projected == null) throw lastFailure;
@@ -113,6 +118,33 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             check(); // a cancellation must not surface as the previous business failure
         }
         return null;
+    }
+    /** 2026-11-16 起唯一仍被应答的模型形态：sinfonlinea 的 player/v1 + v5 三头签名。
+     * 与 hongguoTV 0.16.5 MobilePlayback.kt 同构（query 无 ts、gzip 正文、不带 Cookie）。 */
+    private JSONObject playerV1(String did, String iid, String vid) throws Exception {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("aid", "8662"); query.put("app_name", "novelread");
+        query.put("version_code", "74332"); query.put("version_name", "7.4.3.32");
+        query.put("channel", "vivo_8662_64"); query.put("device_platform", "android");
+        query.put("device_type", "PGT-AN10"); query.put("os_version", "12"); query.put("update_version_code", "74332");
+        query.put("iid", iid); query.put("cdid", PlaybackSignerV5.newCdid()); query.put("device_id", did);
+        JSONObject payload = new JSONObject()
+            .put("biz_param", new JSONObject().put("detail_page_version", 0).put("device_level", 3).put("disable_digg_stat", false)
+                .put("disable_video_relate_book", false).put("need_all_video_definition", true).put("need_mp4_align", false)
+                .put("use_os_player", false).put("use_server_dns", false).put("video_platform", 1024))
+            .put("mixed_video_id_map", new JSONObject().put("1004", new JSONArray().put(vid)))
+            .put("dr_scene", "player");
+        byte[] body = gzip(payload.toString().getBytes(StandardCharsets.UTF_8));
+        PlaybackSignerV5.Request signed = PlaybackSignerV5.signPlayback(PlaybackSignerV5.PLAYER_V1_API, query, body, System.currentTimeMillis());
+        Map<String, String> headers = new LinkedHashMap<>(signed.headers);
+        headers.put("User-Agent", PlaybackSignerV5.PLAYER_V1_UA);
+        headers.put("Accept", "application/json");
+        headers.put("Content-Encoding", "gzip");
+        headers.put("Connection", "close");
+        check();
+        OfficialApiClient.Response response = modelTransport.execute(new OfficialApiClient.Request(signed.url, "POST", headers, body, deadline));
+        check();
+        return adopt(response, vid, deadline);
     }
     private JSONObject videoTab(String did, String iid, String vid) throws Exception {
         TreeMap<String, String> tabQuery = query(did, iid, "73932", "7.3.9.32");
@@ -182,10 +214,12 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         catch (Exception invalid) { check(); throw new ModelError("App片源模型响应格式无效", "APP_INVALID_RESPONSE"); }
         if (!zero(envelope.opt("code")) || envelope.has("error_code") && !zero(envelope.opt("error_code")))
             throw new ModelError("App接口暂未提供本集播放信息", "BUSINESS_REJECTED");
-        // The legacy POST nests the entry under data[vid]; video_tab adds one more video_model_data layer.
+        // The legacy POST nests the entry under data[vid]; video_tab adds one more video_model_data
+        // layer; player/v1 groups the episode map under data["1004"].
         JSONObject dataObject = envelope.optJSONObject("data");
         if (dataObject == null) throw new ModelError("App接口未返回本集片源模型", "APP_INVALID_RESPONSE");
         JSONObject payload = dataObject.optJSONObject(vid);
+        if (payload == null) { JSONObject grouped = dataObject.optJSONObject("1004"); if (grouped != null) payload = grouped.optJSONObject(vid); }
         if (payload == null) payload = dataObject.optJSONObject("video_model_data") != null ? dataObject.optJSONObject("video_model_data").optJSONObject(vid) : null;
         if (payload == null) throw new ModelError("App接口未返回本集片源模型", "APP_INVALID_RESPONSE");
         identity(envelope, vid); identity(dataObject, vid); identity(payload, vid);
@@ -267,7 +301,10 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             URI uri = new URI(request.url);
             boolean post = "/novel/player/multi_video_model/v1/".equals(uri.getRawPath()) && request.method.equals("POST");
             boolean tab = "/reading/bookapi/video_tab/multi_video_model/v1/".equals(uri.getRawPath()) && request.method.equals("GET") && request.body.length == 0;
-            if (!"https".equals(uri.getScheme()) || !"api5-normal-sinfonlineb.fqnovel.com".equals(uri.getHost()) || !post && !tab || uri.getPort() != -1 || uri.getUserInfo() != null || uri.getFragment() != null || request.body.length > 128 * 1024)
+            // The v5 player/v1 form lives on the sinfonlinea host; everything else stays on sinfonlineb.
+            boolean player = "/novel/player/multi_video_model/player/v1".equals(uri.getRawPath()) && request.method.equals("POST")
+                && "api5-normal-sinfonlinea.fqnovel.com".equals(uri.getHost());
+            if (!"https".equals(uri.getScheme()) || !player && !"api5-normal-sinfonlineb.fqnovel.com".equals(uri.getHost()) || !post && !tab && !player || uri.getPort() != -1 || uri.getUserInfo() != null || uri.getFragment() != null || request.body.length > 128 * 1024)
                 throw new ModelError("App片源服务地址无效", "INVALID_INPUT");
             return uri;
         }

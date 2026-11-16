@@ -4,6 +4,13 @@ s=Path(sys.argv[1]).read_text();start=s.index('    private void startRegisteredM
 fields=[]
 for name in ['modelWorker','modelCalls','modelTasks']:
  fields.append(re.search(r'private final [^;\n]+\b'+name+r'\b[^;\n]+;',s).group())
+# The production dispatch path routes every UI callback through callbackScript
+# (U+2028/U+2029 escaping); extract it alongside the dispatch region.
+callback=''
+m=re.search(r'(    /\*\* U\+2028[^\n]*\n(?:    [^\n]*\n)*?    private static String callbackScript\(JSONObject response\) \{\n(?:.*?\n)*?    \}\n)',s)
+if m:callback=m.group(1)
+elif 'callbackScript(' in s[start:end]:
+ sys.exit('registered-model-dispatch-harness: callbackScript used but not extracted; update the regex')
 code=r'''
 import java.util.*;import java.util.concurrent.*;import java.util.concurrent.atomic.*;import org.json.*;
 public final class RegisteredModelDispatchTest {
@@ -11,7 +18,7 @@ public final class RegisteredModelDispatchTest {
  final FakeActivity activity=new FakeActivity();
  static int checks;static void check(boolean ok,String label){checks++;if(!ok)throw new AssertionError(label);}
  void respondHttpError(Object id,String error,String code){if(!closed)activity.scripts.add("ERROR "+id+":"+code);}
- PRODUCTION
+ PRODUCTION CALLBACK
  static void waitFor(java.util.function.BooleanSupplier condition,String label)throws Exception{long stop=System.nanoTime()+2_000_000_000L;while(!condition.getAsBoolean()&&System.nanoTime()<stop)Thread.sleep(2);check(condition.getAsBoolean(),label);}
  static JSONObject params()throws Exception{return new JSONObject().put("vid","7694655440692448281");}
  public static void main(String[]args)throws Exception{
@@ -47,5 +54,5 @@ final class RegisteredPlaybackModel implements AutoCloseable {
  JSONObject fetch(String vid)throws Exception{if(block){entered.incrementAndGet();while(release.getCount()>0)try{release.await();}catch(InterruptedException ignored){}}if(timeout){expired=true;throw new java.net.SocketTimeoutException("synthetic registered deadline");}if(fail)throw new ModelError();return new JSONObject().put("vid",vid).put("video_model",new JSONObject().put("fixture",true));}
  boolean current(){return !closed&&!expired;}public void close(){closed=true;release.countDown();}
 }
-'''.replace('FIELDS','\n'.join(fields)).replace('PRODUCTION',s[start:end])
+'''.replace('FIELDS','\n'.join(fields)).replace('PRODUCTION',s[start:end]).replace(' CALLBACK','\n'+callback if callback else '')
 Path(sys.argv[2]).write_text(code)

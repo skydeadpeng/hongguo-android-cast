@@ -5,6 +5,8 @@ if [[ "${1:-}" == --source-root ]];then ROOT="$2";shift 2;fi
 [[ $# == 0 ]] || exit 2
 JAVA_HOME="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
 JSON_JAR="${JSON_JAR:-$HOME/.m2/repository/com/vaadin/external/google/android-json/0.0.20131108.vaadin1/android-json-0.0.20131108.vaadin1.jar}"
+# AppTransport/NetworkGuard reference android.os.Build since the TLS hardening pass.
+SDK_JAR="${SDK_JAR:-${ANDROID_HOME:-$HOME/Library/Android/sdk}/platforms/android-35/android.jar}"
 TMP="$(mktemp -d -t hongguo-registered-model.XXXXXX)";trap 'rm -rf "$TMP"' EXIT
 SRC="$ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
 python3 - "$SRC/NativeBridge.java" "$TMP/RegisteredRpcAllowlistTest.java" <<'PY'
@@ -15,9 +17,10 @@ Path(sys.argv[2]).write_text('import java.util.*; public final class RegisteredR
 PY
 "$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -d "$TMP/allowlist" "$TMP/RegisteredRpcAllowlistTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/allowlist" RegisteredRpcAllowlistTest
-"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
- "$SRC/DanmakuSigner.java" "$SRC/SearchProtocol.java" "$SRC/PassportConstants.java" "$SRC/PassportSigner.java" "$SRC/PassportDevice.java" "$SRC/PassportJson.java" "$SRC/OfficialApiClient.java" "$SRC/OfficialTransport.java" "$SRC/AppTransport.java" "$SRC/NetworkGuard.java" "$SRC/PlayerSigner.java" "$SRC/RegisteredPlaybackModel.java" "$OWN/android/tests/PlayerSignerTest.java" "$OWN/android/tests/RegisteredPlaybackModelTest.java"
+"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR:$SDK_JAR" -d "$TMP/classes" \
+ "$SRC/DanmakuSigner.java" "$SRC/SearchProtocol.java" "$SRC/PassportConstants.java" "$SRC/PassportSigner.java" "$SRC/PassportDevice.java" "$SRC/PassportJson.java" "$SRC/OfficialApiClient.java" "$SRC/OfficialTransport.java" "$SRC/AppTransport.java" "$SRC/NetworkGuard.java" "$SRC/PlayerSigner.java" "$SRC/PlaybackSignerV5.java" "$SRC/RegisteredPlaybackModel.java" "$OWN/android/tests/PlayerSignerTest.java" "$OWN/android/tests/PlaybackSignerV5Test.java" "$OWN/android/tests/RegisteredPlaybackModelTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.PlayerSignerTest
+"$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.PlaybackSignerV5Test
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.RegisteredPlaybackModelTest "$TMP/projected-flags.json"
 node "$OWN/android/tests/registered-model-projection.test.cjs" "$ROOT" "$TMP/projected-flags.json"
 python3 "$OWN/android/tests/registered-model-dispatch-harness.py" "$SRC/NativeBridge.java" "$TMP/RegisteredModelDispatchTest.java"

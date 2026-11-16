@@ -8,6 +8,7 @@
 const crypto = require('node:crypto');
 const sm3 = require('./sm3');
 const { signPlayer } = require('./playback-signature');
+const { buildPlaybackV5Request } = require('./playback-signature-v5');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
 const localId = () => String(1000000000000000n + BigInt('0x' + crypto.randomBytes(6).toString('hex')));
 // 已登记设备身份（device_register 之后由桥接层注入）；未登记时保持合成身份。
@@ -166,6 +167,25 @@ try { const zlib = require('node:zlib'); if (typeof zlib.gzipSync === 'function'
  * tsukiyo-zero/hongguoTV's ContentRepository.tabVideoModel (GPL-3.0-only).
  * 2026-11-11: the server now verifies real 551 Argus/Ladon signatures; the old
  * timestamp-placeholder ladon/argus and gorgon/helios/medusa earn empty 200s. */
+/** RFC4122 v4 UUID via randomBytes（浏览器 crypto shim 无 randomUUID，勿依赖）。 */
+const localCdid = () => {
+    const b = crypto.randomBytes(16);
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    const hex = b.toString('hex');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
+/** v5 player/v1 模型请求（2026-11-16 起唯一仍被应答的模型形态；551 POST/video_tab 全空 200）。
+ * 与 hongguoTV 0.16.5 MobilePlayback.kt 同构：sinfonlinea 主机、无 ts 参数、gzip 正文、
+ * 仅 x-khronos/x-helios/x-medusa 三头、不带任何 Cookie。cdid 未随注册身份下发时按本地
+ * UUID 携带（与 Kotlin 孪生一致，服务端只核对 medusa 明文与 query 的身份一致性）。 */
+function signedPlayerV1Request(payload, vid) {
+    const identity = registeredIdentity
+        ? { iid: registeredIdentity.iid, device_id: registeredIdentity.device_id, cdid: registeredIdentity.cdid || localCdid() }
+        : { iid: localId(), device_id: localId(), cdid: localCdid() };
+    return buildPlaybackV5Request(String(vid), identity, payload);
+}
+
 function signedModelRequest(payload, videoId = '') {
     const playbackDevice = videoId ? VIDEO_TAB_PROFILE : PLAYBACK_PROFILE;
     const device = { ...DEVICE, ...playbackDevice,
@@ -419,10 +439,12 @@ async function fetchAppPlayUrl(vid, options = {}) {
         }
     }
     if (!info) {
-        // Shared model parsing for the POST route and the video_tab recovery.
+        // Shared model parsing for the v5 POST route, the legacy POST and the video_tab recovery.
         const adoptModel = response => {
             assertPlaybackAllowed(response);
-            const entries = response.data?.video_model_data ?? response.data;
+            // player/v1 nests the entry under data["1004"]; the legacy forms use data[vid]
+            // with an optional video_model_data layer.
+            const entries = response.data?.['1004'] ?? response.data?.video_model_data ?? response.data;
             const entry = entries?.[vid];
             assertPlaybackAllowed(entries, entry);
             const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
@@ -432,11 +454,8 @@ async function fetchAppPlayUrl(vid, options = {}) {
             }
             return model;
         };
-        try {
-            const signed = signedModelRequest(payload);
-            const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
-            const model = adoptModel(response);
-            // Current models may carry the video list inline; the legacy fallback round trip is then skipped.
+        // Current models may carry the video list inline; the legacy fallback round trip is then skipped.
+        const settleModel = async model => {
             if (!acceptInline(model)) {
                 const fallback = parseFallback(model.fallback_api);
                 if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
@@ -445,21 +464,38 @@ async function fetchAppPlayUrl(vid, options = {}) {
                 info = outer?.video_info?.data;
                 if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
             }
-        } catch (error) {
-            // Only a locally classified empty model POST may recover. Valid business
-            // refusals, wrong IDs, HTML and fallback GET errors keep their behavior.
-            if (error?.code !== 'APP_EMPTY_RESPONSE' || error.responseStage !== 'model_post') throw error;
-            // 老 POST 持续空 200 时，把恢复机会用在按集号签名的 video_tab GET 上。
-            const signed = signedModelRequest(payload, vid);
-            const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
-            const model = adoptModel(response);
-            if (!acceptInline(model)) {
-                const fallback = parseFallback(model.fallback_api);
-                if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
-                const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
-                assertPlaybackAllowed(outer, outer.video_info, outer.video_info?.data);
-                info = outer?.video_info?.data;
-                if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
+        };
+        // 2026-11-16: the model endpoint answers only the v5 three-header player/v1 form;
+        // the older 551 POST and the video_tab GET earn empty 200s. v5 goes first, and only
+        // a locally classified empty response spends its budget on the legacy ladder.
+        // The v5 form signs the exact gzip bytes, so the attempt needs zlib; the WebView
+        // bundle has none and always supplies a native registered provider instead.
+        const playerV1Payload = JSON.stringify({
+            biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
+            mixed_video_id_map: { '1004': [vid] },
+            dr_scene: 'player',
+        });
+        try {
+            if (!gzipOf) throw Object.assign(new Error('v5 需要 gzip 支持'), { code: 'APP_EMPTY_RESPONSE', responseStage: 'model_post' });
+            const signed = signedPlayerV1Request(playerV1Payload, vid);
+            const response = await lookupJson(signed.url, { method: 'POST', headers: signed.headers, data: signed.body }, 'model_post');
+            await settleModel(adoptModel(response));
+        } catch (v5Error) {
+            // Business refusals, wrong IDs and malformed models stay terminal; only a
+            // classified empty v5 response may try the legacy signed POST.
+            if (v5Error?.code !== 'APP_EMPTY_RESPONSE' || v5Error.responseStage !== 'model_post') throw v5Error;
+            try {
+                const signed = signedModelRequest(payload);
+                const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
+                await settleModel(adoptModel(response));
+            } catch (error) {
+                // Only a locally classified empty model POST may recover. Valid business
+                // refusals, wrong IDs, HTML and fallback GET errors keep their behavior.
+                if (error?.code !== 'APP_EMPTY_RESPONSE' || error.responseStage !== 'model_post') throw error;
+                // 老 POST 持续空 200 时，把恢复机会用在按集号签名的 video_tab GET 上。
+                const signed = signedModelRequest(payload, vid);
+                const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
+                await settleModel(adoptModel(response));
             }
         }
     }
@@ -519,4 +555,4 @@ async function fetchAppPlayUrl(vid, options = {}) {
         : Object.assign(new Error('本集片源地址或密钥无法解析'), { code: 'INVALID_RESPONSE' });
 }
 
-module.exports = { fetchAppPlayUrl, signedAppRequest, signedModelRequest, setDeviceIdentity, __xGorgon: xGorgon, API_HOSTS: [new URL(VIDEO_API).host] };
+module.exports = { fetchAppPlayUrl, signedAppRequest, signedModelRequest, signedPlayerV1Request, setDeviceIdentity, __xGorgon: xGorgon, API_HOSTS: [new URL(VIDEO_API).host] };
