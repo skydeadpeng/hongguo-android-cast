@@ -40,14 +40,20 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         UpstreamDeviceRegister.Identity identity = UpstreamDeviceRegister.register();
         return new String[]{identity.deviceId, identity.iid, identity.cdid};
     }
-    /** The working TV clients register once per session and reuse the identity, and a
-     * served identity keeps being served; per-lookup identities spend several rotations
-     * before the first model arrives. Cache the identity process-wide; every rotation
-     * replaces it. */
+    /** The working TV clients register once per INSTALL and persist the identity
+     * (hongguoTV's PreferencesPlayerDeviceStore); a served identity keeps being served
+     * across process restarts, while fresh registrations mostly earn poisoned ones.
+     * Cache in memory, persist to disk after the identity proves itself (a model
+     * arrived), and reload the persisted identity on the next cold start. */
     private static final AtomicReference<String[]> SHARED_IDENTITY = new AtomicReference<>();
+    private static volatile java.io.File identityFile;
+    /** Wire the on-disk identity slot once from the application context. */
+    static void identityStore(java.io.File file) { identityFile = file; }
     static String[] cachedBootstrap() throws Exception {
         String[] identity = SHARED_IDENTITY.get();
         if (identity != null) return identity;
+        identity = loadPersistedIdentity();
+        if (identity != null) { SHARED_IDENTITY.set(identity); return identity; }
         identity = upstreamBootstrap();
         SHARED_IDENTITY.set(identity);
         return identity;
@@ -58,6 +64,26 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         String[] fresh = {identity.deviceId, identity.iid, identity.cdid};
         SHARED_IDENTITY.set(fresh);
         return fresh;
+    }
+    /** Persists an identity after it earned a served model; never throws. */
+    private static void persistIdentity(String[] identity) {
+        java.io.File file = identityFile;
+        if (file == null || identity == null || identity.length < 2) return;
+        try {
+            JSONObject record = new JSONObject().put("device_id", identity[0]).put("install_id", identity[1]);
+            if (identity.length > 2 && identity[2] != null) record.put("cdid", identity[2]);
+            java.nio.file.Files.write(file.toPath(), record.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ignored) { }
+    }
+    private static String[] loadPersistedIdentity() {
+        java.io.File file = identityFile;
+        if (file == null || !file.isFile()) return null;
+        try {
+            JSONObject record = OfficialApiClient.parse(java.nio.file.Files.readAllBytes(file.toPath()));
+            String did = record.optString("device_id", ""), iid = record.optString("install_id", ""), cdid = record.optString("cdid", "");
+            if (OfficialApiClient.validID(did) && OfficialApiClient.validID(iid)) return new String[]{did, iid, cdid};
+        } catch (Exception ignored) { }
+        return null;
     }
 
     RegisteredPlaybackModel() { this(System.nanoTime() + MAX_NANOS); }
@@ -139,6 +165,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
                 }
             }
             if (projected == null) throw lastFailure;
+            persistIdentity(new String[]{did, iid, cdid});
             return new JSONObject().put("vid", vid).put("video_model", projected);
         } finally {
             registering = null; owner = null;
