@@ -3,7 +3,9 @@ package io.github.jackotom.hongguo.android;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -61,8 +63,9 @@ final class UpstreamDeviceRegister {
         byte[] body = ttEncrypt(compressed);
         java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
         headers.put("User-Agent", USER_AGENT);
-        headers.put("Accept", "application/json");
-        headers.put("Content-Type", "application/octet-stream;tt-data=a");
+        // Byte-exact with the working TV clients: no Accept header and a plain
+        // content-type — the ";tt-data=a" suffix lands identities in a hollowed pool.
+        headers.put("Content-Type", "application/octet-stream");
         headers.put("log-encode-type", "gzip");
         headers.put("x-ss-dp", "8662");
         headers.put("x-ss-req-ticket", String.valueOf(now));
@@ -73,7 +76,7 @@ final class UpstreamDeviceRegister {
         headers.put("x-neptune", "-8|50:51:59:30:40:47:49:39");
         headers.put("x-ss-stub", DanmakuSigner.hex(DanmakuSigner.md5(body)).toUpperCase(java.util.Locale.ROOT));
         if (cookieHeader != null && !cookieHeader.isEmpty()) headers.put("Cookie", cookieHeader);
-        String raw = AppTransport.upstreamRegisterPost(URL, headers, body, System.nanoTime() + 10_000_000_000L);
+        String raw = okhttpRegister(URL, headers, body);
         JSONObject reply;
         try { reply = new JSONObject(raw); }
         catch (Exception invalid) { throw new java.io.IOException("上游登记响应非 JSON: " + raw.substring(0, Math.min(200, raw.length()))); }
@@ -82,7 +85,29 @@ final class UpstreamDeviceRegister {
             throw new java.io.IOException("上游设备登记被拒绝: " + raw.substring(0, Math.min(300, raw.length())));
         String deviceId = id(reply, "device_id"), iid = id(reply, "install_id");
         if (deviceId.isEmpty() || iid.isEmpty()) throw new java.io.IOException("上游设备登记未返回有效身份");
+        trace("register ok device_id=" + deviceId);
         return new Identity(deviceId, iid, cdid);
+    }
+
+    /** OkHttp registration on the shared model client (one connection pool for the whole
+     * registered-identity lifecycle, like the working TV clients); honors the system proxy
+     * so diagnostics can capture it. Bounded to 10 seconds per exchange. */
+    private static String okhttpRegister(String url, Map<String, String> headers, byte[] body) throws Exception {
+        okhttp3.OkHttpClient client = RegisteredPlaybackModel.modelSharedClient().newBuilder()
+            .connectTimeout(10, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS).callTimeout(10, TimeUnit.SECONDS)
+            .followRedirects(false).followSslRedirects(false).build();
+        okhttp3.Request.Builder builder = new okhttp3.Request.Builder().url(url)
+            .post(okhttp3.RequestBody.create(body));
+        for (Map.Entry<String, String> header : headers.entrySet()) builder.header(header.getKey(), header.getValue());
+        try (okhttp3.Response response = client.newCall(builder.build()).execute()) {
+            trace("register http=" + response.code() + " bytes=" + (response.body() == null ? 0 : response.body().contentLength()));
+            if (response.code() != 200) throw new java.io.IOException("上游设备登记 HTTP " + response.code());
+            okhttp3.ResponseBody payload = response.body();
+            return payload == null ? "" : payload.string();
+        }
+    }
+    private static void trace(String message) {
+        try { android.util.Log.i("HongguoV5", message); } catch (Throwable ignored) { }
     }
 
     private static String id(JSONObject reply, String name) {

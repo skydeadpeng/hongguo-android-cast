@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only network diagnostics: additionally trust the local mitmproxy CA so
+     real signed playback requests can be captured for protocol comparison. Release
+     builds never include this file and keep system trust only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="@raw/mitm_ca"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

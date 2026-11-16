@@ -95,3 +95,8 @@ dependencies { coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5' 
 // so phones and TVs without hardware HEVC can still play H.265/ByteVC2 sources. Not a runtime
 // dependency of the phone/TV flavors; loaded from the tvNative source set only.
 dependencies { tvNativeImplementation 'org.videolan.android:libvlc-all:3.6.2' }
+
+// The v5 model endpoint (player/v1) fingerprints its HTTP client and hollows plain
+// HttpURLConnection requests (HTTP/1.1, no ALPN) with empty 200s; OkHttp negotiates
+// h2 like the working clients. Used only by the registered model transport.
+dependencies { implementation 'com.squareup.okhttp3:okhttp:4.12.0' }

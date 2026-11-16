@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import org.json.*;
@@ -23,16 +24,54 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         ModelError(String message, String code) { super(message); this.code = code; }
     }
     private final OfficialApiClient.Transport registration, modelTransport;
+    private final DeviceBootstrap bootstrap, rotateBootstrap;
     private final long deadline;
     private final AtomicBoolean started = new AtomicBoolean();
     private volatile boolean closed;
     private volatile OfficialApiClient registering;
     private volatile Thread owner;
 
+    /** Anonymous identity source: returns {device_id, install_id, cdid}. */
+    interface DeviceBootstrap { String[] register() throws Exception; }
+    /** The v5 model endpoint hollows identities from the older log.snssdk.com registration
+     * line; the upstream 73932 profile (sig_hash and friends) is what working TV clients
+     * register with and is trusted there. */
+    static String[] upstreamBootstrap() throws Exception {
+        UpstreamDeviceRegister.Identity identity = UpstreamDeviceRegister.register();
+        return new String[]{identity.deviceId, identity.iid, identity.cdid};
+    }
+    /** The working TV clients register once per session and reuse the identity, and a
+     * served identity keeps being served; per-lookup identities spend several rotations
+     * before the first model arrives. Cache the identity process-wide; every rotation
+     * replaces it. */
+    private static final AtomicReference<String[]> SHARED_IDENTITY = new AtomicReference<>();
+    static String[] cachedBootstrap() throws Exception {
+        String[] identity = SHARED_IDENTITY.get();
+        if (identity != null) return identity;
+        identity = upstreamBootstrap();
+        SHARED_IDENTITY.set(identity);
+        return identity;
+    }
+    /** Rotations always register a fresh identity and make it the shared one. */
+    static String[] freshBootstrap() throws Exception {
+        UpstreamDeviceRegister.Identity identity = UpstreamDeviceRegister.register();
+        String[] fresh = {identity.deviceId, identity.iid, identity.cdid};
+        SHARED_IDENTITY.set(fresh);
+        return fresh;
+    }
+
     RegisteredPlaybackModel() { this(System.nanoTime() + MAX_NANOS); }
     RegisteredPlaybackModel(long deadline) { this(new OfficialTransport(), new ModelHttpTransport(), deadline); }
     RegisteredPlaybackModel(OfficialApiClient.Transport registration, OfficialApiClient.Transport modelTransport, long deadline) {
+        this(registration, modelTransport, RegisteredPlaybackModel::cachedBootstrap, RegisteredPlaybackModel::freshBootstrap, deadline);
+    }
+    RegisteredPlaybackModel(OfficialApiClient.Transport registration, OfficialApiClient.Transport modelTransport, DeviceBootstrap bootstrap, long deadline) {
+        this(registration, modelTransport, bootstrap, bootstrap, deadline);
+    }
+    RegisteredPlaybackModel(OfficialApiClient.Transport registration, OfficialApiClient.Transport modelTransport, DeviceBootstrap bootstrap, DeviceBootstrap rotateBootstrap, long deadline) {
         this.registration = Objects.requireNonNull(registration); this.modelTransport = Objects.requireNonNull(modelTransport);
+        this.bootstrap = Objects.requireNonNull(bootstrap);
+        this.rotateBootstrap = Objects.requireNonNull(rotateBootstrap);
         this.deadline = Math.min(deadline, System.nanoTime() + MAX_NANOS);
     }
     static String requestedVid(JSONObject params) throws IOException {
@@ -55,45 +94,55 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     JSONObject fetch(String vid) throws Exception {
         if (vid == null || !vid.matches("[0-9]{1,30}")) throw new ModelError("分集请求信息无效", "INVALID_INPUT");
         if (!started.compareAndSet(false, true)) throw new IOException("App片源请求已经结束");
-        owner = Thread.currentThread(); OfficialApiClient client = null;
+        owner = Thread.currentThread();
         try {
-            check(); client = new OfficialApiClient(OfficialApiClient.newSession(), registration); registering = client;
-            check(); client.deadlineNanos(deadline); client.registerDevice(); check();
             // This fresh in-memory device is unrelated to AccountSync/OfficialAccountVault.
-            JSONObject anonymous = client.session();
-            String did = anonymous.optString("device_id"), iid = anonymous.optString("install_id");
-            if (!anonymous.optBoolean("registered") || !OfficialApiClient.validID(did) || !OfficialApiClient.validID(iid))
+            // The upstream registration line matches the working TV clients' profile; the
+            // older PassportDevice line yields identities the v5 model endpoint hollows.
+            check();
+            String[] identity;
+            try { identity = bootstrap.register(); traceV5("bootstrap ok did=" + identity[0] + (identity[0].equals(SHARED_IDENTITY.get() == null ? "" : SHARED_IDENTITY.get()[0]) ? " (shared)" : " (fresh)")); }
+            catch (Exception failure) { traceV5("bootstrap failed: " + failure); check(); throw failure; }
+            check();
+            String did = identity[0], iid = identity[1], cdid = identity.length > 2 ? identity[2] : null;
+            if (!OfficialApiClient.validID(did) || !OfficialApiClient.validID(iid))
                 throw new ModelError("App片源设备登记未完成", "APP_INVALID_RESPONSE");
-            // 2026-11-16: the model endpoint answers only the v5 three-header player/v1 form;
-            // the older 551-signed POST and the video_tab GET earn empty 200s. Each identity
-            // tries v5 first, then the legacy forms once; a refused identity is replaced
-            // (in memory only) until the budget runs out.
+            // 2026-11-16: the model endpoint answers only the v5 three-header player/v1 form
+            // (the older 551 POST and video_tab GET earn empty 200s) and it rate-limits per
+            // client: a served identity keeps being served while bursts of registrations earn
+            // poisoned ones. So the ladder retries the SAME identity with generous spacing
+            // first, and registers a fresh identity only as the last resort.
             JSONObject projected = null; ModelError lastFailure = null;
-            for (int attempt = 1; attempt <= 3 && projected == null; attempt++) {
-                if (attempt > 1) {
+            for (int attempt = 1; attempt <= 5 && projected == null; attempt++) {
+                if (attempt > 1) pace(attempt >= 4 ? 2600 : 1900);
+                if (attempt == 4) {
                     String[] reRegistered = reRegister();
                     if (reRegistered == null) break;
                     did = reRegistered[0]; iid = reRegistered[1];
+                    if (reRegistered.length > 2 && reRegistered[2] != null && !reRegistered[2].isEmpty()) cdid = reRegistered[2];
                 }
-                try { projected = playerV1(did, iid, vid); }
+                try { projected = playerV1(did, iid, cdid, vid); }
+                catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
+                check();
+            }
+            if (projected == null && lastFailure != null) {
+                // Last resort: the two legacy forms on the final identity (each paced).
+                pace(1500);
+                try { projected = videoTab(did, iid, vid); }
                 catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
                 check();
                 if (projected == null) {
-                    try { projected = videoTab(did, iid, vid); }
+                    pace(1500);
+                    try { projected = multiPost(did, iid, vid); }
                     catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
                     check();
-                    if (projected == null) {
-                        try { projected = multiPost(did, iid, vid); }
-                        catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
-                        check();
-                    }
                 }
             }
             if (projected == null) throw lastFailure;
             return new JSONObject().put("vid", vid).put("video_model", projected);
         } finally {
             registering = null; owner = null;
-            if (client != null) client.close(); else try { registration.close(); } catch (RuntimeException ignored) { }
+            try { registration.close(); } catch (RuntimeException ignored) { }
             try { modelTransport.close(); } catch (RuntimeException ignored) { }
         }
     }
@@ -102,6 +151,14 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     private static boolean recoverable(ModelError failure) {
         return "APP_EMPTY_RESPONSE".equals(failure.code) || "HTTP_ERROR".equals(failure.code);
     }
+    /** Wait up to the given pause inside the remaining budget; cancellations surface at once. */
+    private void pace(long milliseconds) throws IOException {
+        long stop = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(milliseconds);
+        while (System.nanoTime() < stop) {
+            check();
+            try { Thread.sleep(120); } catch (InterruptedException cancelled) { Thread.currentThread().interrupt(); throw new InterruptedIOException("App片源请求已取消"); }
+        }
+    }
     /** One fresh registration when the remaining budget allows a full extra identity attempt;
      * any failure ends the identity rotation with the previous failure intact. The retry client
      * is never closed here: it shares the injected registration transport, which the fetch
@@ -109,25 +166,25 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     private String[] reRegister() throws IOException {
         if (deadline - System.nanoTime() < TimeUnit.SECONDS.toNanos(6)) return null;
         try {
-            OfficialApiClient retry = new OfficialApiClient(OfficialApiClient.newSession(), registration);
-            check(); retry.deadlineNanos(deadline); retry.registerDevice(); check();
-            JSONObject session = retry.session();
-            String did = session.optString("device_id"), iid = session.optString("install_id");
-            if (session.optBoolean("registered") && OfficialApiClient.validID(did) && OfficialApiClient.validID(iid)) return new String[]{did, iid};
+            check(); String[] identity = rotateBootstrap.register(); check();
+            if (OfficialApiClient.validID(identity[0]) && OfficialApiClient.validID(identity[1])) return identity;
         } catch (Exception ignored) {
             check(); // a cancellation must not surface as the previous business failure
         }
         return null;
     }
     /** 2026-11-16 起唯一仍被应答的模型形态：sinfonlinea 的 player/v1 + v5 三头签名。
-     * 与 hongguoTV 0.16.5 MobilePlayback.kt 同构（query 无 ts、gzip 正文、不带 Cookie）。 */
-    private JSONObject playerV1(String did, String iid, String vid) throws Exception {
+     * 与 hongguoTV 0.16.5 MobilePlayback.kt 同构（query 无 ts、gzip 正文、不带 Cookie）；
+     * cdid 与 Kotlin 孪生一致：会话自己的随机 UUID，与注册 payload 里的 cdid 相互独立。 */
+    private JSONObject playerV1(String did, String iid, String cdid, String vid) throws Exception {
         Map<String, String> query = new LinkedHashMap<>();
         query.put("aid", "8662"); query.put("app_name", "novelread");
         query.put("version_code", "74332"); query.put("version_name", "7.4.3.32");
         query.put("channel", "vivo_8662_64"); query.put("device_platform", "android");
         query.put("device_type", "PGT-AN10"); query.put("os_version", "12"); query.put("update_version_code", "74332");
-        query.put("iid", iid); query.put("cdid", PlaybackSignerV5.newCdid()); query.put("device_id", did);
+        query.put("iid", iid);
+        query.put("cdid", PlaybackSignerV5.newCdid());
+        query.put("device_id", did);
         JSONObject payload = new JSONObject()
             .put("biz_param", new JSONObject().put("detail_page_version", 0).put("device_level", 3).put("disable_digg_stat", false)
                 .put("disable_video_relate_book", false).put("need_all_video_definition", true).put("need_mp4_align", false)
@@ -144,6 +201,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         check();
         OfficialApiClient.Response response = modelTransport.execute(new OfficialApiClient.Request(signed.url, "POST", headers, body, deadline));
         check();
+        traceV5("player/v1 vid=" + vid + " http=" + response.status + " bytes=" + response.body.length);
         return adopt(response, vid, deadline);
     }
     private JSONObject videoTab(String did, String iid, String vid) throws Exception {
@@ -163,6 +221,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         check();
         OfficialApiClient.Response tabResponse = modelTransport.execute(new OfficialApiClient.Request(VIDEO_TAB_API + "?" + tabString, "GET", tabHeaders, new byte[0], deadline));
         check();
+        traceV5("video_tab vid=" + vid + " http=" + tabResponse.status + " bytes=" + tabResponse.body.length);
         return adopt(tabResponse, vid, deadline);
     }
     private JSONObject multiPost(String did, String iid, String vid) throws Exception {
@@ -186,6 +245,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         check();
         OfficialApiClient.Response response = modelTransport.execute(new OfficialApiClient.Request(API + "?" + queryString, "POST", headers, body, deadline));
         check();
+        traceV5("legacy vid=" + vid + " http=" + response.status + " bytes=" + response.body.length);
         return adopt(response, vid, deadline);
     }
     private static TreeMap<String, String> query(String did, String iid, String versionCode, String versionName) {
@@ -198,6 +258,10 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (GZIPOutputStream gzip = new GZIPOutputStream(out)) { gzip.write(plain); }
         return out.toByteArray();
+    }
+    /** One diagnostic line per player/v1 attempt; inert off-device (no android.util.Log). */
+    private static void traceV5(String message) {
+        try { android.util.Log.i("HongguoV5", message); } catch (Throwable ignored) { }
     }
     /** Shared response adoption for the multi-video POST and the video_tab recovery GET. */
     private JSONObject adopt(OfficialApiClient.Response response, String vid, long deadline) throws Exception {
@@ -290,13 +354,17 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         return output.toByteArray();
     }
     static final class ModelHttpTransport implements OfficialApiClient.Transport {
-        private static final ScheduledExecutorService WATCHDOG = Executors.newSingleThreadScheduledExecutor(runnable -> { Thread thread = new Thread(runnable, "hongguo-model-deadline"); thread.setDaemon(true); return thread; });
-        interface ConnectionFactory { HttpURLConnection open(URI uri) throws IOException; }
-        private final ConnectionFactory connections;
-        private volatile boolean closed; private volatile HttpURLConnection active;
-        ModelHttpTransport() { this(uri -> (HttpURLConnection) uri.toURL().openConnection()); }
-        ModelHttpTransport(ConnectionFactory connections) { this.connections = Objects.requireNonNull(connections); }
-        @Override public void close() { closed = true; HttpURLConnection connection = active; if (connection != null) connection.disconnect(); }
+        /** Wire engine seam: production runs OkHttp (the v5 endpoint hollows plain
+         * HttpURLConnection requests — HTTP/1.1 without ALPN — with empty 200s, while
+         * OkHttp's h2 clients are answered); tests inject a capturing fake. The pin is the
+         * CDN node this attempt targets (null = system resolution). */
+        interface Engine { OfficialApiClient.Response call(URI uri, OfficialApiClient.Request request, int timeoutMs, java.net.InetAddress pin) throws Exception; }
+        private final Engine engine;
+        private static final java.util.Set<okhttp3.Call> ACTIVE_CALLS = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+        private volatile boolean closed;
+        ModelHttpTransport() { this(ModelHttpTransport::productionOkhttpCall); }
+        ModelHttpTransport(Engine engine) { this.engine = Objects.requireNonNull(engine); }
+        @Override public void close() { closed = true; for (okhttp3.Call call : ACTIVE_CALLS.toArray(new okhttp3.Call[0])) call.cancel(); }
         static URI validate(OfficialApiClient.Request request) throws Exception {
             URI uri = new URI(request.url);
             boolean post = "/novel/player/multi_video_model/v1/".equals(uri.getRawPath()) && request.method.equals("POST");
@@ -312,25 +380,64 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             if (closed || Thread.currentThread().isInterrupted()) throw new InterruptedIOException("App片源请求已取消");
             if (System.nanoTime() >= deadline) throw new SocketTimeoutException("App片源请求总等待超时");
         }
-        @Override public OfficialApiClient.Response execute(OfficialApiClient.Request request) throws Exception {
-            check(request.deadlineNanos); URI uri = validate(request); HttpURLConnection connection = connections.open(uri); active = connection;
-            ScheduledFuture<?> alarm = WATCHDOG.schedule(connection::disconnect, Math.max(1, request.deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
-            try {
-                check(request.deadlineNanos); int timeout = (int) Math.max(1, Math.min(7000, TimeUnit.NANOSECONDS.toMillis(request.deadlineNanos - System.nanoTime())));
-                connection.setRequestMethod(request.method); connection.setConnectTimeout(timeout); connection.setReadTimeout(timeout); connection.setInstanceFollowRedirects(false);
-                // Opening an output stream can rewrite GET to POST. Only the signed POST has a body.
-                boolean sendsBody = request.method.equals("POST");
-                if (sendsBody) { connection.setDoOutput(true); connection.setFixedLengthStreamingMode(request.body.length); }
-                for (Map.Entry<String, String> header : request.headers.entrySet()) connection.setRequestProperty(header.getKey(), header.getValue());
-                connection.setRequestProperty("Accept-Encoding", "gzip");
-                if (sendsBody) try (OutputStream out = connection.getOutputStream()) { check(request.deadlineNanos); out.write(request.body); }
-                check(request.deadlineNanos); int status = connection.getResponseCode(); check(request.deadlineNanos);
-                if (status != 200) return new OfficialApiClient.Response(status, Collections.emptyMap(), new byte[0]);
-                long length = connection.getContentLength(); if (length > MAX_BYTES) throw new ModelError("App片源模型响应超过大小限制", "APP_INVALID_RESPONSE");
-                byte[] body; try (InputStream input = connection.getInputStream()) { body = read(input, request.deadlineNanos); }
-                check(request.deadlineNanos); return new OfficialApiClient.Response(status, connection.getHeaderFields(), body);
-            } catch (Exception failure) { check(request.deadlineNanos); throw failure; }
-            finally { alarm.cancel(false); connection.disconnect(); if (active == connection) active = null; }
+        /** OkHttp engine: h2 via ALPN, exact signed headers, callTimeout bounds the whole exchange.
+         * The model endpoints sit on a rotating CDN pool where some nodes hollow requests with
+         * empty 200s while others serve; the engine pins each request to one node from the
+         * pool (system answer when unavailable) and the fetch ladder rotates the node. */
+        private static OfficialApiClient.Response productionOkhttpCall(URI uri, OfficialApiClient.Request request, int timeoutMs, java.net.InetAddress pin) throws Exception {
+            okhttp3.OkHttpClient.Builder client = SHARED_CLIENT.newBuilder()
+                .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS).readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .callTimeout(timeoutMs, TimeUnit.MILLISECONDS);
+            if (pin != null) {
+                client.dns(hostname -> {
+                    if (hostname.equals(uri.getHost())) return java.util.Collections.singletonList(pin);
+                    return java.util.Arrays.asList(java.net.InetAddress.getAllByName(hostname));
+                });
+            }
+            okhttp3.Request.Builder builder = new okhttp3.Request.Builder().url(uri.toURL());
+            if (request.method.equals("POST")) builder.post(okhttp3.RequestBody.create(request.body));
+            else builder.get();
+            for (Map.Entry<String, String> header : request.headers.entrySet()) builder.header(header.getKey(), header.getValue());
+            builder.header("Accept-Encoding", "gzip");
+            okhttp3.Call call = client.build().newCall(builder.build());
+            ACTIVE_CALLS.add(call);
+            try { return consume(call.execute(), request); }
+            finally { ACTIVE_CALLS.remove(call); }
         }
+        private static final okhttp3.OkHttpClient SHARED_CLIENT = new okhttp3.OkHttpClient.Builder()
+            .followRedirects(false).followSslRedirects(false).protocols(java.util.Arrays.asList(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
+            .build();
+        /** The registration and the model must share one client so the identity and its
+         * model request ride the same pooled h2 connections, like the working TV clients. */
+        static okhttp3.OkHttpClient sharedClient() { return SHARED_CLIENT; }
+        private static OfficialApiClient.Response consume(okhttp3.Response response, OfficialApiClient.Request request) throws Exception {
+            try {
+                int status = response.code();
+                if (status != 200) return new OfficialApiClient.Response(status, Collections.emptyMap(), new byte[0]);
+                byte[] body = read(response.body().byteStream(), request.deadlineNanos);
+                return new OfficialApiClient.Response(status, response.headers().toMultimap(), body);
+            } finally { response.close(); }
+        }
+        @Override public OfficialApiClient.Response execute(OfficialApiClient.Request request) throws Exception {
+            check(request.deadlineNanos); URI uri = validate(request);
+            check(request.deadlineNanos); int timeout = (int) Math.max(1, Math.min(7000, TimeUnit.NANOSECONDS.toMillis(request.deadlineNanos - System.nanoTime())));
+            java.net.InetAddress pin = nextNode(uri.getHost());
+            try {
+                OfficialApiClient.Response response = engine.call(uri, request, timeout, pin);
+                check(request.deadlineNanos);
+                return response;
+            } catch (Exception failure) { check(request.deadlineNanos); throw failure; }
+        }
+        /** One CDN node per attempt, rotating over the current DNS answer; null = system resolution. */
+        private java.net.InetAddress nextNode(String host) {
+            try {
+                java.net.InetAddress[] nodes = java.net.InetAddress.getAllByName(host);
+                int index = nodeCursor.getAndIncrement() % nodes.length;
+                return nodes[index];
+            } catch (Exception broken) { return null; }
+        }
+        private static final java.util.concurrent.atomic.AtomicInteger nodeCursor = new java.util.concurrent.atomic.AtomicInteger();
     }
+    /** Shared OkHttp client for the whole registered-identity lifecycle (register + model). */
+    static okhttp3.OkHttpClient modelSharedClient() { return ModelHttpTransport.sharedClient(); }
 }
