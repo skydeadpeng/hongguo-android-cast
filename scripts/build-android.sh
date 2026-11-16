@@ -106,10 +106,14 @@ else
     NATIVE_VERSION="$(sed -n '/tvNative {/,/^        }/s/.*versionName '\''\([^'\'']*\)'\''.*/\1/p' android/app/build.gradle | head -1)"
     SUFFIX="tvNative-release"
     [[ "$MODE" != *-release-compatible ]] || SUFFIX="tvNative-release-compatible"
-    OUTPUT="dist/android/HongguoNative-${NATIVE_VERSION:-dev}-$SUFFIX.apk"
-    cp "android/app/build/outputs/apk/tvNative/release/app-tvNative-release.apk" "$OUTPUT"
+    # Since the ABI splits (tvNative 0.1.22) the channel ships one APK per ABI;
+    # the universal build stays unpublished, same as the phone/TV channels.
+    OUTPUT_BASE="dist/android/HongguoNative-${NATIVE_VERSION:-dev}-$SUFFIX"
+    for ABI in arm64-v8a armeabi-v7a; do
+      cp "android/app/build/outputs/apk/tvNative/release/app-tvNative-$ABI-release.apk" "$OUTPUT_BASE-$ABI.apk"
+    done
     SUMS="dist/android/SHA256SUMS-native-$SUFFIX.txt"
-    shasum -a 256 "$OUTPUT" > "$SUMS"
+    shasum -a 256 "$OUTPUT_BASE-arm64-v8a.apk" "$OUTPUT_BASE-armeabi-v7a.apk" > "$SUMS"
     printf '\nAPK_OUTPUT=%s/dist/android\n' "$ROOT"
     cat "$SUMS"
     exit 0
