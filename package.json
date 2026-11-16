@@ -9,21 +9,22 @@
     "dev": "node scripts/dev.js",
     "dev:react": "vite",
     "build:react": "vite build",
-    "build": "npm run build:react && electron-builder --win --x64 --publish never",
-    "build:zip": "npm run build:react && electron-builder --win --x64 --publish never --dir && node scripts/make-zip.js",
-    "build:dir": "npm run build:react && electron-builder --win --x64 --publish never --dir",
-    "build:portable": "npm run build:react && electron-builder --win portable --x64 --publish never",
-    "build:installer": "npm run build:react && electron-builder --win nsis --x64 --publish never",
+    "build:react:shell": "vite build --config vite.desktop-android.config.mjs",
+    "build": "npm run build:react:shell && electron-builder --win --x64 --publish never",
+    "build:zip": "npm run build:react:shell && electron-builder --win --x64 --publish never --dir && node scripts/make-zip.js",
+    "build:dir": "npm run build:react:shell && electron-builder --win --x64 --publish never --dir",
+    "build:portable": "npm run build:react:shell && electron-builder --win portable --x64 --publish never",
+    "build:installer": "npm run build:react:shell && electron-builder --win nsis --x64 --publish never",
     "pack": "electron-builder --dir",
     "zip": "node scripts/make-zip.js",
     "setup:ffmpeg:mac": "node scripts/setup-ffmpeg-mac.js",
-    "build:mac": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac dmg zip --arm64 --x64 --publish never",
-    "build:mac:dir": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac --arm64 --x64 --dir --publish never",
+    "build:mac": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react:shell && electron-builder --mac dmg zip --arm64 --x64 --publish never",
+    "build:mac:dir": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react:shell && electron-builder --mac --arm64 --x64 --dir --publish never",
     "test": "node scripts/test.cjs",
     "setup:software": "node scripts/setup-software-player.cjs",
     "predev": "npm run setup:software",
     "prebuild:react": "npm run setup:software",
-    "build:linux": "npm run build:react && node scripts/check-linux-media.cjs && electron-builder --linux AppImage --x64 --publish never",
+    "build:linux": "npm run build:react:shell && node scripts/check-linux-media.cjs && electron-builder --linux AppImage --x64 --publish never",
     "build:android:ui": "node scripts/build-android-mac-source.mjs && vite build --config vite.android.config.mjs",
     "build:android": "bash scripts/build-android.sh",
     "build:android:tv:release-compatible": "bash scripts/build-android.sh --tv-release-compatible",
@@ -70,9 +71,10 @@
       "output": "dist"
     },
     "files": [
-      "main.js",
-      "preload.js",
-      "dist-react/**/*",
+      "main-android.js",
+      "preload-android.js",
+      "dist-react-android/**/*",
+      "desktop-android-player/**/*",
       "src/native/**/*",
       "src/store.js"
     ],
@@ -120,7 +122,7 @@
       ]
     },
     "portable": {
-      "artifactName": "${productName}-6.1-便携版.${ext}"
+      "artifactName": "${productName}-6.2-便携版.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -199,8 +201,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "jackotom",
-      "repo": "hongguo-drama"
+      "owner": "skydeadpeng",
+      "repo": "hongguo-android-cast"
     },
     "linux": {
       "target": [

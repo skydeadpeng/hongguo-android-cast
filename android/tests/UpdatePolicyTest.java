@@ -6,6 +6,7 @@ public final class UpdatePolicyTest {
  static void bad(Runnable r){checks++;try{r.run();throw new AssertionError("accepted "+checks);}catch(IllegalArgumentException expected){}}
  static String url(String flavor){return "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.11/Hongguo-0.12.11-"+flavor+"-release-compatible.apk";}
  static String nativeUrl(String name){return "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v"+name+"/HongguoNative-"+name+"-tvNative-release-compatible.apk";}
+ static String nativeAbiUrl(String name,String abi){return "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v"+name+"/HongguoNative-"+name+"-tvNative-release-compatible-"+abi+".apk";}
  static void validate(String pkg,String flavor,int code,String name,int sdk,long size,String hash,String url,int installed,String installedName){UpdatePolicy.validate(1,"android-compatible",flavor,pkg,code,name,sdk,size,hash,url,pkg,installed,installedName,35);}
  public static void main(String[]a){
   String pkg="io.github.jackotom.hongguo.android",hash="a".repeat(64);
@@ -43,6 +44,16 @@ public final class UpdatePolicyTest {
   yes(UpdatePolicy.downloadSources(nativeUrl("0.2.0").replace("-compatible","")).size()==5);
   bad(()->UpdatePolicy.downloadSources(nativeUrl("0.2.0").replace("HongguoNative-0.2.0-tvNative","Hongguo-0.2.0-tvNative")));
   bad(()->UpdatePolicy.downloadSources(nativeUrl("0.2.0").replace("HongguoNative-0.2.0-tvNative","HongguoNative-0.2.0-phone")));
+  // 0.1.22+ production manifest shape: minSdk 23 and per-ABI asset names. The pre-fix policy
+  // rejected both and bricked tvNative OTA — these cases pin the production shape (2026-11).
+  validate(pkg+".tvnative","tvnative",24,"0.1.23",23,46578374L,hash,nativeAbiUrl("0.1.23","arm64-v8a"),23,"0.1.22"); checks++;
+  validate(pkg+".tvnative","tvnative",24,"0.1.23",23,42850776L,hash,nativeAbiUrl("0.1.23","armeabi-v7a"),23,"0.1.22"); checks++;
+  validate(pkg+".tvnative","tvnative",24,"0.1.23",23,100,hash,nativeAbiUrl("0.1.23","arm64-v8a").replace("-compatible",""),23,"0.1.22"); checks++;
+  bad(()->validate(pkg+".tvnative","tvnative",24,"0.1.23",22,100,hash,nativeAbiUrl("0.1.23","arm64-v8a"),23,"0.1.22"));
+  yes(UpdatePolicy.downloadSources(nativeAbiUrl("0.1.23","arm64-v8a")).size()==5);
+  yes(UpdatePolicy.downloadSources(nativeAbiUrl("0.1.23","armeabi-v7a")).size()==5);
+  bad(()->UpdatePolicy.downloadSources(nativeAbiUrl("0.1.23","x86_64")));
+  bad(()->UpdatePolicy.downloadSources(nativeAbiUrl("0.1.23","arm64-v8a").replace(".apk",".apk.extra")));
   yes(UpdatePolicy.manifestSources("tvnative",5).get(0).url.contains("update-tvnative.json"));
   yes(UpdatePolicy.manifestSources("tv",5).get(0).url.contains("update-tv.json"));
   yes(!UpdatePolicy.automaticCheckDue(100000000L,99999000L,200000000L));

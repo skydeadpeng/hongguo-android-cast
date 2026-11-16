@@ -41,7 +41,7 @@ node scripts/generate-android-update.mjs --apk dist/android/HongguoNative-0.1.2-
 2. 从最终APK生成清单和校验和，保管现有私钥，不提交私钥或凭据。
 3. 上传不可变版本Release资产；同一versionCode不替换不同内容。
 4. 确认资产下载及散列正确后，最后更新`android/update-phone.json`、`update-tv.json`、`update-tvnative.json`稳定清单。稳定清单不应先于可用 APK 发布。原生 TV 清单必须使用本次最终签名 APK 的真实 size/SHA256；不发布占位散列。原生 TV Release 保持 `--latest=false`，不覆盖手机/TV WebView 版的 Latest 标记。
-5. 真实手机及TV分别从旧版走应用内安装，检查未知来源权限返回、取消/重试及数据保留；ADB覆盖安装不替代这条业务验收。
+5. 真实手机及TV分别从旧版走应用内安装，检查未知来源权限返回、取消/重试及数据保留；ADB覆盖安装不替代这条业务验收。debug 包不走更新通道（AppUpdater 对 DEBUG 直接置 unsupported），OTA 验收必须用 release 签名包；检查项必须覆盖新清单与本版 UpdatePolicy 的一致性（minSdk、flavor、packageName、资产文件名后缀——0.1.22 起 tvNative 清单为 minSdk 23 + ABI 后缀资产名，曾因校验未同步而全线阻断 OTA）。
 
 ## 安装与数据
 

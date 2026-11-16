@@ -114,3 +114,4 @@ Screenshot_*.jpg
 
 # 桌面安卓 UI 构建产物
 dist-react-android/
+.tmp-android-test/

@@ -7,10 +7,11 @@
  * 然后启动 Vite 开发服务器，等待就绪后启动 Electron 窗口。
  */
 const { spawn } = require('child_process');
+const fs = require('fs');
 const net = require('net');
 const path = require('path');
 
-const PREFERRED_PORT = 5173; // 与 vite.config.js 保持一致
+const PREFERRED_PORT = 5173; // 与 vite.desktop-android.config.mjs 的默认开发端口一致
 
 // 检查端口是否被占用（返回 true=占用）
 function checkPort(port) {
@@ -47,6 +48,16 @@ function waitPortReady(port, timeoutMs = 30000) {
 }
 
 async function main() {
+  // 安卓 UI 的 index.html 引用 /generated/startup-bootstrap.js（gitignore 的生成物）；
+  // 缺失时 dev 页面会 404，先补生成再启动。
+  const bootstrap = path.join(__dirname, '..', 'src', 'android', 'public', 'generated', 'startup-bootstrap.js');
+  if (!fs.existsSync(bootstrap)) {
+    console.log('[启动检查] 缺少 startup-bootstrap.js，先运行 scripts/build-android-startup.mjs 生成');
+    const gen = spawn('node', [path.join(__dirname, 'build-android-startup.mjs')], { stdio: 'inherit', shell: true });
+    const genCode = await new Promise(resolve => gen.on('close', resolve));
+    if (genCode !== 0) { console.error('[启动失败] startup-bootstrap.js 生成失败'); process.exit(1); }
+  }
+
   const occupied = await checkPort(PREFERRED_PORT);
   const port = occupied ? await findFreePort(PREFERRED_PORT + 1) : PREFERRED_PORT;
 
@@ -56,8 +67,10 @@ async function main() {
     console.log(`\n[启动检查] 端口 ${PREFERRED_PORT} 空闲，正常启动\n`);
   }
 
-  // 1. 启动 Vite 开发服务器（strictPort 保证用我们选定的端口）
-  const vite = spawn('npx', ['vite', '--port', String(port), '--strictPort', '--host', '127.0.0.1'], {
+  // 1. 启动 Vite 开发服务器（strictPort 保证用我们选定的端口）。
+  //    现入口是 main-android.js（安卓壳 UI），dev server 必须用同一份 vite.desktop-android.config；
+  //    main-android.js 读取 VITE_DEV_SERVER_URL 后 loadURL，HMR 才真正生效。
+  const vite = spawn('npx', ['vite', '--config', 'vite.desktop-android.config.mjs', '--port', String(port), '--strictPort', '--host', '127.0.0.1'], {
     shell: true,
     stdio: 'inherit',
     env: { ...process.env },

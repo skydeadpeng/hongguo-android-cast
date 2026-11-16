@@ -118,7 +118,7 @@ final class AppUpdater {
     }
     private void respond(String id, String error) {
         if (destroyed) return;
-        try { pageScript("window.__androidUpdatesResponse && window.__androidUpdatesResponse(" + new JSONObject().put("id", id).put("result", snapshot()).put("error", error == null ? JSONObject.NULL : error) + ")"); }
+        try { pageScript(callbackScript("__androidUpdatesResponse", new JSONObject().put("id", id).put("result", snapshot()).put("error", error == null ? JSONObject.NULL : error))); }
         catch (JSONException ignored) { }
     }
     private JSONObject snapshot() throws JSONException {
@@ -133,7 +133,13 @@ final class AppUpdater {
     }
     private void publish() {
         if (destroyed) return;
-        try { pageScript("window.__androidUpdatesChanged && window.__androidUpdatesChanged(" + snapshot() + ")"); } catch (JSONException ignored) { }
+        try { pageScript(callbackScript("__androidUpdatesChanged", snapshot())); } catch (JSONException ignored) { }
+    }
+
+    /** U+2028/U+2029 are valid JS line terminators that org.json leaves raw; release notes
+     *  carrying them would break every evaluateJavascript of the update page. Escape them. */
+    private static String callbackScript(String global, JSONObject value) {
+        return "window." + global + " && window." + global + "(" + value.toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029") + ")";
     }
     void pageReady() { pageReady = true; maybePrompt(); automaticCheck(); }
     void pageUnavailable() { pageReady = false; dismissPrompt(); }

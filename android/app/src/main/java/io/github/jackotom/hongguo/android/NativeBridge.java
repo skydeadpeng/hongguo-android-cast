@@ -137,7 +137,7 @@ final class NativeBridge {
                     if (!closed && (message != null || operation.current()) && modelCalls.get(key) == operation) {
                         JSONObject response = new JSONObject().put("id", id).put("result", ready == null ? JSONObject.NULL : ready).put("error", message == null ? JSONObject.NULL : message);
                         if (errorCode != null) response.put("errorCode", errorCode);
-                        activity.script("window.__androidResponse && window.__androidResponse(" + response.toString() + ")");
+                        activity.script(callbackScript(response));
                     }
                 } catch (JSONException ignored) { }
                 finally { modelCalls.remove(key, operation); operation.close(); }
@@ -211,7 +211,7 @@ final class NativeBridge {
         try {
             JSONObject response = new JSONObject().put("id", id).put("result", JSONObject.NULL).put("error", message == null ? "页面请求未成功，请重试" : message);
             if (code != null) response.put("errorCode", code);
-            final String source = "window.__androidResponse && window.__androidResponse(" + response.toString() + ")";
+            final String source = callbackScript(response);
             activity.runOnUiThread(() -> { if (!closed) activity.script(source); });
         } catch (JSONException ignored) { }
     }
@@ -760,11 +760,18 @@ final class NativeBridge {
         if (closed) return;
         try {
             JSONObject response = new JSONObject().put("id", id).put("result", result == null ? JSONObject.NULL : result).put("error", error == null ? JSONObject.NULL : error);
-            final String source = "window.__androidResponse && window.__androidResponse(" + response.toString() + ")";
+            final String source = callbackScript(response);
             // Retry may replace the WebView while a worker response waits in the
             // UI queue. Check this bridge's lifetime on that queue, not only here.
             activity.runOnUiThread(() -> { if (!closed) activity.script(source); });
         } catch (JSONException ignored) { }
+    }
+
+    /** U+2028/U+2029 are valid JS line terminators that org.json leaves raw; a title or
+     *  description carrying them would make every evaluateJavascript of that response a
+     *  SyntaxError with the callback silently lost. Escape them at the last mile. */
+    private static String callbackScript(JSONObject response) {
+        return "window.__androidResponse && window.__androidResponse(" + response.toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029") + ")";
     }
     void close() { closed = true; closeRegisteredModels(); closeHttp(); worker.shutdownNow(); downloadWorker.shutdownNow(); searchWorker.shutdownNow(); accountWorker.shutdownNow(); try { AccountSync.get().cancelLogin(); } catch (Exception ignored) { } }
 }

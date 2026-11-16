@@ -54,8 +54,11 @@ function macFixture() {
   assert.equal(f.updater.disableWebInstaller, true);
   assert.equal(f.updater.disableDifferentialDownload, true);
   assert.equal(f.updater.feed.provider, 'github');
-  assert.equal(f.updater.feed.owner, 'jackotom');
-  assert.equal(f.updater.feed.repo, 'hongguo-drama');
+  // 更新源三处必须一致（build.publish / build/app-update.yml / setFeedURL）——
+  // 断言对齐 package.json 的 build.publish，防止任何一处再单独漂移。
+  const publish = require('../package.json').build.publish;
+  assert.equal(f.updater.feed.owner, publish.owner);
+  assert.equal(f.updater.feed.repo, publish.repo);
   assert.equal(f.controller.install().success, false);
   const first = f.controller.download('1.81');
   const duplicate = f.controller.download('1.81');

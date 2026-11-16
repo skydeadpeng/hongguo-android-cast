@@ -9,7 +9,9 @@ function createUpdateInstaller({ updater, currentVersion, isEnabled, installBloc
   // Release ZIPs are rebuilt after notarization; their old blockmaps are invalid.
   updater.disableDifferentialDownload = true;
   updater.logger = null;
-  updater.setFeedURL({ provider: 'github', owner: 'jackotom', repo: 'hongguo-drama' });
+  // 唯一公开更新源：与 package.json build.publish、build/app-update.yml 三处一致（check-electron-entry 守卫）。
+  // jackotom/hongguo-drama 自 2026-11 起由上游发布 7.x，不得再作为本 fork 的桌面更新源。
+  updater.setFeedURL({ provider: 'github', owner: 'skydeadpeng', repo: 'hongguo-android-cast' });
   let state = { supported: true, reason: '', status: 'idle', version: null, percent: 0, error: '', downloaded: false };
   let operation = null, cancellationToken = null, generation = 0, operationGeneration = 0;
   let nativeInstallListener = null, nativeReadyVersion = null;

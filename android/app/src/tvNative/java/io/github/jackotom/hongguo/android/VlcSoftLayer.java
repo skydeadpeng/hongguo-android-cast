@@ -61,7 +61,10 @@ public final class VlcSoftLayer {
             media.setHWDecoderEnabled(false, false); // software decode by design: hardware HEVC is what's missing here
             player.setMedia(media);
             media.release();
-            player.setEventListener(event -> {
+            // libVLC dispatches events on its own thread; every branch below touches views or
+            // player state, so the whole body runs on the main handler (refreshTime/refreshToggle
+            // already assume the UI thread).
+            player.setEventListener(event -> watchdogHandler.post(() -> {
                 if (ended) return;
                 switch (event.type) {
                     case MediaPlayer.Event.EndReached:
@@ -87,7 +90,7 @@ public final class VlcSoftLayer {
                         break;
                     default: break;
                 }
-            });
+            }));
             player.getVLCVout().setVideoView(surface);
             player.getVLCVout().attachViews();
             player.setVideoScale(MediaPlayer.ScaleType.SURFACE_BEST_FIT);

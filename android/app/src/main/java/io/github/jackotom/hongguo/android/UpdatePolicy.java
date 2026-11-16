@@ -36,10 +36,13 @@ final class UpdatePolicy {
         // The independent native TV line owns its package suffix and HongguoNative asset prefix.
         String expected = installedPackage.endsWith(".tvnative") ? "tvnative" : installedPackage.endsWith(".tv") ? "tv" : "phone";
         String expectedPackage = "io.github.jackotom.hongguo.android" + (expected.equals("tvnative") ? ".tvnative" : expected.equals("tv") ? ".tv" : "");
+        // tvNative supports Android 6.0 (minSdk 23) since 0.1.22; verify() still pins the
+        // manifest minSdk to the APK's real value, so this floor is just a sanity bound.
+        int minSdkFloor = expected.equals("tvnative") ? 23 : 26;
         if (schema != 1 || !"android-compatible".equals(channel) || !expected.equals(flavor)
                 || !installedPackage.equals(pkg) || !expectedPackage.equals(pkg)
                 || code <= 0 || name == null || !name.matches("[0-9]+\\.[0-9]+\\.[0-9]+")
-                || minSdk < 26 || minSdk > deviceSdk || size <= 0 || size > MAX_APK_BYTES
+                || minSdk < minSdkFloor || minSdk > deviceSdk || size <= 0 || size > MAX_APK_BYTES
                 || sha256 == null || !sha256.matches("[a-fA-F0-9]{64}")) throw new IllegalArgumentException("更新信息与当前设备不匹配");
         if (code < installedCode || code == installedCode && !installedName.equals(name)) throw new IllegalArgumentException("更新清单尚未刷新或版本不一致，请稍后重试");
         URI uri;
@@ -47,9 +50,14 @@ final class UpdatePolicy {
         String prefix = expected.equals("tvnative")
                 ? "/" + REPOSITORY + "/releases/download/v" + name + "/HongguoNative-" + name + "-tvNative-release"
                 : "/" + REPOSITORY + "/releases/download/v" + name + "/Hongguo-" + name + "-" + flavor + "-release";
+        // 0.1.22+ publishes per-ABI APKs next to the universal/-compatible names.
+        boolean assetPathOk = false;
+        for (String abi : new String[]{"", "-arm64-v8a", "-armeabi-v7a"})
+            for (String quality : new String[]{"", "-compatible"})
+                if ((prefix + quality + abi + ".apk").equals(uri.getRawPath())) assetPathOk = true;
         if (!"https".equals(uri.getScheme()) || !"github.com".equals(uri.getHost()) || uri.getPort() != -1
                 || uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null
-                || !((prefix + "-compatible.apk").equals(uri.getRawPath()) || (prefix + ".apk").equals(uri.getRawPath()))) throw new IllegalArgumentException("更新包不是本应用的固定版本发行文件");
+                || !assetPathOk) throw new IllegalArgumentException("更新包不是本应用的固定版本发行文件");
     }
     static boolean matchingArchive(String installedPackage, int installedCode, String archivePackage,
                                    int archiveCode, String archiveName, int expectedCode, String expectedName,
@@ -94,7 +102,9 @@ final class UpdatePolicy {
         URI uri;
         try { uri=URI.create(canonical); } catch (RuntimeException invalid) { throw new IllegalArgumentException("更新包地址无效"); }
         // The Native prefix pairs only with the tvNative flavor; phone/tv keep the legacy name.
-        String pattern="/"+REPOSITORY+"/releases/download/v([0-9]+\\.[0-9]+\\.[0-9]+)/Hongguo(Native)?-\\1-(phone|tv|tvNative)-release(?:-compatible)?\\.apk";
+        // 0.1.22+ publishes per-ABI APKs (universalApk stays available), so the optional
+        // -arm64-v8a / -armeabi-v7a suffix is part of the canonical release asset name.
+        String pattern="/"+REPOSITORY+"/releases/download/v([0-9]+\\.[0-9]+\\.[0-9]+)/Hongguo(Native)?-\\1-(phone|tv|tvNative)-release(?:-compatible)?(?:-(arm64-v8a|armeabi-v7a))?\\.apk";
         java.util.regex.Matcher matcher;
         if (!"https".equals(uri.getScheme()) || !"github.com".equals(uri.getHost()) || uri.getPort()!=-1
             || uri.getRawUserInfo()!=null || uri.getRawQuery()!=null || uri.getRawFragment()!=null

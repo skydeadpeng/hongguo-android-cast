@@ -1,8 +1,6 @@
 name: Linux x64 AppImage candidate
 on:
   workflow_dispatch:
-  push:
-    branches: ['codex/features-6.1']
 permissions:
   contents: read
 jobs:
