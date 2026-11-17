@@ -23,8 +23,8 @@ final class UpstreamDeviceRegister {
     private static final String USER_AGENT = AccountSigner.USER_AGENT;
 
     static final class Identity {
-        final String deviceId, iid, cdid;
-        Identity(String deviceId, String iid, String cdid) { this.deviceId = deviceId; this.iid = iid; this.cdid = cdid; }
+        final String deviceId, iid, cdid, cookies;
+        Identity(String deviceId, String iid, String cdid, String cookies) { this.deviceId = deviceId; this.iid = iid; this.cdid = cdid; this.cookies = cookies; }
     }
 
     private UpstreamDeviceRegister() { }
@@ -85,8 +85,70 @@ final class UpstreamDeviceRegister {
             throw new java.io.IOException("上游设备登记被拒绝: " + raw.substring(0, Math.min(300, raw.length())));
         String deviceId = id(reply, "device_id"), iid = id(reply, "install_id");
         if (deviceId.isEmpty() || iid.isEmpty()) throw new java.io.IOException("上游设备登记未返回有效身份");
+        String cookies = registrationCookies();
         trace("register ok device_id=" + deviceId);
-        return new Identity(deviceId, iid, cdid);
+        Identity identity = new Identity(deviceId, iid, cdid, cookies);
+        // The working TV clients warm a fresh identity with catalog browsing on the SAME
+        // identity (bookmall/tab + registration cookies) before the first playback model
+        // request; identities that hit player/v1 with no footprint earn hollowed pools.
+        warmupCatalog(identity);
+        return identity;
+    }
+
+    /** Last registration's Set-Cookie, filtered to the values the working clients keep. */
+    private static volatile String lastCookies = "";
+    private static String registrationCookies() {
+        try {
+            java.util.LinkedHashSet<String> kept = new java.util.LinkedHashSet<>();
+            for (String header : lastCookieHeaders) {
+                String pair = header.split(";", 2)[0].trim();
+                String name = pair.split("=", 2)[0].trim();
+                if (pair.contains("=") && java.util.Arrays.asList("store-region", "store-region-src", "install_id", "ttreq").contains(name))
+                    kept.add(pair);
+            }
+            return String.join("; ", kept);
+        } catch (Exception ignored) { return ""; }
+    }
+    private static volatile java.util.List<String> lastCookieHeaders = java.util.Collections.emptyList();
+
+    /** One catalog GET on the fresh identity — the browsing footprint real clients leave. */
+    private static void warmupCatalog(Identity identity) {
+        try {
+            long now = System.currentTimeMillis();
+            long ts = now / 1000;
+            String query = "iid=" + identity.iid + "&device_id=" + identity.deviceId
+                + "&ac=wifi&channel=update_64&aid=8662&app_name=novelread"
+                + "&version_code=74332&version_name=7.4.3.32&device_platform=android&os=android&ssmix=a"
+                + "&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16"
+                + "&manifest_version_code=74332&resolution=1280*2772&dpi=520&update_version_code=74332"
+                + "&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=74332&compliance_status=0"
+                + "&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0"
+                + "&cdid=" + identity.cdid + "&tab_type=16&bottom_tab_type=7";
+            okhttp3.Request.Builder rb = new okhttp3.Request.Builder()
+                .url("https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/bookmall/tab/v1/?" + query)
+                .get();
+            rb.header("accept", "application/json; charset=utf-8,application/x-protobuf");
+            rb.header("x-ss-req-ticket", String.valueOf(now));
+            rb.header("sdk-version", "2");
+            rb.header("x-xs-from-web", "0");
+            rb.header("x-khronos", String.valueOf(ts));
+            rb.header("x-ladon", java.util.Base64.getEncoder().encodeToString(new byte[]{(byte) ts, (byte) (ts >>> 8), (byte) (ts >>> 16), (byte) (ts >>> 24)}));
+            rb.header("x-argus", java.util.Base64.getEncoder().encodeToString(new byte[]{(byte) (ts >>> 24), (byte) (ts >>> 16), (byte) (ts >>> 8), (byte) ts}));
+            // Full v3-era signature set like the working clients' catalog calls.
+            int nonce = (int) (now & 0xFFFF);
+            rb.header("x-gorgon", PassportSigner.gorgon(query, new byte[0], (int) ts, nonce));
+            rb.header("x-helios", heliosV3(ts));
+            rb.header("user-agent", "com.phoenix.read/74332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)");
+            if (identity.cookies != null && !identity.cookies.isEmpty()) rb.header("cookie", identity.cookies);
+            okhttp3.OkHttpClient client = RegisteredPlaybackModel.modelSharedClient().newBuilder()
+                .connectTimeout(8, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS).callTimeout(8, TimeUnit.SECONDS).build();
+            try (okhttp3.Response response = client.newCall(rb.build()).execute()) {
+                byte[] body = response.body() == null ? new byte[0] : response.body().bytes();
+                trace("warmup http=" + response.code() + " bytes=" + body.length);
+            }
+        } catch (Exception failure) {
+            trace("warmup failed: " + failure);
+        }
     }
 
     /** OkHttp registration on the shared model client (one connection pool for the whole
@@ -102,12 +164,68 @@ final class UpstreamDeviceRegister {
         try (okhttp3.Response response = client.newCall(builder.build()).execute()) {
             trace("register http=" + response.code() + " bytes=" + (response.body() == null ? 0 : response.body().contentLength()));
             if (response.code() != 200) throw new java.io.IOException("上游设备登记 HTTP " + response.code());
+            lastCookieHeaders = response.headers("Set-Cookie");
             okhttp3.ResponseBody payload = response.body();
             return payload == null ? "" : payload.string();
         }
     }
     private static void trace(String message) {
         try { android.util.Log.i("HongguoV5", message); } catch (Throwable ignored) { }
+    }
+
+    /** v3-era helios (license 1588093228) for catalog calls; line-for-line the JS twin. */
+    private static String heliosV3(long ts) {
+        try {
+            java.security.SecureRandom random = new java.security.SecureRandom();
+            int nonce = random.nextInt();
+            byte[] leNonce = new byte[]{(byte) nonce, (byte) (nonce >>> 8), (byte) (nonce >>> 16), (byte) (nonce >>> 24)};
+            java.security.MessageDigest md5 = java.security.MessageDigest.getInstance("MD5");
+            byte[] digest = md5.digest(concat(leNonce, "8662".getBytes(StandardCharsets.UTF_8)));
+            byte[] ascii = PlaybackSignerV5.hexText(digest).getBytes(StandardCharsets.US_ASCII);
+            long[] w = new long[4];
+            for (int i = 0; i < 4; i++) w[i] = readLE64(ascii, i * 8);
+            long[] table = new long[35];
+            table[0] = w[0];
+            long b0 = w[0], b8 = w[1];
+            java.util.ArrayDeque<Long> queue = new java.util.ArrayDeque<>();
+            queue.add(w[2]); queue.add(w[3]);
+            for (int i = 0; i < 34; i++) {
+                long x8 = Long.rotateRight(b8, 8) + b0;
+                x8 ^= i;
+                queue.add(x8);
+                x8 ^= Long.rotateRight(b0, 61);
+                table[i + 1] = x8;
+                b0 = x8;
+                b8 = queue.poll();
+            }
+            byte[] text = (ts + "-1588093228-8662").getBytes(StandardCharsets.UTF_8);
+            int padding = 16 - text.length % 16;
+            byte[] padded = java.util.Arrays.copyOf(text, text.length + padding);
+            java.util.Arrays.fill(padded, text.length, padded.length, (byte) padding);
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            out.write(leNonce, 0, 4);
+            for (int at = 0; at < padded.length; at += 16) {
+                long a = readLE64(padded, at), b = readLE64(padded, at + 8);
+                for (int i = 0; i < 34; i++) {
+                    b = table[i] ^ (a + Long.rotateRight(b, 8));
+                    a = b ^ Long.rotateRight(a, 61);
+                }
+                out.write(le64(a), 0, 8); out.write(le64(b), 0, 8);
+            }
+            return java.util.Base64.getEncoder().encodeToString(out.toByteArray());
+        } catch (Exception failure) { return ""; }
+    }
+    private static long readLE64(byte[] data, int at) {
+        return java.nio.ByteBuffer.wrap(data, at, 8).order(java.nio.ByteOrder.LITTLE_ENDIAN).getLong();
+    }
+    private static byte[] le64(long value) {
+        return java.nio.ByteBuffer.allocate(8).order(java.nio.ByteOrder.LITTLE_ENDIAN).putLong(value).array();
+    }
+    private static byte[] concat(byte[]... parts) {
+        int size = 0; for (byte[] part : parts) size += part.length;
+        byte[] out = new byte[size]; int at = 0;
+        for (byte[] part : parts) { System.arraycopy(part, 0, out, at, part.length); at += part.length; }
+        return out;
     }
 
     private static String id(JSONObject reply, String name) {

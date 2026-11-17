@@ -38,7 +38,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
      * register with and is trusted there. */
     static String[] upstreamBootstrap() throws Exception {
         UpstreamDeviceRegister.Identity identity = UpstreamDeviceRegister.register();
-        return new String[]{identity.deviceId, identity.iid, identity.cdid};
+        return new String[]{identity.deviceId, identity.iid, identity.cdid, identity.cookies};
     }
     /** The working TV clients register once per INSTALL and persist the identity
      * (hongguoTV's PreferencesPlayerDeviceStore); a served identity keeps being served
@@ -61,7 +61,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     /** Rotations always register a fresh identity and make it the shared one. */
     static String[] freshBootstrap() throws Exception {
         UpstreamDeviceRegister.Identity identity = UpstreamDeviceRegister.register();
-        String[] fresh = {identity.deviceId, identity.iid, identity.cdid};
+        String[] fresh = {identity.deviceId, identity.iid, identity.cdid, identity.cookies};
         SHARED_IDENTITY.set(fresh);
         return fresh;
     }
@@ -72,6 +72,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         try {
             JSONObject record = new JSONObject().put("device_id", identity[0]).put("install_id", identity[1]);
             if (identity.length > 2 && identity[2] != null) record.put("cdid", identity[2]);
+            if (identity.length > 3 && identity[3] != null && !identity[3].isEmpty()) record.put("cookies", identity[3]);
             java.nio.file.Files.write(file.toPath(), record.toString().getBytes(StandardCharsets.UTF_8));
         } catch (Exception ignored) { }
     }
@@ -80,8 +81,8 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         if (file == null || !file.isFile()) return null;
         try {
             JSONObject record = OfficialApiClient.parse(java.nio.file.Files.readAllBytes(file.toPath()));
-            String did = record.optString("device_id", ""), iid = record.optString("install_id", ""), cdid = record.optString("cdid", "");
-            if (OfficialApiClient.validID(did) && OfficialApiClient.validID(iid)) return new String[]{did, iid, cdid};
+            String did = record.optString("device_id", ""), iid = record.optString("install_id", ""), cdid = record.optString("cdid", ""), cookies = record.optString("cookies", "");
+            if (OfficialApiClient.validID(did) && OfficialApiClient.validID(iid)) return new String[]{did, iid, cdid, cookies};
         } catch (Exception ignored) { }
         return null;
     }
