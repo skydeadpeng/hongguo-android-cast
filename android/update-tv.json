@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 97,
-  "versionName": "0.12.74",
+  "versionCode": 98,
+  "versionName": "0.12.75",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.74/Hongguo-0.12.74-tv-release-compatible.apk",
-  "size": 1720666,
-  "sha256": "e038b6d4251e5b06e8a0551d0ec70da5c4c28263ec984f003998f49d7d5e53ec",
-  "notes": "红果 Android 0.12.74（手机与 TV WebView）\n\n- 优化首次打开速度：应用启动时即在后台完成播放身份登记（或复用已保存身份），首次点播放不再等待注册流程；取源重试的间隔也做了收紧，最坏情况下的等待明显缩短。\n- 播放、下载与本地数据不受影响；0.12.73 及更早版本可直接覆盖升级。\n",
-  "publishedAt": "2026-11-17T01:30:18.762Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.75/Hongguo-0.12.75-tv-release-compatible.apk",
+  "size": 1720718,
+  "sha256": "407b258094bfbdbe544e9aa9376f5c26c3abf21eefb40eb48d73421f4c6e4760",
+  "notes": "红果 Android 0.12.75（手机与 TV WebView）\n\n- 进一步优化播放启动速度：身份预热改为后台执行，不再占用取源重试的等待时间；首次点播放的等待在 0.12.74 基础上再缩短约三分之一（实测约 10 秒内起播）。\n- 播放、下载与本地数据不受影响；0.12.74 可直接覆盖升级。\n",
+  "publishedAt": "2026-11-17T02:05:40.128Z"
 }
