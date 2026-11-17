@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 25,
-  "versionName": "0.1.24",
+  "versionCode": 26,
+  "versionName": "0.1.25",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.24/HongguoNative-0.1.24-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 46584132,
-  "sha256": "b3bc01b3e5ff8f3ae95b0d2baa54eef38a76845eecfc1be308b6460dfd3853af",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.25/HongguoNative-0.1.25-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 47053262,
+  "sha256": "d6cb263963de5104d4870b5234e745fd218c4f680a534d19812ae45934565281",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.24/HongguoNative-0.1.24-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 46584132,
-      "sha256": "b3bc01b3e5ff8f3ae95b0d2baa54eef38a76845eecfc1be308b6460dfd3853af"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.25/HongguoNative-0.1.25-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 47053262,
+      "sha256": "d6cb263963de5104d4870b5234e745fd218c4f680a534d19812ae45934565281"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.24/HongguoNative-0.1.24-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 42856536,
-      "sha256": "f60573b67a25bbaae568e5837a9bf3eb7aca1198fdac0d1d1b87d010bfb5dbea"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.25/HongguoNative-0.1.25-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 43325663,
+      "sha256": "cfbee8e6b375614d5dd4d2a5da83218a2f73fc500c84db9e3c981d963f7236dc"
     }
   },
-  "notes": "红果原生电视 0.1.24\n\n- 修复 2026-11-16 起在线取源全部失效的问题：红果接口当天升级了请求签名校验，旧签名请求一律返回空响应。本版按新校验改用新的签名方式与播放接口，取源、整集下载与播放恢复正常。\n- 黄果来源不受影响；追剧、下载与设置不受影响。\n\n可在「设置 → 关于/版本更新」覆盖升级（自动检查有 24 小时冷却，手动检查立即生效）。本版已在 TV 模拟器通过真实播放验证。\n",
-  "publishedAt": "2026-11-16T14:41:51.776Z"
+  "notes": "红果原生电视 0.1.25\n\n- 继续修复 2026-11-16 起的在线取源问题：本版完善取源链路（可兼容变体请求、注册身份持久化复用、传输层升级），取源可用性进一步提升。\n- 播放兜底链路保持不变；追剧、下载与设置不受影响。\n\n可在「设置 → 关于/版本更新」覆盖升级。建议升级后先播一集完成首次身份登记。\n",
+  "publishedAt": "2026-11-17T00:41:33.012Z"
 }
