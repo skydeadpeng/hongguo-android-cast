@@ -1,6 +1,6 @@
 # Android 0.12.80 / 原生 TV 0.1.31 联合发行
 
-日期：2026-11-17（Asia/Shanghai）。当前为发行候选；发布与稳定清单切换回执在完成后补充。仅涉及手机、TV WebView、tvNative，不发布桌面或 webOS 新版。
+日期：2026-11-17（Asia/Shanghai）。手机／TV WebView 0.12.80 与原生 TV 0.1.31 已正式公开发布。仅涉及手机、TV WebView、tvNative，不发布桌面或 webOS 新版。
 
 ## 版本与修复
 
@@ -48,7 +48,7 @@
 
 正式包验证器全部通过，见本地 `device/ALL-LINES-VERIFIED.json` 及 `device/VERIFICATION.txt`。此前 `0.12.79-repair.20261117` debug 包结果保持为历史，不代替本次正式包。
 
-离线核心回归已实跑通过：完整NativeMediaContracts（Crypto41／合同213／恢复50／Lookup34／原生Lookup18）、原生恢复11组63项、取消所有权128项、v5签名326项、注册模型230项、共享模型53测试、签名偏移64项；更新生成器与更新策略43测试通过。最终第二轮完整CI前置矩阵30条命令全部exit0（30 PASS／0 FAIL），没有用重跑覆盖失败日志。第一轮既有编译／fixture失败及修复证据保留，见 `regressions/FINAL-SUMMARY.txt` 与 `regressions/round2/SUMMARY.txt`。远端CI回执在发布阶段补充。
+离线核心回归已实跑通过：完整NativeMediaContracts（Crypto41／合同213／恢复50／Lookup34／原生Lookup18）、原生恢复11组63项、取消所有权128项、v5签名326项、注册模型230项、共享模型53测试、签名偏移64项；更新生成器与更新策略43测试通过。最终第二轮完整CI前置矩阵30条命令全部exit0（30 PASS／0 FAIL），没有用重跑覆盖失败日志。第一轮既有编译／fixture失败及修复证据保留，见 `regressions/FINAL-SUMMARY.txt` 与 `regressions/round2/SUMMARY.txt`。冻结提交的 main 与两个 tag 远端 Android CI 均已 completed/success，含生产 Java 编译、完整回归、APK 构建及 artifact 上传，详见下方正式发布回执。
 
 发行前同时修正测试入口的真实依赖闭包、已迁移文件复制函数的源码定位，以及host JVM的显式API35与真实NOFOLLOW_LINKS文件系统适配；这些host-only类不编入App。entitlement测试增加完成哨兵，防止悬空Promise导致exit0但实际0项检查；保持原业务断言并补齐测试用AES-CBC桥，修后14组240项真实完成。生产源码及四个APK未因测试入口修复而变化。
 
@@ -60,3 +60,14 @@
 4. 资产公开可取后，最后提交三个稳定更新清单，核对 raw 通道；历史资产与标签不替换。
 
 本轮未将实体设备、应用内安装全流程或32位设备解码写为已通过；已有 ADB 覆盖升级也不代替 OTA 业务验收。
+
+## 正式发布回执
+
+- 冻结源码：`39eb4e8759bf6fa38a642da7ed6157d0a8870126`；`v0.12.80` 与 `v0.1.31` 均精确指向此提交。发行后文档与稳定清单提交不改变冻结标签或已发布 APK。
+- 原生 TV 于 **2026-11-17 15:46:35 +08:00** 正式公开，7 个附件；手机／TV WebView 于 **15:46:38 +08:00** 正式公开，8 个附件。
+- 正式入口：[手机／TV WebView 0.12.80](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.80) · [原生 TV 0.1.31](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.31)。Latest 指向 `v0.12.80`，原生 TV 保持非 Latest。
+- 15 个附件的远端名称、大小、GitHub 计算的 SHA256 与本地冻结附件逐项一致；所有资产状态均为 uploaded。两个源码 ZIP 各 1203 文件逐字节匹配冻结提交。
+- 远端 Android CI：[main / 44040453220](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/44040453220)、[v0.12.80 / 44040528043](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/44040528043)、[v0.1.31 / 44040527595](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/44040527595) 均为 completed/success，head SHA 均与冻结提交一致；三份完整日志与原始日志 ZIP 均保存并重开核对。
+
+- 公开资产门槛：独立 GitHub Linux runner [44042410078](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/44042410078) 的匿名下载步骤于 15:55:18 +08:00 完成并成功；15 个附件逐个完整下载并比对大小／SHA256，无凭据下载。此核验不复用鉴权草稿下载结果。本机匿名 API 额度耗尽及 TCP 超时记录单独保留，不写为公开下载通过。
+- 稳定清单：确认公开资产下载步骤成功后，将 `android/update-phone-0.12.80.json`、`android/update-tv-0.12.80.json`、`android/update-tvnative-0.1.31.json` 原样复制至各自稳定入口；保留切换前0.12.79／0.1.30清单及摘要。对应 APK、版本快照与冻结标签未被重打或覆盖。

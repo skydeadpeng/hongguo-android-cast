@@ -4,7 +4,7 @@
 
 ## 安装包与版本选择
 
-| 版本 | 发行目标 | 应用 ID | 界面 |
+| 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
 | 手机 | 0.12.80 / code103 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
 | TV WebView | 0.12.80 / code103 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
