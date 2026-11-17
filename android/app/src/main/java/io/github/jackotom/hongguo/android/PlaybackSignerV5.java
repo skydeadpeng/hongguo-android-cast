@@ -104,9 +104,13 @@ final class PlaybackSignerV5 {
     // ===== digest helpers =====
     private static int getIv(int initial, byte[] data) {
         int value = initial;
-        for (int i = 0; i < data.length; i++)
-            value = (i & 1) == 0 ? (value >>> 4) ^ value ^ (value << 6) ^ data[i]
-                : ~((value >>> 7) ^ value ^ (data[i] | (value << 12)));
+        for (int i = 0; i < data.length; i++) {
+            // Kotlin Byte.u()/JS Buffer use unsigned octets; Java byte sign extension
+            // changes both the branch selector and the signed request ticket.
+            int octet = data[i] & 255;
+            value = (i & 1) == 0 ? (value >>> 4) ^ value ^ (value << 6) ^ octet
+                : ~((value >>> 7) ^ value ^ (octet | (value << 12)));
+        }
         return value;
     }
     private static int iv(byte[] query, byte[] body, long ts) {
@@ -121,7 +125,8 @@ final class PlaybackSignerV5 {
         int check = 0x20220420;
         for (int i = 0; i < 12; i++) {
             int temp = (i & 1) == 0 ? (check >>> 3) ^ check : (check >>> 5) ^ check;
-            check = (i & 1) == 0 ? data[i] ^ (check << 7) : data[i] | (check << 11);
+            int octet = data[i] & 255;
+            check = (i & 1) == 0 ? octet ^ (check << 7) : octet | (check << 11);
             if ((i & 1) != 0) check = ~check;
             check = check ^ temp;
         }

@@ -14,6 +14,7 @@ while [ "$#" -gt 0 ]; do
 done
 JAVA_HOME="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
 JSON_JAR="${JSON_JAR:-$HOME/.m2/repository/com/vaadin/external/google/android-json/0.0.20131108.vaadin1/android-json-0.0.20131108.vaadin1.jar}"
+SDK_JAR="${SDK_JAR:-${ANDROID_HOME:-$HOME/Library/Android/sdk}/platforms/android-35/android.jar}"
 TMP="$(mktemp -d -t hongguo-initial-playback.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
 SRC="$SOURCE_ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
@@ -73,15 +74,15 @@ final class CencDecryptor {
  static void decryptInPlace(File target,byte[] key)throws Exception{calls++;byte[] expected=expectedKeys.get(NetworkGuard.lastUrl);boolean match=expected==null||Arrays.equals(expected,key);keyMatches.add(match);if(!match)throw new IOException("wrong fixture content key");Files.write(target.toPath(),new byte[]{7,8,9});}
 }
 STUB
-"$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
- "$TMP/Context.java" "$TMP/InitialPlaybackStubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/PlaybackCachePolicy.java" \
+"$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR:$SDK_JAR" -d "$TMP/classes" \
+ "$TMP/Context.java" "$TMP/InitialPlaybackStubs.java" "$SRC/MediaQuality.java" "$SRC/SpadeDecoder.java" "$SRC/DanmakuSigner.java" "$SRC/AppMediaSource.java" "$SRC/PlaybackSources.java" "$SRC/LegacyFiles.java" "$SRC/PlaybackCachePolicy.java" \
  "$TEST_ROOT/InitialPlaybackFallbackTest.java" "$TEST_ROOT/Playback1080RecoveryTest.java"
 STATUS=0
 if [ "$INITIAL" = true ]; then
- "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.InitialPlaybackFallbackTest || STATUS=1
+ "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.InitialPlaybackFallbackTest || STATUS=1
 fi
 if [ "$RECOVERY" = true ]; then
- "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.Playback1080RecoveryTest || STATUS=1
+ "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.Playback1080RecoveryTest || STATUS=1
 fi
 if [ "$STATUS" = 0 ]; then echo 'PASS InitialPlaybackAnd1080 offlineOnly=true networkRequests=0 deviceUntouched=true'; else echo 'FAIL InitialPlaybackAnd1080 offlineOnly=true networkRequests=0 deviceUntouched=true'; fi
 exit "$STATUS"

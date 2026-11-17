@@ -14,40 +14,47 @@ public final class PlaybackSignerV5Test {
     static int checks;
     static void check(boolean ok, String text) { checks++; if (!ok) throw new AssertionError(text); }
 
-    // {ts, querySm3, bodyMd5, digest(16B)}
+    // {ts, querySm3, bodyMd5, digest+checksum(20B)}
+    // Complete outputs independently generated with upstream Kotlin Signer, not this Java/JS twin.
+    // Regeneration/evidence: verification/playback-repair-2026-11-17/protocol/run-oracle.sh
     static final String[][] F13 = {
-        {"1800000000","97f67a81cea547c71c76702cc529330762c14971d85f3c335467579d1e9c15e3","0ff85a33ee8c8aa4f59a843d5199909f","ca03ec7a0c2444b3dcccf33453d02579"},
-        {"1800000001","959b0479339d92d4ab2c428cff3daa0349a78072e56115d2fd8181ef00ef722d","49783eb0095375c17655cdc1ff329874","a1376d7977abbc1dbc536aae0429ac2c"},
-        {"1800000002","37c02962735148636add7f1430394e36013faedcd015f1c5519773153b0efc81","c9ee9a33be57c4125ee742ee67f68cff","acadd6dc830f1d3249c77c86d1a03ab7"},
-        {"1800000003","1ec50c23a9d19b673a4b7037cc51f20b594f04d37234da13b52321f5fd1c7a18","fcd833cf4fa23db062ea04a99de1f6f1","7f18dac9add0b303bc6fdd4bfd181b39"},
-        {"1800000004","b11761b148eaadce909a31b3c0c4e9dc7a6db19d89e4d036bf9948d4f7d2cd47","302e1e011fcde596282923682a4f74ca","ef2475d793d3228e1bb40c2d5258b32f"},
-        {"1800000005","925d3850c921a6cb9174d581243cc0c4150e51bdd144205b462acbd2cd46e5db","7dd8c5bccd64ae6e1c58ade2c929ac41","dc1da7cf8c897dffc390d0997c58f916"},
-        {"1800000006","69d9f1d85c7a7421e14153fa37535bc0d04a0dc755ad1e13e0a65ab2a96fbbba","34b3025ffca5e08743b49f6ce3b6abf8","d45e587fbbd4798ceab2623b5237f104"},
-        {"1800000007","c7c03633bfff0551b4975ea7b31929f5d1fa250ba492d472a5a511b3e5b4c45c","92df202c08c24d635f0154095848657a","bdb494221bc010227df67b21ad814938"},
-        {"1800000008","c0f19b22831d1561f17b85e4b58dc90b2d274bcf1ec00fe24f270f4bcacf9602","7418334aa5d188fc874f67deea9a21d7","fedb0bbc2c073944c7378d6e94eafce8"},
-        {"1800000009","e60f9c10bb6e74959462742e18470865a9d5a0e693504edc6e7c47155d54c898","e95c11c6ebf1b2019000b5d2b6efb2b9","24bdcc955e3f0cab49aba64f91712c98"},
-        {"1800000010","9f44488778e4730fb6495e32faaea2bf97ee6be47e7a7ce73c5ce92f34b7f2d9","1f85408ee383baa76345e77f16a08293","fccc11f6138080539b1548d0b9055bd3"},
-        {"1800000011","76bb13d24db94ecede1be7ab5047d442e279ebaedbec12a6002ff1736320eb70","6befdc0280d0eb9b00864f3b10fd6e9f","8b85e9d9dda0b53ab7bed85d7a0546f0"},
-        {"1800000012","f08e4771e3ec68f66503a4138ba295646ff135891793aa2c48703fbbe83f959a","7fe849ed9d3bc1057fb8e7d05d42d50a","abf54872e5b0589a490ad8f77fc80144"},
-        {"1800000013","22caa8612064c469bb6f3038b92d46c81660dbbf76e0bb1c1ea06d7dcf35df1c","fc1361b74ef50e9a8f1637e1fca4d838","7a22986242c909f50fae3460cacd6775"},
-        {"1800000014","7fea02e2070957c54a1352e67e905f56b95a9d9ff7bba694a8bad7f0f2c910ed","48477c26e58747dabfc0b2290185eef2","c279b885497eeadf9ac22d4fb7a34b34"},
-        {"1800000015","ddf456d095ef231ae9a0332848c86372d34079e8e784bfa319f0c84703daf67d","e93ce6e2ce1bcdaeb93bed8463fbb5b5","3e5d88f088e9e56a668fb0020d9a1832"},
-        {"1800000016","0ab8312b0ab537ab8614b73c84d1e651b91a383ff96524b0850526dfea8e2edf","e37a63574ca36affff4b9bab95d76fce","e47ce104e1708f47b58c35e62d757e34"},
-        {"1800000017","3804c6a08ddf104c3775f2383e7a31ad1246464d3ab402ec1169ddbfc7aaf354","78eecf206f357a9caca88b91ef134743","30d0ff8ad17ea5bc87fe24f6a03d2111"},
-        {"1800000018","f89abdaca254a6f22a01ccd23a9a3408c3c62f1ce67428e1e14fe2ecd7513df1","c105211c82a27ccd4ca00daccd7b8710","f1eb59c415f6edc215d0a8ab50ec88d8"},
-        {"1800000019","a239a3356cc751cddcaee6e06a3d15e1caaae43f2f85a261f14945934ab54c4e","526fda00a40beaabeeb8c150f71cc210","8645f854bdaf96d4bf385432594d5a1d"},
-        {"1800000020","50d51b627a3e67f00fd556534dc3d155ae8402198a8e6a734edc7bddabc6a4f1","4678211f3a092c6af8e75cca1afc31ca","fb3e103857894dc97a4dde6864f084cc"},
-        {"1800000021","b78cc5d1b14cee008085e0e0f3a8b5be7d3dbca0cebc37f4b5ffd574a9df00c6","5fbf4ba47b8610fa654b96ca2818ba91","5701b2a57c5d497f7431cc610624b5f0"},
-        {"1800000022","adf6b9936576b9708ae1a393182a1ef0fede156ffd41c69b9ecf9d3ce2263aa4","9dbfb4aa682f1cc4e0efe2896c603fe4","ae03abe442d4d601bc2135ee4529b72d"},
-        {"1800000023","c00beda338b6c034ee147173ab78f678bc56eed8f2aa9c1cb7bac157b87e36f5","fd5139f800ac11ada82a542131551bac","90a1698d9022aa5a91daf9db53f7ed63"},
-        {"1800000024","ccc3b48e070a81622e0af3b030faba24be90b07c8d6d92ee64a94c907dec0b90","8f32ebc7f408721e94a14ff6fb31299b","8400797d526a9e55ad99dcbaa5d0be13"},
-        {"1800000025","fea6f6ff01087847c4eb2f2c6e4424c6a7b92aec5d624a450529f9321fa03850","cdcf940a7d471c6db8f2f033ce593da0","a486f40927fc2c015fa56b441af15f42"},
-        {"1800000026","bada73694f51f051031c710f78a7ba3c6c677c634a63198757f8a1940ba6d22f","a78390d73256cd71e4830aab685c8a71","6c9e4b9fe7c7646e3ffcb6125f7aca76"},
-        {"1800000027","6d7e4dacc21b0b5d2cd54138f941bc98cff8ee59f27ac205527b3e3207d19691","094f2d484098b4a46ae820ddfb001bcc","9e2433cc7076f16614d3a9f574403723"},
-        {"1800000028","6b25972f9f1b7e059d1cbfafa2b168a4872f818d2d69987b388da7a9a056dc7c","5918ae7dcca9d95fca221de508800bf8","fb9cbb60efdf6e90192fe3bfe8912a03"},
-        {"1800000029","d0c1ec04b4affb0401da90d6f403eb7a2ea095d7fb2789caa3f24eb97b4e84aa","5ec477ba383495da0215c7abc93fe061","28da0f1ae9f4bf3b47af5c8de041fa04"},
-        {"1800000030","9f1231092eccc944f23ace788382f6582c7539217899b49064e73fe7bb5f2c4b","cc13517bcf9e05a656bf58ed06e53790","3e820f120bec38f67ed05de1dd02b79e"},
-        {"1800000031","7452b4261e5ba66aa463bbc4892aa93c11f3f4005b3747c6adabb6359212d2e8","f5b46ee83c8b3c78876cd15e992c3c82","26c2a2a9bd5a7f468b3f1f4525c0ba18"}
+        {"1800000000","97f67a81cea547c71c76702cc529330762c14971d85f3c335467579d1e9c15e3","0ff85a33ee8c8aa4f59a843d5199909f","ca03ec7a0c2444b3dcccf33453d0257936dbddf9"},
+        {"1800000001","959b0479339d92d4ab2c428cff3daa0349a78072e56115d2fd8181ef00ef722d","49783eb0095375c17655cdc1ff329874","a1376d7977abbc1dbc536aae0429ac2c37e0b914"},
+        {"1800000002","37c02962735148636add7f1430394e36013faedcd015f1c5519773153b0efc81","c9ee9a33be57c4125ee742ee67f68cff","acadd6dc830f1d3249c77c86d1a03ab737fc72a0"},
+        {"1800000003","1ec50c23a9d19b673a4b7037cc51f20b594f04d37234da13b52321f5fd1c7a18","fcd833cf4fa23db062ea04a99de1f6f1","7f18dac9add0b303bc6fdd4bfd181b397ef5883e"},
+        {"1800000004","b11761b148eaadce909a31b3c0c4e9dc7a6db19d89e4d036bf9948d4f7d2cd47","302e1e011fcde596282923682a4f74ca","ef2475d793d3228e1bb40c2d5258b32fb739daf5"},
+        {"1800000005","925d3850c921a6cb9174d581243cc0c4150e51bdd144205b462acbd2cd46e5db","7dd8c5bccd64ae6e1c58ade2c929ac41","dc1da7cf8c897dffc390d0997c58f9167e92e6bd"},
+        {"1800000006","69d9f1d85c7a7421e14153fa37535bc0d04a0dc755ad1e13e0a65ab2a96fbbba","34b3025ffca5e08743b49f6ce3b6abf8","d45e587fbbd4798ceab2623b5237f104a42934fe"},
+        {"1800000007","c7c03633bfff0551b4975ea7b31929f5d1fa250ba492d472a5a511b3e5b4c45c","92df202c08c24d635f0154095848657a","bdb494221bc010227df67b21ad814938bd79227e"},
+        {"1800000008","c0f19b22831d1561f17b85e4b58dc90b2d274bcf1ec00fe24f270f4bcacf9602","7418334aa5d188fc874f67deea9a21d7","fedb0bbc2c073944c7378d6e94eafce824ef9e27"},
+        {"1800000009","e60f9c10bb6e74959462742e18470865a9d5a0e693504edc6e7c47155d54c898","e95c11c6ebf1b2019000b5d2b6efb2b9","24bdcc955e3f0cab49aba64f91712c9877fab7f2"},
+        {"1800000010","9f44488778e4730fb6495e32faaea2bf97ee6be47e7a7ce73c5ce92f34b7f2d9","1f85408ee383baa76345e77f16a08293","fccc11f6138080539b1548d0b9055bd327cb6652"},
+        {"1800000011","76bb13d24db94ecede1be7ab5047d442e279ebaedbec12a6002ff1736320eb70","6befdc0280d0eb9b00864f3b10fd6e9f","8b85e9d9dda0b53ab7bed85d7a0546f06769d6cb"},
+        {"1800000012","f08e4771e3ec68f66503a4138ba295646ff135891793aa2c48703fbbe83f959a","7fe849ed9d3bc1057fb8e7d05d42d50a","abf54872e5b0589a490ad8f77fc80144edb44af8"},
+        {"1800000013","22caa8612064c469bb6f3038b92d46c81660dbbf76e0bb1c1ea06d7dcf35df1c","fc1361b74ef50e9a8f1637e1fca4d838","7a22986242c909f50fae3460cacd6775b4c976b1"},
+        {"1800000014","7fea02e2070957c54a1352e67e905f56b95a9d9ff7bba694a8bad7f0f2c910ed","48477c26e58747dabfc0b2290185eef2","c279b885497eeadf9ac22d4fb7a34b34ad70713e"},
+        {"1800000015","ddf456d095ef231ae9a0332848c86372d34079e8e784bfa319f0c84703daf67d","e93ce6e2ce1bcdaeb93bed8463fbb5b5","3e5d88f088e9e56a668fb0020d9a1832adcf76bd"},
+        {"1800000016","0ab8312b0ab537ab8614b73c84d1e651b91a383ff96524b0850526dfea8e2edf","e37a63574ca36affff4b9bab95d76fce","e47ce104e1708f47b58c35e62d757e34f59e9b2e"},
+        {"1800000017","3804c6a08ddf104c3775f2383e7a31ad1246464d3ab402ec1169ddbfc7aaf354","78eecf206f357a9caca88b91ef134743","30d0ff8ad17ea5bc87fe24f6a03d21116f1a264c"},
+        {"1800000018","f89abdaca254a6f22a01ccd23a9a3408c3c62f1ce67428e1e14fe2ecd7513df1","c105211c82a27ccd4ca00daccd7b8710","f1eb59c415f6edc215d0a8ab50ec88d8a44d77ce"},
+        {"1800000019","a239a3356cc751cddcaee6e06a3d15e1caaae43f2f85a261f14945934ab54c4e","526fda00a40beaabeeb8c150f71cc210","8645f854bdaf96d4bf385432594d5a1d6cd6f403"},
+        {"1800000020","50d51b627a3e67f00fd556534dc3d155ae8402198a8e6a734edc7bddabc6a4f1","4678211f3a092c6af8e75cca1afc31ca","fb3e103857894dc97a4dde6864f084cc3de4d97b"},
+        {"1800000021","b78cc5d1b14cee008085e0e0f3a8b5be7d3dbca0cebc37f4b5ffd574a9df00c6","5fbf4ba47b8610fa654b96ca2818ba91","5701b2a57c5d497f7431cc610624b5f037ce6f3d"},
+        {"1800000022","adf6b9936576b9708ae1a393182a1ef0fede156ffd41c69b9ecf9d3ce2263aa4","9dbfb4aa682f1cc4e0efe2896c603fe4","ae03abe442d4d601bc2135ee4529b72d27f648be"},
+        {"1800000023","c00beda338b6c034ee147173ab78f678bc56eed8f2aa9c1cb7bac157b87e36f5","fd5139f800ac11ada82a542131551bac","90a1698d9022aa5a91daf9db53f7ed63bd35e821"},
+        {"1800000024","ccc3b48e070a81622e0af3b030faba24be90b07c8d6d92ee64a94c907dec0b90","8f32ebc7f408721e94a14ff6fb31299b","8400797d526a9e55ad99dcbaa5d0be13b72c71fb"},
+        {"1800000025","fea6f6ff01087847c4eb2f2c6e4424c6a7b92aec5d624a450529f9321fa03850","cdcf940a7d471c6db8f2f033ce593da0","a486f40927fc2c015fa56b441af15f42b45ac346"},
+        {"1800000026","bada73694f51f051031c710f78a7ba3c6c677c634a63198757f8a1940ba6d22f","a78390d73256cd71e4830aab685c8a71","6c9e4b9fe7c7646e3ffcb6125f7aca766f444287"},
+        {"1800000027","6d7e4dacc21b0b5d2cd54138f941bc98cff8ee59f27ac205527b3e3207d19691","094f2d484098b4a46ae820ddfb001bcc","9e2433cc7076f16614d3a9f5744037233cf2cae0"},
+        {"1800000028","6b25972f9f1b7e059d1cbfafa2b168a4872f818d2d69987b388da7a9a056dc7c","5918ae7dcca9d95fca221de508800bf8","fb9cbb60efdf6e90192fe3bfe8912a03b465c6a7"},
+        {"1800000029","d0c1ec04b4affb0401da90d6f403eb7a2ea095d7fb2789caa3f24eb97b4e84aa","5ec477ba383495da0215c7abc93fe061","28da0f1ae9f4bf3b47af5c8de041fa047564b1c3"},
+        {"1800000030","9f1231092eccc944f23ace788382f6582c7539217899b49064e73fe7bb5f2c4b","cc13517bcf9e05a656bf58ed06e53790","3e820f120bec38f67ed05de1dd02b79e772d4c4a"},
+        {"1800000031","7452b4261e5ba66aa463bbc4892aa93c11f3f4005b3747c6adabb6359212d2e8","f5b46ee83c8b3c78876cd15e992c3c82","26c2a2a9bd5a7f468b3f1f4525c0ba18f59d67c6"}
+    };
+    // Kotlin signPlayback selected tickets for the synthetic map/body below; catches
+    // a shared wrong branchClass/signPlayback implementation that self-checks cannot.
+    static final long[] SELECTED_TICKETS = {
+        1800000000006L, 1800000001006L, 1800000002009L, 1800000003001L, 1800000004035L, 1800000005020L, 1800000006006L, 1800000007047L, 1800000008032L, 1800000009025L, 1800000010012L, 1800000011002L, 1800000012003L, 1800000013012L, 1800000014004L, 1800000015009L, 1800000016018L, 1800000017035L, 1800000018018L, 1800000019002L, 1800000020018L, 1800000021000L, 1800000022014L, 1800000023004L, 1800000024002L, 1800000025001L, 1800000026037L, 1800000027001L, 1800000028002L, 1800000029019L, 1800000030001L, 1800000031003L
     };
     // {ts, key, iv, source, encrypted}
     static final String[][] CARRIER = {
@@ -64,8 +71,7 @@ public final class PlaybackSignerV5Test {
             long ts = Long.parseLong(row[0]);
             byte[] out = PlaybackSignerV5.hashF13(PlaybackSignerV5.hex(row[1]), PlaybackSignerV5.hex(row[2]), ts);
             check(out.length == 20, "f13 length class " + i);
-            check(PlaybackSignerV5.hexText(Arrays.copyOf(out, 16)).equals(row[3]), "f13 digest class " + i + " ts=" + ts);
-            check((out[16] & 0x24) == 0x24, "f13 checksum bits class " + i);
+            check(PlaybackSignerV5.hexText(out).equals(row[3]), "f13 full digest+checksum class " + i + " ts=" + ts);
         }
         check(CARRIER.length == 4, "carrier vector count actual=" + CARRIER.length);
         for (int i = 0; i < CARRIER.length; i++) {
@@ -87,6 +93,8 @@ public final class PlaybackSignerV5Test {
             String query = request.url.substring(request.url.indexOf('?') + 1);
             check(!query.contains("ts="), "v5 query carries no ts parameter ts=" + ts);
             check(PlaybackSignerV5.branchClass(query, body, ts) == 12, "ticket search lands on class 12 ts=" + ts);
+            String ticket = "_rticket=" + SELECTED_TICKETS[(int) (ts - 1800000000L)];
+            check(query.endsWith(ticket), "ticket matches independent Kotlin golden ts=" + ts);
             check(request.headers.get("x-khronos").equals(Long.toString(ts)), "x-khronos ts=" + ts);
             check("8311EA30C1C81ED466F1C2D5BB128C5F".equals(request.headers.get("x-ss-stub")), "x-ss-stub binds gzip bytes ts=" + ts);
             check(Arrays.equals(request.body, body), "body passed through ts=" + ts);
@@ -95,6 +103,6 @@ public final class PlaybackSignerV5Test {
             Map<String, String> other = new LinkedHashMap<>(values); other.put("device_id", "789");
             check(!medusa.equals(PlaybackSignerV5.medusa(request.url, body, ts, other)), "x-medusa binds identity ts=" + ts);
         }
-        System.out.println("PlaybackSignerV5Test PASS checks=" + checks + " vectors=f13:32+carrier:4 rotations=32");
+        System.out.println("PlaybackSignerV5Test PASS checks=" + checks + " vectors=f13-full20:32+carrier:4+kotlin-tickets:32 rotations=32");
     }
 }

@@ -75,6 +75,14 @@ final class PlaybackSources {
     /** Internal Java model strategy; playback can pin it without changing legacy callers. */
     interface NativeLookup { JSONObject lookup(String sid, String vid, String requestedQuality, int ceiling, long timeoutMs) throws Exception; }
     private static volatile NativeLookup nativeLookup;
+    private static final long[] PLAYBACK_RETRY_DELAYS_MS = {1000,2500,5000};
+    interface RecoveryTiming { long nanoTime(); void sleep(long delayMs) throws InterruptedException; }
+    private static final RecoveryTiming SYSTEM_RECOVERY_TIMING = new RecoveryTiming() {
+        public long nanoTime(){return System.nanoTime();}
+        public void sleep(long delayMs)throws InterruptedException{Thread.sleep(delayMs);}
+    };
+    private static volatile RecoveryTiming playbackRecoveryTiming = SYSTEM_RECOVERY_TIMING;
+    static void setPlaybackRecoveryTimingForTests(RecoveryTiming timing) { playbackRecoveryTiming=timing==null?SYSTEM_RECOVERY_TIMING:timing; }
     static void attachNative(NativeLookup lookup) { nativeLookup = lookup; }
     static void detachNative(NativeLookup lookup) { if (nativeLookup == lookup) nativeLookup = null; }
     static synchronized void detach(MainActivity value) {
@@ -257,7 +265,9 @@ final class PlaybackSources {
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
         if(failedWeb)markWebFailure(sid,vid);
         if(ceiling==0&&!fresh)return resolve(sid,vid,requested,true,lookup).withPlaybackLookup(lookup);
-        if(fresh)recoveryPause();
+        // Explicit native recovery already has an outer retry owner. Do not add
+        // another delay or retry ladder to its single fresh request.
+        if(fresh&&lookup==null)recoveryPause();
         return register(bindSeries(resolveApp(sid,vid,requested,!fresh,ceiling,lookup),sid),vid,true).withPlaybackLookup(lookup);
     }
     private static Plan resolveWeb(String sid,String vid) throws Exception {
@@ -334,6 +344,7 @@ final class PlaybackSources {
         return resolveApp(sid,vid,requestedQuality,retryInitialLookup,ceiling,null);
     }
     private static JSONObject resolveApp(String sid,String vid,String requestedQuality,boolean retryInitialLookup,int ceiling,NativeLookup lookup) throws Exception {
+        if(lookup!=null)return resolvePlaybackApp(sid,vid,requestedQuality,retryInitialLookup,ceiling,lookup);
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(30);
         for(int attempt=0;;attempt++) {
             long remaining=TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime());
@@ -352,6 +363,35 @@ final class PlaybackSources {
             }
         }
     }
+    /** Only PlayerActivity's explicit Java strategy owns this bounded empty-model
+     * recovery. Legacy page/default-native/download callers retain their policy. */
+    private static JSONObject resolvePlaybackApp(String sid,String vid,String quality,boolean retryInitial,int ceiling,NativeLookup lookup) throws Exception {
+        RecoveryTiming timing=playbackRecoveryTiming;
+        long deadline=timing.nanoTime()+TimeUnit.SECONDS.toNanos(20);
+        for(int attempt=0;;attempt++) {
+            if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
+            long remaining=TimeUnit.NANOSECONDS.toMillis(deadline-timing.nanoTime());
+            if(remaining<=0)throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT");
+            try {
+                JSONObject info=resolveAppAttempt(sid,vid,quality,remaining,ceiling,lookup);
+                if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
+                if(deadline-timing.nanoTime()<=0)throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT");
+                return info;
+            } catch(Exception error) {
+                if(cancelled(error)){Thread.currentThread().interrupt();throw error;}
+                if(deadline-timing.nanoTime()<=0)throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT");
+                if(!(error instanceof AppLookupException))throw error;
+                String code=((AppLookupException)error).code;
+                boolean empty=RESPONSE_RETRY_CODE.equals(code);
+                // Keep the pre-existing one transport retry, including Android's
+                // two-second negative DNS cache. Only empty models get three.
+                if(!retryInitial||!(empty?attempt<PLAYBACK_RETRY_DELAYS_MS.length:attempt==0&&LOOKUP_TRANSIENT_CODES.contains(code)))throw error;
+                long delayMs=empty?PLAYBACK_RETRY_DELAYS_MS[attempt]:code.equals("ENOTFOUND")||code.equals("EAI_AGAIN")?2100:500;
+                if(deadline-timing.nanoTime()<=TimeUnit.MILLISECONDS.toNanos(delayMs))throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT");
+                try {timing.sleep(delayMs);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw interrupted;}
+            }
+        }
+    }
     private static JSONObject resolveAppAttempt(String sid,String vid,String requestedQuality,long timeoutMs,int ceiling,NativeLookup playbackLookup) throws Exception {
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
         NativeLookup lookup = playbackLookup!=null?playbackLookup:nativeLookup;
@@ -359,10 +399,16 @@ final class PlaybackSources {
             if (playbackLookup==null&&pending.size()>=8) throw new IOException("分集正在准备，请稍后重试");
             JSONObject info;
             try { info = lookup.lookup(sid, vid, requestedQuality, ceiling, timeoutMs); }
-            catch (AppMediaSource.AppSourceException error) { throw new AppLookupException(error.getMessage()==null?"App片源暂未取得":error.getMessage(), error.code); }
-            catch (java.net.SocketTimeoutException error) { throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT"); }
-            catch (InterruptedIOException error) { throw error; }
-            catch (Exception error) { throw new AppLookupException(error.getMessage()==null?"App片源暂未取得":error.getMessage(), ""); }
+            catch (Exception error) {
+                if(cancelled(error)){Thread.currentThread().interrupt();throw error;}
+                if(error instanceof AppMediaSource.AppSourceException&&"ERR_CANCELED".equals(((AppMediaSource.AppSourceException)error).code)){
+                    Thread.currentThread().interrupt();throw new InterruptedIOException("播放恢复已取消");
+                }
+                if(error instanceof AppMediaSource.AppSourceException)throw new AppLookupException(error.getMessage()==null?"App片源暂未取得":error.getMessage(),((AppMediaSource.AppSourceException)error).code);
+                if(error instanceof java.net.SocketTimeoutException)throw new AppLookupException("App片源准备超时，请重试","ETIMEDOUT");
+                throw new AppLookupException(error.getMessage()==null?"App片源暂未取得":error.getMessage(), "");
+            }
+            if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
             if (!requestedQuality.equals(info.optString("requestedQuality", requestedQuality))) throw new IOException("片源清晰度结果不匹配");
             if (ceiling>0 && info.optInt("playbackCeiling",-1)!=ceiling) throw new IOException("播放清晰度边界结果不匹配");
             return info;
@@ -440,7 +486,7 @@ final class PlaybackSources {
         Plan plan=find(url,requestedQuality);
         if (plan==null) {
             if (!requestedQuality.equals("auto")) throw new IOException("指定清晰度的片源准备信息已过期，请重新取源");
-            if (!AppTransport.domain(new URI(url).getHost(),"qznovelvod.com","fqnovelvod.com","douyinvod.com")) throw new IOException("App片源准备信息已过期，请重新取源");
+            if (AppTransport.domain(new URI(url).getHost(),"qznovelvod.com","fqnovelvod.com","douyinvod.com")) throw new IOException("App片源准备信息已过期，请重新取源");
             NetworkGuard.download(url,destination,maxBytes,ACTIVE_PROGRESS.get()); return;
         }
         download(plan,destination,maxBytes);

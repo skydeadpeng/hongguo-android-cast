@@ -30,5 +30,12 @@ SRC="$ROOT/app/src/main/java/io/github/jackotom/hongguo/android"
 cat > "$TMP/io/github/jackotom/hongguo/android/BuildConfig.java" <<'STUB'
 package io.github.jackotom.hongguo.android;public final class BuildConfig {public static final boolean IS_TV=false,NATIVE_UI=false,DEBUG=true;public static final String VERSION_NAME="0.4.0";}
 STUB
-"$JAVA_HOME/bin/javac" -encoding UTF-8 -source 17 -target 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d "$TMP/sdk35" "$TMP/io/github/jackotom/hongguo/android/BuildConfig.java" "$SRC/"*.java
+GRADLE_CACHE="${GRADLE_CACHE:-$HOME/.gradle/caches/modules-2/files-2.1}"
+OKHTTP_CP=''
+for module in com.squareup.okhttp3/okhttp com.squareup.okio/okio-jvm org.jetbrains.kotlin/kotlin-stdlib org.jetbrains/annotations; do
+ jar="$(find "$GRADLE_CACHE/$module" -type f -name '*-[0-9]*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name '*-metadata.jar' -print -quit 2>/dev/null || true)"
+ [[ -f "$jar" ]] || { echo "Missing cached runtime dependency: $module" >&2; exit 1; }
+ OKHTTP_CP="$OKHTTP_CP:$jar"
+done
+"$JAVA_HOME/bin/javac" -encoding UTF-8 -source 17 -target 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar:$OKHTTP_CP" -d "$TMP/sdk35" "$TMP/io/github/jackotom/hongguo/android/BuildConfig.java" "$SRC/"*.java
 echo 'PASS PlayerOptions SDK35 allProductionCompile=true deviceUntouched=true'

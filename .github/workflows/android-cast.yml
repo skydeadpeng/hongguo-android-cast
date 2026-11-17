@@ -35,12 +35,7 @@ jobs:
           gradle-version: '8.9'
       - name: Compile all Android production Java against SDK 35
         shell: bash
-        run: |
-          set -euo pipefail
-          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
-          mkdir -p "$RUNNER_TEMP/cast-sdk/classes"
-          printf '%s\n' 'package io.github.jackotom.hongguo.android; public final class BuildConfig {public static final boolean IS_TV=false,NATIVE_UI=false,DEBUG=true;public static final String VERSION_NAME="ci";}' > "$RUNNER_TEMP/cast-sdk/BuildConfig.java"
-          javac -encoding UTF-8 -source 17 -target 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d "$RUNNER_TEMP/cast-sdk/classes" "$RUNNER_TEMP/cast-sdk/BuildConfig.java" android/app/src/main/java/io/github/jackotom/hongguo/android/*.java
+        run: gradle -p android :app:compilePhoneDebugJavaWithJavac --no-daemon --console=plain
       - name: Prepare existing Android JSON test dependency
         run: mvn -q dependency:get -Dartifact=com.vaadin.external.google:android-json:0.0.20131108.vaadin1
       - name: Run HLS, remux and source lifecycle boundary tests
@@ -53,6 +48,8 @@ jobs:
         run: |
           bash android/tests/run-announcement-request-tests.sh
           bash android/tests/run-registered-playback-model-tests.sh
+          node scripts/check-android-model-cancel-ownership.test.mjs
+          bash android/tests/run-playback-native-recovery-tests.sh
           bash android/tests/run-official-transport-timeout-tests.sh
           bash android/tests/run-guest-playback-resolver-tests.sh
           bash android/tests/run-guest-playback-integration-tests.sh
@@ -82,6 +79,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: huangguo-cast-phone-debug
-          path: android/app/build/outputs/apk/phone/debug/app-phone-debug.apk
+          path: android/app/build/outputs/apk/phone/debug/app-phone-universal-debug.apk
           if-no-files-found: error
           retention-days: 14

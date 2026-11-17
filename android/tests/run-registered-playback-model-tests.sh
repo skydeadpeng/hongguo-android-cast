@@ -13,6 +13,9 @@ GRADLE_CACHE="${GRADLE_CACHE:-$HOME/.gradle/caches/modules-2/files-2.1}"
 OKHTTP_JAR="$(find "$GRADLE_CACHE/com.squareup.okhttp3/okhttp" -name 'okhttp-4.12.0.jar' | head -1)"
 OKIO_JAR="$(find "$GRADLE_CACHE/com.squareup.okio/okio-jvm" -name 'okio-jvm-3.6.0.jar' | head -1)"
 KOTLIN_JAR="$(find "$GRADLE_CACHE/org.jetbrains.kotlin/kotlin-stdlib" -name 'kotlin-stdlib-2.0.20.jar' | head -1)"
+if [[ -z "$KOTLIN_JAR" ]]; then
+ KOTLIN_JAR="$(find "$GRADLE_CACHE/org.jetbrains.kotlin/kotlin-stdlib" -type f -name 'kotlin-stdlib-[0-9]*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name '*-metadata.jar' -print -quit)"
+fi
 ANNOTATIONS_JAR="$(find "$GRADLE_CACHE/org.jetbrains/annotations" -name 'annotations-13.0.jar' | head -1)"
 for jar in "$OKHTTP_JAR" "$OKIO_JAR" "$KOTLIN_JAR" "$ANNOTATIONS_JAR"; do [[ -f "$jar" ]] || { echo "missing okhttp runtime jar: $jar" >&2; exit 1; }; done
 OKHTTP_CP="$OKHTTP_JAR:$OKIO_JAR:$KOTLIN_JAR:$ANNOTATIONS_JAR"

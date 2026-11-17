@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug-only overlay: additionally trust the local mitmproxy CA (see
-     res/xml/network_security_config.xml in this source set) for protocol
-     diagnostics. The release merge keeps the manifest without this attribute. -->
+<!-- Debug uses system trust as well, without requiring a private local CA file.
+     The release merge keeps the manifest without this attribute. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <application

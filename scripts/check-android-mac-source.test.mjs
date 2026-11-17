@@ -29,6 +29,13 @@ assert.ok(Object.keys(fresh.metafile.inputs).some(name => name.endsWith('/native
 assert.ok(!Object.keys(fresh.metafile.inputs).some(name => name.endsWith('/native/app-source.js')));
 assert.ok(generated.endsWith(fresh.outputFiles[0].text), 'generated adapter must match the actual current browser entry and secure dependency aliases');
 const iife = (await transform(generated, { format: 'iife', globalName: 'AndroidMacSource', target: 'chrome89' })).code;
+// The shipped adapter exports playback, while the shared module also signs catalog
+// requests with Medusa. Exercise that distinct protocol without changing app exports.
+const signerIife = (await build({ stdin: { resolveDir: root, contents: "export { signedAppRequest } from './src/native/app-source-registered.js';" },
+  bundle: true, write: false, format: 'iife', globalName: 'SignedMacSource', platform: 'browser', target: 'chrome67',
+  inject: [path.join(adapter, 'buffer-runtime.mjs')],
+  alias: { 'node:crypto': path.join(adapter, 'crypto-shim.mjs'), 'node:zlib': path.join(adapter, 'zlib-shim.mjs'), axios: path.join(adapter, 'axios-common.cjs') },
+  define: { 'AbortSignal.timeout': 'androidAppTimeout' } })).outputFiles[0].text;
 const appText = fs.readFileSync(path.join(root, 'src/native/app-source-registered.js'), 'utf8');
 const appHash = crypto.createHash('sha256').update(appText).digest('hex');
 
@@ -141,9 +148,21 @@ function browserFixture(options = {}) {
 }
 function desktopFixture(options = {}) {
   const random = deterministic(options.seed), calls = [], reply = responses(options);
+  const modules = new Map();
   const context = vm.createContext({ ...globals(random, options.timestamp), Buffer, module: { exports: {} }, require(name) {
     if (name === 'node:crypto') return { ...crypto, randomBytes: random.randomBytes };
-    if (name === './sm3' || name === './download-quality' || name === './playback-signature' || name === './playback-signature-v5') return require(path.join(root, 'src/native', name));
+    if (name === './sm3' || name === './download-quality') return require(path.join(root, 'src/native', name));
+    if (name === './playback-signature' || name === './playback-signature-v5') {
+      // Nested signers must consume this fixture's clock and entropy stream too.
+      // A real Node require would escape the VM and make byte parity nondeterministic.
+      if (!modules.has(name)) {
+        const child = { exports: {} };
+        modules.set(name, child);
+        const load = vm.runInContext(`(function(require, module, exports) {\n${fs.readFileSync(path.join(root, 'src/native', name + '.js'), 'utf8')}\n})`, context);
+        load(context.require, child, child.exports);
+      }
+      return modules.get(name).exports;
+    }
     if (name === 'axios') return async config => {
       const request = { url: config.url, method: config.method || 'GET', headers: config.headers,
         body: config.data == null ? '' : Buffer.from(config.data).toString('utf8') };
@@ -157,6 +176,16 @@ function desktopFixture(options = {}) {
     context.__fixtureRequest = structuredClone(request);
     return vm.runInContext('branchOf(__fixtureRequest.url, Buffer.from(__fixtureRequest.body), Number(__fixtureRequest.headers["x-khronos"]))', context);
   } };
+}
+function browserSigningFixture(options = {}) {
+  const random = deterministic(options.seed);
+  const context = vm.createContext({ ...globals(random, options.timestamp), window: { AndroidCrypto: { process: nativeCrypto } },
+    crypto: { getRandomValues(array) { array.set(random.randomBytes(array.length)); return array; } } });
+  vm.runInContext(signerIife, context);
+  return context.SignedMacSource;
+}
+function signedBytes(request) {
+  return { url: request.url, headers: JSON.parse(JSON.stringify(request.headers)), body: Buffer.from(request.body).toString('hex') };
 }
 
 test('browser Buffer supports the exact Mac base64url and BigInt APIs', () => {
@@ -223,7 +252,7 @@ test('browser bundle reproduces the shared registered source signed request, dec
   assert.equal(actual.referer, ''); for (const candidate of actual.variants) assert.equal(candidate.referer, '');
   const requests = browser.calls.filter(call => call.method === 'appRequest').map(call => signedRequest(call.params));
   assert.deepEqual(requests, JSON.parse(JSON.stringify(desktop.calls)));
-  assert.equal(requests.length, 2); assert.ok(requests[0].headers['x-medusa']); assert.ok(requests[0].headers['x-gorgon']);
+  assert.equal(requests.length, 2); assert.ok(requests[0].headers['x-argus']); assert.ok(requests[0].headers['x-ladon']);
   assert.equal(JSON.parse(requests[0].body).mixed_video_id_map['1004'][0], vid);
 });
 test('32 entropy seeds preserve all shared registered request bytes and models across signature branches offline', async t => {
@@ -245,11 +274,20 @@ test('32 entropy seeds preserve all shared registered request bytes and models a
         assert.deepEqual(Buffer.from(requests[0].body, 'utf8'), Buffer.from(desktopRequests[0].body, 'utf8'));
         // Include the fallback GET, not just the signature-bearing POST.
         assert.deepEqual(requests, desktopRequests);
-        const branch = desktop.branch(desktopRequests[0]);
+        // This fallback fetch uses the 551 model protocol, not the independent
+        // Medusa catalog signer. Preserve its branch coverage on its real entry.
+        assert.ok(requests[0].headers['x-argus']); assert.ok(requests[0].headers['x-ladon']);
+        const catalog = desktopFixture(options), browserCatalog = browserSigningFixture(options);
+        const api = requests[0].url.split('?')[0], payload = requests[0].body;
+        const expectedSigned = catalog.source.signedAppRequest(api, payload);
+        const actualSigned = browserCatalog.signedAppRequest(api, payload);
+        assert.deepEqual(signedBytes(actualSigned), signedBytes(expectedSigned));
+        assert.ok(actualSigned.headers['x-medusa']); assert.ok(actualSigned.headers['x-gorgon']);
+        const branch = catalog.branch({ ...expectedSigned, body: expectedSigned.body.toString('utf8') });
         assert.ok(branch === 0 || branch === 2);
         branches.set(branch, (branches.get(branch) || 0) + 1);
-        headerLengths.add(requests[0].headers['x-medusa'].length);
-        signatures.add(requests[0].headers['x-medusa']);
+        headerLengths.add(actualSigned.headers['x-medusa'].length);
+        signatures.add(actualSigned.headers['x-medusa']);
         urls.add(requests[0].url);
       } finally { browser.unregister(); }
     });

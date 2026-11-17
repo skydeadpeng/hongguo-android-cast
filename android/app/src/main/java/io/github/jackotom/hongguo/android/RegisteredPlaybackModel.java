@@ -391,11 +391,22 @@ final class RegisteredPlaybackModel implements AutoCloseable {
          * CDN node this attempt targets (null = system resolution). */
         interface Engine { OfficialApiClient.Response call(URI uri, OfficialApiClient.Request request, int timeoutMs, java.net.InetAddress pin) throws Exception; }
         private final Engine engine;
-        private static final java.util.Set<okhttp3.Call> ACTIVE_CALLS = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+        // One lookup owns its calls, while SHARED_CLIENT still owns the shared h2 pool.
+        // The same monitor serializes close and registration: a call created while
+        // close is running either joins its owner's cancellation snapshot or never executes.
+        private final java.util.Set<okhttp3.Call> activeCalls = new java.util.HashSet<>();
         private volatile boolean closed;
-        ModelHttpTransport() { this(ModelHttpTransport::productionOkhttpCall); }
+        ModelHttpTransport() { this.engine = this::productionOkhttpCall; }
         ModelHttpTransport(Engine engine) { this.engine = Objects.requireNonNull(engine); }
-        @Override public void close() { closed = true; for (okhttp3.Call call : ACTIVE_CALLS.toArray(new okhttp3.Call[0])) call.cancel(); }
+        @Override public void close() {
+            okhttp3.Call[] owned;
+            synchronized (activeCalls) {
+                if (closed) return;
+                closed = true;
+                owned = activeCalls.toArray(new okhttp3.Call[0]);
+            }
+            for (okhttp3.Call call : owned) call.cancel();
+        }
         static URI validate(OfficialApiClient.Request request) throws Exception {
             URI uri = new URI(request.url);
             boolean post = "/novel/player/multi_video_model/v1/".equals(uri.getRawPath()) && request.method.equals("POST");
@@ -415,7 +426,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
          * The model endpoints sit on a rotating CDN pool where some nodes hollow requests with
          * empty 200s while others serve; the engine pins each request to one node from the
          * pool (system answer when unavailable) and the fetch ladder rotates the node. */
-        private static OfficialApiClient.Response productionOkhttpCall(URI uri, OfficialApiClient.Request request, int timeoutMs, java.net.InetAddress pin) throws Exception {
+        private OfficialApiClient.Response productionOkhttpCall(URI uri, OfficialApiClient.Request request, int timeoutMs, java.net.InetAddress pin) throws Exception {
             okhttp3.OkHttpClient.Builder client = SHARED_CLIENT.newBuilder()
                 .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS).readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .callTimeout(timeoutMs, TimeUnit.MILLISECONDS);
@@ -431,9 +442,27 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             for (Map.Entry<String, String> header : request.headers.entrySet()) builder.header(header.getKey(), header.getValue());
             builder.header("Accept-Encoding", "gzip");
             okhttp3.Call call = client.build().newCall(builder.build());
-            ACTIVE_CALLS.add(call);
-            try { return consume(call.execute(), request); }
-            finally { ACTIVE_CALLS.remove(call); }
+            return executeTrackedCall(call, request);
+        }
+        private OfficialApiClient.Response executeTrackedCall(okhttp3.Call call, OfficialApiClient.Request request) throws Exception {
+            boolean registered = false;
+            try {
+                synchronized (activeCalls) {
+                    check(request.deadlineNanos);
+                    activeCalls.add(call);
+                    registered = true;
+                }
+                // close may have won immediately after registration. OkHttp also
+                // remembers cancellation if close runs between this check and execute.
+                check(request.deadlineNanos);
+                OfficialApiClient.Response response = consume(call.execute(), request);
+                check(request.deadlineNanos);
+                return response;
+            } finally {
+                if (registered) {
+                    synchronized (activeCalls) { activeCalls.remove(call); }
+                } else call.cancel();
+            }
         }
         private static final okhttp3.OkHttpClient SHARED_CLIENT = new okhttp3.OkHttpClient.Builder()
             .followRedirects(false).followSslRedirects(false).protocols(java.util.Arrays.asList(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))

@@ -38,9 +38,19 @@ function fixture(seed, timestamp, browser) {
   } else {
     globals.Buffer = Buffer;
     globals.module = { exports: {} };
+    const modules = new Map();
     globals.require = name => {
       if (name === 'node:crypto') return { ...crypto, randomBytes };
       if (name === './sm3' || name === './download-quality') return require(path.join(root, 'src/native', name));
+      if (name === './playback-signature' || name === './playback-signature-v5') {
+        if (!modules.has(name)) {
+          const child = { exports: {} };
+          modules.set(name, child);
+          const load = vm.runInContext(`(function(require, module, exports) {\n${fs.readFileSync(path.join(root, 'src/native', name + '.js'), 'utf8')}\n})`, globals);
+          load(globals.require, child, child.exports);
+        }
+        return modules.get(name).exports;
+      }
       throw new Error('Unexpected dependency: ' + name);
     };
   }

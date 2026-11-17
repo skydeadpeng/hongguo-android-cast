@@ -34,6 +34,7 @@
     "check:android": "node --experimental-test-coverage --test scripts/check-android-source.test.mjs scripts/check-android-tv-navigation.test.mjs && node scripts/check-android-project.cjs",
     "check:android:device": "node scripts/check-android-device.mjs",
     "check:android:playback": "node scripts/check-android-playback.mjs",
+    "check:android:playback-native": "node scripts/check-android-model-cancel-ownership.test.mjs && bash android/tests/run-playback-native-recovery-tests.sh && bash android/tests/run-registered-playback-model-tests.sh",
     "check:android:playback:ui": "bash scripts/check-android-playback-ui.sh",
     "check:android:playback:device": "node scripts/check-android-playback-device.mjs",
     "check:android:mobile": "node scripts/check-android-mobile-update.mjs"
