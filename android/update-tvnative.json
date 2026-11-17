@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 27,
-  "versionName": "0.1.26",
+  "versionCode": 28,
+  "versionName": "0.1.27",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.26/HongguoNative-0.1.26-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 47053256,
-  "sha256": "23729bdec53d7e20fe3ef00d7c75e13c6ac8ef870543ca806d749f98b8a7f510",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.27/HongguoNative-0.1.27-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 47053265,
+  "sha256": "ab093aae7e8c0f1bc01e665c26b6c3cb518c73b7b8d4cabb00ae30a2436767b5",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.26/HongguoNative-0.1.26-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 47053256,
-      "sha256": "23729bdec53d7e20fe3ef00d7c75e13c6ac8ef870543ca806d749f98b8a7f510"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.27/HongguoNative-0.1.27-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 47053265,
+      "sha256": "ab093aae7e8c0f1bc01e665c26b6c3cb518c73b7b8d4cabb00ae30a2436767b5"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.26/HongguoNative-0.1.26-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 43325658,
-      "sha256": "5489ceb624852cc7319132f1fcdedef1b50c4373a492bfa965057462fce3f24d"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.27/HongguoNative-0.1.27-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 43325662,
+      "sha256": "f60158ca397960a9f9d37bc6b380678e7765d51fc28d7878a5edee4a76009adf"
     }
   },
-  "notes": "红果原生电视 0.1.26\n\n- 优化首次打开速度：启动时后台预登记播放身份，首次播放不再等待注册；取源重试间隔收紧。\n- 播放与本地数据不受影响；0.1.25 可直接覆盖升级。\n",
-  "publishedAt": "2026-11-17T01:30:19.513Z"
+  "notes": "红果原生电视 0.1.27\n\n- 进一步优化播放启动速度：身份预热改为后台执行，首次播放等待再缩短。\n- 播放与本地数据不受影响；0.1.26 可直接覆盖升级。\n",
+  "publishedAt": "2026-11-17T02:05:40.898Z"
 }
