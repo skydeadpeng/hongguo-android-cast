@@ -49,7 +49,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     private static volatile java.io.File identityFile;
     /** Wire the on-disk identity slot once from the application context. */
     static void identityStore(java.io.File file) { identityFile = file; }
-    static String[] cachedBootstrap() throws Exception {
+    static synchronized String[] cachedBootstrap() throws Exception {
         String[] identity = SHARED_IDENTITY.get();
         if (identity != null) return identity;
         identity = loadPersistedIdentity();
@@ -141,7 +141,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             // first, and registers a fresh identity only as the last resort.
             JSONObject projected = null; ModelError lastFailure = null;
             for (int attempt = 1; attempt <= 5 && projected == null; attempt++) {
-                if (attempt > 1) pace(attempt >= 4 ? 2600 : 1900);
+                if (attempt > 1) pace(attempt >= 4 ? 2000 : 1200);
                 if (attempt == 4) {
                     String[] reRegistered = reRegister();
                     if (reRegistered == null) break;
