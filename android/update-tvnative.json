@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 29,
-  "versionName": "0.1.28",
+  "versionCode": 30,
+  "versionName": "0.1.29",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.28/HongguoNative-0.1.28-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 47053253,
-  "sha256": "f61cc0d99d50f5ef528b5ff45bf91ad73d000bd6da595d5a330449b31f80e201",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.29/HongguoNative-0.1.29-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 47053257,
+  "sha256": "26cac0b9341b20f07a25e5d0c073c91290bc554c2b56c9dcb84fd796458453aa",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.28/HongguoNative-0.1.28-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 47053253,
-      "sha256": "f61cc0d99d50f5ef528b5ff45bf91ad73d000bd6da595d5a330449b31f80e201"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.29/HongguoNative-0.1.29-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 47053257,
+      "sha256": "26cac0b9341b20f07a25e5d0c073c91290bc554c2b56c9dcb84fd796458453aa"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.28/HongguoNative-0.1.28-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 43325654,
-      "sha256": "4f87cfdd553b2f17493362f5feab4be61f80337ce0c7e59eeaf0e79af150d46e"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.29/HongguoNative-0.1.29-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 43325662,
+      "sha256": "c5e0189c6ca1639f676911dfebdfa45c5ad46e96c3da8b8908c93ad079b5eafa"
     }
   },
-  "notes": "红果原生电视 0.1.28\n\n- 大幅优化播放速度：取源探测引入\"空响应快速失败\"，连续空响应后各集只做一次快速探测即转兜底链路；实测新剧首集约 4 秒出画面。\n- 高清链路命中时自动恢复完整尝试；播放与本地数据不受影响。0.1.27 可直接覆盖升级。\n",
-  "publishedAt": "2026-11-17T03:01:18.784Z"
+  "notes": "红果原生电视 0.1.29\n\n- 修复部分剧集首次播放需要返回重试的问题：取源重试提前让位给兜底链路，首次尝试即可完成播放。\n- 播放与本地数据不受影响；0.1.28 可直接覆盖升级。\n",
+  "publishedAt": "2026-11-17T03:24:19.937Z"
 }
