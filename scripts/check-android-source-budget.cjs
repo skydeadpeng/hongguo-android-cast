@@ -80,14 +80,23 @@ async function main() {
     const window = {
       AndroidCrypto: { process(raw) {
         const request = JSON.parse(raw);
-        assert.equal(request.operation, 'digest');
-        return JSON.stringify({ data: crypto.createHash(request.algorithm)
+        if (request.operation === 'digest') return JSON.stringify({ data: crypto.createHash(request.algorithm)
           .update(Buffer.from(request.data, 'base64')).digest('base64'), error: null });
+        if (request.operation !== 'encrypt' && request.operation !== 'decrypt') return JSON.stringify({ data: '', error: 'unsupported operation' });
+        const cipher = (request.operation === 'encrypt' ? crypto.createCipheriv : crypto.createDecipheriv)
+          ('aes-128-cbc', Buffer.from(request.key, 'base64'), Buffer.from(request.iv, 'base64'));
+        cipher.setAutoPadding(request.autoPadding !== false);
+        return JSON.stringify({ data: Buffer.concat([cipher.update(Buffer.from(request.data, 'base64')),
+          cipher.final()]).toString('base64'), error: null });
       } },
       AndroidBridge: { postMessage(raw) {
         const request = { ...JSON.parse(raw), at: time.now() }; calls.push(request);
         if (request.method === 'cancelHttp') return;
         if (request.method === 'appResolveResult') { fixture.reply(request, { accepted: true }); return; }
+        // The browser entry bootstraps the process identity before the first model RPC:
+        // answer it deterministically so every group exercises the real sequence.
+        if (request.method === 'appDeviceIdentity') { fixture.reply(request,
+          { device_id: '1793070000001', install_id: '1793070000002' }); return; }
         if (handle) handle(request, fixture);
         else fixture.defaultReply(request);
       } },
@@ -134,7 +143,7 @@ async function main() {
           return handle ? handle(config, fixture) : fixture.response(config.method === 'POST' ? legacyPost() : legacyGet());
         };
         if (name === 'node:crypto') return crypto;
-        if (name === './sm3' || name === './download-quality') return require(path.join(native, name));
+        if (name === './sm3' || name === './download-quality' || name === './playback-signature' || name === './playback-signature-v5') return require(path.join(native, name));
         throw new Error('Unexpected dependency; networking prohibited: ' + name);
       },
     };
@@ -144,21 +153,23 @@ async function main() {
     return fixture;
   }
 
-  await group('registered empty response after 7s leaves a fresh 6s HTTP fallback', async () => {
+  await group('registered empty response retries at 1s/3s/8s then leaves a fresh 6s HTTP fallback', async () => {
     const f = browser((request, self) => { if (request.method !== 'appRegisteredModel') self.defaultReply(request); });
-    const pending = f.source.fetchAppPlayUrl(VID); const native = f.models()[0];
-    equal(f.time.timers.map(t => t.ms).sort((a, b) => a - b), [20000, 28000]);
+    const pending = f.source.fetchAppPlayUrl(VID); await flush(); const native = f.models()[0];
+    equal(f.time.timers.filter(t => !t.cleared).map(t => t.ms).sort((a, b) => a - b), [20000, 28000]);
     f.time.advance(7000); f.fail(native, 'APP_EMPTY_RESPONSE');
+    // Same-identity RecoveryBudget retries: fire each queued backoff timer, then fail the fresh probe.
+    for (const step of [1000, 3000, 8000]) { await flush(); f.time.advance(step); await flush(); f.fail(f.models()[f.models().length - 1], 'APP_EMPTY_RESPONSE'); }
     const result = await pending;
     equal(result.url, MEDIA); equal(result.contentKey, null);
     equal(f.httpCalls().map(c => c.params.timeoutMs), [6000, 6000]);
-    equal(f.httpCalls().map(c => c.at - f.time.start), [7000, 7000]);
-    equal(f.models().length, 1); equal(f.time.active().length, 0);
+    equal(f.httpCalls().map(c => c.at - f.time.start), [19000, 19000]);
+    equal(f.models().length, 4); equal(f.time.active().length, 0);
   });
 
   await group('real registered RPC timeout at 20s leaves the reserved 6s fallback', async () => {
     const f = browser((request, self) => { if (request.method !== 'appRegisteredModel') self.defaultReply(request); });
-    const pending = f.source.fetchAppPlayUrl(VID); const native = f.models()[0];
+    const pending = f.source.fetchAppPlayUrl(VID); await flush(); const native = f.models()[0];
     f.time.advance(20000);
     equal((await pending).url, MEDIA);
     equal(f.httpCalls().map(c => c.params.timeoutMs), [6000, 6000]);
@@ -172,31 +183,41 @@ async function main() {
       if (request.method === 'appRegisteredModel') self.fail(request, 'APP_EMPTY_RESPONSE');
       else { if (request.params.method === 'POST') self.time.advance(2300); self.defaultReply(request); }
     });
-    equal((await f.source.fetchAppPlayUrl(VID)).url, MEDIA);
+    const settled = f.source.fetchAppPlayUrl(VID).then(out => out, error => error);
+    await flush();
+    for (const step of [1000, 3000, 8000]) { await flush(); f.time.advance(step); }
+    equal((await settled).url, MEDIA);
     equal(f.httpCalls().map(c => c.params.timeoutMs), [6000, 3700]);
     equal(new Set(f.httpCalls().map(c => c.params.deadlineMs)).size, 1);
-    equal(f.models().length, 1);
+    equal(f.models().length, 4);
   });
 
   await group('exhausted legacy POST does not start a GET or another provider', async () => {
     const f = browser((request, self) => { if (request.method === 'appRegisteredModel') self.fail(request, 'APP_EMPTY_RESPONSE'); });
     const pending = f.source.fetchAppPlayUrl(VID); const result = pending.catch(e => e);
+    await flush();
+    for (const step of [1000, 3000, 8000]) { await flush(); f.time.advance(step); }
     await flush(); equal(f.httpCalls().length, 1); f.time.advance(6000);
-    equal((await result).code, 'ETIMEDOUT'); equal(f.httpCalls().length, 1); equal(f.models().length, 1);
+    equal((await result).code, 'ETIMEDOUT'); equal(f.httpCalls().length, 1); equal(f.models().length, 4);
     equal(f.time.active().length, 0);
   });
 
-  await group('empty legacy response never invokes an already attempted provider twice', async () => {
+  await group('empty legacy responses fail after the bounded provider retries without provider restarts', async () => {
     const f = browser((request, self) => {
       if (request.method === 'appRegisteredModel') self.fail(request, 'APP_EMPTY_RESPONSE');
       else self.http(request, '');
     });
-    await rejects(f.source.fetchAppPlayUrl(VID), 'APP_EMPTY_RESPONSE');
-    equal(f.models().length, 1); equal(f.httpCalls().length, 1);
+    const result = f.source.fetchAppPlayUrl(VID).catch(e => e);
+    await flush();
+    for (const step of [1000, 3000, 8000]) { await flush(); f.time.advance(step); }
+    const failure = await result;
+    equal(failure.code, 'APP_EMPTY_RESPONSE');
+    equal(f.models().length, 4); equal(f.httpCalls().length, 2);
   });
 
   await group('business refusal HTTP denial cancellation invalid and unknown errors never fall back', async () => {
-    for (const code of ['BUSINESS_REJECTED', 'HTTP_ERROR', 'INVALID_INPUT', 'ERR_CANCELED',
+    // HTTP_ERROR is transient by design (retry + legacy fallback, covered above).
+    for (const code of ['BUSINESS_REJECTED', 'INVALID_INPUT', 'ERR_CANCELED',
       'SECURITY_BLOCKED', 'APP_INVALID_RESPONSE', 'UNRECOGNIZED_FAILURE', undefined]) {
       const f = browser((request, self) => {
         if (request.method === 'appRegisteredModel') self.fail(request, code); else self.defaultReply(request);
@@ -225,21 +246,24 @@ async function main() {
         if (request.method === 'appRegisteredModel') self.fail(request, 'APP_EMPTY_RESPONSE');
         else self.http(request, { code: status }, status);
       });
-      equal((await rejects(f.source.fetchAppPlayUrl(VID))).status, status);
-      equal(f.models().length, 1); equal(f.httpCalls().length, 1);
+      const result = f.source.fetchAppPlayUrl(VID).catch(e => e);
+      await flush();
+      for (const step of [1000, 3000, 8000]) { await flush(); f.time.advance(step); }
+      equal((await result).status, status);
+      equal(f.models().length, 4); equal(f.httpCalls().length, 1);
     }
   });
 
   await group('successful 7s registered inline model does not make an HTTP request', async () => {
     const f = browser(() => {}); const pending = f.source.fetchAppPlayUrl(VID, { quality: '1080p' });
-    f.time.advance(7000); f.reply(f.models()[0], registeredModel());
+    await flush(); f.time.advance(7000); f.reply(f.models()[0], registeredModel());
     const result = await pending; equal(result.url, MEDIA); equal(result.width, 1080);
     equal(f.httpCalls().length, 0); equal(f.time.active().length, 0);
   });
 
   await group('registered fallback GET gets its own first HTTP budget after a 7s provider wait', async () => {
     const f = browser((request, self) => { if (request.method !== 'appRegisteredModel') self.defaultReply(request); });
-    const pending = f.source.fetchAppPlayUrl(VID); f.time.advance(7000);
+    const pending = f.source.fetchAppPlayUrl(VID); await flush(); f.time.advance(7000);
     f.reply(f.models()[0], { vid: VID, video_model: { fallback_api: 'https://vod.snssdk.com/synthetic-budget-fixture' } });
     equal((await pending).url, MEDIA);
     equal(f.httpCalls().map(c => c.params.method), ['GET']); equal(f.httpCalls()[0].params.timeoutMs, 6000);
@@ -260,7 +284,7 @@ async function main() {
   await group('cancellation during registration closes exact RPC and ignores late success', async () => {
     const f = browser(() => {}); const controller = new AbortController();
     const pending = f.source.fetchAppPlayUrl(VID, { signal: controller.signal });
-    const outcome = pending.catch(e => e), native = f.models()[0];
+    await flush(); const outcome = pending.catch(e => e), native = f.models()[0];
     controller.abort(); equal((await outcome).code, 'ERR_CANCELED');
     equal(f.calls.filter(c => c.method === 'cancelHttp').map(c => c.params.requestId), [native.id]);
     equal(f.httpCalls().length, 0); f.reply(native, registeredModel()); await flush();
@@ -270,10 +294,12 @@ async function main() {
   await group('cancellation during fallback prevents GET and any result publication', async () => {
     const f = browser((request, self) => { if (request.method === 'appRegisteredModel') self.fail(request, 'APP_EMPTY_RESPONSE'); });
     const pending = f.window.__androidAppResolve('cancel-fallback', SID, VID);
+    await flush();
+    for (const step of [1000, 3000, 8000]) { await flush(); f.time.advance(step); }
     await flush(); equal(f.httpCalls().length, 1);
     f.window.__androidAppCancelResolve('cancel-fallback'); await pending;
     f.http(f.httpCalls()[0], legacyPost()); await flush();
-    equal(f.httpCalls().length, 1); equal(f.results().length, 0); equal(f.models().length, 1);
+    equal(f.httpCalls().length, 1); equal(f.results().length, 0); equal(f.models().length, 4);
   });
 
   await group('unregister cancels the model and removes only its own handlers', async () => {
@@ -312,7 +338,9 @@ async function main() {
     });
     let providerCalls = 0;
     const result = await f.source.fetchAppPlayUrl(VID, { registeredModelProvider: async () => {
-      providerCalls++; equal(f.signals.length, 0); f.time.advance(7000); throw error('APP_EMPTY_RESPONSE');
+      // ECONNABORTED exercises the budget-exhaustion fall-through this group pins;
+      // the APP_EMPTY_RESPONSE retry cadence is covered by the browser groups above.
+      providerCalls++; equal(f.signals.length, 0); f.time.advance(7000); throw error('ECONNABORTED');
     } });
     equal(result.url, MEDIA); equal(providerCalls, 1); equal(f.signals.length, 1);
     equal(f.signals[0].at - f.time.start, 7000); equal(f.signals[0].ms, 12000);
@@ -346,8 +374,9 @@ async function main() {
     for (const [body, code] of [['', 'APP_EMPTY_RESPONSE'], [JSON.stringify({ code: 401 }), 'BUSINESS_REJECTED']]) {
       const f = shared(() => ({ status: 200, data: body, headers: {} }));
       const failure = await rejects(f.source.fetchAppPlayUrl(VID), code);
-      if (code === 'APP_EMPTY_RESPONSE') equal(failure.responseStage, 'model_post');
-      equal(f.calls.length, 1);
+      // An empty POST also probes the video_tab GET once before failing; business refusal is terminal.
+      if (code === 'APP_EMPTY_RESPONSE') { equal(failure.responseStage, 'model_post'); equal(f.calls.length, 2); }
+      else equal(f.calls.length, 1);
     }
   });
 

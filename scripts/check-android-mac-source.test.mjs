@@ -23,7 +23,7 @@ const adapter = path.join(root, 'src/android/mac-source');
 const fresh = await build({ entryPoints: [path.join(adapter, 'entry.mjs')], bundle: true,
   write: false, format: 'esm', platform: 'browser', target: 'chrome67', metafile: true,
   inject: [path.join(adapter, 'buffer-runtime.mjs')],
-  alias: { 'node:crypto': path.join(adapter, 'crypto-shim.mjs'), axios: path.join(adapter, 'axios-common.cjs') },
+  alias: { 'node:crypto': path.join(adapter, 'crypto-shim.mjs'), 'node:zlib': path.join(adapter, 'zlib-shim.mjs'), axios: path.join(adapter, 'axios-common.cjs') },
   define: { 'AbortSignal.timeout': 'androidAppTimeout' }, legalComments: 'inline' });
 assert.ok(Object.keys(fresh.metafile.inputs).some(name => name.endsWith('/native/app-source-registered.js')));
 assert.ok(!Object.keys(fresh.metafile.inputs).some(name => name.endsWith('/native/app-source.js')));
@@ -39,10 +39,11 @@ function nativeCrypto(input) {
     let result;
     if (request.operation === 'digest') result = crypto.createHash(request.algorithm).update(bytes).digest();
     else {
-      assert.equal(request.operation, 'decrypt'); assert.equal(request.algorithm, 'AES-128-CBC');
-      const decipher = crypto.createDecipheriv('aes-128-cbc', Buffer.from(request.key, 'base64'), Buffer.from(request.iv, 'base64'));
-      decipher.setAutoPadding(request.autoPadding);
-      result = Buffer.concat([decipher.update(bytes), decipher.final()]);
+      assert.ok(request.operation === 'decrypt' || request.operation === 'encrypt'); assert.equal(request.algorithm, 'AES-128-CBC');
+      const cipher = (request.operation === 'encrypt' ? crypto.createCipheriv : crypto.createDecipheriv)
+        ('aes-128-cbc', Buffer.from(request.key, 'base64'), Buffer.from(request.iv, 'base64'));
+      cipher.setAutoPadding(request.autoPadding);
+      result = Buffer.concat([cipher.update(bytes), cipher.final()]);
     }
     return JSON.stringify({ data: result.toString('base64'), error: null });
   } catch (error) { return JSON.stringify({ data: null, error: error.message }); }
@@ -126,7 +127,11 @@ function browserFixture(options = {}) {
   vm.runInContext(iife, context);
   const rpc = async (method, params) => {
     calls.push({ method, params: structuredClone(params) });
-    if (method === 'appRegisteredModel') throw Object.assign(new Error('fixture provider empty'), { code: 'APP_EMPTY_RESPONSE' });
+    // ECONNABORTED: budget-exhaustion fall-through (single provider call, immediate
+    // legacy path). The APP_EMPTY_RESPONSE same-identity retry cadence is covered by
+    // check-android-registered-model.test.mjs and check-android-source-budget.cjs,
+    // whose harnesses drive fake backoff timers deterministically.
+    if (method === 'appRegisteredModel') throw Object.assign(new Error('fixture provider budget exhausted'), { code: 'ECONNABORTED' });
     if (method === 'appRequest' && options.callNative) return options.callNative(method, params);
     if (method === 'appRequest' && options.nativeFailure) return { status: 0, body: '', url: params.url, errorCode: options.nativeFailure };
     return method === 'appRequest' ? reply(params) : { received: true };
@@ -138,7 +143,7 @@ function desktopFixture(options = {}) {
   const random = deterministic(options.seed), calls = [], reply = responses(options);
   const context = vm.createContext({ ...globals(random, options.timestamp), Buffer, module: { exports: {} }, require(name) {
     if (name === 'node:crypto') return { ...crypto, randomBytes: random.randomBytes };
-    if (name === './sm3' || name === './download-quality') return require(path.join(root, 'src/native', name));
+    if (name === './sm3' || name === './download-quality' || name === './playback-signature' || name === './playback-signature-v5') return require(path.join(root, 'src/native', name));
     if (name === 'axios') return async config => {
       const request = { url: config.url, method: config.method || 'GET', headers: config.headers,
         body: config.data == null ? '' : Buffer.from(config.data).toString('utf8') };

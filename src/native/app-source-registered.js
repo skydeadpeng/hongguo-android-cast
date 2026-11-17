@@ -413,30 +413,51 @@ async function fetchAppPlayUrl(vid, options = {}) {
         // model POST, and the native registration needs no signature at all. A provider
         // explicitly transient/empty failure before a usable model may fall back;
         // refusal, cancellation and mismatched model data are terminal.
-        try {
-            const reply = await registeredProvider(vid);
-            if (!reply || reply.vid !== vid || !reply.video_model || typeof reply.video_model !== 'object' || Array.isArray(reply.video_model)) {
-                throw Object.assign(new Error('App 已登记设备的单集模型与请求不一致'), { code: 'APP_INVALID_RESPONSE' });
+        // 2026-11-17: transient/empty failures re-invoke the SAME provider at the
+        // hongguoTV RecoveryBudget cadence (~1s/3s/8s, same persisted identity) before
+        // falling to the legacy path. The provider itself is single-shot per call —
+        // recovery lives HERE, not as rapid re-registration inside the native fetch:
+        // re-registering per retry burned identity goodwill and poisoned every rotation.
+        // ETIMEDOUT/ECONNABORTED fall to legacy without retry: they mean the per-call
+        // budget is exhausted, not the rate-limit window we are waiting out.
+        const providerRetryable = error => ['APP_EMPTY_RESPONSE', 'HTTP_ERROR', 'ENOTFOUND', 'EAI_AGAIN',
+            'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE'].includes(error?.code);
+        const providerFallback = error => ['ECONNABORTED', 'ETIMEDOUT'].includes(error?.code);
+        const providerRetryDelays = [1000, 3000, 8000];
+        let providerFailure = null;
+        for (let providerAttempt = 0; ; providerAttempt++) {
+            try {
+                const reply = await registeredProvider(vid);
+                if (!reply || reply.vid !== vid || !reply.video_model || typeof reply.video_model !== 'object' || Array.isArray(reply.video_model)) {
+                    throw Object.assign(new Error('App 已登记设备的单集模型与请求不一致'), { code: 'APP_INVALID_RESPONSE' });
+                }
+                assertPlaybackAllowed(reply, reply.video_model);
+                if (!acceptInline(reply.video_model)) {
+                    const fallback = parseFallback(reply.video_model.fallback_api);
+                    if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
+                    const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
+                    assertPlaybackAllowed(outer, outer.video_info, outer.video_info?.data);
+                    info = outer?.video_info?.data; registered = true;
+                }
+                if (!info || !info.video_list || typeof info.video_list !== 'object') throw Object.assign(new Error('App 单集模型缺少有效片源列表'), { code: 'APP_INVALID_RESPONSE' });
+                providerFailure = null;
+                break;
+            } catch (providerError) {
+                // Only an explicitly transient/empty provider failure may retry here and
+                // later fall back. Never turn refusal, cancellation or mismatched data
+                // into a fresh request merely because that path now has its intended
+                // time budget. HTTP_ERROR joins the set since 2026-11-12: the graded
+                // upstream refuses whole fresh identities with 404s across both native forms.
+                if (registered || !(providerRetryable(providerError) || providerFallback(providerError))) throw providerError;
+                if (providerRetryable(providerError) && providerAttempt < providerRetryDelays.length && !options.signal?.aborted) {
+                    await new Promise(resolve => setTimeout(resolve, providerRetryDelays[providerAttempt]));
+                    continue;
+                }
+                providerFailure = providerError;
+                break;
             }
-            assertPlaybackAllowed(reply, reply.video_model);
-            if (!acceptInline(reply.video_model)) {
-                const fallback = parseFallback(reply.video_model.fallback_api);
-                if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
-                const outer = await lookupJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, 'fallback_get');
-                assertPlaybackAllowed(outer, outer.video_info, outer.video_info?.data);
-                info = outer?.video_info?.data; registered = true;
-            }
-            if (!info || !info.video_list || typeof info.video_list !== 'object') throw Object.assign(new Error('App 单集模型缺少有效片源列表'), { code: 'APP_INVALID_RESPONSE' });
-        } catch (providerError) {
-            // Only an explicitly transient/empty provider failure may try the existing
-            // legacy path. Never turn refusal, cancellation or mismatched data into a
-            // fresh request merely because that path now has its intended time budget.
-            // HTTP_ERROR joins the set since 2026-11-12: the graded upstream refuses
-            // whole fresh identities with 404s across both native forms.
-            if (registered || !['APP_EMPTY_RESPONSE', 'HTTP_ERROR', 'ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN',
-                'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE'].includes(providerError?.code)) throw providerError;
-            info = null;
         }
+        if (providerFailure) info = null;
     }
     if (!info) {
         // Shared model parsing for the v5 POST route, the legacy POST and the video_tab recovery.

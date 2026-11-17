@@ -333,12 +333,9 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, openExterna
             let lastError = null;
             for (let attempt = 0; attempt < 3; attempt++) {
               if (attempt > 0) {
-                // 空响应＝会话失效或短期拒绝：重新注册一个新身份再试（与服务端的新鲜会话语义一致）。
-                await new Promise(resolve => setTimeout(resolve, 800 + attempt * 700));
-                await reRegisterDevice();
-                const fresh = registeredIdentityOrNull();
-                if (fresh) { identity.deviceId = fresh.deviceId; identity.installId = fresh.installId; identity.cookie = fresh.cookie; identity.deviceToken = fresh.deviceToken; }
-                setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
+                // 2026-11-17：空响应＝短期限流，同一身份按 hongguoTV RecoveryBudget 节奏退避重试。
+                // 不再每轮重新注册换身份——多轮换身份快速消耗信誉，反被服务端整段拉黑。
+                await new Promise(resolve => setTimeout(resolve, 1000 + attempt * 2000));
               }
               const signed = signedPlayerV1Request(payload, vid);
               const response = await axios.post(signed.url, signed.body, {

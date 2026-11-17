@@ -9,32 +9,41 @@ function spade(key=KEY,tag='app_v1') {const plain=Buffer.from('0'+key),n=tag.len
 function model(rows){return{vid:VID,video_model:{video_list:rows||[{main_url:Buffer.from(URL_OK).toString('base64'),video_meta:{codec_type:'bytevc1',vwidth:1080,vheight:1920,definition:'1080P'},encrypt_info:{spade_a:spade()}}]}}}
 const legacyPost={code:0,data:{[VID]:{video_model:JSON.stringify({fallback_api:'https://vod.snssdk.com/fixture'})}}},legacyGet={video_info:{data:{video_list:{one:{main_url:URL_OK,codec_type:'h264',vwidth:1080,vheight:1920}}}}};
 const bundle=await build({entryPoints:[path.join(adapter,'entry.mjs')],bundle:true,write:false,platform:'browser',format:'iife',globalName:'RegisteredSource',target:'chrome89',inject:[path.join(adapter,'buffer-runtime.mjs')],alias:{'node:crypto':path.join(adapter,'crypto-shim.mjs'),axios:path.join(adapter,'axios-common.cjs')},define:{'AbortSignal.timeout':'androidAppTimeout'}});
-function fixture(options={}){let now=1793070000000;const calls=[],timers=[],window={AndroidCrypto:{process(raw){const r=JSON.parse(raw);assert.equal(r.operation,'digest');return JSON.stringify({data:crypto.createHash(r.algorithm).update(Buffer.from(r.data,'base64')).digest('base64'),error:null})}}};class Clock extends Date{static now(){return now}}
-const context=vm.createContext({window,URL,URLSearchParams,AbortSignal,AbortController,Date:Clock,setTimeout(fn,ms){const timer={fn,ms,cleared:false};timers.push(timer);return timer},clearTimeout(t){if(t)t.cleared=true},crypto:{getRandomValues:b=>crypto.webcrypto.getRandomValues(b)}});vm.runInContext(bundle.outputFiles[0].text,context);
+function fixture(options={}){let now=1793070000000;const calls=[],timers=[],window={AndroidCrypto:{process(raw){const r=JSON.parse(raw);if(r.operation==='digest')return JSON.stringify({data:crypto.createHash(r.algorithm).update(Buffer.from(r.data,'base64')).digest('base64'),error:null});if(r.operation!=='encrypt'&&r.operation!=='decrypt')return JSON.stringify({data:'',error:'unsupported operation'});const cipher=(r.operation==='encrypt'?crypto.createCipheriv:crypto.createDecipheriv)('aes-128-cbc',Buffer.from(r.key,'base64'),Buffer.from(r.iv,'base64'));cipher.setAutoPadding(r.autoPadding!==false);return JSON.stringify({data:Buffer.concat([cipher.update(Buffer.from(r.data,'base64')),cipher.final()]).toString('base64'),error:null})}}};class Clock extends Date{static now(){return now}}
+const context=vm.createContext({window,URL,URLSearchParams,AbortSignal,AbortController,Date:Clock,setTimeout(fn,ms){const timer={fn,ms,cleared:false,fired:false};timers.push(timer);return timer},clearTimeout(t){if(t)t.cleared=true},crypto:{getRandomValues:b=>crypto.webcrypto.getRandomValues(b)}});vm.runInContext(bundle.outputFiles[0].text,context);
 const unregister=context.RegisteredSource.registerAppResolver(async(method,params,timeout,rpcOptions)=>{calls.push({method,params,timeout,signal:rpcOptions?.signal});if(method==='appRegisteredModel'){if(options.registered)return options.registered(params,timeout,rpcOptions);return model(options.rows)}if(method!=='appRequest')return{accepted:true};const isPost=params.method==='POST';const body=options.emptyAt==='fallback_get'?JSON.stringify(isPost?legacyPost:null):options.legacySuccess?JSON.stringify(isPost?legacyPost:legacyGet):options.body??'';return{status:options.status??200,body,headers:{},url:params.url}});
 return{source:context.RegisteredSource,window,calls,timers,unregister,setNow:v=>now=v,now:()=>now};}
-await group('registered provider runs first without legacy HTTP and decodes real protocol',async()=>{const f=fixture();const out=await f.source.fetchAppPlayUrl(VID,{quality:'1080p'});eq(out.vid,VID);eq(out.url,URL_OK);eq(out.contentKey,KEY);eq(out.codec,'hevc');eq(out.width,1080);eq(out.height,1920);eq(out.requestedQuality,'1080p');eq(f.calls.map(c=>c.method),['appRegisteredModel']);eq(f.calls[0].params.vid,VID);eq(Object.keys(f.calls[0].params),['vid']);eq(f.calls[0].timeout,20000);check(f.calls[0].signal instanceof AbortSignal,'native RPC cancellable');check(f.timers.find(t=>t.ms===28000)?.cleared,'whole deadline cleared on success')});
+// 空响应重试节奏（同身份 1s/3s/8s）挂在假定时器上：泵掉 ms<=8000 的重试定时器直到不再产生。
+async function pump(f){for(let guard=0;guard<64;guard++){await new Promise(r=>setImmediate(r));const due=f.timers.filter(t=>!t.cleared&&!t.fired&&t.ms<=8000).sort((a,b)=>a.ms-b.ms)[0];if(!due)return;due.fired=true;due.fn();}}
+await group('registered provider runs first without legacy HTTP and decodes real protocol',async()=>{const f=fixture();const out=await f.source.fetchAppPlayUrl(VID,{quality:'1080p'});eq(out.vid,VID);eq(out.url,URL_OK);eq(out.contentKey,KEY);eq(out.codec,'hevc');eq(out.width,1080);eq(out.height,1920);eq(out.requestedQuality,'1080p');eq(f.calls.map(c=>c.method),['appDeviceIdentity','appRegisteredModel']);eq(f.calls[1].params.vid,VID);eq(Object.keys(f.calls[1].params),['vid']);eq(f.calls[1].timeout,20000);check(f.calls[1].signal instanceof AbortSignal,'native RPC cancellable');check(f.timers.find(t=>t.ms===28000)?.cleared,'whole deadline cleared on success')});
 await group('shared module without a provider preserves empty HTTP classification',async()=>{const context={Buffer,URL,AbortSignal,module:{exports:{}},require:n=>n==='axios'?async()=>({status:200,data:'',headers:{}}):n.startsWith('./')?require(path.join(native,n)):require(n)};vm.runInNewContext(fs.readFileSync(path.join(native,'app-source-registered.js'),'utf8'),context);await assert.rejects(context.module.exports.fetchAppPlayUrl(VID),e=>e.code==='APP_EMPTY_RESPONSE'&&e.responseStage==='model_post');checks++});
-await group('explicit empty provider allows one legacy HTTP lookup',async()=>{const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture empty'),{code:'APP_EMPTY_RESPONSE'})}});const out=await f.source.fetchAppPlayUrl(VID);eq(out.url,URL_OK);eq(f.calls.map(c=>c.method),['appRegisteredModel','appRequest','appRequest'])});
+await group('explicit empty provider retries at the same identity before one legacy HTTP lookup',async()=>{const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture empty'),{code:'APP_EMPTY_RESPONSE'})}});const pending=f.source.fetchAppPlayUrl(VID);pending.catch(()=>{});await pump(f);eq((await pending).url,URL_OK);eq(f.calls.map(c=>c.method),['appDeviceIdentity','appRegisteredModel','appRegisteredModel','appRegisteredModel','appRegisteredModel','appRequest','appRequest']);eq(f.timers.filter(t=>t.fired).map(t=>t.ms),[1000,3000,8000])});
 await group('only explicit transient or empty provider errors allow legacy fallback; refusal invalid and cancel are terminal',async()=>{
-  for(const code of ['APP_EMPTY_RESPONSE','ECONNABORTED','ETIMEDOUT','ENOTFOUND','EAI_AGAIN','ECONNRESET','ECONNREFUSED','EHOSTUNREACH','ENETUNREACH','EPIPE']){
+  for(const code of ['APP_EMPTY_RESPONSE','HTTP_ERROR','ENOTFOUND','EAI_AGAIN','ECONNRESET','ECONNREFUSED','EHOSTUNREACH','ENETUNREACH','EPIPE']){
     const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture failure'),{code})}});
-    eq((await f.source.fetchAppPlayUrl(VID)).url,URL_OK);
-    eq(f.calls.map(c=>c.method),['appRegisteredModel','appRequest','appRequest']);
+    const pending=f.source.fetchAppPlayUrl(VID);pending.catch(()=>{});await pump(f);eq((await pending).url,URL_OK);
+    eq(f.calls.filter(c=>c.method==='appRegisteredModel').length,4,'same-identity retries at 1s/3s/8s');
+    eq(f.calls.filter(c=>c.method==='appRequest').length,2);
     check(f.calls.filter(c=>c.method==='appRequest').every(c=>c.params.timeoutMs>0&&c.params.timeoutMs<=6000),'bounded shared HTTP budget');
+  }
+  for(const code of ['ECONNABORTED','ETIMEDOUT']){
+    const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture budget'),{code})}});
+    eq((await f.source.fetchAppPlayUrl(VID)).url,URL_OK);
+    eq(f.calls.filter(c=>c.method==='appRegisteredModel').length,1,'budget exhaustion falls to legacy without retry');
+    eq(f.calls.filter(c=>c.method==='appRequest').length,2);
   }
   for(const code of ['BUSINESS_REJECTED','APP_INVALID_RESPONSE','ERR_CANCELED','INVALID_RESPONSE',undefined]){
     const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture terminal'),{code})}});
     await assert.rejects(f.source.fetchAppPlayUrl(VID),e=>e.code===code);checks++;
-    eq(f.calls.map(c=>c.method),['appRegisteredModel']);
+    eq(f.calls.map(c=>c.method),['appDeviceIdentity','appRegisteredModel']);
   }
 });
-await group('legacy empty malformed business and forbidden HTTP replies never restart the provider',async()=>{
+await group('legacy empty malformed business and forbidden HTTP replies fail after the provider retry budget',async()=>{
   for(const options of [{body:''},{body:' \n\t '},{body:'null'},{body:'<html>bad</html>'},{body:'{}'},{body:'{"code":401}'},{status:403},{emptyAt:'fallback_get'}]){
     const f=fixture({...options,registered:()=>{throw Object.assign(new Error('fixture empty'),{code:'APP_EMPTY_RESPONSE'})}});
-    await assert.rejects(f.source.fetchAppPlayUrl(VID));checks++;
-    eq(f.calls.filter(c=>c.method==='appRegisteredModel').length,1);
-    eq(f.calls.filter(c=>c.method==='appRequest').length,options.emptyAt?2:1);
+    const pending=f.source.fetchAppPlayUrl(VID);pending.catch(()=>{});await pump(f);await assert.rejects(pending);checks++;
+    eq(f.calls.filter(c=>c.method==='appRegisteredModel').length,4);
+    eq(f.calls.filter(c=>c.method==='appRequest').length,options.emptyAt||options.body===''||options.body===' \n\t '||options.body==='null'?2:1);
   }
 });
 await group('slow transient provider receives a fresh shared six-second legacy budget',async()=>{
@@ -47,13 +56,13 @@ await group('inline plaintext requires explicit encryption metadata and never sy
   for(const encrypt_info of [undefined,{}, {encrypt:true},{encrypt:'unknown'}]){
     const f=fixture({rows:[{main_url:URL_OK,video_meta:{codec_type:'h264',vwidth:1080,vheight:1920},encrypt_info}]});
     await assert.rejects(f.source.fetchAppPlayUrl(VID),e=>e.code==='INVALID_RESPONSE');checks++;
-    eq(f.calls.map(c=>c.method),['appRegisteredModel']);
+    eq(f.calls.map(c=>c.method),['appDeviceIdentity','appRegisteredModel']);
   }
   const f=fixture({registered:()=>({...model([{main_url:URL_OK,video_meta:{codec_type:'h264',vwidth:1080,vheight:1920},encrypt_info:{encrypt:false}}]),device_id:'private-device',iid:'private-install',cookie:'private-cookie'})});
   const out=await f.source.fetchAppPlayUrl(VID);eq(out.url,URL_OK);check(!out.contentKey,'plaintext has no synthetic key');
   check(!JSON.stringify(out).includes('private-'),'identity never escapes in playInfo');
 });
-await group('native wrapper VID shape and single model structure are checked',async()=>{for(const reply of [{...model(),vid:'999'},model().video_model,{vid:VID,video_model:[]},{vid:VID,video_model:{}},{vid:VID,video_model:'{}'}]){const f=fixture({registered:()=>reply});await assert.rejects(f.source.fetchAppPlayUrl(VID),e=>e.code===(reply.video_model&&Object.keys(reply.video_model).length===0&&!Array.isArray(reply.video_model)?'MISSING_MODEL':'APP_INVALID_RESPONSE'));checks++;eq(f.calls.map(c=>c.method),['appRegisteredModel'])}});
+await group('native wrapper VID shape and single model structure are checked',async()=>{for(const reply of [{...model(),vid:'999'},model().video_model,{vid:VID,video_model:[]},{vid:VID,video_model:{}},{vid:VID,video_model:'{}'}]){const f=fixture({registered:()=>reply});await assert.rejects(f.source.fetchAppPlayUrl(VID),e=>e.code===(reply.video_model&&Object.keys(reply.video_model).length===0&&!Array.isArray(reply.video_model)?'MISSING_MODEL':'APP_INVALID_RESPONSE'));checks++;eq(f.calls.map(c=>c.method),['appDeviceIdentity','appRegisteredModel'])}});
 await group('single-model direct/base64 URLs preserve HTTPS host credential and port rules',async()=>{for(const raw of ['http://127.0.0.1/private','https://127.0.0.1/private','https://qznovelvod.com.attacker.test/a','https://user:pass@v3-reading.qznovelvod.com/a','https://v3-reading.qznovelvod.com:444/a']){for(const url of [raw,Buffer.from(raw).toString('base64')]){const f=fixture({rows:[{main_url:url,video_meta:{codec_type:'h264',vwidth:1080,vheight:1920},encrypt_info:{encrypt:false}}]});await assert.rejects(f.source.fetchAppPlayUrl(VID),e=>['SECURITY_BLOCKED','INVALID_RESPONSE'].includes(e.code));checks++;}}const f=fixture({rows:[{main_url:URL_OK,video_meta:{codec_type:'h264',vwidth:1080,vheight:1920},encrypt_info:{encrypt:false}}]});eq((await f.source.fetchAppPlayUrl(VID)).url,URL_OK)});
 await group('registered Spade250 rejects malformed and unsupported key formats instead of omitting encryption',async()=>{for(const key of ['not valid base64',Buffer.from('bad').toString('base64'),spade(KEY,'app_v2')]){const row=model().video_model.video_list[0];row.encrypt_info.spade_a=key;const f=fixture({rows:[row]});await assert.rejects(f.source.fetchAppPlayUrl(VID),e=>e.code==='INVALID_RESPONSE');checks++}});
 await group('manual1080 remains strict while playback low ceiling uses only verified dimensions',async()=>{const rows=[360,480,540,720,1080].map(n=>({main_url:Buffer.from(URL_OK+'?q='+n).toString('base64'),video_meta:{codec_type:'bytevc1',vwidth:n,vheight:n*2,definition:n+'P'},encrypt_info:{encrypt:false}}));const f=fixture({rows});const full=await f.source.fetchAppPlayUrl(VID,{quality:'1080p'});eq(full.width,1080);eq(full.variants.length,0);const low=await f.source.fetchAppPlayUrl(VID,{quality:'auto',playbackFloor:480,playbackCeiling:539});check([low,...low.variants].every(v=>v.width>=480&&v.width<=539),'strict low cap');const bad=fixture({rows:[{main_url:URL_OK,video_meta:{codec_type:'h264',definition:'1080P',vwidth:480,vheight:854},encrypt_info:{encrypt:false}}]});await assert.rejects(bad.source.fetchAppPlayUrl(VID,{quality:'1080p'}));checks++});
