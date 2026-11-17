@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -139,9 +140,15 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             // client: a served identity keeps being served while bursts of registrations earn
             // poisoned ones. So the ladder retries the SAME identity with generous spacing
             // first, and registers a fresh identity only as the last resort.
+            // 2026-11-17: a fully hollowed fetch arms a fast-fail — later fetches make one
+            // unpaced v5 probe and surface the hollow immediately so the JS web fallback
+            // takes over in seconds instead of paying the whole paced ladder every episode.
+            // Any served model, or a 3-minute quiet gap, restores the full ladder.
+            boolean fastFail = v5FastFailActive();
+            int ladderAttempts = fastFail ? 1 : 5;
             JSONObject projected = null; ModelError lastFailure = null;
-            for (int attempt = 1; attempt <= 5 && projected == null; attempt++) {
-                if (attempt > 1) pace(attempt >= 4 ? 2000 : 1200);
+            for (int attempt = 1; attempt <= ladderAttempts && projected == null; attempt++) {
+                if (attempt > 1 && !fastFail) pace(attempt >= 4 ? 2000 : 1200);
                 if (attempt == 4) {
                     String[] reRegistered = reRegister();
                     if (reRegistered == null) break;
@@ -152,7 +159,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
                 catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
                 check();
             }
-            if (projected == null && lastFailure != null) {
+            if (projected == null && lastFailure != null && !fastFail) {
                 // Last resort: the two legacy forms on the final identity (each paced).
                 pace(1500);
                 try { projected = videoTab(did, iid, vid); }
@@ -166,6 +173,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
                 }
             }
             if (projected == null) throw lastFailure;
+            HOLLOW_STREAK.set(0);
             persistIdentity(new String[]{did, iid, cdid});
             return new JSONObject().put("vid", vid).put("video_model", projected);
         } finally {
@@ -178,6 +186,19 @@ final class RegisteredPlaybackModel implements AutoCloseable {
      * malformed models stay terminal for the alternate form as well. */
     private static boolean recoverable(ModelError failure) {
         return "APP_EMPTY_RESPONSE".equals(failure.code) || "HTTP_ERROR".equals(failure.code);
+    }
+    /** Hollow fast-fail state: four empty v5 answers (roughly one full ladder) arm a
+     * single-probe mode so later episodes fall to the web chain in seconds; any served
+     * answer or a 3-minute quiet gap restores the full ladder. */
+    private static final AtomicInteger HOLLOW_STREAK = new AtomicInteger();
+    private static volatile long hollowMarkMs;
+    private static boolean v5FastFailActive() {
+        if (System.currentTimeMillis() - hollowMarkMs >= 180_000) { HOLLOW_STREAK.set(0); return false; }
+        return HOLLOW_STREAK.get() >= 4;
+    }
+    private static void noteHollowFetch() {
+        hollowMarkMs = System.currentTimeMillis();
+        HOLLOW_STREAK.incrementAndGet();
     }
     /** Wait up to the given pause inside the remaining budget; cancellations surface at once. */
     private void pace(long milliseconds) throws IOException {
@@ -230,6 +251,9 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         OfficialApiClient.Response response = modelTransport.execute(new OfficialApiClient.Request(signed.url, "POST", headers, body, deadline));
         check();
         traceV5("player/v1 vid=" + vid + " http=" + response.status + " bytes=" + response.body.length);
+        // Per-attempt hollow bookkeeping (a deadline-killed fetch must still arm the
+        // fast-fail): every empty v5 answer counts, every served one clears it.
+        if (response.body.length == 0) noteHollowFetch(); else HOLLOW_STREAK.set(0);
         return adopt(response, vid, deadline);
     }
     private JSONObject videoTab(String did, String iid, String vid) throws Exception {
