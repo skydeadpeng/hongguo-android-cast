@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 100,
-  "versionName": "0.12.77",
+  "versionCode": 101,
+  "versionName": "0.12.78",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.77/Hongguo-0.12.77-phone-release-compatible.apk",
-  "size": 1722514,
-  "sha256": "f62f3048d72f1c92699729711e83cb1a3fdb4515c9f563343f1b6ebd3168932a",
-  "notes": "红果 Android 0.12.77（手机与 TV WebView）\n\n- 修复部分剧集首次播放需要返回重试才能播放的问题：取源重试不再占用全部等待预算，探测提前让位给兜底下载链路，首次尝试即可完成播放（此前重试链路会把预算耗尽导致超时）。\n- 播放、下载与本地数据不受影响；0.12.76 可直接覆盖升级。\n",
-  "publishedAt": "2026-11-17T03:24:19.052Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.78/Hongguo-0.12.78-phone-release-compatible.apk",
+  "size": 1722242,
+  "sha256": "39859f9b0206e8fd415ebfc994b4c81c277c33eb6a4d6a488ddf11a9a72a9d59",
+  "notes": "红果 Android 0.12.78（手机与 TV WebView）\n\n- 重构取源策略以匹配已验证可正常播放的客户端：每次取源只发送一次高清探测请求，不再在内部反复重试和更换身份。此前的多轮重试在服务端限流时快速消耗身份信誉，反而导致后续全部被拒。\n- 现在：单次探测秒级返回结果——命中则高清播放，未命中立即转兜底链路；应用层的自动重试在稍后用同一身份再探测（限流窗口过后即恢复高清）。\n- 播放可用性与速度显著提升；下载与本地数据不受影响。\n",
+  "publishedAt": "2026-11-17T04:21:23.661Z"
 }
