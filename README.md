@@ -29,13 +29,13 @@
 
 ## 下载与安装
 
-当前版本：手机 / TV WebView **0.12.77**，原生 TV **0.1.29**。按设备下载一个 APK 安装即可，要求 Android 8.0+。
+当前版本：手机 / TV WebView **0.12.78**，原生 TV **0.1.30**。按设备下载一个 APK 安装即可，要求 Android 8.0+。
 
 | 客户端 | 版本 | 下载 | 说明 |
 |---|---|---|---|
-| Android 手机 / 平板 | 0.12.77 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.77/Hongguo-0.12.77-phone-release-compatible.apk) | 触屏操作、本机播放、DLNA 投屏、扫码登录云同步 |
-| Android TV / 盒子（WebView） | 0.12.77 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.77/Hongguo-0.12.77-tv-release-compatible.apk) | 遥控器友好的 WebView 界面，原生解码播放 |
-| Android 原生 TV | 0.1.29 | [下载 APK（arm64）](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.29/HongguoNative-0.1.29-tvNative-release-compatible-arm64-v8a.apk) · [32 位](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.29/HongguoNative-0.1.29-tvNative-release-compatible-armeabi-v7a.apk) | 不依赖系统 WebView 的全原生电视界面，支持 Android 6.0+，解码方式可设（含内置软解） |
+| Android 手机 / 平板 | 0.12.78 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.78/Hongguo-0.12.78-phone-release-compatible.apk) | 触屏操作、本机播放、DLNA 投屏、扫码登录云同步 |
+| Android TV / 盒子（WebView） | 0.12.78 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.78/Hongguo-0.12.78-tv-release-compatible.apk) | 遥控器友好的 WebView 界面，原生解码播放 |
+| Android 原生 TV | 0.1.30 | [下载 APK（arm64）](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.30/HongguoNative-0.1.30-tvNative-release-compatible-arm64-v8a.apk) · [32 位](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.30/HongguoNative-0.1.30-tvNative-release-compatible-armeabi-v7a.apk) | 不依赖系统 WebView 的全原生电视界面，支持 Android 6.0+，解码方式可设（含内置软解） |
 
 [查看全部版本](https://github.com/skydeadpeng/hongguo-android-cast/releases) · [版本记录与验证情况](ANDROID.md)
 
