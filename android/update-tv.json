@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 99,
-  "versionName": "0.12.76",
+  "versionCode": 100,
+  "versionName": "0.12.77",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.76/Hongguo-0.12.76-tv-release-compatible.apk",
-  "size": 1720970,
-  "sha256": "901190d4a293f98015cf371d5d989fe94fa2c051744f6b2ac95a1f0b4bc02488",
-  "notes": "红果 Android 0.12.76（手机与 TV WebView）\n\n- 大幅优化播放速度：取源探测引入\"空响应快速失败\"——连续几次取源被服务端空响应后，后续各集只做一次快速探测即转入兜底链路，不再反复等待整轮重试。实测新剧第一集从点击到出画面约 4 秒（此前 30 秒以上），连播切集更快。\n- 高清链路命中时自动恢复完整尝试；播放、下载与本地数据不受影响。0.12.75 可直接覆盖升级。\n",
-  "publishedAt": "2026-11-17T03:01:18.074Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.77/Hongguo-0.12.77-tv-release-compatible.apk",
+  "size": 1721138,
+  "sha256": "f16919eaf2465a5c39ee6c2fffa1e95856794380a5c8d4a2b265d4bd216a0770",
+  "notes": "红果 Android 0.12.77（手机与 TV WebView）\n\n- 修复部分剧集首次播放需要返回重试才能播放的问题：取源重试不再占用全部等待预算，探测提前让位给兜底下载链路，首次尝试即可完成播放（此前重试链路会把预算耗尽导致超时）。\n- 播放、下载与本地数据不受影响；0.12.76 可直接覆盖升级。\n",
+  "publishedAt": "2026-11-17T03:24:19.289Z"
 }
