@@ -71,3 +71,17 @@
 
 - 公开资产门槛：独立 GitHub Linux runner [44042410078](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/44042410078) 的匿名下载步骤于 15:55:18 +08:00 完成并成功；15 个附件逐个完整下载并比对大小／SHA256，无凭据下载。此核验不复用鉴权草稿下载结果。本机匿名 API 额度耗尽及 TCP 超时记录单独保留，不写为公开下载通过。
 - 稳定清单：确认公开资产下载步骤成功后，将 `android/update-phone-0.12.80.json`、`android/update-tv-0.12.80.json`、`android/update-tvnative-0.1.31.json` 原样复制至各自稳定入口；保留切换前0.12.79／0.1.30清单及摘要。对应 APK、版本快照与冻结标签未被重打或覆盖。
+
+- 稳定清单提交：`b526865e12f9cf3fc20aab9b3fcd040678a091ef`，已正常推送 main。切换后本地更新回归35测试全部通过；鉴权 contents API 核验三个 main 稳定文件与冻结快照逐字节相同，独立匿名 runner 的 cache-bust raw 核验于16:00:50 +08:00同轮确认103／103／32及完整摘要。
+- 稳定清单提交后的 [Android cast / 44042594975](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/44042594975) 于 **16:00:09 +08:00** completed/success，16步骤全部成功，完整日志另存。
+
+### 通用 Test 工作流未通过项
+
+Android 专用构建／源码回归与设备验收结果不代表仓库所有工作流通过。冻结提交的 [通用 Test / 44040453160](https://github.com/skydeadpeng/hongguo-android-cast/actions/runs/44040453160) 执行 `npm test` 仍为 exit1（4条命令失败），本次没有将其标为通过：
+
+1. `check-windows-installer.cjs --config` 仍硬编码期待旧桌面仓库，与2026-11-16已改动的 publish 仓库配置不一致。
+2. `check-download-quality.cjs` 的旧 fixture 只对 POST 返回模型，而生产代码已使用带 video_id 的签名 GET，导致 MISSING_MODEL。
+3. `check-source-recovery.cjs` 同类 HTTP 方法 fixture 漂移，包含将预期403用例误送入空响应路径的情况。
+4. `check-download-quality-integration.cjs` 的真实取源用例出现 Web HTTP404，随后 media lookup 地址断言失败，26／27；日志没有给出 App 路由具体失败原因，不推断所有上游均失效。
+
+逐 blob 核对上述4脚本、通用测试入口／工作流、fixture整树、生产 src 整树、main.js 及 package-lock：本轮修复前后11项均完全相同。Android此次修复位于Java原生取源层，并在最终APK独立完成真实播放验收；未为凑通用 Test 绿色而改桌面代码或覆盖冻结资产。详细原始失败、归因与blob对照保留本地 `ci/general-test/VERIFICATION.txt`。
