@@ -135,48 +135,19 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             String did = identity[0], iid = identity[1], cdid = identity.length > 2 ? identity[2] : null;
             if (!OfficialApiClient.validID(did) || !OfficialApiClient.validID(iid))
                 throw new ModelError("App片源设备登记未完成", "APP_INVALID_RESPONSE");
-            // 2026-11-16: the model endpoint answers only the v5 three-header player/v1 form
-            // (the older 551 POST and video_tab GET earn empty 200s) and it rate-limits per
-            // client: a served identity keeps being served while bursts of registrations earn
-            // poisoned ones. So the ladder retries the SAME identity with generous spacing
-            // first, and registers a fresh identity only as the last resort.
-            // 2026-11-17: a fully hollowed fetch arms a fast-fail — later fetches make one
-            // unpaced v5 probe and surface the hollow immediately so the JS web fallback
-            // takes over in seconds instead of paying the whole paced ladder every episode.
-            // Any served model, or a 3-minute quiet gap, restores the full ladder.
-            boolean fastFail = v5FastFailActive();
-            int ladderAttempts = fastFail ? 1 : 5;
+            // 2026-11-17 (evening): match the working TV clients' architecture exactly —
+            // ONE v5 request per fetch, no internal retry ladder, no identity rotation,
+            // no pacing. The working clients (hongguoTV 0.16.5) send a single player/v1
+            // request; recovery lives at the episode level (their RecoveryBudget re-calls
+            // the playback with the SAME persisted identity at 1s/2.5s/5s/15s/30s/60s/90s/
+            // 105s). Our previous multi-attempt ladder burned identity goodwill in rapid
+            // bursts and poisoned every rotation. This fetch now mirrors the single-shot
+            // design: succeed or fail in under a second, let the JS web fallback or the
+            // user's retry carry the recovery on the same blessed identity.
             JSONObject projected = null; ModelError lastFailure = null;
-            for (int attempt = 1; attempt <= ladderAttempts && projected == null; attempt++) {
-                // 2026-11-17: the ladder must leave the JS web fallback room to finish inside
-                // the overall resolve budget — a ladder that burns the whole 20s RPC budget
-                // forces a first-attempt timeout and a manual back-and-retry. Stop starting
-                // new attempts once less than eight seconds of budget remains.
-                if (attempt > 1 && !ladderTimeLeft()) break;
-                if (attempt > 1 && !fastFail) pace(attempt >= 4 ? 2000 : 1200);
-                if (attempt == 4) {
-                    String[] reRegistered = reRegister();
-                    if (reRegistered == null) break;
-                    did = reRegistered[0]; iid = reRegistered[1];
-                    if (reRegistered.length > 2 && reRegistered[2] != null && !reRegistered[2].isEmpty()) cdid = reRegistered[2];
-                }
-                try { projected = playerV1(did, iid, cdid, vid); }
-                catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
-                check();
-            }
-            if (projected == null && lastFailure != null && !fastFail && ladderTimeLeft()) {
-                // Last resort: the two legacy forms on the final identity (each paced).
-                pace(1500);
-                try { projected = videoTab(did, iid, vid); }
-                catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
-                check();
-                if (projected == null) {
-                    pace(1500);
-                    try { projected = multiPost(did, iid, vid); }
-                    catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
-                    check();
-                }
-            }
+            try { projected = playerV1(did, iid, cdid, vid); }
+            catch (ModelError failure) { lastFailure = failure; }
+            check();
             if (projected == null) throw lastFailure;
             HOLLOW_STREAK.set(0);
             persistIdentity(new String[]{did, iid, cdid});
