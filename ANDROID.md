@@ -6,15 +6,22 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.72 / code95 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.72 / code95 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.24 / code25 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.73 / code96 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.73 / code96 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.25 / code26 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.72](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.72) · [原生 TV 0.1.24](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.24)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.73](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.73) · [原生 TV 0.1.25](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.25)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+
+## 0.12.73 / 0.1.25 播放链路继续修复（手机 / TV WebView / 原生 TV）
+
+- 在 0.12.72 的 v5 签名基础上继续完善取源链路：模型请求改用可兼容变体（device_level=1，对齐 hongguoTV 0.16.6 的变体修复）、注册身份持久化到本机（一次成功长期复用，避免反复注册新身份）、网络传输层升级为 OkHttp（h2）、注册后目录预热。
+- 播放兜底链路保持不变：v5 高清不可用时自动回退网页链路，播放始终可用。
+- 黄果来源不受影响；账号、观看记录、下载与本地设置不受影响。
+- 验证：TV 与手机模拟器真实播放通过（网页链路秒级起播、整集缓存、身份落盘与重启复用闭环）；v5 高清链路在模拟器上受服务端按客户端指纹分级影响，真机表现待回测。
 
 ## 0.12.72 / 0.1.24 播放 v5 签名修复（手机 / TV WebView / 原生 TV）
 
