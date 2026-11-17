@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 30,
-  "versionName": "0.1.29",
+  "versionCode": 31,
+  "versionName": "0.1.30",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.29/HongguoNative-0.1.29-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 47053257,
-  "sha256": "26cac0b9341b20f07a25e5d0c073c91290bc554c2b56c9dcb84fd796458453aa",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.30/HongguoNative-0.1.30-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 47053256,
+  "sha256": "930a2431502edf2ed577f7443291903b7b624bfccd8be792f0c2792d8367b54d",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.29/HongguoNative-0.1.29-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 47053257,
-      "sha256": "26cac0b9341b20f07a25e5d0c073c91290bc554c2b56c9dcb84fd796458453aa"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.30/HongguoNative-0.1.30-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 47053256,
+      "sha256": "930a2431502edf2ed577f7443291903b7b624bfccd8be792f0c2792d8367b54d"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.29/HongguoNative-0.1.29-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 43325662,
-      "sha256": "c5e0189c6ca1639f676911dfebdfa45c5ad46e96c3da8b8908c93ad079b5eafa"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.30/HongguoNative-0.1.30-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 43325654,
+      "sha256": "7e6c33c43bd8e18b32cbadd13e9bd5b555ec7594cabc0d2dc3d0f03297580a30"
     }
   },
-  "notes": "红果原生电视 0.1.29\n\n- 修复部分剧集首次播放需要返回重试的问题：取源重试提前让位给兜底链路，首次尝试即可完成播放。\n- 播放与本地数据不受影响；0.1.28 可直接覆盖升级。\n",
-  "publishedAt": "2026-11-17T03:24:19.937Z"
+  "notes": "红果原生电视 0.1.30\n\n- 重构取源为单次探测：不再在内部多轮重试消耗身份信誉；命中秒级高清，未命中立即转兜底链路。速度与可用性显著提升。\n- 播放与本地数据不受影响。\n",
+  "publishedAt": "2026-11-17T04:21:24.732Z"
 }
