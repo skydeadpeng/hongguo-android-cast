@@ -87,11 +87,12 @@ final class UpstreamDeviceRegister {
         if (deviceId.isEmpty() || iid.isEmpty()) throw new java.io.IOException("上游设备登记未返回有效身份");
         String cookies = registrationCookies();
         trace("register ok device_id=" + deviceId);
-        Identity identity = new Identity(deviceId, iid, cdid, cookies);
+        final Identity identity = new Identity(deviceId, iid, cdid, cookies);
         // The working TV clients warm a fresh identity with catalog browsing on the SAME
         // identity (bookmall/tab + registration cookies) before the first playback model
         // request; identities that hit player/v1 with no footprint earn hollowed pools.
-        warmupCatalog(identity);
+        // Async: a slow catalog answer must never stall the model ladder behind it.
+        new Thread(() -> warmupCatalog(identity), "hongguo-warmup").start();
         return identity;
     }
 
