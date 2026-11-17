@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 26,
-  "versionName": "0.1.25",
+  "versionCode": 27,
+  "versionName": "0.1.26",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.25/HongguoNative-0.1.25-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 47053262,
-  "sha256": "d6cb263963de5104d4870b5234e745fd218c4f680a534d19812ae45934565281",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.26/HongguoNative-0.1.26-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 47053256,
+  "sha256": "23729bdec53d7e20fe3ef00d7c75e13c6ac8ef870543ca806d749f98b8a7f510",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.25/HongguoNative-0.1.25-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 47053262,
-      "sha256": "d6cb263963de5104d4870b5234e745fd218c4f680a534d19812ae45934565281"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.26/HongguoNative-0.1.26-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 47053256,
+      "sha256": "23729bdec53d7e20fe3ef00d7c75e13c6ac8ef870543ca806d749f98b8a7f510"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.25/HongguoNative-0.1.25-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 43325663,
-      "sha256": "cfbee8e6b375614d5dd4d2a5da83218a2f73fc500c84db9e3c981d963f7236dc"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.26/HongguoNative-0.1.26-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 43325658,
+      "sha256": "5489ceb624852cc7319132f1fcdedef1b50c4373a492bfa965057462fce3f24d"
     }
   },
-  "notes": "红果原生电视 0.1.25\n\n- 继续修复 2026-11-16 起的在线取源问题：本版完善取源链路（可兼容变体请求、注册身份持久化复用、传输层升级），取源可用性进一步提升。\n- 播放兜底链路保持不变；追剧、下载与设置不受影响。\n\n可在「设置 → 关于/版本更新」覆盖升级。建议升级后先播一集完成首次身份登记。\n",
-  "publishedAt": "2026-11-17T00:41:33.012Z"
+  "notes": "红果原生电视 0.1.26\n\n- 优化首次打开速度：启动时后台预登记播放身份，首次播放不再等待注册；取源重试间隔收紧。\n- 播放与本地数据不受影响；0.1.25 可直接覆盖升级。\n",
+  "publishedAt": "2026-11-17T01:30:19.513Z"
 }
