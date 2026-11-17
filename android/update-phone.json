@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 98,
-  "versionName": "0.12.75",
+  "versionCode": 99,
+  "versionName": "0.12.76",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.75/Hongguo-0.12.75-phone-release-compatible.apk",
-  "size": 1722350,
-  "sha256": "4d2e34becde86d7ae48110430d7d397d67c2fb2e053199738f9433d04ae38bde",
-  "notes": "红果 Android 0.12.75（手机与 TV WebView）\n\n- 进一步优化播放启动速度：身份预热改为后台执行，不再占用取源重试的等待时间；首次点播放的等待在 0.12.74 基础上再缩短约三分之一（实测约 10 秒内起播）。\n- 播放、下载与本地数据不受影响；0.12.74 可直接覆盖升级。\n",
-  "publishedAt": "2026-11-17T02:05:39.857Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.76/Hongguo-0.12.76-phone-release-compatible.apk",
+  "size": 1722374,
+  "sha256": "fe02b33378b927171bada1b75f3d8299cb1870cc7911736d81fe986b6ca69c15",
+  "notes": "红果 Android 0.12.76（手机与 TV WebView）\n\n- 大幅优化播放速度：取源探测引入\"空响应快速失败\"——连续几次取源被服务端空响应后，后续各集只做一次快速探测即转入兜底链路，不再反复等待整轮重试。实测新剧第一集从点击到出画面约 4 秒（此前 30 秒以上），连播切集更快。\n- 高清链路命中时自动恢复完整尝试；播放、下载与本地数据不受影响。0.12.75 可直接覆盖升级。\n",
+  "publishedAt": "2026-11-17T03:01:17.830Z"
 }
