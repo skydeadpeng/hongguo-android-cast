@@ -6,15 +6,20 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.75 / code98 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.75 / code98 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.27 / code28 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.76 / code99 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.76 / code99 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.28 / code29 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.75](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.75) · [原生 TV 0.1.27](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.27)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.76](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.76) · [原生 TV 0.1.28](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.28)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+
+## 0.12.76 / 0.1.28 空响应快速失败（手机 / TV WebView / 原生 TV）
+
+- 取源探测按次统计空响应：连续四次空响应后，后续各集只做一次无间隔探测即转兜底链路（此前每集都要重付整轮带间隔的重试）；任何一次命中或三分钟静默自动恢复完整尝试。
+- 实测模拟器新剧首集点击到出画面约 4 秒（此前 30 秒以上）；连播切集更快。
 
 ## 0.12.75 / 0.1.27 预热改后台（手机 / TV WebView / 原生 TV）
 
