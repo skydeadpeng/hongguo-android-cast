@@ -11,6 +11,7 @@ JAVA_HOME="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/H
 ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 # The Android-compatible org.json jar is test-only; the APK uses Android's built-in org.json.
 JSON_JAR="${JSON_JAR:-$HOME/.m2/repository/com/vaadin/external/google/android-json/0.0.20131108.vaadin1/android-json-0.0.20131108.vaadin1.jar}"
+SDK_JAR="${SDK_JAR:-${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}/platforms/android-35/android.jar}"
 if [ ! -f "$JSON_JAR" ]; then
   JSON_JAR="$(find "$HOME/.gradle/caches" "$HOME/.m2/repository/org/json/json" -name 'json-*.jar' ! -name '*sources*' ! -name '*javadoc*' -print 2>/dev/null | head -1)"
 fi
@@ -24,8 +25,8 @@ if grep -nE 'UNICODE_CHARACTER_CLASS|\(\?[^)]*U' "$SRC/EpisodeResolver.java"; th
   exit 1
 fi
 echo 'PASS EpisodeResolver Android regex compatibility guard'
-"$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/parser" "$SRC/NetworkGuard.java" "$SRC/EpisodeResolver.java" "$ROOT/tests/EpisodeResolverTest.java"
-"$JAVA_HOME/bin/java" -cp "$TMP/parser:$JSON_JAR" io.github.jackotom.hongguo.android.EpisodeResolverTest
+"$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR:$SDK_JAR" -d "$TMP/parser" "$SRC/NetworkGuard.java" "$SRC/LegacyText.java" "$SRC/EpisodeResolver.java" "$ROOT/tests/EpisodeResolverTest.java"
+"$JAVA_HOME/bin/java" -cp "$TMP/parser:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.EpisodeResolverTest
 cat > "$TMP/NetworkGuard.java" <<'STUB'
 package io.github.jackotom.hongguo.android;
 final class NetworkGuard {
@@ -49,7 +50,7 @@ final class NetworkGuard {
     }
 }
 STUB
-"$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/transport" "$TMP/NetworkGuard.java" "$SRC/EpisodeResolver.java" "$ROOT/tests/EpisodeResolverTransportTest.java"
-"$JAVA_HOME/bin/java" -cp "$TMP/transport:$JSON_JAR" io.github.jackotom.hongguo.android.EpisodeResolverTransportTest
-"$JAVA_HOME/bin/javac" -encoding UTF-8 --release 17 -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d "$TMP/android-sdk35" "$SRC/NetworkGuard.java" "$SRC/EpisodeResolver.java"
+"$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$JSON_JAR:$SDK_JAR" -d "$TMP/transport" "$TMP/NetworkGuard.java" "$SRC/LegacyText.java" "$SRC/EpisodeResolver.java" "$ROOT/tests/EpisodeResolverTransportTest.java"
+"$JAVA_HOME/bin/java" -cp "$TMP/transport:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.EpisodeResolverTransportTest
+"$JAVA_HOME/bin/javac" -encoding UTF-8 --release 17 -cp "$SDK_JAR" -d "$TMP/android-sdk35" "$SRC/NetworkGuard.java" "$SRC/LegacyText.java" "$SRC/EpisodeResolver.java"
 echo 'PASS EpisodeResolver SDK35 compile release=17'

@@ -6,6 +6,7 @@ if [[ "${1:-}" == --source-root && $# == 2 ]]; then SOURCE_ROOT="$(cd "$2" && pw
 elif [[ $# != 0 ]]; then echo 'USAGE run-guest-playback-integration-tests.sh [--source-root PROJECT]' >&2; exit 2; fi
 JAVA_HOME="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
 JSON_JAR="${JSON_JAR:-$HOME/.m2/repository/com/vaadin/external/google/android-json/0.0.20131108.vaadin1/android-json-0.0.20131108.vaadin1.jar}"
+SDK_JAR="${SDK_JAR:-${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}/platforms/android-35/android.jar}"
 [[ -x "$JAVA_HOME/bin/javac" && -x "$JAVA_HOME/bin/java" && -r "$JSON_JAR" ]] || { echo 'Set JAVA_HOME and JSON_JAR to an available JDK and android-json.jar.' >&2; exit 2; }
 TMP="$(mktemp -d -t hongguo-guest-integration.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
@@ -86,8 +87,8 @@ SRC="$SOURCE_ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
 # available host runtime; this is an offline integration test, not Android ABI QA.
 RELEASE=()
 if [[ -r "$JAVA_HOME/lib/ct.sym" ]]; then RELEASE=(--release 17); fi
-"$JAVA_HOME/bin/javac" "${RELEASE[@]}" -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
+"$JAVA_HOME/bin/javac" "${RELEASE[@]}" -encoding UTF-8 -cp "$JSON_JAR:$SDK_JAR" -d "$TMP/classes" \
  "$TMP/android/content/Context.java" "$TMP/GuestBoundaryStubs.java" \
- "$SRC/PlaybackSources.java" "$SRC/MediaQuality.java" "$SRC/PlaybackCache.java" "$SRC/PlaybackCachePolicy.java" \
+ "$SRC/LegacyFiles.java" "$SRC/PlaybackSources.java" "$SRC/MediaQuality.java" "$SRC/PlaybackCache.java" "$SRC/PlaybackCachePolicy.java" \
  "$TEST_ROOT/GuestPlaybackIntegrationTest.java"
-"$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.GuestPlaybackIntegrationTest "$SRC/PlayerActivity.java"
+"$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.GuestPlaybackIntegrationTest "$SRC/PlayerActivity.java"

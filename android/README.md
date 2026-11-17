@@ -4,9 +4,9 @@
 
 - `phone`：手机启动入口，包名 `io.github.jackotom.hongguo.android`。
 - `tv`：横屏、Leanback 启动入口、遥控器导航，包名后缀 `.tv`，可与手机版共存。
-- `tvNative`：无 WebView 的独立原生 TV 版（面向系统 WebView 过旧的设备），包名后缀 `.tvnative`、独立版本线 0.1.x（当前 0.1.2 / code3）、原生界面 + Java 取源，与上两者共存。本机数据与下载不跨包自动迁移；支持自己的自动更新渠道。详见根目录 README 的「原生 TV 独立版」与 `ANDROID.md`。
+- `tvNative`：无 WebView 的独立原生 TV 版（面向系统 WebView 过旧的设备），包名后缀 `.tvnative`、独立版本线 0.1.x（本轮 0.1.31 / code32）、原生界面 + Java 取源，与上两者共存。本机数据与下载不跨包自动迁移；支持自己的自动更新渠道。详见根目录 README 的「下载与安装」与 `ANDROID.md`。
 
-Android 8.0 / API 26 起；编译 / target API 35；Java 17；AGP 8.7.2。无第三方 Android 运行库。正式发布前请配置自己的 release 签名；debug APK 仅使用本机 Android debug keystore。
+手机／TV WebView 支持 Android 8.0 / API26 起；tvNative 支持 Android 6.0 / API23 起。编译 / target API35；Java17；AGP8.7.2。共享取源使用 OkHttp；tvNative 内置 libVLC 软件解码，核心库调用使用 desugaring。发行使用既有兼容证书签署 non-debuggable release；debug 包不走稳定更新渠道。
 
 ## 构建
 

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tv",
+  "packageName": "io.github.jackotom.hongguo.android.tv",
+  "versionCode": 103,
+  "versionName": "0.12.80",
+  "minSdk": 26,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.80/Hongguo-0.12.80-tv-release-compatible.apk",
+  "size": 1721790,
+  "sha256": "7efba4d6b8e8a295f2eb89dcbb7b6fbfc8f71ddad8e7c1a9f5ae25a964f79f77",
+  "notes": "红果 Android 0.12.80（手机与 TV WebView）\n\n- 修复 Android Java v5 签名字节的无符号处理，纠正签名分支与请求时间字段，解决接口返回空响应导致的取源失败。\n- 模型请求按任务隔离取消：后续分集预取结束时不再取消当前播放的取源请求。\n- 原生播放器首播遇空模型时，在同一总预算内有限重试；保留取消、超时及明确拒绝处理，不叠加无限重试。\n- 修复缺失或过期播放准备信息时的 App 媒体域名判断，避免将未准备的 App 片源当成普通文件下载。\n- 保留原包名和兼容安装证书，支持同包覆盖升级；账号、下载和观看记录不做迁移或清理。\n\n本次同步提供原生电视版 0.1.31；三个应用各自使用原有更新渠道。验证记录见 docs/android-release-2026-11-17.md。\n\n验证：三个最终 release 已在独立 API32 arm64 模拟器完成真实1080P连续30秒及切集，旧版ADB覆盖升级测试资料保留。实体设备、完整应用内OTA及32位设备运行未验。\n",
+  "publishedAt": "2026-11-17T07:39:07.713Z"
+}

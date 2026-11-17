@@ -399,7 +399,7 @@ public final class GuestPlaybackIntegrationTest {
         int guest=bridge.indexOf("if(plan.guestPlayback){downloadPrepared(id,series,episode,plan);break;}",download);
         check(download>=0&&guest>download&&manager>guest,"NativeBridge guest enters prepared path before DownloadManager URL request");
         int prepared=bridge.indexOf("privatevoiddownloadPrepared(");
-        int copied=bridge.indexOf("java.nio.file.Files.copy(prepared.toPath(),target.toPath())",prepared);
+        int copied=bridge.indexOf("LegacyFiles.copy(prepared,target,false)",prepared);
         int fetched=bridge.indexOf("cache.fetch(",prepared);
         check(prepared>=0&&fetched>prepared&&copied>fetched,"NativeBridge copies only after private cache preparation");
         check(bridge.substring(prepared,copied).contains("cache.fetch(sid,vid,index,plan,plan.requestedQuality)"),"NativeBridge retains captured guest provenance during preparation");

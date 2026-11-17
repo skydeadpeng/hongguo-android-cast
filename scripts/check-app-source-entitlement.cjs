@@ -20,6 +20,12 @@ const model = () => ({ video_list: [{ main_url: MEDIA, codec_type: 'h264', vwidt
 const post = (inline = true) => ({ code: 0, data: { [VID]: { video_model: inline ? model() : { fallback_api: FALLBACK } } } });
 const get = () => ({ code: 0, video_info: { code: 0, data: model() } });
 let checks = 0, passed = 0, failed = 0;
+let completed = false;
+process.once('beforeExit', () => {
+  if (completed) return;
+  console.error(`APP_ENTITLEMENT_INCOMPLETE groupsPassed=${passed} groupsFailed=${failed} checks=${checks} mainPending=true`);
+  process.exitCode = 1;
+});
 const equal = (a, b) => { checks++; assert.deepEqual(a, b); };
 async function group(label, fn) {
   try { await fn(); passed++; console.log('PASS ' + label); }
@@ -37,7 +43,7 @@ async function main() {
     const provider = async () => {
       calls.push('provider');
       if (plan.provider) return plan.provider;
-      throw Object.assign(new Error('synthetic empty provider'), { code: 'APP_EMPTY_RESPONSE' });
+      throw Object.assign(new Error('synthetic provider timeout'), { code: 'ETIMEDOUT' });
     };
     const http = method => { calls.push(method); return method === 'POST' ? plan.post : plan.get; };
     const common = { Buffer, URL, URLSearchParams, AbortController, AbortSignal,
@@ -53,8 +59,18 @@ async function main() {
       fetch = () => context.module.exports.fetchAppPlayUrl(VID, { registeredModelProvider: provider, signal: new AbortController().signal });
     } else {
       const window = { AndroidCrypto: { process(raw) {
-        const request = JSON.parse(raw); assert.equal(request.operation, 'digest');
-        return JSON.stringify({ data: crypto.createHash(request.algorithm).update(Buffer.from(request.data, 'base64')).digest('base64'), error: null });
+        const request = JSON.parse(raw), bytes = Buffer.from(request.data, 'base64');
+        let result;
+        if (request.operation === 'digest') result = crypto.createHash(request.algorithm).update(bytes).digest();
+        else {
+          assert.ok(request.operation === 'encrypt' || request.operation === 'decrypt');
+          assert.equal(request.algorithm, 'AES-128-CBC');
+          const cipher = (request.operation === 'encrypt' ? crypto.createCipheriv : crypto.createDecipheriv)
+            ('aes-128-cbc', Buffer.from(request.key, 'base64'), Buffer.from(request.iv, 'base64'));
+          cipher.setAutoPadding(request.autoPadding);
+          result = Buffer.concat([cipher.update(bytes), cipher.final()]);
+        }
+        return JSON.stringify({ data: result.toString('base64'), error: null });
       } } };
       const context = vm.createContext({ ...common, window, crypto: { getRandomValues: bytes => crypto.webcrypto.getRandomValues(bytes) } });
       vm.runInContext(bundle.outputFiles[0].text, context);
@@ -131,5 +147,6 @@ async function main() {
   }
   console.log(`APP_ENTITLEMENT_${failed ? 'FAILED' : 'OK'} groupsPassed=${passed} groupsFailed=${failed} checks=${checks} actualSharedAndAndroid=true syntheticMetadataOnly=true networkRequests=0`);
   process.exitCode = failed ? 1 : 0;
+  completed = true;
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

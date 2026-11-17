@@ -4,17 +4,25 @@
 
 ## 安装包与版本选择
 
-| 版本 | 当前发行 | 应用 ID | 界面 |
+| 版本 | 发行目标 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.78 / code101 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.78 / code101 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.30 / code31 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.80 / code103 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.80 / code103 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.31 / code32 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.78](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.78) · [原生 TV 0.1.30](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.30)。完整选择、数据隔离与构建说明见 [README 原生 TV 章节](README.md#原生-tv-独立版)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.80](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.80) · [原生 TV 0.1.31](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.31)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+
+## 0.12.80 / 0.1.31 播放修复联合发行（2026-11-17）
+
+- 修正 Java v5 签名的无符号字节转换；实网对照由 HTTP200 空正文恢复到有效高清模型。
+- 前台与预取请求独立取消，首播空模型在同一20秒预算内有界恢复，取消与截止后不发布迟到结果。
+- 修正 App 媒体缺失解密计划时的域名判断；完整媒体合同回归纳入发行验证。
+- 手机／TV WebView 为 0.12.80/code103，原生 TV 为 0.1.31/code32；保留安装证书与三个独立更新渠道。
+- 正式包、测试结果及实机覆盖记录见[本轮发行记录](docs/android-release-2026-11-17.md)；早前修复测试及历史失败见[修复记录](docs/playback-repair-2026-11-17.md)。
 
 ## 0.12.78 / 0.1.30 单次探测重构（手机 / TV WebView / 原生 TV）
 

@@ -9,6 +9,7 @@ elif [ "$#" -ne 0 ]; then
 fi
 JAVA_HOME="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
 JSON_JAR="${JSON_JAR:-$HOME/.m2/repository/com/vaadin/external/google/android-json/0.0.20131108.vaadin1/android-json-0.0.20131108.vaadin1.jar}"
+SDK_JAR="${SDK_JAR:-${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}/platforms/android-35/android.jar}"
 if [ ! -f "$JSON_JAR" ]; then echo 'TEST_DEPENDENCY_MISSING set JSON_JAR to an Android-compatible org.json runtime jar'; exit 2; fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -32,12 +33,14 @@ final class NetworkGuard {
 }
 STUB
 # Host-JVM Java 17 source/target check, deliberately NOT an SDK35 or full JDK17 claim.
-JAVAC=("$JAVA_HOME/bin/javac" -encoding UTF-8 -source 17 -target 17 -Xlint:-options -cp "$JSON_JAR")
-"${JAVAC[@]}" -d "$TMP/resolver" "$TMP/NetworkGuard.java" "$SRC/EpisodeResolver.java" "$TEST"
-"$JAVA_HOME/bin/java" -cp "$TMP/resolver:$JSON_JAR" io.github.jackotom.hongguo.android.GuestPlaybackResolverTest
-"${JAVAC[@]}" -d "$TMP/transport" "$SRC/NetworkGuard.java" "$SRC/EpisodeResolver.java" "$TEST"
+JAVAC=("$JAVA_HOME/bin/javac" -encoding UTF-8 -source 17 -target 17 -Xlint:-options -cp "$JSON_JAR:$SDK_JAR")
+# This TLS contract exercises API35; SDK android.jar is a compile stub with SDK_INT=0.
+HOST_BUILD="$ROOT/tests/host-platform/android/os/Build.java"
+"${JAVAC[@]}" -d "$TMP/resolver" "$HOST_BUILD" "$TMP/NetworkGuard.java" "$SRC/LegacyText.java" "$SRC/EpisodeResolver.java" "$TEST"
+"$JAVA_HOME/bin/java" -cp "$TMP/resolver:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.GuestPlaybackResolverTest
+"${JAVAC[@]}" -d "$TMP/transport" "$HOST_BUILD" "$SRC/NetworkGuard.java" "$SRC/LegacyText.java" "$SRC/EpisodeResolver.java" "$TEST"
 # Both system DNS and DoH are replaced. Every TCP/TLS byte is handled by the test's
 # SocketImpl/SSLContext doubles; no listening socket or upstream request is used.
 printf '93.184.216.34 hongguoduanju.com\n' > "$TMP/hosts"
-"$JAVA_HOME/bin/java" -Djdk.net.hosts.file="$TMP/hosts" -cp "$TMP/transport:$JSON_JAR" io.github.jackotom.hongguo.android.GuestPlaybackResolverTest --network-guard
+"$JAVA_HOME/bin/java" -Djdk.net.hosts.file="$TMP/hosts" -cp "$TMP/transport:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.GuestPlaybackResolverTest --network-guard
 echo 'PASS guest playback production resolver/transport contracts (offline host JVM, Java 17 source/target)'

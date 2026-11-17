@@ -8,7 +8,7 @@ for(const [name,change] of Object.entries({wrongDevice:{device:'mpv'},wrongPacka
 
 const nativeInput = (compatible = true) => ({
   device: 'tvnative',
-  badging: "package: name='io.github.jackotom.hongguo.android.tvnative' versionCode='3' versionName='0.1.2'\nsdkVersion:'26'",
+  badging: "package: name='io.github.jackotom.hongguo.android.tvnative' versionCode='3' versionName='0.1.2'\nsdkVersion:'23'",
   signature: `Verifies\nSigner #1 certificate SHA-256 digest: ${signer}`,
   bytes: 123,
   sha256: 'b'.repeat(64),
@@ -21,6 +21,7 @@ test('native TV manifests retain independent version, package and Native asset i
     assert.equal(manifest.flavor, 'tvnative');
     assert.equal(manifest.packageName, 'io.github.jackotom.hongguo.android.tvnative');
     assert.equal(manifest.versionCode, 3);
+    assert.equal(manifest.minSdk, 23);
     assert.equal(manifest.versionName, '0.1.2');
     assert.equal(manifest.sha256, 'b'.repeat(64));
     assert.equal(manifest.size, 123);
@@ -36,6 +37,7 @@ for (const [name, change] of Object.entries({
   nativeAssetTVSuffix: { filename: 'HongguoNative-0.1.2-tv-release-compatible.apk' },
   nativeAssetLowercaseSuffix: { filename: 'HongguoNative-0.1.2-tvnative-release-compatible.apk' },
   nativeAssetWrongVersion: { filename: 'HongguoNative-0.1.1-tvNative-release-compatible.apk' },
+  nativeWrongSdk: { badging: nativeInput().badging.replace("sdkVersion:'23'", "sdkVersion:'26'") },
   nativeDebug: { badging: nativeInput().badging + '\napplication-debuggable' },
 })) test(`reject ${name}`, () => assert.throws(() => createUpdateManifest({ ...nativeInput(), ...change })));
 for (const device of ['phone', 'tv']) {
