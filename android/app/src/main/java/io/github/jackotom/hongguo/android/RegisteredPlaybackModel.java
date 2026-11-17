@@ -148,6 +148,11 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             int ladderAttempts = fastFail ? 1 : 5;
             JSONObject projected = null; ModelError lastFailure = null;
             for (int attempt = 1; attempt <= ladderAttempts && projected == null; attempt++) {
+                // 2026-11-17: the ladder must leave the JS web fallback room to finish inside
+                // the overall resolve budget — a ladder that burns the whole 20s RPC budget
+                // forces a first-attempt timeout and a manual back-and-retry. Stop starting
+                // new attempts once less than eight seconds of budget remains.
+                if (attempt > 1 && !ladderTimeLeft()) break;
                 if (attempt > 1 && !fastFail) pace(attempt >= 4 ? 2000 : 1200);
                 if (attempt == 4) {
                     String[] reRegistered = reRegister();
@@ -159,7 +164,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
                 catch (ModelError failure) { lastFailure = failure; if (!recoverable(failure)) throw failure; }
                 check();
             }
-            if (projected == null && lastFailure != null && !fastFail) {
+            if (projected == null && lastFailure != null && !fastFail && ladderTimeLeft()) {
                 // Last resort: the two legacy forms on the final identity (each paced).
                 pace(1500);
                 try { projected = videoTab(did, iid, vid); }
@@ -187,6 +192,9 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     private static boolean recoverable(ModelError failure) {
         return "APP_EMPTY_RESPONSE".equals(failure.code) || "HTTP_ERROR".equals(failure.code);
     }
+    /** True while enough of the shared budget remains to start another ladder attempt and
+     * still leave the JS web fallback time to finish within the overall resolve deadline. */
+    private boolean ladderTimeLeft() { return deadline - System.nanoTime() > TimeUnit.SECONDS.toNanos(8); }
     /** Hollow fast-fail state: four empty v5 answers (roughly one full ladder) arm a
      * single-probe mode so later episodes fall to the web chain in seconds; any served
      * answer or a 3-minute quiet gap restores the full ladder. */
