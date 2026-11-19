@@ -7,8 +7,8 @@
   "versionName": "0.12.81",
   "minSdk": 26,
   "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.81/Hongguo-0.12.81-phone-release-compatible.apk",
-  "size": 1724194,
-  "sha256": "664a7a7afaf45fc32cae3489dc76dab50edb6ab7c6a6767cb86811092d0b307d",
+  "size": 1724174,
+  "sha256": "bc802b56d8a0e78c33924e7ded2da837342633aea55025f5a5045a385a15969e",
   "notes": "- 修复红果播放取源：主接口返回空正文时，仅对当前播放分集补一次兼容请求。\n- 遵守服务端稍后重试提示，后台预取不额外重试；保留画质、分集身份与媒体校验。\n- 保留原包名和兼容安装证书。手机与 TV WebView 分别安装对应 APK，原生 TV 同步发布 0.1.32。\n",
-  "publishedAt": "2026-11-19T13:47:22.125Z"
+  "publishedAt": "2026-11-19T13:53:30.471Z"
 }

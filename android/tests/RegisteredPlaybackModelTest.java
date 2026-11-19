@@ -57,6 +57,28 @@ public final class RegisteredPlaybackModelTest {
   @Override public Map<String,List<String>> getHeaderFields(){return Collections.singletonMap("Content-Type",Collections.singletonList("application/json"));}
  }
  public static void main(String[]args)throws Exception{
+  group("zero-byte gzip headers preserve empty-model and backoff classification",()->{
+   List<String> mismatches=new ArrayList<>();
+   for(String name:new String[]{"recover","backoff","malformed","truncated","unknown-encoding","speculative","double-empty","tab-backoff"}){
+    AtomicInteger calls=new AtomicInteger();
+    RegisteredPlaybackModel op=operation(r->registration(),r->{
+     calls.incrementAndGet();
+     if(r.method.equals("GET")&&name.equals("recover"))return response(200,tabEnvelope(VID,model()));
+     Map<String,List<String>>headers=new LinkedHashMap<>();headers.put("Content-Encoding",Arrays.asList(name.equals("unknown-encoding")?"br":"gzip"));
+     if(name.equals("backoff")||name.equals("tab-backoff")&&r.method.equals("GET"))headers.put("rEtRy-AfTeR",Arrays.asList("30"));
+     byte[] body=name.equals("malformed")?new byte[]{1,2,3}:name.equals("truncated")?new byte[]{31,(byte)139}:new byte[0];
+     return new OfficialApiClient.Response(200,headers,body);
+    });
+    String outcome;
+    try{JSONObject out=op.fetch(VID,name.equals("speculative"));outcome=out.has("video_model")?"MODEL":"MISSING";}
+    catch(Exception failure){outcome=failure instanceof RegisteredPlaybackModel.ModelError?((RegisteredPlaybackModel.ModelError)failure).code:failure.getClass().getSimpleName();}
+    String expected=name.equals("recover")?"MODEL":name.equals("backoff")||name.equals("tab-backoff")?"APP_SERVICE_BACKOFF":name.equals("unknown-encoding")?"APP_INVALID_RESPONSE":name.equals("malformed")?"ZipException":name.equals("truncated")?"EOFException":"APP_EMPTY_RESPONSE";
+    int expectedRequests=name.equals("recover")||name.equals("double-empty")||name.equals("tab-backoff")?2:1;
+    System.out.println("ZERO_GZIP_CASE name="+name+" outcome="+outcome+" requests="+calls.get()+" expected="+expected+" expectedRequests="+expectedRequests);
+    if(!outcome.equals(expected)||calls.get()!=expectedRequests)mismatches.add(name);
+   }
+   check(mismatches.isEmpty(),"zero-byte gzip is an empty response, not decompressor EOF; cases="+mismatches);
+  });
   group("foreground empty v5 recovers once from exact-episode video_tab",()->{
    AtomicInteger registrations=new AtomicInteger();List<OfficialApiClient.Request> requests=new ArrayList<>();
    RegisteredPlaybackModel op=operation(r->{registrations.incrementAndGet();return response(200,new JSONObject(new String(registration().body,StandardCharsets.UTF_8)).put("cookies","install_id="+IID+"; ttreq=fixture-register; store-region=cn; store-region-src=did; sessionid=private-account-cookie").toString());},r->{

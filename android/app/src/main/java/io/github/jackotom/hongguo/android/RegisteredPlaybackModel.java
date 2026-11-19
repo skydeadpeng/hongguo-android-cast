@@ -294,8 +294,11 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         if (response.status != 200) throw new ModelError("App片源服务返回 HTTP " + response.status, "HTTP_ERROR");
         byte[] data = response.body;
         String encoding = response.header("Content-Encoding");
-        if (encoding.equalsIgnoreCase("gzip")) { try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(data))) { data = read(in, deadline); } }
-        else if (!encoding.isEmpty() && !encoding.equalsIgnoreCase("identity")) throw new ModelError("App片源模型响应编码无效", "APP_INVALID_RESPONSE");
+        if (!encoding.isEmpty() && !encoding.equalsIgnoreCase("gzip") && !encoding.equalsIgnoreCase("identity"))
+            throw new ModelError("App片源模型响应编码无效", "APP_INVALID_RESPONSE");
+        // Explicit Accept-Encoding keeps this header on hollow HTTP 200 replies.
+        // No wire bytes means no gzip member: classify empty/backoff below instead of EOF.
+        if (encoding.equalsIgnoreCase("gzip") && data.length > 0) { try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(data))) { data = read(in, deadline); } }
         if (new String(data, StandardCharsets.UTF_8).trim().isEmpty()) {
             if (!response.header("Retry-After").trim().isEmpty()) throw new ModelError("播放服务繁忙，请稍后重试", "APP_SERVICE_BACKOFF");
             throw new ModelError("App接口未返回有效数据", "APP_EMPTY_RESPONSE");
