@@ -6,22 +6,22 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.80 / code103 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.80 / code103 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.31 / code32 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.81 / code104 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.81 / code104 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.32 / code33 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.80](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.80) · [原生 TV 0.1.31](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.31)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.81](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.81) · [原生 TV 0.1.32](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.32)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
 
-## 0.12.81 / 0.1.32 本地播放更新（2026-11-19）
+## 0.12.81 / 0.1.32 播放修复联合发行（2026-11-19）
 
-- 对齐 hongguoTV 0.16.10：前台 v5 空响应时同身份、同分集追加一次 video_tab GET；服务忙、明确拒绝、取消与截止保持终止。
-- 后台预取不做兼容GET或前台空响应重试；保留原画质、加密、完整文件和身份校验。
-- 三线非调试兼容签名包已构建，保留原应用 ID；尚未发布或切换稳定更新通道，当前公开发行仍为上表版本。
-- 上游差异、包名和本轮验证见 [播放更新记录](docs/android-playback-2026-11-19.md)。
+- 主接口空响应时，仅当前播放分集允许一次兼容取源，服务忙和明确拒绝不追加请求。
+- 修复零字节 gzip 响应分类，以及切集时备用接口连接失败被误报为无效数据；沿用现有有界重试，后台预取不增加重试。
+- 正式包通过三线模拟器真实下载、首集播放及按「下一集」切到第 2 集；四包匿名下载核对后，三个应用内更新通道已切换。
+- 发行与实测边界见[本轮发行记录](docs/android-release-2026-11-19.md)。
 
 ## 0.12.80 / 0.1.31 播放修复联合发行（2026-11-17）
 
