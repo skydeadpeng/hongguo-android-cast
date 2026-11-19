@@ -7,20 +7,20 @@
   "versionName": "0.1.32",
   "minSdk": 23,
   "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.32/HongguoNative-0.1.32-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 47053344,
-  "sha256": "f2ac1e349ab8067c05bc30ac0046d250e733fed49d98e038b2b2db790c9b2c4e",
+  "size": 47053351,
+  "sha256": "d01d8a0d8900fbea1c9bfbfab087b8c6a06c1405e540e360310bc7137bd8b6db",
   "abis": {
     "arm64-v8a": {
       "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.32/HongguoNative-0.1.32-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 47053344,
-      "sha256": "f2ac1e349ab8067c05bc30ac0046d250e733fed49d98e038b2b2db790c9b2c4e"
+      "size": 47053351,
+      "sha256": "d01d8a0d8900fbea1c9bfbfab087b8c6a06c1405e540e360310bc7137bd8b6db"
     },
     "armeabi-v7a": {
       "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.32/HongguoNative-0.1.32-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 43325743,
-      "sha256": "ba7fb4d19fb99c1cf2995087147a8c1d7bb4abd962a0392386a594a77050ee9d"
+      "size": 43325745,
+      "sha256": "75922acd987bb1984d302149ec796acdda0a6435b4ad8adeeeaf28ef943a046d"
     }
   },
-  "notes": "- 修复红果播放取源：主接口返回空正文时，仅对当前播放分集补一次兼容请求。\n- 遵守服务端稍后重试提示，后台预取不额外重试；保留画质、分集身份与媒体校验。\n- 沿用原安装证书，支持 Android 6.0+。分别提供 arm64-v8a 与 armeabi-v7a APK；手机与 TV WebView 同步发布 0.12.81。\n",
-  "publishedAt": "2026-11-19T13:53:32.778Z"
+  "notes": "- 修复红果播放取源：主接口返回空正文时，仅对当前播放分集补一次兼容请求。\n- 遵守服务端稍后重试提示，后台预取不额外重试；保留画质、分集身份与媒体校验。\n- 沿用原安装证书，支持 Android 6.0+。分别提供 arm64-v8a 与 armeabi-v7a APK；手机与 TV WebView 同步发布 0.12.81。\n- 修复切集时备用取源连接失败被误判为无效响应的问题。恢复沿用现有重试时限，不改变分集或画质。\n",
+  "publishedAt": "2026-11-19T14:09:33.808Z"
 }

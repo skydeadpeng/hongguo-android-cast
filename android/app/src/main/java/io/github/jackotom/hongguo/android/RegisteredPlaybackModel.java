@@ -243,7 +243,12 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         check();
         PlaybackSignerV5.Request signed = TabPlaybackSigner.sign(did, iid, cdid, vid, cookies, System.currentTimeMillis());
         check();
-        OfficialApiClient.Response response = modelTransport.execute(new OfficialApiClient.Request(signed.url, "GET", signed.headers, signed.body, deadline));
+        OfficialApiClient.Response response;
+        try { response = modelTransport.execute(new OfficialApiClient.Request(signed.url, "GET", signed.headers, signed.body, deadline)); }
+        catch (ConnectException refused) {
+            check(); // Cancellation/deadline wins over the connection classification.
+            throw new ModelError("App片源连接暂未建立，请重试", "ECONNREFUSED");
+        }
         check();
         traceV5("video_tab vid=" + vid + " http=" + response.status + " bytes=" + response.body.length);
         return adopt(response, vid, deadline);
@@ -389,14 +394,20 @@ final class RegisteredPlaybackModel implements AutoCloseable {
          * OkHttp's h2 clients are answered); tests inject a capturing fake. The pin is the
          * CDN node this attempt targets (null = system resolution). */
         interface Engine { OfficialApiClient.Response call(URI uri, OfficialApiClient.Request request, int timeoutMs, java.net.InetAddress pin) throws Exception; }
+        interface NodeSelector { java.net.InetAddress select(String host); }
         private final Engine engine;
+        private final NodeSelector nodeSelector;
         // One lookup owns its calls, while SHARED_CLIENT still owns the shared h2 pool.
         // The same monitor serializes close and registration: a call created while
         // close is running either joins its owner's cancellation snapshot or never executes.
         private final java.util.Set<okhttp3.Call> activeCalls = new java.util.HashSet<>();
         private volatile boolean closed;
-        ModelHttpTransport() { this.engine = this::productionOkhttpCall; }
-        ModelHttpTransport(Engine engine) { this.engine = Objects.requireNonNull(engine); }
+        ModelHttpTransport() { this.engine = this::productionOkhttpCall; this.nodeSelector = this::nextNode; }
+        // An injected wire engine is offline unless its test explicitly supplies a selector.
+        ModelHttpTransport(Engine engine) { this(engine, host -> null); }
+        ModelHttpTransport(Engine engine, NodeSelector nodeSelector) {
+            this.engine = Objects.requireNonNull(engine); this.nodeSelector = Objects.requireNonNull(nodeSelector);
+        }
         @Override public void close() {
             okhttp3.Call[] owned;
             synchronized (activeCalls) {
@@ -480,7 +491,9 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         @Override public OfficialApiClient.Response execute(OfficialApiClient.Request request) throws Exception {
             check(request.deadlineNanos); URI uri = validate(request);
             check(request.deadlineNanos); int timeout = (int) Math.max(1, Math.min(7000, TimeUnit.NANOSECONDS.toMillis(request.deadlineNanos - System.nanoTime())));
-            java.net.InetAddress pin = nextNode(uri.getHost());
+            // Compatibility GET retains OkHttp's full system DNS address list and
+            // route selection. The existing POST node-selection policy is unchanged.
+            java.net.InetAddress pin = request.method.equals("GET") ? null : nodeSelector.select(uri.getHost());
             try {
                 OfficialApiClient.Response response = engine.call(uri, request, timeout, pin);
                 check(request.deadlineNanos);

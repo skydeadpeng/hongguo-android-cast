@@ -57,6 +57,35 @@ public final class RegisteredPlaybackModelTest {
   @Override public Map<String,List<String>> getHeaderFields(){return Collections.singletonMap("Content-Type",Collections.singletonList("application/json"));}
  }
  public static void main(String[]args)throws Exception{
+  group("compatibility ConnectException is typed for the existing outer retry owner",()->{
+   AtomicInteger requests=new AtomicInteger();Exception error=reject(()->operation(r->registration(),r->{requests.incrementAndGet();if(r.method.equals("POST"))return response(200,"");throw new ConnectException("synthetic connection refusal");}).fetch(VID));
+   String code=error instanceof RegisteredPlaybackModel.ModelError?((RegisteredPlaybackModel.ModelError)error).code:error.getClass().getSimpleName();
+   System.out.println("TAB_CONNECT_CLASSIFICATION actual="+code+" requests="+requests.get()+" expected=ECONNREFUSED expectedRequests=2 networkRequests=0");
+   check(error instanceof RegisteredPlaybackModel.ModelError&&code.equals("ECONNREFUSED")&&requests.get()==2,"one POST and one GET; typed connection refusal without a nested retry");
+  });
+  group("tab connection classification preserves cancellation deadline and primary POST errors",()->{
+   AtomicInteger calls=new AtomicInteger();Exception canceled=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("POST"))return response(200,"");Thread.currentThread().interrupt();throw new ConnectException("synthetic canceled connect");}).fetch(VID));
+   check(canceled instanceof InterruptedIOException&&!(canceled instanceof SocketTimeoutException)&&calls.get()==2,"cancel wins before ECONNREFUSED and no additional request");Thread.interrupted();
+   calls.set(0);long stop=System.nanoTime()+100_000_000L;
+   Exception expired=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("POST"))return response(200,"");Thread.sleep(150);throw new ConnectException("synthetic late connect");},stop).fetch(VID));
+   check(expired instanceof SocketTimeoutException&&calls.get()==2,"original deadline wins before ECONNREFUSED and no nested retry");
+   calls.set(0);Exception primary=reject(()->operation(r->registration(),r->{calls.incrementAndGet();throw new ConnectException("synthetic primary refusal");}).fetch(VID));
+   check(primary instanceof ConnectException&&calls.get()==1,"POST connection classification unchanged and no tab after a POST transport error");
+  });
+  group("compatibility GET uses the full DNS list while POST retains its selected pin",()->{
+   InetAddress selected=InetAddress.getByAddress(new byte[]{1,1,1,1});AtomicInteger selectors=new AtomicInteger(),engines=new AtomicInteger();List<InetAddress>pins=new ArrayList<>();
+   RegisteredPlaybackModel.ModelHttpTransport.Engine engine=(uri,r,timeout,pin)->{engines.incrementAndGet();pins.add(pin);return response(200,"{}");};
+   try(RegisteredPlaybackModel.ModelHttpTransport transport=new RegisteredPlaybackModel.ModelHttpTransport(engine,host->{selectors.incrementAndGet();return selected;})){
+    long deadline=System.nanoTime()+5_000_000_000L;
+    transport.execute(new OfficialApiClient.Request(RegisteredPlaybackModel.VIDEO_TAB_API+"?video_id="+VID,"GET",Collections.emptyMap(),new byte[0],deadline));
+    check(selectors.get()==0&&pins.get(0)==null,"GET never resolves/selects a singleton pin before OkHttp");
+    transport.execute(new OfficialApiClient.Request(PlaybackSignerV5.PLAYER_V1_API+"?x=1","POST",Collections.emptyMap(),new byte[]{1},deadline));
+    check(selectors.get()==1&&pins.get(1)==selected,"v5 POST keeps its selected node");
+    transport.execute(new OfficialApiClient.Request(RegisteredPlaybackModel.API+"?x=1","POST",Collections.emptyMap(),new byte[]{1},deadline));
+    check(selectors.get()==2&&pins.get(2)==selected&&engines.get()==3,"legacy POST keeps its selected node and one wire execution per request");
+   }
+   System.out.println("MODEL_DNS_POLICY_OK getPin=null getSelectorCalls=0 postSelectorCalls=2 engineCalls=3 networkRequests=0");
+  });
   group("zero-byte gzip headers preserve empty-model and backoff classification",()->{
    List<String> mismatches=new ArrayList<>();
    for(String name:new String[]{"recover","backoff","malformed","truncated","unknown-encoding","speculative","double-empty","tab-backoff"}){

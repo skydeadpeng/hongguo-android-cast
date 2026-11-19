@@ -56,6 +56,34 @@ public final class PlaybackNativeRecoveryTest {
             reject(()->play(background));
             check(calls[0]==1&&time.sleeps.isEmpty(),"prefetch must not retry or sleep");
         });
+        group("switching episode after an empty prefetch recovers one connection failure at the same quality",()->{
+            final String next="880007";
+            FakeTime time=new FakeTime();timing(time);
+            int[] foreground={0},prefetch={0};
+            List<Long> nextBudgets=new ArrayList<>();
+            PlaybackSources.NativeLookup selected=(sid,vid,q,ceiling,timeout)->{
+                check(SID.equals(sid)&&"1080p".equals(q)&&ceiling==0,"switch changed series, quality or ceiling");
+                if (VID.equals(vid)) return model(q,ceiling).put("width",1080).put("height",1920);
+                check(next.equals(vid),"connection recovery replaced the requested episode");
+                nextBudgets.add(timeout);
+                if (++foreground[0]==1)
+                    throw new AppMediaSource.AppSourceException("fixture refused TCP connection","ECONNREFUSED");
+                return model(q,ceiling).put("vid",next).put("width",1080).put("height",1920);
+            };
+            PlaybackSources.NativeLookup background=new PlaybackSources.NativeLookup(){
+                public JSONObject lookup(String sid,String vid,String q,int c,long timeout)throws Exception {
+                    check(next.equals(vid),"prefetch episode mismatch");prefetch[0]++;throw empty();
+                }
+                public boolean speculative(){return true;}
+            };
+            PlaybackSources.Plan first=PlaybackSources.resolvePlayback(SID,VID,"1080p",0,false,false,selected);
+            reject(()->PlaybackSources.resolvePlayback(SID,next,"1080p",0,false,false,background));
+            PlaybackSources.Plan second=PlaybackSources.resolvePlayback(SID,next,"1080p",0,false,false,selected);
+            check(VID.equals(first.vid)&&next.equals(second.vid)&&"1080p".equals(second.requestedQuality),"switch did not finish at the exact episode and quality");
+            check(prefetch[0]==1&&foreground[0]==2,"expected one speculative attempt and one bounded foreground retry");
+            check(time.sleeps.equals(Collections.singletonList(500L))&&nextBudgets.equals(Arrays.asList(20000L,19500L)),"connection retry lost the shared deadline");
+            check(NetworkGuard.downloads==0,"offline boundary must not download media");
+        });
         group("service backoff is terminal at native playback boundary",()->{
             FakeTime time=new FakeTime();timing(time);int[]calls={0};
             reject(()->play((s,v,q,c,t)->{calls[0]++;throw new AppMediaSource.AppSourceException("service busy","APP_SERVICE_BACKOFF");}));
