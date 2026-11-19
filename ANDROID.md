@@ -16,6 +16,13 @@
 
 下载：[手机 / TV WebView 0.12.80](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.80) · [原生 TV 0.1.31](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.31)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
 
+## 0.12.81 / 0.1.32 本地播放更新（2026-11-19）
+
+- 对齐 hongguoTV 0.16.10：前台 v5 空响应时同身份、同分集追加一次 video_tab GET；服务忙、明确拒绝、取消与截止保持终止。
+- 后台预取不做兼容GET或前台空响应重试；保留原画质、加密、完整文件和身份校验。
+- 三线非调试兼容签名包已构建，保留原应用 ID；尚未发布或切换稳定更新通道，当前公开发行仍为上表版本。
+- 上游差异、包名和本轮验证见 [播放更新记录](docs/android-playback-2026-11-19.md)。
+
 ## 0.12.80 / 0.1.31 播放修复联合发行（2026-11-17）
 
 - 修正 Java v5 签名的无符号字节转换；实网对照由 HTTP200 空正文恢复到有效高清模型。

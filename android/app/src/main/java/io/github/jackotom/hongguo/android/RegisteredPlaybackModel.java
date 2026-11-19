@@ -13,7 +13,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import org.json.*;
 
-/** One anonymous registered identity per metadata lookup, never an account session or a disk record. */
+/** Anonymous registered playback identity, isolated from account sessions. */
 final class RegisteredPlaybackModel implements AutoCloseable {
     static final String API = "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/";
     // Per-episode recovery endpoint: the legacy POST can earn a persistent empty 200.
@@ -119,7 +119,9 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         try { modelTransport.close(); } catch (RuntimeException ignored) { }
         Thread thread = owner; if (thread != null && thread != Thread.currentThread()) thread.interrupt();
     }
-    JSONObject fetch(String vid) throws Exception {
+    JSONObject fetch(String vid) throws Exception { return fetch(vid, false); }
+    /** Speculative prefetch must not spend a foreground compatibility request. */
+    JSONObject fetch(String vid, boolean speculative) throws Exception {
         if (vid == null || !vid.matches("[0-9]{1,30}")) throw new ModelError("分集请求信息无效", "INVALID_INPUT");
         if (!started.compareAndSet(false, true)) throw new IOException("App片源请求已经结束");
         owner = Thread.currentThread();
@@ -132,25 +134,28 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             try { identity = bootstrap.register(); traceV5("bootstrap ok did=" + identity[0] + (identity[0].equals(SHARED_IDENTITY.get() == null ? "" : SHARED_IDENTITY.get()[0]) ? " (shared)" : " (fresh)")); }
             catch (Exception failure) { traceV5("bootstrap failed: " + failure); check(); throw failure; }
             check();
-            String did = identity[0], iid = identity[1], cdid = identity.length > 2 ? identity[2] : null;
+            String did = identity[0], iid = identity[1];
+            String cdid = identity.length > 2 && identity[2] != null && !identity[2].isEmpty() ? identity[2] : PlaybackSignerV5.newCdid();
+            String cookies = identity.length > 3 && identity[3] != null ? identity[3] : "";
             if (!OfficialApiClient.validID(did) || !OfficialApiClient.validID(iid))
                 throw new ModelError("App片源设备登记未完成", "APP_INVALID_RESPONSE");
-            // 2026-11-17 (evening): match the working TV clients' architecture exactly —
-            // ONE v5 request per fetch, no internal retry ladder, no identity rotation,
-            // no pacing. The working clients (hongguoTV 0.16.5) send a single player/v1
-            // request; recovery lives at the episode level (their RecoveryBudget re-calls
-            // the playback with the SAME persisted identity at 1s/2.5s/5s/15s/30s/60s/90s/
-            // 105s). Our previous multi-attempt ladder burned identity goodwill in rapid
-            // bursts and poisoned every rotation. This fetch now mirrors the single-shot
-            // design: succeed or fail in under a second, let the JS web fallback or the
-            // user's retry carry the recovery on the same blessed identity.
-            JSONObject projected = null; ModelError lastFailure = null;
+            // hongguoTV 0.16.10: only an empty foreground v5 response may check
+            // video_tab once. Both requests keep the exact identity and deadline;
+            // HTTP/business/format failures and service backoff remain terminal.
+            JSONObject projected;
             try { projected = playerV1(did, iid, cdid, vid); }
-            catch (ModelError failure) { lastFailure = failure; }
+            catch (ModelError failure) {
+                if (speculative || !"APP_EMPTY_RESPONSE".equals(failure.code)) throw failure;
+                check();
+                try { projected = videoTab(did, iid, cdid, vid, cookies); }
+                catch (ModelError fallback) {
+                    if ("APP_EMPTY_RESPONSE".equals(fallback.code)) throw failure;
+                    throw fallback;
+                }
+            }
             check();
-            if (projected == null) throw lastFailure;
             HOLLOW_STREAK.set(0);
-            persistIdentity(new String[]{did, iid, cdid});
+            persistIdentity(new String[]{did, iid, cdid, cookies});
             return new JSONObject().put("vid", vid).put("video_model", projected);
         } finally {
             registering = null; owner = null;
@@ -201,9 +206,8 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         }
         return null;
     }
-    /** 2026-11-16 起唯一仍被应答的模型形态：sinfonlinea 的 player/v1 + v5 三头签名。
-     * 与 hongguoTV 0.16.5 MobilePlayback.kt 同构（query 无 ts、gzip 正文、不带 Cookie）；
-     * cdid 与 Kotlin 孪生一致：会话自己的随机 UUID，与注册 payload 里的 cdid 相互独立。 */
+    /** Primary v5 player request: gzip JSON and no account/registration cookies.
+     * The profile cdid is shared with the single foreground compatibility GET. */
     private JSONObject playerV1(String did, String iid, String cdid, String vid) throws Exception {
         Map<String, String> query = new LinkedHashMap<>();
         query.put("aid", "8662"); query.put("app_name", "novelread");
@@ -211,7 +215,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         query.put("channel", "vivo_8662_64"); query.put("device_platform", "android");
         query.put("device_type", "PGT-AN10"); query.put("os_version", "12"); query.put("update_version_code", "74332");
         query.put("iid", iid);
-        query.put("cdid", PlaybackSignerV5.newCdid());
+        query.put("cdid", cdid);
         query.put("device_id", did);
         JSONObject payload = new JSONObject()
             .put("biz_param", new JSONObject().put("detail_page_version", 0).put("device_level", 1).put("disable_digg_stat", false)
@@ -235,25 +239,14 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         if (response.body.length == 0) noteHollowFetch(); else HOLLOW_STREAK.set(0);
         return adopt(response, vid, deadline);
     }
-    private JSONObject videoTab(String did, String iid, String vid) throws Exception {
-        TreeMap<String, String> tabQuery = query(did, iid, "73932", "7.3.9.32");
-        long tabTicket = System.currentTimeMillis(), tabKhronos = tabTicket / 1000;
-        tabQuery.put("ts", Long.toString(tabKhronos)); tabQuery.put("_rticket", Long.toString(tabTicket));
-        tabQuery.put("video_id", vid); tabQuery.put("video_id_type", "0"); tabQuery.put("device_level", "1");
-        tabQuery.put("need_all_video_definition", "1"); tabQuery.put("need_mp4_align", "0"); tabQuery.put("use_os_player", "0");
-        tabQuery.put("video_platform", "1024"); tabQuery.put("source", "0"); tabQuery.put("from_video_id", "");
-        String tabString = PassportSigner.encode(tabQuery);
-        Map<String, String> tabHeaders = new LinkedHashMap<>(PlayerSigner.signPlayer(tabString, null, tabKhronos));
-        tabHeaders.put("User-Agent", playbackUserAgent("73932")); tabHeaders.put("Accept", "application/json; charset=utf-8,application/x-protobuf");
-        tabHeaders.put("X-XS-From-Web", "0"); tabHeaders.put("Passport-Sdk-Version", "50561");
-        tabHeaders.put("Sdk-Version", "2"); tabHeaders.put("X-SS-DP", "8662");
-        tabHeaders.put("X-Tt-Store-Region", "cn"); tabHeaders.put("X-Tt-Store-Region-Src", "did");
-        tabHeaders.put("X-Tt-Request-Tag", "t=0;n=0");
+    private JSONObject videoTab(String did, String iid, String cdid, String vid, String cookies) throws Exception {
         check();
-        OfficialApiClient.Response tabResponse = modelTransport.execute(new OfficialApiClient.Request(VIDEO_TAB_API + "?" + tabString, "GET", tabHeaders, new byte[0], deadline));
+        PlaybackSignerV5.Request signed = TabPlaybackSigner.sign(did, iid, cdid, vid, cookies, System.currentTimeMillis());
         check();
-        traceV5("video_tab vid=" + vid + " http=" + tabResponse.status + " bytes=" + tabResponse.body.length);
-        return adopt(tabResponse, vid, deadline);
+        OfficialApiClient.Response response = modelTransport.execute(new OfficialApiClient.Request(signed.url, "GET", signed.headers, signed.body, deadline));
+        check();
+        traceV5("video_tab vid=" + vid + " http=" + response.status + " bytes=" + response.body.length);
+        return adopt(response, vid, deadline);
     }
     private JSONObject multiPost(String did, String iid, String vid) throws Exception {
         TreeMap<String, String> query = query(did, iid, "74332", "7.4.3.32");
@@ -303,7 +296,10 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         String encoding = response.header("Content-Encoding");
         if (encoding.equalsIgnoreCase("gzip")) { try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(data))) { data = read(in, deadline); } }
         else if (!encoding.isEmpty() && !encoding.equalsIgnoreCase("identity")) throw new ModelError("App片源模型响应编码无效", "APP_INVALID_RESPONSE");
-        if (new String(data, StandardCharsets.UTF_8).trim().isEmpty()) throw new ModelError("App接口未返回有效数据", "APP_EMPTY_RESPONSE");
+        if (new String(data, StandardCharsets.UTF_8).trim().isEmpty()) {
+            if (!response.header("Retry-After").trim().isEmpty()) throw new ModelError("播放服务繁忙，请稍后重试", "APP_SERVICE_BACKOFF");
+            throw new ModelError("App接口未返回有效数据", "APP_EMPTY_RESPONSE");
+        }
         JSONObject envelope;
         try { envelope = OfficialApiClient.parse(data); }
         catch (Exception invalid) { check(); throw new ModelError("App片源模型响应格式无效", "APP_INVALID_RESPONSE"); }

@@ -1,0 +1,660 @@
+{
+  "vectors": [
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-0",
+      "sha256": "dea4442c797fc6092ee985d13de329db65969ab20888ca7f8c76353f794e9ab5",
+      "iid": "2234567890",
+      "now": 1800000000000,
+      "randoms": [
+        192937725,
+        946448214,
+        -22925211,
+        -775883285,
+        -412199564,
+        58240555,
+        -333539666
+      ],
+      "started": 1799999987655,
+      "nonce": "synthetic-process-0",
+      "did": "1234567890",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567890&device_id=1234567890&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-0&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000000000"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-1",
+      "sha256": "79741dcab68cc979b26162c1b9685541f0224b7d06db52fc195e51ba43a457ce",
+      "iid": "2234567891",
+      "now": 1800000001000,
+      "randoms": [
+        191013980,
+        -1866063498,
+        -676954320,
+        -752377331,
+        -1050057581,
+        -1505453637,
+        -714072941
+      ],
+      "started": 1799999988655,
+      "nonce": "synthetic-process-1",
+      "did": "1234567891",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567891&device_id=1234567891&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-1&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000001002"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-2",
+      "sha256": "215cea9ba8777eb68bc64d68ebc1067bd4a0ad3d83930ad9d7663baa534c8038",
+      "iid": "2234567892",
+      "now": 1800000002000,
+      "randoms": [
+        190629232,
+        -710578922,
+        51233317,
+        -1606669599,
+        1399351194,
+        1617781361,
+        -1649173055
+      ],
+      "started": 1799999989655,
+      "nonce": "synthetic-process-2",
+      "did": "1234567892",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567892&device_id=1234567892&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-2&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000002000"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-3",
+      "sha256": "34a2bb80658eb8bf030608731db3599bbde187815322a3ed5f80486257fe6433",
+      "iid": "2234567893",
+      "now": 1800000003000,
+      "randoms": [
+        191783478,
+        117934646,
+        -2133329595,
+        956207206,
+        -1653907833,
+        838010958,
+        1156127287
+      ],
+      "started": 1799999990655,
+      "nonce": "synthetic-process-3",
+      "did": "1234567893",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567893&device_id=1234567893&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-3&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000003000"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-4",
+      "sha256": "14f2133f517062a73fcaae794945b29cef4228b5df43dba6a979ab26da35379f",
+      "iid": "2234567894",
+      "now": 1800000004000,
+      "randoms": [
+        191398729,
+        1273419222,
+        -1405141958,
+        101914937,
+        795500941,
+        -333721340,
+        221027173
+      ],
+      "started": 1799999991655,
+      "nonce": "synthetic-process-4",
+      "did": "1234567894",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567894&device_id=1234567894&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-4&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000004004"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-5",
+      "sha256": "b80e880fcf58585c70d0ed0c58681d6ee4bfc7133e3d49c221e09c0e531f9964",
+      "iid": "2234567895",
+      "now": 1800000005000,
+      "randoms": [
+        177163020,
+        1076675573,
+        -232003156,
+        -1442127920,
+        1229312372,
+        -738143393,
+        -17938685
+      ],
+      "started": 1799999992655,
+      "nonce": "synthetic-process-5",
+      "did": "1234567895",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567895&device_id=1234567895&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-5&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000005004"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-6",
+      "sha256": "3bf41de8d4c56659bb9b99c6143f14333a77f9b0c72c12cc20e1710f7e8b7d97",
+      "iid": "2234567896",
+      "now": 1800000006000,
+      "randoms": [
+        176778271,
+        -2062807147,
+        496184481,
+        1998547107,
+        -616246149,
+        -1909875691,
+        -953038800
+      ],
+      "started": 1799999993655,
+      "nonce": "synthetic-process-6",
+      "did": "1234567896",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567896&device_id=1234567896&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-6&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000006000"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-7",
+      "sha256": "41aff520cb2cbcdae0cea6df2e4aaf1a8de76d1d522ffa8489aacc925d9a6863",
+      "iid": "2234567897",
+      "now": 1800000007000,
+      "randoms": [
+        177932518,
+        -1234293579,
+        -1688378431,
+        266456616,
+        625462120,
+        1605321202,
+        1852261543
+      ],
+      "started": 1799999994655,
+      "nonce": "synthetic-process-7",
+      "did": "1234567897",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567897&device_id=1234567897&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-7&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000007001"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-8",
+      "sha256": "9e73b8dc320c9ded438fdb6086f68b11aabcbd9e923ad6534d62dd0399cc4258",
+      "iid": "2234567898",
+      "now": 1800000008000,
+      "randoms": [
+        177547769,
+        -78809003,
+        -960190793,
+        -587835652,
+        -1220096402,
+        433588905,
+        917161429
+      ],
+      "started": 1799999995655,
+      "nonce": "synthetic-process-8",
+      "did": "1234567898",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567898&device_id=1234567898&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-8&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000008000"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-9",
+      "sha256": "b614218b1b09a8fd17ca1840c6fb4ed155eab5b6be413b381dcff2612e4550a0",
+      "iid": "2234567899",
+      "now": 1800000009000,
+      "randoms": [
+        175624024,
+        1403646580,
+        -1614219903,
+        -564329698,
+        -1857954419,
+        -1130105288,
+        536628154
+      ],
+      "started": 1799999996655,
+      "nonce": "synthetic-process-9",
+      "did": "1234567899",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567899&device_id=1234567899&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-9&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000009003"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-10",
+      "sha256": "9a5e5c94671e8b22ff3800b160443b036655edb6c0f929839396570d173428e9",
+      "iid": "2234567900",
+      "now": 1800000010000,
+      "randoms": [
+        175239276,
+        -1735836140,
+        -886032266,
+        -1418621966,
+        591454356,
+        1993129711,
+        -398471960
+      ],
+      "started": 1799999997655,
+      "nonce": "synthetic-process-10",
+      "did": "1234567900",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567900&device_id=1234567900&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-10&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000010001"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-11",
+      "sha256": "7232443707b4d9b99f6bcf33216fc11066f2a84afe3afdb19996257ff19566d1",
+      "iid": "2234567901",
+      "now": 1800000011000,
+      "randoms": [
+        176393522,
+        -907322572,
+        1224372118,
+        1144254839,
+        1833162625,
+        1213359308,
+        -1888138914
+      ],
+      "started": 1799999998655,
+      "nonce": "synthetic-process-11",
+      "did": "1234567901",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567901&device_id=1234567901&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-11&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000011001"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-12",
+      "sha256": "804fbba09409be430b561d89bb8f3c89cf6ce87d1f47cec7f9c3281596521220",
+      "iid": "2234567902",
+      "now": 1800000012000,
+      "randoms": [
+        176008773,
+        248162004,
+        1952559756,
+        289962571,
+        -12395897,
+        41627010,
+        1471728268
+      ],
+      "started": 1799999999655,
+      "nonce": "synthetic-process-12",
+      "did": "1234567902",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567902&device_id=1234567902&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-12&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000012002"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-13",
+      "sha256": "32aab1ef13faec38fc546c24ba98aa96ae1db049ffd5c08443cbc90c30263eb1",
+      "iid": "2234567903",
+      "now": 1800000013000,
+      "randoms": [
+        174085029,
+        1730617588,
+        1298530646,
+        313468525,
+        -650253914,
+        -1522067182,
+        1091194993
+      ],
+      "started": 1800000000655,
+      "nonce": "synthetic-process-13",
+      "did": "1234567903",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567903&device_id=1234567903&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-13&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000013000"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-14",
+      "sha256": "2c8f69f6d9961715efbe971e7840635f1790c8564716b8753b4850770a1a33d0",
+      "iid": "2234567904",
+      "now": 1800000014000,
+      "randoms": [
+        173700280,
+        -1408865132,
+        2026718283,
+        -540823744,
+        1799154861,
+        1601167816,
+        156094879
+      ],
+      "started": 1800000001655,
+      "nonce": "synthetic-process-14",
+      "did": "1234567904",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567904&device_id=1234567904&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-14&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000014002"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-15",
+      "sha256": "8203066b906e353aa4868b3d9242b09b5ee32ff18e2633f59f46f3a9db81866a",
+      "iid": "2234567905",
+      "now": 1800000015000,
+      "randoms": [
+        174854527,
+        -580351564,
+        -157844629,
+        2022053062,
+        -1254104166,
+        821397413,
+        -1333572075
+      ],
+      "started": 1800000002655,
+      "nonce": "synthetic-process-15",
+      "did": "1234567905",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567905&device_id=1234567905&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-15&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000015001"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-16",
+      "sha256": "7f922d9b60cd8768261bb8038eaac4890e39bd7967b9f9ec0dddec686f6041b2",
+      "iid": "2234567906",
+      "now": 1800000016000,
+      "randoms": [
+        174469778,
+        575133012,
+        570343009,
+        1167760793,
+        1195304608,
+        -350334885,
+        2026295107
+      ],
+      "started": 1800000003655,
+      "nonce": "synthetic-process-16",
+      "did": "1234567906",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567906&device_id=1234567906&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-16&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000016001"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-17",
+      "sha256": "6f91ec3bd070259812849002364c9035c018812165fb4efc11b021626cb92d9c",
+      "iid": "2234567907",
+      "now": 1800000017000,
+      "randoms": [
+        172546033,
+        2057588596,
+        -83686101,
+        1191266747,
+        557446591,
+        -1914029077,
+        1645761832
+      ],
+      "started": 1800000004655,
+      "nonce": "synthetic-process-17",
+      "did": "1234567907",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567907&device_id=1234567907&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-17&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000017002"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-18",
+      "sha256": "0ce71f235ad9643344a1767cd7088824a791699ba0ae8635dcb9e5756d5feeb2",
+      "iid": "2234567908",
+      "now": 1800000018000,
+      "randoms": [
+        172161284,
+        -1081894124,
+        644501536,
+        336974479,
+        -1288111930,
+        1209205921,
+        710661718
+      ],
+      "started": 1800000005655,
+      "nonce": "synthetic-process-18",
+      "did": "1234567908",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567908&device_id=1234567908&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-18&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000018001"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-19",
+      "sha256": "cea95bdfc5197fc68e598e9eb001558556893c5b622785a809d7361068e477c1",
+      "iid": "2234567909",
+      "now": 1800000019000,
+      "randoms": [
+        173315531,
+        -253380556,
+        -1540061376,
+        -1395116012,
+        -46403661,
+        429435518,
+        -779005236
+      ],
+      "started": 1800000006655,
+      "nonce": "synthetic-process-19",
+      "did": "1234567909",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567909&device_id=1234567909&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-19&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000019002"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-20",
+      "sha256": "9f23fef013baffaa7a30d8c70dc88223c69883d5a12a689a9fe3148ad10ba0f8",
+      "iid": "2234567910",
+      "now": 1800000020000,
+      "randoms": [
+        172930782,
+        902104020,
+        -811873739,
+        2045559016,
+        -1891962183,
+        -742296779,
+        -1714105350
+      ],
+      "started": 1800000007655,
+      "nonce": "synthetic-process-20",
+      "did": "1234567910",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567910&device_id=1234567910&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-20&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000020000"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-21",
+      "sha256": "cb11d22eac5b7c792b2a175cb6f0c4b7b12471463f42eb0fc3dd085a361c2bd4",
+      "iid": "2234567911",
+      "now": 1800000021000,
+      "randoms": [
+        183319002,
+        -231208459,
+        1001896536,
+        -658353514,
+        693477648,
+        829704185,
+        2058761254
+      ],
+      "started": 1800000008655,
+      "nonce": "synthetic-process-21",
+      "did": "1234567911",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567911&device_id=1234567911&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-21&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000021001"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-22",
+      "sha256": "59a0dc9e32c702af38eff642bf28d72830081303d430585b5d662bfd9f0d2ff4",
+      "iid": "2234567912",
+      "now": 1800000022000,
+      "randoms": [
+        182934254,
+        924276117,
+        1730084173,
+        -1512645783,
+        -1152080873,
+        -342028112,
+        1123661140
+      ],
+      "started": 1800000009655,
+      "nonce": "synthetic-process-22",
+      "did": "1234567912",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567912&device_id=1234567912&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-22&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000022001"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-23",
+      "sha256": "0a6da3a8f0ea56af1d05fb10d128138dc2e709aeaa7caf4a517212782d194719",
+      "iid": "2234567913",
+      "now": 1800000023000,
+      "randoms": [
+        184088500,
+        1752789685,
+        -454478738,
+        1050231022,
+        89627396,
+        -1121798515,
+        -366005813
+      ],
+      "started": 1800000010655,
+      "nonce": "synthetic-process-23",
+      "did": "1234567913",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567913&device_id=1234567913&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-23&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000023001"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-24",
+      "sha256": "512fbefac004dee05a390ffe8f28c9d600af5c343202cf0488cd1e685fa4bd10",
+      "iid": "2234567914",
+      "now": 1800000024000,
+      "randoms": [
+        183703751,
+        -1386693035,
+        273708899,
+        195938754,
+        -1755931126,
+        2001436483,
+        -1301105927
+      ],
+      "started": 1800000011655,
+      "nonce": "synthetic-process-24",
+      "did": "1234567914",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567914&device_id=1234567914&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-24&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000024000"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-25",
+      "sha256": "82e05c5c1a33084df42360688a30e4a7ac6e68fc3801aa6c00bf00865645abec",
+      "iid": "2234567915",
+      "now": 1800000025000,
+      "randoms": [
+        181780007,
+        95762549,
+        -380320211,
+        219444708,
+        1901178153,
+        437742291,
+        -1681639203
+      ],
+      "started": 1800000012655,
+      "nonce": "synthetic-process-25",
+      "did": "1234567915",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567915&device_id=1234567915&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-25&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000025000"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-26",
+      "sha256": "950c626021f02a519f058e4bc63d03ad4ac881be63b69eea64704fec3561af29",
+      "iid": "2234567916",
+      "now": 1800000026000,
+      "randoms": [
+        181395258,
+        1251247125,
+        347867426,
+        -634847560,
+        55619632,
+        -733990007,
+        1678227979
+      ],
+      "started": 1800000013655,
+      "nonce": "synthetic-process-26",
+      "did": "1234567916",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567916&device_id=1234567916&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-26&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000026000"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-27",
+      "sha256": "f3fc04e0bc87e93b6fccc765b3ec8f39da83e94fb855002425e7fc79448a39f0",
+      "iid": "2234567917",
+      "now": 1800000027000,
+      "randoms": [
+        182549505,
+        2079760693,
+        -1836695485,
+        1928029245,
+        1297327901,
+        -1513760410,
+        188561026
+      ],
+      "started": 1800000014655,
+      "nonce": "synthetic-process-27",
+      "did": "1234567917",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567917&device_id=1234567917&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-27&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000027004"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-28",
+      "sha256": "87525807869f6ffd9568c9ee6b0fa283709c3f4242e309f9758e6e72a96ee903",
+      "iid": "2234567918",
+      "now": 1800000028000,
+      "randoms": [
+        182164756,
+        -1059722027,
+        -1108507848,
+        1073736977,
+        -548230621,
+        1609474588,
+        -746539088
+      ],
+      "started": 1800000015655,
+      "nonce": "synthetic-process-28",
+      "did": "1234567918",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567918&device_id=1234567918&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-28&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000028001"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-29",
+      "sha256": "9eab9bef28c25c536abfca090cb57c0f3443fc4fa75330c9829c141218a365c6",
+      "iid": "2234567919",
+      "now": 1800000029000,
+      "randoms": [
+        180241011,
+        422733557,
+        -1762536958,
+        1097242931,
+        -1186088638,
+        45780396,
+        -1127072363
+      ],
+      "started": 1800000016655,
+      "nonce": "synthetic-process-29",
+      "did": "1234567919",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567919&device_id=1234567919&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-29&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000029002"
+    },
+    {
+      "vid": "123",
+      "cdid": "synthetic-cdid-30",
+      "sha256": "f6db7afd9131cf69bdbb9b7a68d48b11273b7fbb0ea0210c3e66dcc80d10b910",
+      "iid": "2234567920",
+      "now": 1800000030000,
+      "randoms": [
+        179856262,
+        1578218133,
+        -1034349321,
+        242950662,
+        1263320137,
+        -1125951901,
+        -2062172478
+      ],
+      "started": 1800000017655,
+      "nonce": "synthetic-process-30",
+      "did": "1234567920",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567920&device_id=1234567920&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-30&video_id=123&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000030001"
+    },
+    {
+      "vid": "123456789012345678901234567890",
+      "cdid": "synthetic-cdid-31",
+      "sha256": "0fc7535426c458da33264c9cbbe3745f6d59b3ba0d6e2d6791ec37dc813da91d",
+      "iid": "2234567921",
+      "now": 1800000031000,
+      "randoms": [
+        181010509,
+        -1888235595,
+        1076055064,
+        -1489139829,
+        -1789938890,
+        -1905722304,
+        743127865
+      ],
+      "started": 1800000018655,
+      "nonce": "synthetic-process-31",
+      "did": "1234567921",
+      "url": "https:\/\/api5-normal-sinfonlineb.fqnovel.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/?iid=2234567921&device_id=1234567921&ac=wifi&channel=update_64&aid=8662&app_name=novelread&version_code=73932&version_name=7.3.9.32&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&manifest_version_code=73932&resolution=1280*2772&dpi=520&update_version_code=73932&host_abi=arm64-v8a&dragon_device_type=phone&pv_player=73932&compliance_status=0&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&cdid=synthetic-cdid-31&video_id=123456789012345678901234567890&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=&_rticket=1800000031000"
+    }
+  ],
+  "upstream": "N3urda\/hongguoTV",
+  "commit": "478f00683f086f1e5d135b3bcbb443e3cbc8b252",
+  "source": "unmodified Kotlin Signer(mobileV5=false), byte-identical Signer.kt to v0.16.5 independently built core.jar",
+  "canonicalHeaders": [
+    "User-Agent",
+    "Accept",
+    "x-ss-req-ticket",
+    "sdk-version",
+    "x-xs-from-web",
+    "x-khronos",
+    "x-ladon",
+    "x-argus",
+    "x-gorgon",
+    "x-helios",
+    "x-medusa"
+  ]
+}

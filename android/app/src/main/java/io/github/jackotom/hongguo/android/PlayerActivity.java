@@ -1101,7 +1101,7 @@ public final class PlayerActivity extends Activity {
                 if (token != generation || destroyed || !autoplay || castWasActive) return;
                 if (cache.find(sid, following.optString("vid"), following.optInt("index"), targetQuality, targetCeiling) != null
                         || (targetCeiling == 0 && "auto".equals(targetQuality) && downloaded(following) != null)) return;
-                PlaybackSources.Plan plan = PlaybackSources.resolvePlayback(sid, following.optString("vid"), targetQuality, targetCeiling, false, false, RegisteredPlaybackLookup::resolve);
+                PlaybackSources.Plan plan = PlaybackSources.resolvePlayback(sid, following.optString("vid"), targetQuality, targetCeiling, false, false, RegisteredPlaybackLookup.SPECULATIVE);
                 if (token == generation && !destroyed && !castWasActive && autoplay && actualQuality.equals(targetQuality)
                         && stageCeiling(actualQuality, automaticCeiling) == targetCeiling) cacheEpisode(sid, following, plan, targetQuality, token);
             } catch (Exception ignored) { /* The next episode is checked again when requested. */ }

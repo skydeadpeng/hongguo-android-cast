@@ -47,6 +47,20 @@ public final class PlaybackNativeRecoveryTest {
     }
     public static void main(String[]args)throws Exception{
         if(args.length>0&&args[0].equals("--baseline")){baseline();finish();return;}
+        group("background lookup makes one attempt without the foreground retry ladder",()->{
+            FakeTime time=new FakeTime();timing(time);int[]calls={0};
+            PlaybackSources.NativeLookup background=new PlaybackSources.NativeLookup(){
+                public JSONObject lookup(String sid,String vid,String q,int c,long timeoutMs)throws Exception{calls[0]++;throw empty();}
+                public boolean speculative(){return true;}
+            };
+            reject(()->play(background));
+            check(calls[0]==1&&time.sleeps.isEmpty(),"prefetch must not retry or sleep");
+        });
+        group("service backoff is terminal at native playback boundary",()->{
+            FakeTime time=new FakeTime();timing(time);int[]calls={0};
+            reject(()->play((s,v,q,c,t)->{calls[0]++;throw new AppMediaSource.AppSourceException("service busy","APP_SERVICE_BACKOFF");}));
+            check(calls[0]==1&&time.sleeps.isEmpty(),"Retry-After must not enter outer retry ladder");
+        });
         group("explicit native playback retries three empty replies with identical episode quality and ceiling",()->{
             FakeTime time=new FakeTime();timing(time);List<Long> timeouts=new ArrayList<>();int[]calls={0};
             PlaybackSources.Plan plan=play((sid,vid,q,c,t)->{check(SID.equals(sid)&&VID.equals(vid)&&q.equals("720p")&&c==1079,"request identity changed");timeouts.add(t);time.advance(200);if(++calls[0]<4)throw empty();return model(q,c);});

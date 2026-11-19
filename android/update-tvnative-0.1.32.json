@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "channel": "android-compatible",
+  "flavor": "tvnative",
+  "packageName": "io.github.jackotom.hongguo.android.tvnative",
+  "versionCode": 33,
+  "versionName": "0.1.32",
+  "minSdk": 23,
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.32/HongguoNative-0.1.32-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 47053344,
+  "sha256": "ae168d13c494c47ff8da1f9324ba5144379eabe6c1ae818496a2c8748ba190b1",
+  "abis": {
+    "arm64-v8a": {
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.32/HongguoNative-0.1.32-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 47053344,
+      "sha256": "ae168d13c494c47ff8da1f9324ba5144379eabe6c1ae818496a2c8748ba190b1"
+    },
+    "armeabi-v7a": {
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.32/HongguoNative-0.1.32-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 43325745,
+      "sha256": "429e653cc37a80a03ff11294acfbecd64b07edc18a1e021f68587917dd194491"
+    }
+  },
+  "notes": "- 修复红果播放取源：主接口返回空正文时，仅对当前播放分集补一次兼容请求。\n- 遵守服务端稍后重试提示，后台预取不额外重试；保留画质、分集身份与媒体校验。\n- 沿用原安装证书，支持 Android 6.0+。分别提供 arm64-v8a 与 armeabi-v7a APK；手机与 TV WebView 同步发布 0.12.81。\n",
+  "publishedAt": "2026-11-19T13:47:23.669Z"
+}

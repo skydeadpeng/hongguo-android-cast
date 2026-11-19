@@ -490,7 +490,7 @@ final class AccountSigner {
 
     // ---- medusa + sign ---------------------------------------------------------------
 
-    private static byte[] buildMedusa(String url, byte[] body, int khronos, String deviceId, String versionName, String processNonce, long processStarted, int[] randoms) throws Exception {
+    static byte[] buildMedusa(String url, byte[] body, int khronos, String deviceId, String versionName, String processNonce, long processStarted, int[] randoms) throws Exception {
         byte[] bodyMd5 = body == null ? new byte[16] : md5(body);
         String query = url.substring(url.indexOf('?') + 1);
         byte[] querySm3 = sm3(query.getBytes(StandardCharsets.UTF_8));

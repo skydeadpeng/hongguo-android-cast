@@ -8,13 +8,25 @@ import org.json.JSONObject;
 final class RegisteredPlaybackLookup {
     private RegisteredPlaybackLookup() {}
 
+    /** Background preparation never expands an empty v5 reply into a tab request. */
+    static final PlaybackSources.NativeLookup SPECULATIVE = new PlaybackSources.NativeLookup() {
+        @Override public JSONObject lookup(String sid, String vid, String quality, int ceiling, long timeoutMs) throws Exception {
+            return resolve(sid, vid, quality, ceiling, timeoutMs, true);
+        }
+        @Override public boolean speculative() { return true; }
+    };
+
     static JSONObject resolve(String sid, String vid, String quality, int ceiling, long timeoutMs) throws Exception {
+        return resolve(sid, vid, quality, ceiling, timeoutMs, false);
+    }
+
+    private static JSONObject resolve(String sid, String vid, String quality, int ceiling, long timeoutMs, boolean speculative) throws Exception {
         if (timeoutMs <= 0) throw new SocketTimeoutException("App片源准备超时，请重试");
         long budget = Math.min(TimeUnit.MILLISECONDS.toNanos(timeoutMs), RegisteredPlaybackModel.MAX_NANOS);
         long deadline = System.nanoTime() + budget;
         return new AppMediaSource(requestedVid -> {
             try (RegisteredPlaybackModel model = new RegisteredPlaybackModel(deadline)) {
-                return model.fetch(requestedVid);
+                return model.fetch(requestedVid, speculative);
             } catch (RegisteredPlaybackModel.ModelError error) {
                 throw new AppMediaSource.AppSourceException(error.getMessage(), error.code);
             }

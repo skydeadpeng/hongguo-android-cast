@@ -27,10 +27,12 @@ public final class RegisteredPlaybackModelTest {
    String did=payload.optString("device_id_str",""),iid=payload.optString("install_id_str","");
    if(did.isEmpty())did=payload.optString("device_id","");
    if(iid.isEmpty())iid=payload.optString("install_id","");
-   return new String[]{did,iid,CDID};
+   return new String[]{did,iid,CDID,payload.optString("cookies","")};
   },deadline);
  }
  static Map<String,String> query(String url)throws Exception{Map<String,String>out=new LinkedHashMap<>();for(String row:new URI(url).getRawQuery().split("&")){String[]p=row.split("=",2);out.put(URLDecoder.decode(p[0],"UTF-8"),URLDecoder.decode(p.length>1?p[1]:"","UTF-8"));}return out;}
+ static String header(OfficialApiClient.Request r,String name){for(Map.Entry<String,String> e:r.headers.entrySet())if(e.getKey().equalsIgnoreCase(name))return e.getValue();return "";}
+ static String tabEnvelope(String id,JSONObject model)throws Exception{return new JSONObject().put("code",0).put("data",new JSONObject().put("video_model_data",new JSONObject().put(id,new JSONObject().put("video_model",model)))).toString();}
  static byte[] gzip(byte[]raw)throws Exception{ByteArrayOutputStream output=new ByteArrayOutputStream();try(GZIPOutputStream gzip=new GZIPOutputStream(output)){gzip.write(raw);}return output.toByteArray();}
  static final class WireConnection extends HttpURLConnection {
   final String expectedMethod;final int status;final byte[] response;
@@ -55,23 +57,39 @@ public final class RegisteredPlaybackModelTest {
   @Override public Map<String,List<String>> getHeaderFields(){return Collections.singletonMap("Content-Type",Collections.singletonList("application/json"));}
  }
  public static void main(String[]args)throws Exception{
+  group("foreground empty v5 recovers once from exact-episode video_tab",()->{
+   AtomicInteger registrations=new AtomicInteger();List<OfficialApiClient.Request> requests=new ArrayList<>();
+   RegisteredPlaybackModel op=operation(r->{registrations.incrementAndGet();return response(200,new JSONObject(new String(registration().body,StandardCharsets.UTF_8)).put("cookies","install_id="+IID+"; ttreq=fixture-register; store-region=cn; store-region-src=did; sessionid=private-account-cookie").toString());},r->{
+    requests.add(r);return r.method.equals("POST")?response(200," \n\t "):response(200,tabEnvelope(VID,model()));});
+   JSONObject out=op.fetch(VID);
+   check(out.getString("vid").equals(VID)&&out.getJSONObject("video_model").getJSONArray("video_list").length()==1,"current episode model recovered");
+   check(registrations.get()==1&&requests.size()==2&&requests.get(0).method.equals("POST")&&requests.get(1).method.equals("GET"),"one identity and one tab fallback only");
+   OfficialApiClient.Request post=requests.get(0),tab=requests.get(1);Map<String,String>pq=query(post.url),tq=query(tab.url);
+   for(String key:new String[]{"device_id","iid","cdid"})check(pq.get(key).equals(tq.get(key)),"same registered "+key+" on both requests");
+   check(tq.get("cdid").equals(CDID)&&tq.get("video_id").equals(VID)&&tq.get("device_level").equals("1")&&!tq.containsKey("ts"),"profile identity and selected episode on exact tab query");
+   check(tab.url.startsWith(RegisteredPlaybackModel.VIDEO_TAB_API+"?")&&tab.body.length==0&&post.deadlineNanos==tab.deadlineNanos,"fixed GET target empty body and unchanged total deadline");
+   for(String name:new String[]{"x-khronos","x-helios","x-medusa"})check(!header(tab,name).isEmpty(),"tab signature header "+name);
+   check(header(post,"Cookie").isEmpty()&&header(post,"X-Tt-Token").isEmpty(),"primary never receives registration or account credentials");
+   check(header(tab,"Cookie").contains("install_id="+IID)&&header(tab,"Cookie").contains("ttreq=fixture-register")&&!header(tab,"Cookie").contains("sessionid")&&!header(tab,"Cookie").contains("private-account"),"only registration-cookie allowlist reaches tab");
+   check(header(tab,"X-Tt-Token").isEmpty()&&!out.toString().contains("fixture-register"),"no account token or identity/cookie in result");
+  });
   group("registered identity precedes current v5 player/v1 signed request",()->{
    List<OfficialApiClient.Request> requests=new ArrayList<>();AtomicInteger bootCalls=new AtomicInteger();
    RegisteredPlaybackModel op=operation(r->{bootCalls.incrementAndGet();return registration();},r->{
     requests.add(r);check(bootCalls.get()==1,"register exactly once before model");
     check(new URI(r.url).getHost().equals("api5-normal-sinfonlinea.fqnovel.com")&&new URI(r.url).getPath().equals("/novel/player/multi_video_model/player/v1")&&r.method.equals("POST")&&r.body.length>0,"current v5 player/v1 target first");
-    Map<String,String> q=query(r.url);check(DID.equals(q.get("device_id"))&&IID.equals(q.get("iid")),"only registered response identity signs model");check(!q.containsKey("openudid"),"probe profile excludes extra passport fields");check(q.get("cdid")!=null&&q.get("cdid").matches("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")&&!q.get("cdid").equals(CDID),"v5 carries an independent session cdid");check(q.get("version_code").equals("74332")&&q.get("aid").equals("8662")&&q.get("video_id")==null&&!q.containsKey("ts")&&q.containsKey("_rticket"),"v5 profile exact with no ts parameter");
+    Map<String,String> q=query(r.url);check(DID.equals(q.get("device_id"))&&IID.equals(q.get("iid")),"only registered response identity signs model");check(!q.containsKey("openudid"),"probe profile excludes extra passport fields");check(q.get("cdid").equals(CDID),"v5 uses the registered profile cdid shared by its fallback");check(q.get("version_code").equals("74332")&&q.get("aid").equals("8662")&&q.get("video_id")==null&&!q.containsKey("ts")&&q.containsKey("_rticket"),"v5 profile exact with no ts parameter");
     for(String header:new String[]{"x-khronos","x-helios","x-medusa","x-ss-stub"})check(r.headers.get(header)!=null&&!r.headers.get(header).isEmpty(),"v5 signing header "+header);
     for(String retired:new String[]{"X-Ladon","X-Argus","X-SS-Req-Ticket","X-Gorgon"})check(!r.headers.containsKey(retired),"v3-era header retired: "+retired);
     long khronos=Long.parseLong(r.headers.get("x-khronos")),ticket=Long.parseLong(q.get("_rticket"));check(ticket>=khronos*1000&&ticket<khronos*1000+1024,"v5 ticket search stays within the signed second");check(r.headers.get("x-ss-stub").equalsIgnoreCase(DanmakuSigner.hex(DanmakuSigner.md5(r.body))),"v5 signature hashes actual gzip body");check(PlaybackSignerV5.PLAYER_V1_UA.equals(r.headers.get("User-Agent")),"v5 player UA exact");check(!r.headers.containsKey("Cookie")&&!r.headers.containsKey("X-Tt-Token"),"anonymous model never copies registration/account cookies");return response(200,envelope(model()));});
    JSONObject result=op.fetch(VID);check(requests.size()==1&&result.length()==2&&result.getString("vid").equals(VID),"one bootstrap plus one v5 model only");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"real model projected");check(reject(()->op.fetch(VID)) instanceof IOException,"one lookup instance cannot reuse consumed identity");
   });
-  group("hollowed v5 surfaces immediately for the web fallback",()->{
+  group("speculative hollowed v5 surfaces without a compatibility GET",()->{
    AtomicInteger registrations=new AtomicInteger();List<OfficialApiClient.Request> requests=new ArrayList<>();
    RegisteredPlaybackModel op=operation(r->{requests.add(r);registrations.incrementAndGet();return registration();},r->{
     requests.add(r);check(new URI(r.url).getPath().endsWith("/player/v1"),"single-shot v5 only");
     return response(200," ");});
-   try { op.fetch(VID); check(false,"hollow must throw"); }
+   try { op.fetch(VID,true); check(false,"hollow must throw"); }
    catch (Exception failure) {
      check(failure instanceof RegisteredPlaybackModel.ModelError && "APP_EMPTY_RESPONSE".equals(((RegisteredPlaybackModel.ModelError)failure).code),"hollow error surfaced");
    }
@@ -80,10 +98,66 @@ public final class RegisteredPlaybackModelTest {
 group("same identity recovers on the retry (UI-level)",()->{
    AtomicInteger models=new AtomicInteger(),registrations=new AtomicInteger();
    // First fetch hollows, second fetch on the SAME identity succeeds (UI retry)
-   OfficialApiClient.Transport model=r->{int call=models.incrementAndGet();return response(200,call<=1?" ":envelope(model()));};
+   OfficialApiClient.Transport model=r->{int call=models.incrementAndGet();return response(200,call<=2?" ":envelope(model()));};
    try { operation(r->{registrations.incrementAndGet();return registration();},model).fetch(VID); } catch (Exception expected) { }
    JSONObject result=operation(r->{registrations.incrementAndGet();return registration();},model).fetch(VID);
-   check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1&&models.get()>=1,"second attempt on same identity succeeds after first hollow");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"recovered model projected");
+   check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1&&models.get()==3,"second fetch on same identity succeeds after one empty POST/GET pair");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"recovered model projected");
+  });
+  group("foreground gzip empties recover but double-empty does not add requests",()->{
+   for(boolean packed:new boolean[]{false,true}){
+    AtomicInteger calls=new AtomicInteger();RegisteredPlaybackModel op=operation(r->registration(),r->{
+     calls.incrementAndGet();if(r.method.equals("GET"))return response(200,tabEnvelope(VID,model()));
+     return packed?new OfficialApiClient.Response(200,Collections.singletonMap("Content-Encoding",Arrays.asList("gzip")),gzip(" \n ".getBytes(StandardCharsets.UTF_8))):response(200,"");});
+    check(op.fetch(VID).has("video_model")&&calls.get()==2,"raw or decoded gzip empty recovers exactly once");
+   }
+   AtomicInteger calls=new AtomicInteger();Exception empty=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(200," ");}).fetch(VID));
+   check(empty instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)empty).code.equals("APP_EMPTY_RESPONSE")&&calls.get()==2,"double-empty retains typed primary error without another model or identity");
+  });
+  group("Retry-After whitespace plain and gzip answers stay terminal",()->{
+   for(boolean packed:new boolean[]{false,true})for(String spelling:new String[]{"Retry-After","rEtRy-AfTeR"}){
+    AtomicInteger calls=new AtomicInteger();Map<String,List<String>>headers=new LinkedHashMap<>();headers.put(spelling,Arrays.asList("30"));if(packed)headers.put("Content-Encoding",Arrays.asList("gzip"));
+    byte[] body=" \n\t ".getBytes(StandardCharsets.UTF_8);byte[] wire=packed?gzip(body):body;
+    Exception busy=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return new OfficialApiClient.Response(200,headers,wire);}).fetch(VID));
+    check(busy instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)busy).code.equals("APP_SERVICE_BACKOFF")&&calls.get()==1,"busy header prevents GET and remains distinct from recoverable empty");
+   }
+   AtomicInteger calls=new AtomicInteger();Map<String,List<String>>blank=Collections.singletonMap("Retry-After",Arrays.asList(" \t "));
+   check(operation(r->registration(),r->{calls.incrementAndGet();return r.method.equals("POST")?new OfficialApiClient.Response(200,blank,new byte[0]):response(200,tabEnvelope(VID,model()));}).fetch(VID).has("video_model")&&calls.get()==2,"blank backoff field is not a service backoff");
+   calls.set(0);check(operation(r->registration(),r->{calls.incrementAndGet();return new OfficialApiClient.Response(200,Collections.singletonMap("Retry-After",Arrays.asList("30")),envelope(model()).getBytes(StandardCharsets.UTF_8));}).fetch(VID).has("video_model")&&calls.get()==1,"healthy model is not discarded merely because a backoff header exists");
+  });
+  group("compatibility response cannot substitute another episode or ignore refusal",()->{
+   for(String body:new String[]{tabEnvelope("123",model()),"{bad}","{\"code\":1,\"data\":{}}",tabEnvelope(VID,model().put("item_id","123")),new JSONObject(tabEnvelope(VID,model())).put("is_trial_video",true).toString()}){
+    AtomicInteger calls=new AtomicInteger();Exception bad=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(200,r.method.equals("POST")?"":body);}).fetch(VID));
+    check(bad instanceof RegisteredPlaybackModel.ModelError&&calls.get()==2,"wrong identity invalid JSON or business refusal ends one compatibility request");
+   }
+   for(int code:new int[]{302,403,429,500}){
+    AtomicInteger calls=new AtomicInteger();Exception bad=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return r.method.equals("POST")?response(200,""):response(code,tabEnvelope(VID,model()));}).fetch(VID));
+    check(bad instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)bad).code.equals("HTTP_ERROR")&&calls.get()==2,"compatibility HTTP failure stays typed and terminal");
+   }
+   AtomicInteger calls=new AtomicInteger();Exception busy=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return r.method.equals("POST")?response(200,""):new OfficialApiClient.Response(200,Collections.singletonMap("Retry-After",Arrays.asList("30")),new byte[0]);}).fetch(VID));
+   check(busy instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)busy).code.equals("APP_SERVICE_BACKOFF")&&calls.get()==2,"compatibility service backoff is terminal too");
+  });
+  group("compatibility success persists all identity fields without returning them",()->{
+   java.io.File slot=java.io.File.createTempFile("hongguo-model-identity-",".json");RegisteredPlaybackModel.identityStore(slot);
+   try {
+    String cookie="install_id="+IID+"; ttreq=fixture-register";
+    RegisteredPlaybackModel op=operation(r->response(200,new JSONObject(new String(registration().body,StandardCharsets.UTF_8)).put("cookies",cookie).toString()),r->response(200,r.method.equals("POST")?"":tabEnvelope(VID,model())));
+    JSONObject result=op.fetch(VID);JSONObject stored=new JSONObject(java.nio.file.Files.readString(slot.toPath()));
+    check(stored.getString("device_id").equals(DID)&&stored.getString("install_id").equals(IID)&&stored.getString("cdid").equals(CDID)&&stored.getString("cookies").equals(cookie),"successful fallback retains full registered profile for future attempts");
+    check(!result.toString().contains("fixture-register")&&!result.toString().contains(DID)&&!result.toString().contains(IID),"persistent identity does not escape projection");
+   }finally{RegisteredPlaybackModel.identityStore(null);slot.delete();}
+  });
+  group("fallback cancellation and deadline never publish late compatibility models",()->{
+   AtomicInteger calls=new AtomicInteger();long stop=System.nanoTime()+100_000_000L;
+   Exception late=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("POST"))return response(200,"");Thread.sleep(150);return response(200,tabEnvelope(VID,model()));},stop).fetch(VID));
+   check(late instanceof SocketTimeoutException&&calls.get()==2,"GET shares the original deadline and rejects late success");
+   calls.set(0);long postStop=System.nanoTime()+100_000_000L;
+   Exception tooLate=reject(()->operation(r->registration(),r->{calls.incrementAndGet();Thread.sleep(150);return response(200,"");},postStop).fetch(VID));
+   check(tooLate instanceof SocketTimeoutException&&calls.get()==1,"expired POST must not start GET");
+   CountDownLatch entered=new CountDownLatch(1),released=new CountDownLatch(1);AtomicReference<Throwable>result=new AtomicReference<>();AtomicBoolean closed=new AtomicBoolean();
+   OfficialApiClient.Transport model=new OfficialApiClient.Transport(){public OfficialApiClient.Response execute(OfficialApiClient.Request r)throws Exception{if(r.method.equals("POST"))return response(200,"");entered.countDown();while(released.getCount()>0)try{released.await();}catch(InterruptedException ignored){}return response(200,tabEnvelope(VID,model()));}public void close(){closed.set(true);released.countDown();}};
+   RegisteredPlaybackModel op=operation(r->registration(),model);Thread worker=new Thread(()->{try{op.fetch(VID);result.set(new AssertionError("late fallback success"));}catch(Throwable failure){result.set(failure);}});
+   worker.start();check(entered.await(2,TimeUnit.SECONDS),"fallback reached");op.close();worker.join(2000);
+   check(!worker.isAlive()&&closed.get()&&result.get() instanceof InterruptedIOException&&!op.current(),"cancel closes fallback transport and rejects deliberately late successful model");
   });
 group("HTTP refusal fails typed from single attempt",()->{
    AtomicInteger both=new AtomicInteger();

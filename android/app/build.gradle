@@ -27,8 +27,8 @@ android {
         // it must stay a plain number here rather than moving fully to flavors.
         minSdk 23
         targetSdk 35
-        versionCode 103
-        versionName '0.12.80'
+        versionCode 104
+        versionName '0.12.81'
         testInstrumentationRunner 'io.github.jackotom.hongguo.android.ProductionPlaybackInstrumentation'
     }
     flavorDimensions 'device'
@@ -41,8 +41,8 @@ android {
         tvNative {
             dimension 'device'
             applicationIdSuffix '.tvnative'
-            versionCode 32
-            versionName '0.1.31'
+            versionCode 33
+            versionName '0.1.32'
             buildConfigField 'boolean', 'IS_TV', 'true'
             buildConfigField 'boolean', 'NATIVE_UI', 'true'
         }

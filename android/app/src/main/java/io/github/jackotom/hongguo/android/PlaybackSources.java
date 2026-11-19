@@ -73,7 +73,10 @@ final class PlaybackSources {
     }
     static synchronized void attach(MainActivity value) { activity = new WeakReference<>(value); }
     /** Internal Java model strategy; playback can pin it without changing legacy callers. */
-    interface NativeLookup { JSONObject lookup(String sid, String vid, String requestedQuality, int ceiling, long timeoutMs) throws Exception; }
+    interface NativeLookup {
+        JSONObject lookup(String sid, String vid, String requestedQuality, int ceiling, long timeoutMs) throws Exception;
+        default boolean speculative() { return false; }
+    }
     private static volatile NativeLookup nativeLookup;
     private static final long[] PLAYBACK_RETRY_DELAYS_MS = {1000,2500,5000};
     interface RecoveryTiming { long nanoTime(); void sleep(long delayMs) throws InterruptedException; }
@@ -366,6 +369,7 @@ final class PlaybackSources {
     /** Only PlayerActivity's explicit Java strategy owns this bounded empty-model
      * recovery. Legacy page/default-native/download callers retain their policy. */
     private static JSONObject resolvePlaybackApp(String sid,String vid,String quality,boolean retryInitial,int ceiling,NativeLookup lookup) throws Exception {
+        if (lookup.speculative()) retryInitial = false;
         RecoveryTiming timing=playbackRecoveryTiming;
         long deadline=timing.nanoTime()+TimeUnit.SECONDS.toNanos(20);
         for(int attempt=0;;attempt++) {

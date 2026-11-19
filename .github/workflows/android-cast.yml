@@ -47,6 +47,8 @@ jobs:
       - name: Run existing network, service-source and cache regressions
         run: |
           bash android/tests/run-announcement-request-tests.sh
+          bash android/tests/run-tab-playback-signer-tests.sh
+          bash android/tests/run-account-signer-tests.sh
           bash android/tests/run-registered-playback-model-tests.sh
           node scripts/check-android-model-cancel-ownership.test.mjs
           bash android/tests/run-playback-native-recovery-tests.sh
