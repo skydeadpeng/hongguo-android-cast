@@ -1,0 +1,37 @@
+name: Verify stable Android update feeds 20261120
+on:
+  push:
+    branches: [codex/android-release-check-20261120]
+    paths: ['.github/workflows/public-release-feed-check-20261120.yml']
+permissions: {}
+jobs:
+  anonymous-stable-feeds:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Read public plain and cache-busted feeds
+        shell: bash
+        run: |
+          python3 - <<'PYTHON_AUDIT'
+          from concurrent.futures import ThreadPoolExecutor
+          from pathlib import Path
+          import hashlib, json, os, subprocess, tempfile, time
+          rows=json.loads('[{"channel": "phone", "version": "0.12.82", "sha256": "b42ff6e5bcbf01367779439a0a29ee988faa554b51124c116192b9f6a225fe17"}, {"channel": "tv", "version": "0.12.82", "sha256": "457b19a004078b604a7ba349c5444b3c1b4ff899e7eea9059b5b5ff7047d50f6"}, {"channel": "tvnative", "version": "0.1.33", "sha256": "d7294613bf52914dfafeb01c6888e5341192a2c2161f0c2d2bac73e88654fcf1"}]')
+          commit='1280a07dc8b365b56325ff38cb1265c4ad06b676'
+          dir=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
+          def probe(row):
+              url='https://raw.githubusercontent.com/skydeadpeng/hongguo-android-cast/main/android/update-'+row['channel']+'.json'
+              for mode,suffix in [('plain',''),('fresh','?verified='+commit)]:
+                  path=dir/(row['channel']+'-'+mode)
+                  for attempt in range(7):
+                      p=subprocess.run(['curl','--disable','--noproxy','*','--proto','=https','--silent','--show-error','--fail','--connect-timeout','6','--max-time','9','--output',str(path),'--write-out','%{http_code}',url+suffix],env={'PATH':os.environ['PATH']},capture_output=True,text=True,timeout=12)
+                      if p.returncode==0 and p.stdout=='200' and path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest()==row['sha256']:
+                          data=json.loads(path.read_bytes())
+                          assert data['versionName']==row['version']
+                          print('FEED '+json.dumps(dict(row,mode=mode,http=200),separators=(',',':')),flush=True)
+                          break
+                      time.sleep(3)
+                  else: raise RuntimeError('raw endpoint did not return expected feed: '+row['channel']+' '+mode)
+          with ThreadPoolExecutor(max_workers=3) as p: list(p.map(probe,rows))
+          print('STABLE_PUBLIC_READBACK_OK feeds=3 forms=6 plainAndFresh=true',flush=True)
+          PYTHON_AUDIT
