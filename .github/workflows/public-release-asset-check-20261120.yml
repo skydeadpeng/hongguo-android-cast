@@ -1,0 +1,35 @@
+name: Verify public Android release downloads 20261120
+on:
+  push:
+    branches: [codex/android-release-check-20261120]
+    paths: ['.github/workflows/public-release-asset-check-20261120.yml']
+permissions: {}
+jobs:
+  anonymous:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Anonymous full downloads
+        shell: bash
+        run: |
+          python3 - <<'PYTHON_AUDIT'
+          from concurrent.futures import ThreadPoolExecutor
+          import hashlib, json, os, subprocess, tempfile
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          from pathlib import Path
+          rows = json.loads('[{"tag":"v0.12.82","name":"Hongguo-0.12.82-phone-release-compatible.apk","bytes":5924475,"sha256":"cfa398dfec38d7c709d262eb824bedb665897e8d55e9cc1a712321254f6569e8","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.82/Hongguo-0.12.82-phone-release-compatible.apk"},{"tag":"v0.12.82","name":"Hongguo-0.12.82-source.zip","bytes":7641020,"sha256":"22ba6bf9f5f5f0d74e529f4c38ed0cd7fae539cab282576223c2bd11d7bf05e6","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.82/Hongguo-0.12.82-source.zip"},{"tag":"v0.12.82","name":"Hongguo-0.12.82-tv-release-compatible.apk","bytes":5922459,"sha256":"d3c84d8af0a1facf5e27319545400855265062c2a6e13f9cb37ca1579eef8bbd","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.82/Hongguo-0.12.82-tv-release-compatible.apk"},{"tag":"v0.12.82","name":"RELEASE-NOTES.txt","bytes":491,"sha256":"8a25eddce6f5c77d557263848310da9941412ad54bc699813cd70900c9488ff4","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.82/RELEASE-NOTES.txt"},{"tag":"v0.12.82","name":"SHA256SUMS.txt","bytes":661,"sha256":"46a8c170791bb957f10e561dcb673f72d7d2c7ab15438effca80fa28a6a582e4","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.82/SHA256SUMS.txt"},{"tag":"v0.12.82","name":"SOURCE_COMMIT.txt","bytes":111,"sha256":"3bb10e93541ecb4225939922b9a2f5ae4ee38fa1c1f80e45621e8a373b76afd4","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.82/SOURCE_COMMIT.txt"},{"tag":"v0.12.82","name":"update-phone-0.12.82.json","bytes":995,"sha256":"b42ff6e5bcbf01367779439a0a29ee988faa554b51124c116192b9f6a225fe17","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.82/update-phone-0.12.82.json"},{"tag":"v0.12.82","name":"update-tv-0.12.82.json","bytes":992,"sha256":"457b19a004078b604a7ba349c5444b3c1b4ff899e7eea9059b5b5ff7047d50f6","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.82/update-tv-0.12.82.json"},{"tag":"v0.1.33","name":"HongguoNative-0.1.33-source.zip","bytes":7641020,"sha256":"22ba6bf9f5f5f0d74e529f4c38ed0cd7fae539cab282576223c2bd11d7bf05e6","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.33/HongguoNative-0.1.33-source.zip"},{"tag":"v0.1.33","name":"HongguoNative-0.1.33-tvNative-release-compatible-arm64-v8a.apk","bytes":51072580,"sha256":"f42a686b0d0a21ba5c1eade86f48253308679a4fb2a379334d7789ffec8b7b77","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.33/HongguoNative-0.1.33-tvNative-release-compatible-arm64-v8a.apk"},{"tag":"v0.1.33","name":"HongguoNative-0.1.33-tvNative-release-compatible-armeabi-v7a.apk","bytes":47344976,"sha256":"4749b414af689a5cac8eb290239afd22127b0d86b75a237cf54b1478e926f533","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.33/HongguoNative-0.1.33-tvNative-release-compatible-armeabi-v7a.apk"},{"tag":"v0.1.33","name":"RELEASE-NOTES.txt","bytes":491,"sha256":"8a25eddce6f5c77d557263848310da9941412ad54bc699813cd70900c9488ff4","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.33/RELEASE-NOTES.txt"},{"tag":"v0.1.33","name":"SHA256SUMS.txt","bytes":620,"sha256":"23a585181975d40bed59dfec85885c2fffcd9467e3262f71f5676fab1d63eb51","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.33/SHA256SUMS.txt"},{"tag":"v0.1.33","name":"SOURCE_COMMIT.txt","bytes":111,"sha256":"3bb10e93541ecb4225939922b9a2f5ae4ee38fa1c1f80e45621e8a373b76afd4","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.33/SOURCE_COMMIT.txt"},{"tag":"v0.1.33","name":"update-tvnative-0.1.33.json","bytes":1629,"sha256":"d7294613bf52914dfafeb01c6888e5341192a2c2161f0c2d2bac73e88654fcf1","url":"https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.33/update-tvnative-0.1.33.json"}]')
+          root = Path(tempfile.mkdtemp(prefix='anonymous-release-', dir=os.environ['RUNNER_TEMP']))
+          def audit(a):
+              p = root / (a['tag']+'--'+a['name'])
+              env = {'PATH':os.environ['PATH']}
+              cmd=['curl','--disable','--noproxy','*','--location','--fail','--silent','--show-error','--proto','=https','--proto-redir','=https','--connect-timeout','15','--max-time','150','--output',str(p),'--write-out','%{http_code}',a['url']]
+              res=subprocess.run(cmd,env=env,capture_output=True,text=True,timeout=155)
+              if res.returncode or res.stdout!='200': raise RuntimeError(a['name']+' curl_exit='+str(res.returncode)+' HTTP='+res.stdout.strip())
+              with p.open('rb') as handle: got=hashlib.file_digest(handle,'sha256').hexdigest()
+              assert (p.stat().st_size,got)==(a['bytes'],a['sha256']),a['name']
+              d=dict(a,http=200,verifiedAt=datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(timespec='seconds'))
+              print('ANON_ASSET '+json.dumps(d,separators=(',',':')),flush=True)
+          with ThreadPoolExecutor(max_workers=5) as pool: list(pool.map(audit,rows))
+          print('PUBLIC_DOWNLOAD_OK assets=15 apks=4 anonymous=true status=200 sizeAndSha256=verified',flush=True)
+          PYTHON_AUDIT
