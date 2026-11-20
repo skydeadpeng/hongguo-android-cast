@@ -18,6 +18,7 @@
 | React DOM | 18.3.1 | MIT | https://github.com/facebook/react |
 | axios | 1.20.0 | MIT | https://github.com/axios/axios |
 | electron-updater | 6.8.9 | MIT | https://github.com/electron-userland/electron-builder |
+| HLS.js | 1.7.4 | Apache-2.0 | https://github.com/video-dev/hls.js/tree/v1.7.4 |
 
 Electron 打包产物中已包含 Chromium 与 Node.js 的许可声明：
 
@@ -78,6 +79,10 @@ x264 是唯一非系统静态依赖（GPLv2-or-later），整体构建为 GPLv3-
 
 独立编写适配器；接口路径核对参考 [Hululu007/drpy-node](https://github.com/Hululu007/drpy-node/tree/295f2b7047e14122d542a7736cb931e81abcf85c)（GPL-3.0）。
 未复制其中的会话标识或解锁流程。公开接口可访问不代表作品获得再分发授权；安装包不包含剧集媒体。
+
+## 剧果接口参考（桌面开发版）
+
+独立编写适配器；分类、目录、搜索、详情与访客播放接口参考 [GuoApp 的剧果模块 v1.0.1](https://github.com/guoapp-modules/huangju/tree/v1.0.1)（GPL-3.0）。HLS.js 用于桌面在线播放，随其 npm 包保留 Apache-2.0 许可。
 
 
 ## Anime4K-WebGPU
@@ -148,3 +153,22 @@ SOFTWARE.
 - Local decoder/resampler/stretch-pitch Wasm assets come from that exact revision; their SHA256 values are in scripts/software-player-assets.json. No Wasm encoders are included.
 - The complete LGPL text is bundled at software/LIBMEDIA-LGPL-3.0.txt. The upstream project contains the sources and build instructions; JavaScript/Wasm resources remain replaceable local files in the application source/build.
 - ASS dependencies bundled by upstream (assjs and ass-compiler): MIT. libmedia uses FFmpeg under LGPL 2.1 or later and SoundTouch under LGPL 2.1. See upstream licensing notices and pinned sources.
+
+## GuoApp source modules (desktop source layer, 2026-11-19)
+
+- Upstream module repositories: all 15 repositories listed in `vendor/source-modules/index.json` under https://github.com/guoapp-modules .
+- License: GPL-3.0. Original module JavaScript and manifests are preserved without modification under `vendor/source-modules/`; full upstream GPL text is included in `vendor/source-modules/LICENSE`.
+- The pinned release tags, upstream content classifications and SHA-256 hashes for every included module file are recorded in `vendor/source-modules/index.json`, from https://github.com/guoapp-modules/index . Restricted sources are disabled by default and enabled individually.
+- Module API behavior follows https://github.com/Xanerix/guoapp/blob/51f39b58bce6b4c9d464e382e86e5f79aa2e9d2b/DEVELOPMENT.md . The desktop host compatibility layer and normalized provider are local implementations, not the upstream Flutter application or Go runtime.
+- The existing desktop Hongguo provider/player remains the active Hongguo implementation; the pinned Hongguo module is reference material and does not replace that playback path. No media files, source-site accounts, or credentials are bundled.
+
+## Android bundled source pilot (initial stage)
+
+- The initial Android pilot APK included only the pinned GuoApp modules `guipian` and `hanxiaoquan`, with their original files and GPL-3.0 notice. The build derives a Rhino-compatible copy without changing those original files.
+- Rhino 1.8.1: Mozilla Public License 2.0. Source and license: https://github.com/mozilla/rhino/tree/Rhino1_8_1_Release .
+- AndroidX Media3 1.8.0 (ExoPlayer, HLS, UI): Apache License 2.0. Source and license: https://github.com/androidx/media/tree/1.8.0 .
+
+## Android full bundled source layer
+
+- All 15 pinned GuoApp module originals (GPL-3.0) now ship in the Android source assets, with the license and verified SHA-256 index. Android executes only derived compatible scripts from that bundle; Hongguo itself keeps the existing native implementation.
+- jsoup 1.23.2: MIT. Used to parse source responses as HTML data, not to run site scripts. Source and license: https://github.com/jhy/jsoup/tree/jsoup-1.23.2 .

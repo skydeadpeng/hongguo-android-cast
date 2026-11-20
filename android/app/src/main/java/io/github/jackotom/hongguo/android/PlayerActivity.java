@@ -460,7 +460,7 @@ public final class PlayerActivity extends Activity {
     /** A successful stage owns its exact-quality reservation until UI adoption/cancellation. */
     private static final class PreparedMedia {
         final JSONObject episode, series; final String quality, seriesId; final int ceiling; final PlaybackCache.QueueWindow window; boolean protectedKey;
-        Uri uri; String remote, kind; PlaybackSources.Plan plan; boolean manual, cached;
+        Uri uri; String kind; PlaybackSources.Plan plan; boolean manual, cached;
         PreparedMedia(JSONObject series, JSONObject episode, String quality, int ceiling, PlaybackCache.QueueWindow window) { this.ceiling=ceiling; this.series = series; this.seriesId = series.optString("seriesId"); this.episode = episode; this.quality = quality; this.window = window; }
     }
     private synchronized PreparedMedia reserveMedia(JSONObject target, String stageQuality, int ceiling, PlaybackCache.QueueWindow window) throws Exception {
@@ -500,6 +500,7 @@ public final class PlayerActivity extends Activity {
             else if (cached != null) { media.uri = Uri.fromFile(cached); media.kind = "播放缓存 · 本地播放"; media.cached = true; }
             else {
                 if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("播放准备已取消");
+                PlaybackSources.requireCurrentSource(media.seriesId, target.optString("vid"));
                 if (recovering) {
                     final String sid = media.seriesId, vid = target.optString("vid");
                     if (boundedRefetch) {
@@ -519,25 +520,20 @@ public final class PlayerActivity extends Activity {
                 } else media.plan = PlaybackSources.resolvePlayback(media.seriesId, target.optString("vid"), stageQuality, ceiling, false, failedWeb, RegisteredPlaybackLookup::resolve);
                 if (destroyed || token != generation || Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("播放准备已取消");
                 if (media.plan.playbackCeiling != ceiling) throw new java.io.IOException("播放片源清晰度边界不匹配");
-                // 黄果为 AES-128 HLS 直链：无论画质档位恒走在线播放，不进入整文件缓存。
-                // 其余片源自 0.1.17 起一律整集下载后本地播放；下载进度与速度直接展示在状态栏。
-                boolean huangguoStream = media.seriesId.length() == 10 && media.seriesId.startsWith("99");
                 if (boundedRefetch) main.post(() -> {
                     if (!destroyed && token == generation) {
-                        status.setText(huangguoStream ? "片源已取得 · 正在准备播放" : "片源已取得 · 正在准备本集下载");
+                        status.setText("片源已取得 · 正在准备本集下载");
                         showControls();
                     }
                 });
-                if (!huangguoStream) {
-                    // Do not invalidate a cache entry until a bounded fresh lookup has succeeded.
-                    if (boundedRefetch) cache.invalidate(media.seriesId, target.optString("vid"), target.optInt("index"), stageQuality, ceiling);
-                    resetDownloadMarks();
-                    PlaybackSources.ACTIVE_PROGRESS.set((bytes, totalBytes) -> reportDownloadProgress(token, bytes, totalBytes));
-                    File ready;
-                    try { ready = cache.fetchForeground(media.seriesId, target.optString("vid"), target.optInt("index"), media.plan, stageQuality); }
-                    finally { PlaybackSources.ACTIVE_PROGRESS.remove(); }
-                    media.uri = Uri.fromFile(ready); media.kind = "片源已准备 · 缓存播放"; media.cached = true;
-                } else { media.remote = media.plan.url; media.uri = Uri.parse(media.remote); media.kind = "在线播放 · 滚动缓存"; }
+                // Do not invalidate a cache entry until a bounded fresh lookup has succeeded.
+                if (boundedRefetch) cache.invalidate(media.seriesId, target.optString("vid"), target.optInt("index"), stageQuality, ceiling);
+                resetDownloadMarks();
+                PlaybackSources.ACTIVE_PROGRESS.set((bytes, totalBytes) -> reportDownloadProgress(token, bytes, totalBytes));
+                File ready;
+                try { ready = cache.fetchForeground(media.seriesId, target.optString("vid"), target.optInt("index"), media.plan, stageQuality); }
+                finally { PlaybackSources.ACTIVE_PROGRESS.remove(); }
+                media.uri = Uri.fromFile(ready); media.kind = "片源已准备 · 缓存播放"; media.cached = true;
             }
             success = true; return media;
         } finally { if (!success) releasePrepared(media); }
@@ -690,13 +686,13 @@ public final class PlayerActivity extends Activity {
                 main.post(() -> {
                     if (destroyed || token != generation) { releasePrepared(media); return; }
                     adoptMedia(media);
-                    currentKind = media.kind; currentManual = media.manual; currentCache = media.cached; currentWeb = media.remote != null;
+                    currentKind = media.kind; currentManual = media.manual; currentCache = media.cached; currentWeb = false;
                     sourceShortEdge = media.plan != null && media.plan.width > 0 && media.plan.height > 0 ? Math.min(media.plan.width, media.plan.height) : 0; renderStatus();
                     VideoView targetView = video;
                     // Software-decoder preference: skip the hardware player entirely (auto/hw keep
                     // the hardware player and fall back to software decoding on device errors).
                     if ("sw".equals(decoderMode()) && launchSoftDecoder(token, media)) return;
-                    bindPlayback(targetView, token, target, media.remote, playedQuality);
+                    bindPlayback(targetView, token, target);
                     targetView.setOnPreparedListener(player -> {
                         if (destroyed || token != generation || video != targetView) return;
                         cancelPlaybackWatchdogs(); decoderPreparing = false;
@@ -715,7 +711,6 @@ public final class PlayerActivity extends Activity {
                         if (resumeAt > 0 && (video.getDuration() <= 0 || resumeAt < video.getDuration() - 1500)) video.seekTo(resumeAt);
                         if (active && !userPaused) video.start();
                         recordProgress(targetSeries, target, resumeAt); renderStatus(); updateButtons();
-                        if (!offline && media.remote != null) cacheEpisode(media.seriesId, target, media.plan, playedQuality, token);
                         if (!offline && autoplay) schedulePrefetch(token);
                     });
                     Map<String, String> headers = new HashMap<>();
@@ -730,7 +725,7 @@ public final class PlayerActivity extends Activity {
             }
         });
     }
-    private void bindPlayback(VideoView view, int token, JSONObject target, String remoteUrl, String targetQuality) {
+    private void bindPlayback(VideoView view, int token, JSONObject target) {
         final JSONObject targetSeries = owner(target);
         buffering = false;
         view.setOnInfoListener((player, what, extra) -> {
@@ -794,8 +789,6 @@ public final class PlayerActivity extends Activity {
     private static String qualityLabel(String value) { return "auto".equals(value) ? "自动" : value; }
     private static String rateLabel(float value) { return String.format(Locale.ROOT, "%s×", value == (int) value ? Integer.toString((int) value) : Float.toString(value)); }
     private void renderStatus() {
-        // 黄果剧（99 前缀编码）解码出实际尺寸后按剧记录，详情页标注画质档位。
-        if (videoWidth > 0 && videoHeight > 0 && series != null) HuangguoApi.recordResolution(series.optString("seriesId", ""), videoWidth, videoHeight);
         String size = videoWidth > 0 && videoHeight > 0 ? "实际 " + videoWidth + "×" + videoHeight : "实际分辨率待解码确认";
         status.setText(currentKind + " · 当前 " + qualityLabel(actualQuality) + (quality.equals(actualQuality) ? "" : "（首选 " + qualityLabel(quality) + "）") + " · " + size);
     }
@@ -940,13 +933,12 @@ public final class PlayerActivity extends Activity {
             qualitySwitch = null; if (job.timeout != null) main.removeCallbacks(job.timeout);
             automaticCeiling = job.media.ceiling;
             actualSpeed = accepted; if (Float.isFinite(accepted)) requestedSpeed = accepted;
-            bindPlayback(video, generation, episode, job.media.remote, actualQuality);
+            bindPlayback(video, generation, episode);
             final VideoView currentView = video; final int token = generation;
             watchProgressSeeks(mediaPlayer, token, currentView);
             mediaPlayer.setOnVideoSizeChangedListener((mp, width, height) -> { if (video == currentView && token == generation) { videoWidth = width; videoHeight = height; renderStatus(); } });
-            currentManual = false; currentCache = job.media.cached; currentWeb = job.media.remote != null;
+            currentManual = false; currentCache = job.media.cached; currentWeb = false;
             currentKind = "清晰度已切换 · " + job.media.kind; renderStatus(); updateButtons(); showControls(); pruneCache();
-            if (job.media.remote != null) cacheEpisode(job.media.seriesId, episode, job.media.plan, actualQuality, generation);
             if (autoplay) schedulePrefetch(generation);
         } catch (Exception error) { failQualitySwitch(job, error.getMessage()); }
     }
@@ -1044,8 +1036,9 @@ public final class PlayerActivity extends Activity {
         if (danmaku == null || video == null || series == null || episode == null) return;
         try {
             long position = prepared ? Math.max(0, video.getCurrentPosition()) : Math.max(0, resumeAt);
-            boolean local = active && prepared && !offline && !casting() && !castWasActive;
-            danmaku.update(series.optString("seriesId"), episode.optString("vid"), generation, position,
+            String sid = series.optString("seriesId");
+            boolean local = active && prepared && !offline && !casting() && !castWasActive && !PlaybackSources.isRetiredSeries(sid);
+            danmaku.update(sid, episode.optString("vid"), generation, position,
                 Math.max(1, video.getDuration()), local, danmakuEnabled); updateDanmakuButton();
         } catch (RuntimeException ignored) { danmaku.suspend(); } // A decoder transition never turns a comment error into playback failure.
     }

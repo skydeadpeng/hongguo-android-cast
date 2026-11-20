@@ -6,6 +6,10 @@ on:
       - 'src/android/**'
       - 'src/native/app-source-registered.js'
       - 'scripts/check-android-*'
+      - 'scripts/build-android-source-modules.cjs'
+      - 'scripts/check-android-source-*.cjs'
+      - 'vendor/source-modules/**'
+      - 'package-lock.json'
       - '.github/workflows/android-cast.yml'
   pull_request:
     paths:
@@ -13,6 +17,10 @@ on:
       - 'src/android/**'
       - 'src/native/app-source-registered.js'
       - 'scripts/check-android-*'
+      - 'scripts/build-android-source-modules.cjs'
+      - 'scripts/check-android-source-*.cjs'
+      - 'vendor/source-modules/**'
+      - 'package-lock.json'
       - '.github/workflows/android-cast.yml'
 permissions:
   contents: read
@@ -33,17 +41,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Install source asset build dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Compile all Android production Java against SDK 35
         shell: bash
         run: gradle -p android :app:compilePhoneDebugJavaWithJavac --no-daemon --console=plain
+      - name: Verify all locked Android source modules
+        run: |
+          node --test scripts/check-android-source-bundle.test.cjs
+          node scripts/check-android-source-rhino.cjs
       - name: Prepare existing Android JSON test dependency
         run: mvn -q dependency:get -Dartifact=com.vaadin.external.google:android-json:0.0.20131108.vaadin1
-      - name: Run HLS, remux and source lifecycle boundary tests
-        run: |
-          bash android/tests/run-huangguo-api-tests.sh
-          bash android/tests/run-huangguo-hls-tests.sh
-          bash android/tests/run-huangguo-remux-tests.sh
-          bash android/tests/run-huangguo-cast-source-tests.sh
       - name: Run existing network, service-source and cache regressions
         run: |
           bash android/tests/run-announcement-request-tests.sh
@@ -61,6 +69,7 @@ jobs:
           bash android/tests/run-initial-playback-tests.sh
           bash android/tests/run-native-media-contract-tests.sh
           bash android/tests/run-network-guard-tests.sh
+          bash android/tests/run-source-playback-sessions-tests.sh
           bash android/tests/run-network-guard-race-tests.sh
           bash android/tests/run-cast-playlist-source-tests.sh
           bash android/tests/run-dlna-merged-source-tests.sh
@@ -69,7 +78,6 @@ jobs:
           bash android/tests/run-cast-cache-window-tests.sh
       - name: Build phone debug APK
         run: |
-          npm ci --ignore-scripts --no-audit --no-fund
           node scripts/check-android-signer-offsets.cjs
           node scripts/check-android-source-budget.cjs
           node scripts/check-app-source-entitlement.cjs
@@ -80,7 +88,7 @@ jobs:
           gradle -p android :app:assemblePhoneDebug --no-daemon --console=plain
       - uses: actions/upload-artifact@v4
         with:
-          name: huangguo-cast-phone-debug
+          name: android-cast-phone-debug
           path: android/app/build/outputs/apk/phone/debug/app-phone-universal-debug.apk
           if-no-files-found: error
           retention-days: 14

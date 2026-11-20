@@ -1,0 +1,13 @@
+{
+  "id": "beabox",
+  "name": "笔盒",
+  "version": "1.0.1",
+  "description": "分类视频 · 在线搜索",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": ["bh4066.top", "beabox.cc", "beabox.live"],
+  "capabilities": ["search"],
+  "baseUrl": "https://bh4066.top",
+  "allowEmptyCatalog": true
+}

@@ -42,7 +42,7 @@ const officialSeriesModule = fs.existsSync(officialSeriesModulePath) ? await imp
 // These adjacent UI modules are pure at import. Load their real exports while the
 // Detail-only gate keeps native network operations behind its existing bridge stub.
 const adjacentModules = new Map();
-for (const name of ['update-bridge', 'announcements', 'history-view', 'huangguo', 'tv-navigation']) {
+for (const name of ['update-bridge', 'announcements', 'history-view', 'tv-navigation', 'android-sources']) {
   adjacentModules.set(`./${name}.mjs`, await import(pathToFileURL(path.join(root, `src/android/${name}.mjs`)).href));
 }
 await group('FUNCTION source preview=3 leaves episode 4 unknown in full 5-episode directory', async () => {
@@ -109,7 +109,7 @@ await group('FUNCTION rendered Detail controls allow episode 4 and submit queue/
   const react = {
     createElement: (type, props, ...children) => ({ type, props: props || {}, children }),
     useState: initial => [stateIndex++ === 0 ? { busy: false, item: detail } : typeof initial === 'function' ? initial() : initial, () => {}],
-    useEffect() {}, useRef: current => ({ current }), useCallback: fn => fn,
+    useEffect() {}, useRef: current => ({ current }), useCallback: fn => fn, useMemo: fn => fn(),
   };
   const exports = {};
   const code = transformSync(read('src/android/App.jsx') + '\nexports.__gateDetail = Detail;\n', { loader: 'jsx', format: 'cjs', target: 'node22' }).code;
@@ -125,6 +125,11 @@ await group('FUNCTION rendered Detail controls allow episode 4 and submit queue/
     // register its import without executing or weakening any playback assertions.
     if (name === './AccountPanel.jsx') return { __esModule: true, default() { accountPanelRenders++; throw new Error('AccountPanel must not render in the Detail playback gate'); } };
     if (name === './UpdatePanel.jsx') return { __esModule: true, default() { updatePanelRenders++; throw new Error('UpdatePanel must not render in the Detail playback gate'); } };
+    if (name === './JuguoDesktop.jsx' || name === './SourcesDesktop.jsx') {
+      const unexpected = () => { throw new Error('Standalone source page must not render in the Detail playback gate'); };
+      return { JuguoPage: unexpected, JuguoSettings: unexpected, useJuguoSettings: unexpected, SourcesDesktop: unexpected };
+    }
+    if (name === './android-sources.css') return {};
     if (name === './source.mjs') return { ...sourceModule, createSource: () => fixtureSource };
     if (name === './bridge.mjs') return { getPlaybackPreferences: () => preferences, setPlaybackPreference() {}, requestHtml() {}, nativeCall: async (method, params) => { if (method === 'getPlaybackOptions') return { quality: 'auto', speed: 1 }; calls.push({ method, params }); return { started: true }; } };
     if (name.includes('LICENSE')) return '';

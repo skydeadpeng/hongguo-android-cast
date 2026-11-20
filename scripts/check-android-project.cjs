@@ -36,6 +36,17 @@ try {
   for (const file of ['src/android/App.jsx', 'src/android/source.mjs', 'src/android/bridge.mjs']) {
     assert.doesNotMatch(read(file), /window\.electronAPI|require\(['"]electron['"]\)/, file);
   }
+  // Remove the old Android-only source without disabling the new source service.
+  const java = 'android/app/src/main/java/io/github/jackotom/hongguo/android/';
+  for (const file of ['src/android/bridge.mjs', java + 'NativeBridge.java']) {
+    const bridge = read(file);
+    assert.match(bridge, /['"]sourceService['"]/);
+    assert.doesNotMatch(bridge, /huangguo(?:Feed|Search|Detail|Play|Settings|VerifyPin)/);
+  }
+  for (const name of ['HuangguoApi', 'HuangguoCastSource', 'HuangguoHls', 'HuangguoMp4Remuxer', 'TvHuangguoDetailActivity']) {
+    assert.equal(fs.existsSync(path.join(root, java + name + '.java')), false, name);
+  }
+  assert.doesNotMatch(read('android/app/src/tvNative/AndroidManifest.xml'), /TvHuangguoDetailActivity/);
   const scripts = JSON.parse(read('package.json')).scripts;
   assert.ok(scripts['build:android'] && scripts['build:android:ui']);
   console.log('ANDROID_PROJECT_OK phone+tv native_bridge independent_source');

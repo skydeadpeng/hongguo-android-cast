@@ -14,8 +14,10 @@ import android.widget.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
 import org.json.JSONArray;
@@ -27,7 +29,7 @@ public class TvNativeActivity extends Activity {
     private final ThreadPoolExecutor worker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(4));
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<JSONObject> items = new ArrayList<>();
-    private final List<Button> navButtons = new ArrayList<>();
+    private final Map<String, Button> navButtons = new LinkedHashMap<>();
     private AppUpdater updates;
     private Future<?> loadTask;
     private String mode = "catalog", category = "real-drama", libraryView = "favorites";
@@ -62,62 +64,72 @@ public class TvNativeActivity extends Activity {
         super.onCreate(saved);
         TvUi.prepareWindow(this);
         if (saved != null) {
-            mode = saved.getString("mode", "catalog");
-            category = saved.getString("category", "real-drama");
+            String savedMode = saved.getString("mode", "catalog");
+            if ("library".equals(savedMode) || "downloads".equals(savedMode) || "settings".equals(savedMode)) mode = savedMode;
+            String savedCategory = saved.getString("category", "real-drama");
+            if ("comic-drama".equals(savedCategory) || "ai-drama".equals(savedCategory)) category = savedCategory;
             libraryView = saved.getString("libraryView", "favorites");
         }
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(TvUi.BACKGROUND);
+        int edge = TvUi.edgeInset(this);
+        boolean narrow = getResources().getConfiguration().screenWidthDp < 700;
         LinearLayout header = TvUi.row(this);
-        header.setPadding(dp(24), dp(12), dp(24), dp(8));
-        TextView brand = TvUi.text(this, "红果", 20, TvUi.TEXT);
-        brand.setTypeface(null, android.graphics.Typeface.BOLD);
-        header.addView(brand, new LinearLayout.LayoutParams(dp(64), -2));
-        String[][] destinations = { { "catalog", "发现" }, { "huangguo", "黄果" }, { "search", "搜索" }, { "library", "我的追剧" }, { "downloads", "下载" }, { "settings", "设置" } };
+        header.setBackgroundColor(TvUi.BAR);
+        header.setPadding(dp(edge), dp(narrow ? 12 : 20), dp(edge), dp(12));
+        TextView brand = TvUi.heading(this, "红果", narrow ? 20 : 24);
+        header.addView(brand, new LinearLayout.LayoutParams(dp(narrow ? 54 : 80), -2));
+        String[][] destinations = { { "catalog", "发现" }, { "search", "搜索" }, { "sources", "影视来源" }, { "library", "我的追剧" }, { "downloads", "下载" }, { "settings", "设置" } };
         for (String[] destination : destinations) {
-            Button button = TvUi.button(this, destination[1]);
+            Button button = TvUi.navigationButton(this, destination[1]);
             button.setTag(destination[0]);
-            button.setTextSize(14); button.setSingleLine(); button.setMinWidth(0);
-            button.setPadding(dp(4), dp(6), dp(4), dp(6));
+            button.setTextSize(narrow ? 14 : 16); button.setSingleLine();
+            button.setEllipsize(TextUtils.TruncateAt.END);
+            button.setPadding(dp(4), dp(4), dp(4), dp(4));
             button.setOnClickListener(view -> {
                 if (destination[0].equals("search")) TvPlay.launch(this, new Intent(this, TvSearchActivity.class));
+                else if (destination[0].equals("sources")) TvPlay.launch(this, new Intent(this, TvSourceActivity.class));
                 else if (!mode.equals(destination[0])) select(destination[0], category);
             });
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(40), 1f);
-            params.leftMargin = dp(6);
-            header.addView(button, params); navButtons.add(button);
+            float weight = destination[1].length() > 2 ? 1.32f : 1f;
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(44), weight);
+            params.leftMargin = dp(narrow ? 4 : 8);
+            header.addView(button, params); navButtons.put(destination[0], button);
         }
         updateShortcut = TvUi.button(this, "有新版本");
         updateShortcut.setTextSize(12); updateShortcut.setSingleLine(); updateShortcut.setSelected(true);
         updateShortcut.setPadding(dp(6), dp(6), dp(6), dp(6));
         updateShortcut.setVisibility(View.GONE);
         updateShortcut.setOnClickListener(view -> openUpdateSettings());
-        LinearLayout.LayoutParams shortcutParams = new LinearLayout.LayoutParams(dp(72), dp(40));
+        LinearLayout.LayoutParams shortcutParams = new LinearLayout.LayoutParams(dp(72), dp(44));
         shortcutParams.leftMargin = dp(6); header.addView(updateShortcut, shortcutParams);
         root.addView(header, new LinearLayout.LayoutParams(-1, -2));
+        View divider = new View(this);
+        divider.setBackgroundColor(TvUi.BORDER);
+        root.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
         secondary = TvUi.row(this);
-        secondary.setPadding(dp(24), 0, dp(24), dp(8));
+        secondary.setPadding(dp(edge), dp(12), dp(edge), dp(12));
         root.addView(secondary, new LinearLayout.LayoutParams(-1, -2));
         stateRow = TvUi.row(this);
-        stateRow.setPadding(dp(24), 0, dp(24), dp(6));
+        stateRow.setPadding(dp(edge), 0, dp(edge), dp(8));
         busyIndicator = new ProgressBar(this);
         stateRow.addView(busyIndicator, new LinearLayout.LayoutParams(dp(20), dp(20)));
-        status = TvUi.text(this, "", 13, TvUi.MUTED);
+        status = TvUi.text(this, "", 15, TvUi.MUTED);
+        status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         status.setMaxLines(2); status.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(0, -2, 1f);
         statusParams.leftMargin = dp(8); stateRow.addView(status, statusParams);
         retry = TvUi.button(this, "重试");
-        stateRow.addView(retry, new LinearLayout.LayoutParams(-2, dp(36)));
+        stateRow.addView(retry, new LinearLayout.LayoutParams(-2, dp(42)));
         root.addView(stateRow, new LinearLayout.LayoutParams(-1, -2));
         content = new FrameLayout(this);
         root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1f));
         grid = new GridView(this);
-        int width = getResources().getConfiguration().screenWidthDp;
         grid.setNumColumns(TvUi.posterColumns(this));
         grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
-        grid.setHorizontalSpacing(dp(12)); grid.setVerticalSpacing(dp(14));
-        grid.setPadding(dp(24), dp(3), dp(24), dp(14));
+        grid.setHorizontalSpacing(dp(12)); grid.setVerticalSpacing(dp(16));
+        grid.setPadding(dp(edge), dp(4), dp(edge), dp(20));
         grid.setClipToPadding(false);
         TvUi.configureGrid(grid);
         adapter = new SeriesAdapter(); grid.setAdapter(adapter);
@@ -127,7 +139,7 @@ public class TvNativeActivity extends Activity {
         content.addView(grid, new FrameLayout.LayoutParams(-1, -1));
         pageScroll = new ScrollView(this);
         pageScroll.setFillViewport(false);
-        pageScroll.setPadding(dp(24), 0, dp(24), dp(16));
+        pageScroll.setPadding(dp(edge), dp(4), dp(edge), dp(20));
         pagePanel = new LinearLayout(this); pagePanel.setOrientation(LinearLayout.VERTICAL);
         pageScroll.addView(pagePanel, new ScrollView.LayoutParams(-1, -2));
         content.addView(pageScroll, new FrameLayout.LayoutParams(-1, -1));
@@ -136,16 +148,21 @@ public class TvNativeActivity extends Activity {
         emptyPanel.setPadding(dp(28), dp(12), dp(28), dp(16));
         content.addView(emptyPanel, new FrameLayout.LayoutParams(-1, -1));
         more = TvUi.button(this, "加载更多");
-        more.setOnClickListener(view -> { if (mode.equals("huangguo")) loadHuangguo(true); else loadCatalog(true); });
+        more.setOnClickListener(view -> loadCatalog(true));
         LinearLayout footer = TvUi.row(this); footer.setGravity(Gravity.CENTER);
-        footer.setPadding(0, 0, 0, dp(8));
-        footer.addView(more, new LinearLayout.LayoutParams(-2, dp(38)));
+        footer.setPadding(0, 0, 0, dp(16));
+        footer.addView(more, new LinearLayout.LayoutParams(-2, dp(44)));
         root.addView(footer, new LinearLayout.LayoutParams(-1, -2));
         setContentView(root);
         updates = new AppUpdater(this, null); updates.pageReady();
         PlaybackSources.attachNative(lookup);
         select(mode, category);
-        navButtons.get(mode.equals("huangguo") ? 1 : mode.equals("library") ? 3 : mode.equals("downloads") ? 4 : mode.equals("settings") ? 5 : 0).requestFocus();
+        focusNav(mode);
+    }
+    private void focusNav(String destination) {
+        Button button = navButtons.get(destination);
+        if (button == null) button = navButtons.get("catalog");
+        if (button != null) button.requestFocus();
     }
     private int dp(int value) { return TvUi.dp(this, value); }
     private boolean alive(int ticket) { return !destroyed && !isFinishing() && !isDestroyed() && ticket == generation; }
@@ -161,9 +178,8 @@ public class TvNativeActivity extends Activity {
         pageScroll.setVisibility(View.GONE); emptyPanel.setVisibility(View.GONE); grid.setVisibility(View.VISIBLE);
         pagePanel.removeAllViews(); pageScroll.scrollTo(0, 0);
         state("", false, null); buildSecondary();
-        for (Button button : navButtons) button.setSelected(mode.equals(button.getTag()));
+        for (Map.Entry<String, Button> nav : navButtons.entrySet()) nav.getValue().setSelected(mode.equals(nav.getKey()));
         if (mode.equals("catalog")) loadCatalog(false);
-        else if (mode.equals("huangguo")) loadHuangguo(false);
         else if (mode.equals("library")) loadLibrary();
         else if (mode.equals("downloads")) loadDownloads(true);
         else showSettings();
@@ -182,17 +198,6 @@ public class TvNativeActivity extends Activity {
             continueWatching = smallButton("继续观看"); continueWatching.setVisibility(View.GONE);
             continueWatching.setOnClickListener(view -> { if (recent != null) openSeries(recent); });
             addSecondary(continueWatching);
-        } else if (mode.equals("huangguo")) {
-            // 黄果官方站两个内容分类；分类值即官方 slug。
-            String[][] categories = { { "ai-manju", "漫剧" }, { "ai-duanju", "短剧" } };
-            if (category == null || category.isEmpty() || category.equals("real-drama")) category = "ai-manju";
-            for (String[] entry : categories) {
-                Button button = smallButton(entry[1]); button.setTag(entry[0]); button.setSelected(category.equals(entry[0]));
-                button.setOnClickListener(view -> {
-                    if (!category.equals(entry[0])) { select("huangguo", entry[0]); focusSecondary(entry[0]); }
-                });
-                addSecondary(button);
-            }
         } else if (mode.equals("library")) {
             for (String[] entry : new String[][] { { "favorites", "收藏" }, { "history", "观看历史" } }) {
                 Button button = smallButton(entry[1]); button.setTag(entry[0]); button.setSelected(libraryView.equals(entry[0]));
@@ -204,11 +209,12 @@ public class TvNativeActivity extends Activity {
                 addSecondary(button);
             }
         } else {
-            TextView heading = TvUi.text(this, mode.equals("settings") ? "设置" : "下载", 19, TvUi.TEXT);
-            heading.setTypeface(null, android.graphics.Typeface.BOLD);
+            TextView heading = TvUi.heading(this, mode.equals("settings") ? "设置" : "下载", 22);
+            heading.setGravity(Gravity.CENTER_VERTICAL);
             addSecondary(heading);
         }
-        pageSummary = TvUi.text(this, "", 12, TvUi.MUTED);
+        pageSummary = TvUi.text(this, "", 14, TvUi.MUTED);
+        pageSummary.setSingleLine(); pageSummary.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(0, -2, 1f); countParams.leftMargin = dp(8);
         secondary.addView(pageSummary, countParams);
         if (mode.equals("library")) {
@@ -226,13 +232,15 @@ public class TvNativeActivity extends Activity {
         if (destination != null) destination.requestFocus();
     }
     private Button smallButton(String label) {
-        Button button = TvUi.button(this, label); button.setTextSize(13);
-        button.setMinWidth(0); button.setPadding(dp(10), dp(5), dp(10), dp(5));
+        Button button = TvUi.button(this, label);
+        int horizontal = getResources().getConfiguration().screenWidthDp < 700 ? 8 : 12;
+        button.setTextSize(horizontal == 8 ? 13 : 15);
+        button.setPadding(dp(horizontal), dp(4), dp(horizontal), dp(4));
         return button;
     }
     private void addSecondary(View view) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(36));
-        if (secondary.getChildCount() > 0) params.leftMargin = dp(6);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(42));
+        if (secondary.getChildCount() > 0) params.leftMargin = dp(8);
         secondary.addView(view, params);
     }
     private void reload() {
@@ -248,14 +256,14 @@ public class TvNativeActivity extends Activity {
     }
     private void empty(String title, String note, String actionLabel, Runnable action) {
         emptyPanel.removeAllViews();
-        TextView heading = TvUi.text(this, title, 20, TvUi.TEXT); heading.setGravity(Gravity.CENTER);
+        TextView heading = TvUi.heading(this, title, 24); heading.setGravity(Gravity.CENTER);
         emptyPanel.addView(heading, new LinearLayout.LayoutParams(-1, -2));
-        TextView explanation = TvUi.text(this, note, 14, TvUi.MUTED); explanation.setGravity(Gravity.CENTER);
+        TextView explanation = TvUi.text(this, note, 16, TvUi.MUTED); explanation.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(-1, -2); textParams.topMargin = dp(8);
         emptyPanel.addView(explanation, textParams);
         if (action != null) {
             Button button = TvUi.button(this, actionLabel); button.setOnClickListener(view -> action.run());
-            LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-2, dp(40)); buttonParams.topMargin = dp(16);
+            LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-2, dp(44)); buttonParams.topMargin = dp(16);
             emptyPanel.addView(button, buttonParams);
         }
         emptyPanel.setVisibility(View.VISIBLE); grid.setVisibility(View.GONE); pageScroll.setVisibility(View.GONE);
@@ -343,55 +351,6 @@ public class TvNativeActivity extends Activity {
             }
         });
     }
-    /** 黄果官方目录：只读分页列表，剧集编号由 HuangguoApi 编码。 */
-    private void loadHuangguo(boolean append) {
-        if (!mode.equals("huangguo") || loading || append && page >= totalPages) return;
-        final int ticket = ++generation;
-        final int target = append ? page + 1 : 1;
-        final String targetCategory = category == null || category.isEmpty() ? "ai-manju" : category;
-        final int selection = grid.getSelectedItemPosition(), first = grid.getFirstVisiblePosition();
-        final int previousCount = items.size();
-        final boolean focusMore = more.hasFocus();
-        loading = true; more.setEnabled(false); more.setText(append ? "加载中…" : "加载更多");
-        emptyPanel.setVisibility(View.GONE); grid.setVisibility(View.VISIBLE);
-        state(append ? "正在加载下一页…" : "正在读取黄果片单…", true, null);
-        submit(ticket, () -> {
-            try {
-                JSONObject result = HuangguoApi.feed(targetCategory, target);
-                final JSONArray converted = result.getJSONArray("items");
-                final boolean hasMore = result.optBoolean("hasMore", false);
-                runOnUiThread(() -> {
-                    if (!alive(ticket) || !mode.equals("huangguo") || !targetCategory.equals(category)) return;
-                    loading = false; more.setEnabled(true); more.setText("加载更多");
-                    if (!append) items.clear();
-                    Set<String> seen = new HashSet<>();
-                    for (JSONObject row : items) seen.add(row.optString("seriesId"));
-                    for (int i = 0; i < converted.length(); i++) {
-                        JSONObject row = converted.optJSONObject(i);
-                        if (row != null && seen.add(row.optString("seriesId"))) items.add(row);
-                    }
-                    page = target;
-                    totalPages = hasMore ? page + 1 : page;
-                    adapter.notifyDataSetChanged();
-                    if (append) {
-                        grid.setSelection(Math.max(0, focusMore ? Math.min(previousCount, items.size() - 1) : selection >= 0 ? selection : first));
-                        if (focusMore && !items.isEmpty()) grid.requestFocus();
-                    }
-                    more.setVisibility(page < totalPages ? View.VISIBLE : View.GONE);
-                    pageSummary.setText("第 " + page + " 批 · " + items.size() + " 部");
-                    state("", false, null);
-                    if (items.isEmpty()) empty("这个分类暂时没有黄果剧集", "可以刷新片单，或切换其他分类。", "重新加载", () -> loadHuangguo(false));
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    if (!alive(ticket)) return;
-                    loading = false; more.setEnabled(true); more.setText("加载更多");
-                    state(TvUi.message(error), false, () -> loadHuangguo(append));
-                    if (items.isEmpty()) empty("黄果片单读取未完成", "请检查网络后重试。", "重新加载", () -> loadHuangguo(false));
-                });
-            }
-        });
-    }
     private void refreshRecentHistory() {
         if (!mode.equals("catalog") || continueWatching == null) return;
         final int ticket = generation;
@@ -403,7 +362,8 @@ public class TvNativeActivity extends Activity {
                 JSONObject latest = null;
                 for (int i = 0; i < rows.length(); i++) {
                     JSONObject row = rows.optJSONObject(i);
-                    if (row != null && (latest == null || row.optLong("updatedAt") > latest.optLong("updatedAt"))) latest = row;
+                    if (row != null && !PlaybackSources.isRetiredSeries(row.optString("seriesId")) &&
+                        (latest == null || row.optLong("updatedAt") > latest.optLong("updatedAt"))) latest = row;
                 }
                 final JSONObject result = latest;
                 runOnUiThread(() -> {
@@ -438,6 +398,8 @@ public class TvNativeActivity extends Activity {
                 for (int i = 0; i < rows.length(); i++) {
                     JSONObject original = rows.optJSONObject(i); if (original == null) continue;
                     JSONObject row = new JSONObject(original.toString());
+                    // Keep local history/favorite data untouched; do not request the removed source's artwork.
+                    if (PlaybackSources.isRetiredSeries(row.optString("seriesId"))) row.remove("coverUrl");
                     if (view.equals("history")) row.put("historyLabel", "看到第 " + row.optInt("index", 1) + " 集 · " + time(row.optLong("positionMs")));
                     display.add(row);
                 }
@@ -533,9 +495,12 @@ public class TvNativeActivity extends Activity {
     private void openSeries(JSONObject row) {
         String id = row.optString("seriesId");
         if (id.isEmpty()) return;
-        // 黄果剧集以 99 前缀编码进入原生详情，不与红果官网解析混用。
-        if (id.length() == 10 && id.startsWith("99")) TvPlay.launch(this, new Intent(this, TvHuangguoDetailActivity.class).putExtra("seriesId", id));
-        else TvPlay.launch(this, new Intent(this, TvDetailActivity.class).putExtra("seriesId", id));
+        // Reserved legacy ids may survive in local records but must not reach the official lookup.
+        if (PlaybackSources.isRetiredSeries(id)) {
+            Toast.makeText(this, "这个旧来源已移除，记录仍保留。", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        TvPlay.launch(this, new Intent(this, TvDetailActivity.class).putExtra("seriesId", id));
     }
     private void showSettings() {
         grid.setVisibility(View.GONE); emptyPanel.setVisibility(View.GONE); pageScroll.setVisibility(View.VISIBLE);
@@ -579,22 +544,22 @@ public class TvNativeActivity extends Activity {
         } catch (Exception error) { state(TvUi.message(error), false, () -> select("settings", category)); }
     }
     private void section(String title) {
-        TextView heading = TvUi.text(this, title, 17, TvUi.TEXT); heading.setTypeface(null, android.graphics.Typeface.BOLD);
+        TextView heading = TvUi.heading(this, title, 19);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.topMargin = dp(pagePanel.getChildCount() == 0 ? 0 : 16); params.bottomMargin = dp(6);
         pagePanel.addView(heading, params);
     }
     private TextView note(String text) {
-        TextView note = TvUi.text(this, text, 13, TvUi.MUTED);
+        TextView note = TvUi.text(this, text, 15, TvUi.MUTED);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.bottomMargin = dp(8);
         pagePanel.addView(note, params); return note;
     }
     private Button settingRow(String label, String value) {
         LinearLayout row = TvUi.row(this);
-        row.setPadding(dp(12), dp(6), dp(8), dp(6)); row.setBackgroundColor(TvUi.SURFACE);
-        TextView text = TvUi.text(this, label, 15, TvUi.TEXT);
+        row.setPadding(dp(16), dp(8), dp(8), dp(8)); row.setBackground(TvUi.panelShape(this));
+        TextView text = TvUi.text(this, label, 16, TvUi.TEXT);
         row.addView(text, new LinearLayout.LayoutParams(0, -2, 1f));
-        Button button = TvUi.button(this, value); button.setTextSize(14); button.setMinWidth(0);
-        row.addView(button, new LinearLayout.LayoutParams(-2, dp(40)));
+        Button button = TvUi.button(this, value);
+        row.addView(button, new LinearLayout.LayoutParams(-2, dp(44)));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.bottomMargin = dp(4);
         pagePanel.addView(row, params); return button;
     }
@@ -702,7 +667,7 @@ public class TvNativeActivity extends Activity {
             updateShortcut.setText(ready ? "安装更新" : "有新版本");
             updateShortcut.setContentDescription((ready ? "更新已就绪" : "发现新版本 " + snapshot.optString("versionName")) + "，打开应用更新");
             updateShortcut.setVisibility(available || ready ? View.VISIBLE : View.GONE);
-            if (heldFocus && !available && !ready) navButtons.get(4).requestFocus();
+            if (heldFocus && !available && !ready) focusNav("downloads");
         }
         if (updateStatus == null || !mode.equals("settings")) return;
         if (automaticChecks != null) {
@@ -762,8 +727,8 @@ public class TvNativeActivity extends Activity {
         if (updates != null) updates.pause(); AccountSync.get().flush(); super.onPause();
     }
     @Override public void onBackPressed() {
-        if (!mode.equals("catalog")) { select("catalog", category); navButtons.get(0).requestFocus(); return; }
-        if (grid.hasFocus() || more.hasFocus()) { navButtons.get(0).requestFocus(); return; }
+        if (!mode.equals("catalog")) { select("catalog", category); focusNav("catalog"); return; }
+        if (grid.hasFocus() || more.hasFocus()) { focusNav("catalog"); return; }
         super.onBackPressed();
     }
     @Override protected void onDestroy() {

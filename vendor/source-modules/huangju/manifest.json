@@ -1,0 +1,16 @@
+{
+  "id": "huangju",
+  "name": "剧果",
+  "version": "1.0.1",
+  "description": "热门 · 最新 · 分类短剧",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": ["huangju.net", "www.huangju.net", "api.huangju.net"],
+  "capabilities": ["search"],
+  "aliases": ["huangju.net", "www.huangju.net", "api.huangju.net"],
+  "baseUrl": "https://huangju.net",
+  "allowEmptyCatalog": true,
+  "noHostRotation": true,
+  "keepDetailEpisodes": true
+}

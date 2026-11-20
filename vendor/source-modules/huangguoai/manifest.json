@@ -1,0 +1,22 @@
+{
+  "id": "huangguoai",
+  "name": "黄果 AI",
+  "version": "1.0.1",
+  "description": "AI 短剧",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": ["huangguoai.com", "*.lbvrhyir.cc", "*.xxbgwypx.cc", "*.ediayikma.cc", "*.agdkczeyx.cc"],
+  "capabilities": ["search", "rankings"],
+  "group": "huangguo",
+  "groupName": "黄果",
+  "entryName": "AI",
+  "aliases": ["huangguo", "huangguoai.com"],
+  "hostSuffixes": [".lbvrhyir.cc", ".xxbgwypx.cc", ".ediayikma.cc", ".agdkczeyx.cc"],
+  "baseUrl": "https://huangguoai.com",
+  "rankings": [
+    { "id": "huangguo-hot", "name": "热播榜", "description": "黄果站点热播 TOP 20；每日更新。" },
+    { "id": "huangguo-recommend", "name": "推荐榜", "description": "黄果站点推荐 TOP 20。" },
+    { "id": "huangguo-potential", "name": "潜力榜", "description": "黄果站点潜力 TOP 20。" }
+  ]
+}

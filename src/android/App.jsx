@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Home, Search, Bookmark, Download, Settings, Play, Heart, Clock, ChevronRight, ExternalLink, RefreshCw, Film, Radio } from '../components/icons.jsx';
+import { Home, Search, Bookmark, Download, Settings, Play, Heart, Clock, ChevronRight, ExternalLink, RefreshCw, Film } from '../components/icons.jsx';
 import { getPlaybackPreferences, nativeCall, requestHtml, setPlaybackPreference } from './bridge.mjs';
 import { updateCall } from './update-bridge.mjs';
 import { CATEGORIES, createSource } from './source.mjs';
@@ -9,10 +9,13 @@ import { fetchAppPlayUrl } from './generated/mac-app-source.mjs';
 import gplLicense from '../../LICENSE?raw';
 import AccountPanel from './AccountPanel.jsx';
 import UpdatePanel from './UpdatePanel.jsx';
+import { JuguoPage, JuguoSettings, useJuguoSettings } from './JuguoDesktop.jsx';
+import { SourcesDesktop } from './SourcesDesktop.jsx';
+import { getAndroidSourcesApi } from './android-sources.mjs';
+import './android-sources.css';
 import { createOfficialSeasonLookup, requestOfficialSeries } from './official-series.mjs';
 import { announcementLink, createAnnouncements } from './announcements.mjs';
 import { completedEpisode, filterHistory, withHistoryHints } from './history-view.mjs';
-import { HUANGGUO_CATEGORIES, HUANGGUO_LINES, huangguoFeed, huangguoSearch, huangguoDetail, huangguoPlay, huangguoGetSettings, huangguoUpdateSettings, huangguoVerifyPin } from './huangguo.mjs';
 import { pickSpatialCandidate, pickInitialControl } from './tv-navigation.mjs';
 
 const source = createSource(requestHtml, { fallback: fetchAppPlayUrl,
@@ -22,13 +25,19 @@ const seasonLookup = createOfficialSeasonLookup(requestOfficialSeries, createSea
 const EMPTY_LIBRARY = { favorites: [], history: [] };
 const NAV = [
   { id: 'discover', label: '发现', Icon: Home },
-  { id: 'huangguo', label: '黄果', Icon: Radio },
   { id: 'search', label: '搜索', Icon: Search },
   { id: 'library', label: '我的追剧', Icon: Bookmark },
   { id: 'downloads', label: '下载', Icon: Download },
   { id: 'about', label: '关于', Icon: Settings },
 ];
 const errorText = (error) => error?.message || String(error || '请求未完成，请重试。');
+// Native network errors sometimes contain the DNS/CDN peer rather than an
+// actionable explanation. Keep other errors (including HTTP status) intact.
+const discoverErrorText = error => {
+  const text = errorText(error);
+  return /^(?:Failed to connect to |Unable to resolve host |No address associated with hostname|Network is unreachable|Connection refused)/i.test(text)
+    ? '网络连接失败，请检查设备是否联网，然后重新加载。' : text;
+};
 // Keep history RPCs ordered across SearchPage unmount/remount. A late old write
 // must finish before a newly mounted page reads the persisted native history.
 let searchHistoryQueue = Promise.resolve();
@@ -45,6 +54,8 @@ function requestSearchHistory(method, keyword) {
   return request;
 }
 const sameSeries = (a, b) => String(a?.seriesId) === String(b?.seriesId);
+// The removed source stored 10-digit 99-prefixed IDs in the shared library.
+const isRetiredSeriesId = value => /^99[0-9]{8}$/.test(String(value ?? ''));
 const timeText = (ms) => { const s = Math.floor((Number(ms) || 0) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const byteText = (bytes) => { const n = Number(bytes) || 0; return n >= 1024 ** 2 ? `${(n / 1024 ** 2).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`; };
 // Do not duplicate an entire episode list inside library entries or bridge payloads.
@@ -77,9 +88,10 @@ const webpCover = url => typeof url === 'string' && url.length > 6 && url.slice(
 
 function Poster({ item, onOpen, history, onDelete }) {
   const [failed, setFailed] = useState(false);
-  const [src, setSrc] = useState(item.coverUrl);
+  const cover = !item.sourceId && isRetiredSeriesId(item.seriesId) ? '' : item.coverUrl;
+  const [src, setSrc] = useState(cover);
   const imageRef = useRef(null);
-  useEffect(() => { setSrc(item.coverUrl); setFailed(false); }, [item.coverUrl]);
+  useEffect(() => { setSrc(cover); setFailed(false); }, [cover]);
   // IPv6 黑洞等网络下图片请求可能无限挂起：限时未出图按失败处理，显示占位不留白块。
   useEffect(() => {
     if (!src || failed) return undefined;
@@ -110,114 +122,7 @@ function PosterGrid({ items, onOpen, history = false, onDelete }) {
   return <div className="poster-grid">{items.map((item, index) => <Poster key={`${item.seriesId}-${index}`} item={item} onOpen={onOpen} history={history ? item : null} onDelete={onDelete} />)}</div>;
 }
 
-/** 黄果密码门：设置密码后首次进入需要解锁（本会话有效）。 */
-function HuangguoPinGate({ onUnlocked, onCancel }) {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const submit = async event => {
-    event.preventDefault();
-    if (busy || !pin) return;
-    setBusy(true); setError('');
-    try {
-      if (await huangguoVerifyPin(pin)) onUnlocked();
-      else setError('密码不正确');
-    } catch (failure) { setError(errorText(failure)); }
-    finally { setBusy(false); }
-  };
-  return <div className="huangguo-detail" role="dialog" aria-label="黄果密码">
-    <form className="huangguo-pin" onSubmit={submit}>
-      <h2>黄果已上锁</h2>
-      <p>输入密码解锁（本次打开内有效）</p>
-      <input value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" autoComplete="off" placeholder="4-8 位数字密码" aria-label="黄果密码" autoFocus />
-      <div className="huangguo-pin-actions">
-        <button type="button" className="button" onClick={onCancel}>取消</button>
-        <button type="submit" className="button primary" disabled={busy || !pin}>{busy ? '验证中…' : '解锁'}</button>
-      </div>
-      {error && <p className="text-error" role="alert">{error}</p>}
-    </form>
-  </div>;
-}
-
-function HuangguoPage({ notify }) {
-  const [category, setCategory] = useState(HUANGGUO_CATEGORIES[0].id);
-  const [keyword, setKeyword] = useState('');
-  const [query, setQuery] = useState('');
-  const [state, setState] = useState({ busy: true, items: [], hasMore: false, page: 1, error: '' });
-  const [detail, setDetail] = useState(null);
-  const [currentOrigin, setCurrentOrigin] = useState('');
-  const generation = useRef(0);
-  // 顶栏展示当前实际生效线路；切页与设置变更后刷新。
-  useEffect(() => {
-    const read = () => huangguoGetSettings().then(result => setCurrentOrigin(result.currentOrigin || '')).catch(() => {});
-    read();
-    window.addEventListener('huangguosettingschanged', read);
-    return () => window.removeEventListener('huangguosettingschanged', read);
-  }, []);
-  const load = useCallback((next = {}) => {
-    const current = ++generation.current;
-    const page = Math.max(1, Number(next.page) || 1);
-    const searching = 'query' in next ? !!next.query : !!query;
-    const word = 'query' in next ? next.query : query;
-    setState(previous => ({ busy: true, items: next.append ? previous.items : [], hasMore: false, page, error: '' }));
-    const request = searching && word ? huangguoSearch(word, page) : searching ? Promise.resolve({ items: [], hasMore: false }) : huangguoFeed('category' in next ? next.category : category, page);
-    request.then(result => { if (generation.current === current) setState(previous => ({ busy: false, items: next.append ? previous.items.concat(result.items) : result.items, hasMore: result.hasMore, page, error: '' })); })
-      .catch(error => { if (generation.current === current) setState({ busy: false, items: [], hasMore: false, page, error: errorText(error) }); });
-  }, [category, query]);
-  const openDetail = (series) => {
-    setDetail({ series, busy: true, error: '', data: null });
-    huangguoDetail(series.seriesId)
-      .then(data => setDetail(previous => previous?.series?.seriesId === series.seriesId ? { ...previous, busy: false, data } : previous))
-      .catch(error => setDetail(previous => previous?.series?.seriesId === series.seriesId ? { ...previous, busy: false, error: errorText(error) } : previous));
-  };
-  const playEpisode = async (series, episode) => {
-    // 华为/荣耀与普通手机一致，直接在线播放，无需等待提示。
-    try { await huangguoPlay(series, episode); }
-    catch (error) { notify(`本集准备失败：${errorText(error)}`); }
-  };
-  // 返回键优先关闭黄果详情；由 App 层 back 链派发 androidhuangguoback。
-  useEffect(() => {
-    const back = event => { if (detail) { event.preventDefault(); setDetail(null); } };
-    window.addEventListener('androidhuangguoback', back);
-    return () => window.removeEventListener('androidhuangguoback', back);
-  }, [detail]);
-  useEffect(() => { load({}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  return <section className="huangguo-page" aria-label="黄果漫剧">
-    <header className="huangguo-head">
-      <h1>黄果漫剧{currentOrigin ? <span className="huangguo-origin">线路 {currentOrigin}</span> : null}</h1>
-      <form className="huangguo-search" onSubmit={event => { event.preventDefault(); setQuery(keyword.trim()); load({ query: keyword.trim(), page: 1 }); }}>
-        <input value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="搜索黄果剧集" aria-label="搜索黄果剧集" maxLength={100} />
-        <button type="submit" className="button">搜索</button>
-        {!!query && <button type="button" className="button" onClick={() => { setKeyword(''); setQuery(''); load({ query: '', category, page: 1 }); }}>清除</button>}
-      </form>
-    </header>
-    {!query && <div className="category-tabs" role="group" aria-label="黄果分类">{HUANGGUO_CATEGORIES.map(item => <button key={item.id} aria-pressed={item.id === category} onClick={() => { setCategory(item.id); load({ category: item.id, page: 1 }); }}>{item.label}</button>)}</div>}
-    <Status busy={state.busy && !state.items.length} error={!state.items.length ? state.error : ''} onRetry={() => load({ page: 1 })} empty={!state.busy && !state.items.length && !state.error ? { title: '没有找到剧集', text: query ? '换个关键词试试。' : '该分类暂无内容。' } : null}>
-      <PosterGrid items={state.items} onOpen={openDetail} />
-      {state.items.length > 0 && <div className="feed-more">
-        <button type="button" className="button" disabled={state.busy || !state.hasMore} onClick={() => load({ page: state.page + 1, append: true })}>{state.busy ? '正在加载…' : state.hasMore ? '加载更多' : '没有更多了'}</button>
-      </div>}
-    </Status>
-    {detail && <div className="huangguo-detail" role="dialog" aria-label={detail.series.title}>
-      <div className="huangguo-detail-panel">
-        <button type="button" className="button huangguo-back" autoFocus onClick={() => setDetail(null)}>← 返回</button>
-        <Status busy={detail.busy} error={detail.error} onRetry={() => openDetail(detail.series)} empty={!detail.busy && !detail.error && !detail.data ? { title: '详情为空', text: '请稍后重试。' } : null}>
-          {detail.data && <>
-            <div className="huangguo-meta">
-              {detail.data.coverUrl ? <img src={detail.data.coverUrl} alt="" loading="lazy" /> : null}
-              <div><h2>{detail.data.title}</h2><p>{detail.data.description || '暂无简介'}</p><p className="huangguo-count">{detail.data.episodeCount} 集{detail.data.resolution ? ` · 画质 ${detail.data.resolution}` : ''}</p></div>
-            </div>
-            <div className="huangguo-episodes" role="group" aria-label="选集">
-              {detail.data.episodes.map(episode => <button key={episode.vid} disabled={episode.locked} onClick={() => playEpisode(detail.series, episode)}>{episode.locked ? `${episode.label} 🔒` : episode.label}</button>)}
-            </div>
-          </>}
-        </Status>
-      </div>
-    </div>}
-  </section>;
-}
-
-function Discover({ onOpen, library, onSearch, onUpdates }) {
+function Discover({ onOpen, library, onSearch, onUpdates, onSources, sourceEntry, polishUi }) {
   const [category, setCategory] = useState(CATEGORIES[0]?.id || 'all');
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
@@ -288,7 +193,7 @@ function Discover({ onOpen, library, onSearch, onUpdates }) {
     }).catch((error) => {
       if (generation.current !== current) return;
       fetching.current = false;
-      setState({ ...previous, busy: false, error: errorText(error), requestedPage: page });
+      setState({ ...previous, busy: false, error: discoverErrorText(error), requestedPage: page });
     });
     return () => { generation.current++; };
   }, [category, page, reload, feedError]);
@@ -315,15 +220,16 @@ function Discover({ onOpen, library, onSearch, onUpdates }) {
     const next = shown.totalPages ? (visiblePage >= shown.totalPages ? 1 : visiblePage + 1) : visiblePage + 1;
     loadPage(next);
   };
-  // 红果-style home: search pill, continue-watching rail, dense feed grid.
+  // Keep real in-progress episodes above the recommendation catalogue.
   const continueRows = useMemo(() => (library?.history || [])
     .filter(row => (row.positionMs || 0) > 30_000 && !completedEpisode(row))
     .slice(0, 12), [library?.history]);
   const feedMode = feed !== null;
+  const searchButton = <button type="button" className="home-search" onClick={onSearch}><Search size={17} /><span>搜索短剧名称</span></button>;
   return <>
-    <h1 className="visually-hidden">发现短剧</h1>
+    {polishUi ? <header className="page-heading discover-heading"><h1>发现短剧</h1></header> : <h1 className="visually-hidden">发现短剧</h1>}
     {update && <button type="button" className="home-update" onClick={onUpdates}><RefreshCw size={16} /><span>新版本 {update.versionName} 已发布 · 查看更新</span></button>}
-    <button type="button" className="home-search" onClick={onSearch}><Search size={17} /><span>搜索短剧名称</span></button>
+    {onSources ? <div className="android-source-shortcuts">{searchButton}<button ref={sourceEntry} type="button" className="button" onClick={onSources}><Film size={16} />影视来源</button></div> : searchButton}
     {feedMode && <div className="category-tabs" role="group" aria-label="短剧分类">{feedChips.map(chip => <button key={chip.id} aria-pressed={feed.genre === chip.id} disabled={!!feed.busy} onClick={() => loadFeed(0, '', false, chip.id)}>{chip.label}</button>)}</div>}
     {feedError && <div className="category-tabs" role="group" aria-label="短剧分类">{CATEGORIES.map((item) => <button key={item.id} aria-pressed={item.id === category} onClick={() => changeCategory(item.id)}>{item.label}</button>)}</div>}
     {!!continueRows.length && <section className="home-continue" aria-label="继续观看">
@@ -820,50 +726,7 @@ function Downloads({ notify }) {
   </>;
 }
 
-/** 黄果设置：入口显隐、线路选择与密码锁；保存后广播事件，导航与密码门即时生效。 */
-function HuangguoSettingsSection({ notify }) {
-  const [settings, setSettings] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [pinDraft, setPinDraft] = useState('');
-  const [pinConfirm, setPinConfirm] = useState('');
-  const refresh = useCallback(() => {
-    huangguoGetSettings().then(setSettings).catch(cause => setError(errorText(cause)));
-  }, []);
-  useEffect(refresh, [refresh]);
-  const save = async patch => {
-    if (busy) return;
-    setBusy(true); setError('');
-    try {
-      const next = await huangguoUpdateSettings(patch);
-      setSettings(next);
-      window.dispatchEvent(new Event('huangguosettingschanged'));
-      notify('黄果设置已保存');
-    } catch (cause) { setError(errorText(cause)); }
-    finally { setBusy(false); }
-  };
-  return <section className="about-section"><h2>黄果漫剧</h2>
-    {settings ? <>
-      <div className="playback-setting"><div><strong>显示黄果入口</strong><p>关闭后底部导航隐藏黄果栏目</p></div>
-        <button type="button" className="setting-switch" disabled={busy} onClick={() => save({ visible: !settings.visible })}>{settings.visible ? '开启' : '关闭'}</button></div>
-      <div className="playback-setting"><label htmlFor="huangguo-line"><strong>线路</strong><p>默认自动选择可用线路；网络特殊时可手动指定</p></label>
-        <select id="huangguo-line" value={settings.line} disabled={busy} onChange={event => save({ line: event.target.value })}>
-          {HUANGGUO_LINES.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
-        </select></div>
-      <div className="playback-setting"><div><strong>密码锁</strong><p>{settings.hasPin ? '已设置：进入黄果需要密码（本次打开内解锁一次）' : '未设置：设置 4-8 位数字密码后，进入黄果需先解锁'}</p></div></div>
-      {settings.hasPin
-        ? <div className="about-links"><button type="button" className="button" disabled={busy} onClick={() => save({ pin: '' })}>清除密码</button></div>
-        : <div className="huangguo-pin-setup">
-          <input value={pinDraft} onChange={event => setPinDraft(event.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" placeholder="输入新密码（4-8 位数字）" aria-label="黄果新密码" />
-          <input value={pinConfirm} onChange={event => setPinConfirm(event.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" placeholder="再输入一次" aria-label="确认黄果密码" />
-          <button type="button" className="button" disabled={busy || pinDraft.length < 4 || pinDraft !== pinConfirm} onClick={() => { save({ pin: pinDraft }); setPinDraft(''); setPinConfirm(''); }}>设置密码</button>
-        </div>}
-    </> : <p>{error || '正在读取黄果设置…'}</p>}
-    {error && settings && <p className="text-error" role="alert">{error}</p>}
-  </section>;
-}
-
-function About({ info, notify, accountFocus, announcementsRef }) {
+function About({ info, notify, accountFocus, announcementsRef, juguoSettings }) {
   const [cache, setCache] = useState({ busy: true });
   const [clearing, setClearing] = useState(false);
   const mounted = useRef(true);
@@ -884,7 +747,7 @@ function About({ info, notify, accountFocus, announcementsRef }) {
     <AccountPanel isTv={!!info.isTv} focusRequest={accountFocus} />
     <UpdatePanel />
     <AnnouncementSettings announcementsRef={announcementsRef} notify={notify} />
-    <HuangguoSettingsSection notify={notify} />
+    {juguoSettings && <JuguoSettings config={juguoSettings} />}
     <section className="about-section"><h2>应用信息</h2><dl><div><dt>版本</dt><dd>{info.version || '读取中'}</dd></div><div><dt>设备界面</dt><dd>{info.isTv ? 'Android TV / 电视盒子' : 'Android 手机 / 平板'}</dd></div><div><dt>播放方式</dt><dd>安卓原生全屏播放器</dd></div><div><dt>数据存储</dt><dd>本机记录；官方账号同步收藏、历史与进度</dd></div></dl></section>
     <section className="about-section"><h2>播放缓存</h2><p className="cache-status" role="status">{cache.busy ? '正在读取缓存…' : typeof cache.files === 'number' ? `${cache.files} 个文件 · ${byteText(cache.bytes)}${cache.budgetBytes ? ` / 预算 ${byteText(cache.budgetBytes)}` : ''}` : '缓存状态暂未读取'}</p><p className="cache-note">自动清理开启时，保留前 1 集和当前集；本机播放预取下一集，投屏连播时依次预缓存后面 5 集，优先下一集，不等待全部缓存再开播。预取与清理均限于当前季，不自动跨季。普通缓存预算 256 MiB，投屏期间 768 MiB，单集上限 96 MiB；容量不足或取源失败时预缓存可能不足 5 集。更早已看缓存自动释放，手动下载保留，正在供流的文件受保护。</p><div className="about-links"><button className="button" disabled={cache.busy || clearing} onClick={clearCache}>{clearing ? '清理中…' : '清理播放缓存'}</button><button className="button" disabled={clearing} onClick={refreshCache}><RefreshCw />刷新缓存状态</button></div>{cache.error && <p className="text-error" role="alert">{cache.error}</p>}</section>
     <section className="about-section"><h2>使用说明</h2><p>电视可用方向键移动焦点、确认键打开。返回键先关闭详情，再回到发现页；播放器左上角可直接返回选集。</p><p>完整分集都可选择；播放和下载依次尝试网页常规入口、网页备用入口与 App 片源。选集中的「自动取源」不是锁定标志，也不表示所有分集已经验证可播；失败会显示实际原因。</p><p>自动连播默认开启，当前集结束后继续为下一集自动取源；取源失败时保留重试和返回入口。下载完成后，可在「下载」页面离线播放。</p></section>
@@ -1099,7 +962,7 @@ function SeasonDetails({ seed, initialVid, ...props }) {
   return <Detail key={`${selection.seed.seriesId}-${selection.epoch}`} {...props} seed={selection.seed} initialVid={selection.initialVid} resumeIntent={selection.resumeIntent} seasonSelector={seasonSelector} seasonPanel={seasonWanted && directory.items.some(candidate => sameSeries(candidate, selection.seed)) ? { id: `season-panel-${selection.seed.seriesId}`, role: 'tabpanel', 'aria-labelledby': `season-tab-${selection.seed.seriesId}` } : null} selectionGuard={selectionGuard} isSeasonCurrent={isSeasonCurrent} onSeasonLock={onSeasonLock} onDetailResolved={onDetailResolved} />;
 }
 
-function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, notify, isTv = false, seasonSelector = null, seasonPanel = null, selectionGuard, isSeasonCurrent = () => true, onSeasonLock = () => {}, onDetailResolved = () => {} }) {
+function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, notify, isTv = false, polishUi, seasonSelector = null, seasonPanel = null, selectionGuard, isSeasonCurrent = () => true, onSeasonLock = () => {}, onDetailResolved = () => {} }) {
   const [state, setState] = useState({ busy: true });
   const [reload, setReload] = useState(0);
   const [selectedVid, setSelectedVid] = useState(initialVid || null);
@@ -1335,13 +1198,35 @@ function Detail({ seed, initialVid, resumeIntent, library, onBack, onLibrary, no
     if (!target) { setSelectedVid(null); setResumeError('上次观看的分集已不在当前目录，请手动选择；未自动播放其他集。'); return; }
     setSelectedVid(target.vid); run('play', target);
   }, [state.item, resumeIntent?.token]);
+  const synopsis = !isTv && synopsisLong ? (
+    <div className="desc-row">
+      <p ref={description} id="detail-description" className={`detail-description${!descriptionExpanded ? ' description-collapsed' : ''}`}>{item.description || '暂无剧情简介。'}</p>
+      <button className="description-toggle" type="button" aria-expanded={descriptionExpanded} aria-controls="detail-description" onClick={() => setDescriptionExpanded(value => !value)}>{descriptionExpanded ? '收起' : '展开'}</button>
+    </div>
+  ) : <p ref={description} id="detail-description" className="detail-description">{item.description || '暂无剧情简介。'}</p>;
+  const separateSynopsis = polishUi && !isTv;
   return <div className="detail-page">
     <div className="detail-scroll">
     <button className="back-button" onClick={onBack}><ChevronRight size={20} />返回</button>
     <div className="season-detail-panel" {...seasonPanel}>
     {resumeError && <p className="resume-error" role="alert">{resumeError}</p>}
     <Status busy={state.busy} error={state.error} onRetry={() => setReload((n) => n + 1)}>
-      <section className="detail-summary"><div className="detail-cover">{item.coverUrl ? <img src={item.coverUrl} alt="" /> : <Film size={48} />}</div><div className="detail-copy"><h1 className="title-clamp">{item.title}</h1><div className="detail-chips"><span className="chip chip-strong">{item.episodeLabel || (item.episodeCount ? `全 ${item.episodeCount} 集` : '剧集详情')}</span>{(item.tags || []).slice(0, 3).map(tag => <span key={tag} className="chip">{tag}</span>)}<button type="button" className={`favorite-chip chip-fav${isFavorite ? ' on' : ''}`} onClick={favorite} disabled={favoriteBusy || pointError || pointBusy} aria-pressed={isFavorite}><Heart size={16} />{favoriteBusy ? '保存中…' : isFavorite ? '已追' : '追剧'}</button></div>{!isTv && synopsisLong ? <div className="desc-row"><p ref={description} id="detail-description" className={`detail-description${!descriptionExpanded ? ' description-collapsed' : ''}`}>{item.description || '暂无剧情简介。'}</p><button className="description-toggle" type="button" aria-expanded={descriptionExpanded} aria-controls="detail-description" onClick={() => setDescriptionExpanded((value) => !value)}>{descriptionExpanded ? '收起' : '展开'}</button></div> : <p ref={description} id="detail-description" className="detail-description">{item.description || '暂无剧情简介。'}</p>}{favoriteError && <p className="text-error" role="alert">{favoriteError} {pointError ? <button type="button" className="button" onClick={() => setReload(n => n + 1)}>重试剧集状态</button> : "点击追剧按钮重试。"}</p>}</div></section>
+      <section className="detail-summary">
+        <div className="detail-cover">{item.coverUrl ? <img src={item.coverUrl} alt="" /> : <Film size={48} />}</div>
+        <div className="detail-copy">
+          <h1 className="title-clamp">{item.title}</h1>
+          <div className="detail-chips">
+            <span className="chip chip-strong">{item.episodeLabel || (item.episodeCount ? `全 ${item.episodeCount} 集` : '剧集详情')}</span>
+            {(item.tags || []).slice(0, 3).map(tag => <span key={tag} className="chip">{tag}</span>)}
+            <button type="button" className={`favorite-chip chip-fav${isFavorite ? ' on' : ''}`} onClick={favorite} disabled={favoriteBusy || pointError || pointBusy} aria-pressed={isFavorite}>
+              <Heart size={16} />{favoriteBusy ? '保存中…' : isFavorite ? '已追' : '追剧'}
+            </button>
+          </div>
+          {!separateSynopsis && synopsis}
+          {favoriteError && <p className="text-error" role="alert">{favoriteError} {pointError ? <button type="button" className="button" onClick={() => setReload(n => n + 1)}>重试剧集状态</button> : "点击追剧按钮重试。"}</p>}
+        </div>
+        {separateSynopsis && <div className="detail-synopsis">{synopsis}</div>}
+      </section>
     </Status>
     {seasonSelector}
     {!state.busy && !state.error && state.item && <>
@@ -1505,7 +1390,8 @@ const readSession = () => {
     const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
     if (!saved || typeof saved !== 'object') return null;
     const tab = NAV.some(entry => entry.id === saved.tab) ? saved.tab : 'discover';
-    const seriesId = saved.detail && /^[1-9][0-9]{0,29}$/.test(String(saved.detail.seriesId || '')) ? String(saved.detail.seriesId) : null;
+    const id = String(saved.detail?.seriesId || '');
+    const seriesId = /^[1-9][0-9]{0,29}$/.test(id) && !isRetiredSeriesId(id) ? id : null;
     return { tab, detail: seriesId ? { seriesId, title: String(saved.detail.title || '') } : null };
   } catch { return null; }
 };
@@ -1514,10 +1400,15 @@ export default function App() {
   const restored = PROCESS_RESTORED ? readSession() : null;
   const [tab, setTab] = useState(() => restored?.tab || 'discover');
   const [detail, setDetail] = useState(null);
-  // 黄果设置：入口显隐 + 密码锁（本会话解锁一次）；默认可见未锁，读取失败按可见处理。
-  const [huangguoConfig, setHuangguoConfig] = useState({ visible: true, hasPin: false, unlocked: false, loaded: false });
-  const [pinGate, setPinGate] = useState(false);
+  const androidPackage = typeof __HONGGUO_PACKAGED_ANDROID__ !== 'undefined' && __HONGGUO_PACKAGED_ANDROID__;
+  const desktopSourcesApi = androidPackage || typeof window === 'undefined' ? undefined : window.DesktopSources;
+  const juguoApi = androidPackage || typeof window === 'undefined' ? undefined : window.JuguoDesktop;
+  const juguoSettings = useJuguoSettings(juguoApi);
+  const juguoEnabled = !!juguoApi && juguoSettings.enabled;
+  const polishUi = !desktopSourcesApi && !juguoApi;
   const [info, setInfo] = useState({ isTv: false, version: '' });
+  const androidSourcesApi = desktopSourcesApi ? undefined : getAndroidSourcesApi(info);
+  const sourcesApi = desktopSourcesApi || androidSourcesApi;
   const [infoError, setInfoError] = useState('');
   const [library, setLibrary] = useState(EMPTY_LIBRARY);
   const [libraryBusy, setLibraryBusy] = useState(true);
@@ -1526,24 +1417,14 @@ export default function App() {
   const [accountFocus, setAccountFocus] = useState(0);
   const content = useRef(null);
   const lastDetailFocus = useRef(null);
+  const sourceEntry = useRef(null);
+  const restoreSourceEntry = useRef(false);
   const libraryReadEpoch = useRef(0);
   const libraryOwner = useRef(null);
   const accountTransition = useRef(false);
   const previousScroll = useRef(0);
   const noticeTimer = useRef(null);
   const loadInfo = useCallback(async () => { try { const result = await nativeCall('getInfo'); setInfo(result); setInfoError(''); } catch (error) { setInfoError(errorText(error)); } }, []);
-  // 黄果设置：启动与设置变更事件时读取；读取失败按默认（可见、无锁）处理。
-  const loadHuangguoConfig = useCallback(() => {
-    huangguoGetSettings()
-      .then(result => setHuangguoConfig(previous => ({ visible: result.visible, hasPin: result.hasPin, unlocked: previous.unlocked && !result.hasPin ? false : previous.unlocked, loaded: true })))
-      .catch(() => setHuangguoConfig(previous => ({ ...previous, visible: true, loaded: true })));
-  }, []);
-  useEffect(() => {
-    loadHuangguoConfig();
-    const changed = () => loadHuangguoConfig();
-    window.addEventListener('huangguosettingschanged', changed);
-    return () => window.removeEventListener('huangguosettingschanged', changed);
-  }, [loadHuangguoConfig]);
   const loadLibrary = useCallback(async () => { if (accountTransition.current) return; const epoch = ++libraryReadEpoch.current; setLibraryBusy(true); setLibraryError(''); try { const result = await nativeCall('getLibrary'); if (epoch !== libraryReadEpoch.current) return; if (typeof result.owner === "string") libraryOwner.current = result.owner; setLibrary({ favorites: result.favorites || [], history: result.history || [], projection: result.projection || null, owner: result.owner }); setLibraryError(''); } catch (error) { if (epoch === libraryReadEpoch.current) setLibraryError(errorText(error)); } finally { if (epoch === libraryReadEpoch.current) setLibraryBusy(false); } }, []);
   const replaceLibrary = useCallback(value => { libraryReadEpoch.current++; setLibrary(value); setLibraryBusy(false); }, []);
   const notify = useCallback((text) => { setNotice(text); clearTimeout(noticeTimer.current); noticeTimer.current = setTimeout(() => setNotice(''), 4500); }, []);
@@ -1585,13 +1466,16 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.tv = String(!!info.isTv); }, [info.isTv]);
   useTvNavigation(!!info.isTv);
   const closeDetail = useCallback(() => { setDetail(null); setTimeout(() => lastDetailFocus.current?.isConnected && lastDetailFocus.current.focus(), 0); }, []);
-  const openDetail = (series, vid) => { lastDetailFocus.current = document.activeElement; previousScroll.current = content.current?.scrollTop || 0; setDetail({ seed: series, initialVid: vid }); };
+  const closeSources = useCallback(() => { restoreSourceEntry.current = true; setTab('discover'); }, []);
+  const openDetail = (series, vid) => {
+    if (isRetiredSeriesId(series?.seriesId)) { notify('原黄果来源已移除，观看记录仍保留。'); return; }
+    lastDetailFocus.current = document.activeElement;
+    previousScroll.current = content.current?.scrollTop || 0;
+    setDetail({ seed: series, initialVid: vid });
+  };
   const navigate = (id) => {
-    // 黄果入口受设置与密码锁控制：隐藏时不可进入；设了密码须本会话解锁一次。
-    if (id === 'huangguo') {
-      if (!huangguoConfig.visible) return;
-      if (huangguoConfig.hasPin && !huangguoConfig.unlocked) { setPinGate(true); return; }
-    }
+    if (id === 'sources' && !sourcesApi) return;
+    if (id === 'juguo' && !juguoEnabled) return;
     previousScroll.current = 0; setDetail(null); setTab(id);
   };
   // Keep the browsing position so a background process death can reopen it.
@@ -1601,8 +1485,7 @@ export default function App() {
     try { localStorage.setItem(SESSION_KEY, JSON.stringify({ tab, detail: seriesId ? { seriesId, title: String(seed.title || '') } : null, at: Date.now() })); } catch { }
   }, [tab, detail]);
   useEffect(() => { if (restored?.detail) openDetail(restored.detail); }, []);
-  // 进程恢复可能直接落在黄果 tab：隐藏或未解锁时回落到发现页。
-  useEffect(() => { if (huangguoConfig.loaded && tab === 'huangguo' && (!huangguoConfig.visible || huangguoConfig.hasPin && !huangguoConfig.unlocked)) setTab('discover'); }, [huangguoConfig, tab]);
+  useEffect(() => { if (tab === 'juguo' && !juguoEnabled) setTab('discover'); }, [tab, juguoEnabled]);
   const closeAnnouncement = mode => {
     const current = announcement;
     setAnnouncement(null);
@@ -1614,9 +1497,15 @@ export default function App() {
     if (!result.success) notify(result.error);
   };
   useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [tab]);
+  useEffect(() => {
+    if (tab === 'discover' && restoreSourceEntry.current) {
+      restoreSourceEntry.current = false;
+      sourceEntry.current?.focus();
+    }
+  }, [tab]);
   useEffect(() => { if (content.current) content.current.scrollTop = detail ? 0 : previousScroll.current; if (detail) content.current?.querySelector('.back-button')?.focus(); }, [detail?.seed?.seriesId]);
   useEffect(() => {
-    const back = () => { if (pinGate) { setPinGate(false); return true; } if (!window.dispatchEvent(new CustomEvent('androiddownloadback', { cancelable: true }))) return true; if (!window.dispatchEvent(new CustomEvent('androidhuangguoback', { cancelable: true }))) return true; if (detail) { closeDetail(); return true; } if (tab !== 'discover') { setTab('discover'); return true; } return false; };
+    const back = () => { if (!window.dispatchEvent(new CustomEvent('androiddownloadback', { cancelable: true }))) return true; if (tab === 'juguo' && !window.dispatchEvent(new CustomEvent('juguoback', { cancelable: true }))) return true; if (tab === 'sources' && !window.dispatchEvent(new CustomEvent('desktopsourcesback', { cancelable: true }))) return true; if (detail) { closeDetail(); return true; } if (tab === 'sources' && androidSourcesApi && !info.isTv) { closeSources(); return true; } if (tab !== 'discover') { setTab('discover'); return true; } return false; };
     window.__androidBack = back;
     // A share link resolves to a series id natively; only an exact numeric id may open a detail.
     window.__androidOpenSeries = (seriesId) => { const id = String(seriesId || ''); if (/^\d{1,30}$/.test(id)) openDetail({ seriesId: id, title: '' }); };
@@ -1627,21 +1516,25 @@ export default function App() {
       if (window.__androidBack === back) delete window.__androidBack;
       if (window.__androidOpenSeries) delete window.__androidOpenSeries;
     };
-  }, [detail, tab, closeDetail]);
-  return <div className={`android-app ${info.isTv ? 'tv-layout' : 'phone-layout'}`}>
-    <nav className="app-nav" aria-label="主要导航"><div className="nav-brand"><span><Play size={21} /></span><strong>红果短剧</strong></div><div className="nav-items">{NAV.filter(({ id }) => id !== 'huangguo' || huangguoConfig.visible).map(({ id, label, Icon }) => <button key={id} aria-current={!detail && tab === id ? 'page' : undefined} onClick={() => navigate(id)}><Icon size={22} /><span>{label === '我的追剧' ? <><span className="nav-word">我的</span><span className="nav-word">追剧</span></> : label}</span></button>)}</div>{info.isTv && <p className="nav-version">遥控器方向键选择<br />v{info.version || '—'}</p>}</nav>
-    <div className="content-shell"><div className="phone-brand"><span><Play size={18} /></span><strong>红果短剧</strong><button className="brand-search" type="button" aria-label="搜索短剧" onClick={() => navigate('search')}><Search size={20} /></button></div>{infoError && <div className="environment-error" role="alert"><span>{infoError}</span><button onClick={loadInfo}>重试连接</button></div>}<main ref={content} className={`main-content${detail ? ' detail-open' : ''}`} id="main-content">
-      {detail && <SeasonDetails key={detail.seed.seriesId} {...detail} library={library} onBack={closeDetail} onLibrary={replaceLibrary} notify={notify} isTv={!!info.isTv} />}
+  }, [detail, tab, closeDetail, closeSources, androidSourcesApi, info.isTv, notify]);
+  // Keep mobile sources beside Discover search; TV has room for a sidebar destination.
+  const mobileSourcesShortcut = !!androidSourcesApi && !info.isTv;
+  const mediaNav = desktopSourcesApi || androidSourcesApi && info.isTv ? [...NAV.slice(0, 1), { id: 'sources', label: '影视来源', Icon: Film }, ...NAV.slice(1)] : NAV;
+  const navItems = juguoEnabled ? [...mediaNav.slice(0, 1), { id: 'juguo', label: '剧果', Icon: Film }, ...mediaNav.slice(1)] : mediaNav;
+  return <div className={`android-app ${info.isTv ? 'tv-layout' : 'phone-layout'}${polishUi ? ' android-ui-polish' : ''}`}>
+    <nav className="app-nav" aria-label="主要导航"><div className="nav-brand"><span><Play size={21} /></span><strong>红果短剧</strong></div><div className="nav-items">{navItems.map(({ id, label, Icon }) => <button key={id} aria-current={!detail && tab === id ? 'page' : undefined} onClick={() => navigate(id)}><Icon size={22} /><span>{label === '我的追剧' ? <><span className="nav-word">我的</span><span className="nav-word">追剧</span></> : label}</span></button>)}</div>{info.isTv && <p className="nav-version">遥控器方向键选择<br />v{info.version || '—'}</p>}</nav>
+    <div className="content-shell"><div className="phone-brand"><span><Play size={18} /></span><strong>红果短剧</strong>{(!polishUi || !detail && tab !== 'discover' && tab !== 'search') && <button className="brand-search" type="button" aria-label="搜索短剧" onClick={() => navigate('search')}><Search size={20} /></button>}</div>{infoError && <div className="environment-error" role="alert"><span>{infoError}</span><button onClick={loadInfo}>重试连接</button></div>}<main ref={content} className={`main-content${detail ? ' detail-open' : ''}`} id="main-content" data-page={detail ? 'detail' : tab}>
+      {detail && <SeasonDetails key={detail.seed.seriesId} {...detail} library={library} onBack={closeDetail} onLibrary={replaceLibrary} notify={notify} isTv={!!info.isTv} polishUi={polishUi} />}
       <div className="page-slot" hidden={!!detail}>
-        {tab === 'discover' && <Discover onOpen={openDetail} library={library} onSearch={() => navigate('search')} onUpdates={() => navigate('about')} />}
-        {tab === 'huangguo' && huangguoConfig.visible && (!huangguoConfig.hasPin || huangguoConfig.unlocked) && <HuangguoPage notify={notify} />}
+        {tab === 'discover' && <Discover onOpen={openDetail} library={library} onSearch={() => navigate('search')} onUpdates={() => navigate('about')} onSources={mobileSourcesShortcut ? () => navigate('sources') : undefined} sourceEntry={sourceEntry} polishUi={polishUi} />}
+        {tab === 'juguo' && juguoEnabled && <JuguoPage api={juguoApi} PosterGrid={PosterGrid} Status={Status} />}
+        {tab === 'sources' && sourcesApi && <>{mobileSourcesShortcut && <button type="button" className="back-button source-discover-back" autoFocus onClick={closeSources}><ChevronRight />返回发现</button>}<SourcesDesktop api={sourcesApi} PosterGrid={PosterGrid} Status={Status} onOpenHongguo={openDetail} onOpenNativeHongguo={() => navigate('discover')} sourceButtons={!!androidSourcesApi} /></>}
         {tab === 'search' && <SearchPage onOpen={openDetail} />}
         {tab === 'library' && <Library library={library} error={libraryError} busy={libraryBusy} onRetry={loadLibrary} onOpen={openDetail} onAccount={() => { navigate('about'); setAccountFocus(value => value + 1); }} onLibrary={replaceLibrary} notify={notify} />}
         {tab === 'downloads' && !detail && <Downloads notify={notify} />}
-        {tab === 'about' && <About info={info} notify={notify} accountFocus={accountFocus} announcementsRef={announcements} />}
+        {tab === 'about' && <About info={info} notify={notify} accountFocus={accountFocus} announcementsRef={announcements} juguoSettings={juguoApi && juguoSettings} />}
       </div>
     </main></div>{notice && <div className="toast" role="status">{notice}</div>}
     {announcement && <AnnouncementDialog announcement={announcement} onClose={closeAnnouncement} />}
-    {pinGate && <HuangguoPinGate onUnlocked={() => { setPinGate(false); setHuangguoConfig(previous => ({ ...previous, unlocked: true })); previousScroll.current = 0; setDetail(null); setTab('huangguo'); }} onCancel={() => setPinGate(false)} />}
   </div>;
 }

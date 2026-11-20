@@ -1,0 +1,215 @@
+{
+  "format": 1,
+  "modules": [
+    {
+      "id": "beabox",
+      "name": "笔盒",
+      "version": "1.0.1",
+      "description": "分类视频 · 在线搜索",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/beabox",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "a9bad28677eefb7b454647c031694f2fb3d279dbde24a423d081349578d4928a",
+        "main.js": "0daff652429bdc456f7cd873f6fbe4bdf81a33ef634618239313430f1de4ab57"
+      }
+    },
+    {
+      "id": "dsd",
+      "name": "帝果",
+      "version": "1.0.1",
+      "description": "分类视频 · 在线搜索",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/dsd",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "20ae6c86a0d72e174eb8004ad32905bdefdec2a323c40a24bf65445221cc6565",
+        "main.js": "265afa272ac65273ec5d01b815d7905de3566c4329b57e131f854ec8105dbbbc"
+      }
+    },
+    {
+      "id": "guipian",
+      "name": "鬼片",
+      "version": "1.0.1",
+      "description": "鬼片 · 电视剧 · 动漫",
+      "api": 1,
+      "adult": false,
+      "repo": "guoapp-modules/guipian",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "bbfd41262474a930e7317347555fc9e97beb0672de8ff0bcff74374c3ce25098",
+        "main.js": "63c43a0c808b915ea55952c3d4f6c6d9f2ed27155ae0486c2030edb80ffc1099"
+      }
+    },
+    {
+      "id": "hanime1",
+      "name": "Hanime1",
+      "version": "1.0.1",
+      "description": "分类视频 · 在线搜索 · 多清晰度 · 日本 IP 无法访问",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/hanime1",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "d90efd95958760d8ab9d935a0f249e49f72625c8a475d5d584fa3a7028a54829",
+        "main.js": "f14bd4bffcfbc24cf259de527e7fb2e0da3aaaa86f75ae3eed0de5575a1a1dc1"
+      }
+    },
+    {
+      "id": "hanxiaoquan",
+      "name": "韩小圈",
+      "version": "1.0.1",
+      "description": "韩剧 · 韩国电影 · 综艺动漫",
+      "api": 1,
+      "adult": false,
+      "repo": "guoapp-modules/hanxiaoquan",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "0e4df821ae106434135d9697fe6f6bf26e4cc4b0f8f51811250f2ef850bf5d62",
+        "main.js": "fb5237db127315994456dac11bd392867cf3d24beab2cfc17f1d0b6cc2be6f05"
+      }
+    },
+    {
+      "id": "heitao",
+      "name": "黑桃",
+      "version": "1.0.1",
+      "description": "分类短剧 · 在线搜索",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/heitao",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "a5ea87f19137fdb4d770d249faae97dcda48b4c320ade9b59658b69f680897af",
+        "main.js": "5f59ad4e21da7d272ee1efd76fd21e18b9f640524006325a35f5d437147b75a1"
+      }
+    },
+    {
+      "id": "hongguo",
+      "name": "红果",
+      "version": "1.0.4",
+      "description": "短剧 · 漫剧 · AI 剧 · 听书",
+      "api": 1,
+      "adult": false,
+      "repo": "guoapp-modules/hongguo",
+      "tag": "v1.0.4",
+      "sha256": {
+        "manifest.json": "2828dcb8225eaf13fefe9fd8045753a4ff36f6c67b134dd1865bb7b7ff1e74fe",
+        "main.js": "66a7a6d296b274d30f060ec2dfce5e4015be09ae0655eb505f8a348c9612f1d1"
+      }
+    },
+    {
+      "id": "huangguo-video",
+      "name": "黄果视频",
+      "version": "1.0.1",
+      "description": "视频剧集",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/huangguo-video",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "a08630adbd41b4856b251aa1f5588bbe5d8087147c823c75a70f176d5f8ab2d4",
+        "main.js": "317cc53266d1493b510e6d37cfd255a88e552224a469e0b96d41a8bfa21dc62e"
+      }
+    },
+    {
+      "id": "huangguoai",
+      "name": "黄果 AI",
+      "version": "1.0.1",
+      "description": "AI 短剧",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/huangguoai",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "7439d054b4672d1dc268bacfc886650e5142531905ff0fadc363e07af67efb61",
+        "main.js": "5b9e86ac42295b94b2abe1c8ee6a09cb2d86e01e45e44809f34ecb8b1cb7c5d0"
+      }
+    },
+    {
+      "id": "huangju",
+      "name": "剧果",
+      "version": "1.0.1",
+      "description": "热门 · 最新 · 分类短剧",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/huangju",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "6a0b6e6a0876be2585a3f165d16b38209794029fa799482e283d7650117c36bf",
+        "main.js": "33dd8316c42f3e0fb34b189c50a6414e983a4b7b4cbe05bbbc8f24d20d6bff5b"
+      }
+    },
+    {
+      "id": "ikanbot",
+      "name": "爱看机器人",
+      "version": "1.0.4",
+      "description": "爱看机器人（ikanbot）——全网聚合搜索式影视源，多线路可切换",
+      "api": 1,
+      "adult": false,
+      "repo": "guoapp-modules/ikanbot",
+      "tag": "v1.0.4",
+      "sha256": {
+        "manifest.json": "aa973e87f75aaee68e36881a3bda7b5eebaea80788b70e3a9141dcf9006fcc1a",
+        "main.js": "db1b3ddc6477f3cbb738c73f407e63b530831916b64410f9a002fc2f86b04a92"
+      }
+    },
+    {
+      "id": "jinguoduanju",
+      "name": "禁果短剧",
+      "version": "1.0.1",
+      "description": "推荐 · 分类短剧 · 在线搜索",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/jinguoduanju",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "328426a570addcdd803962eee4edc9e4595ce9459807a2da8a50bfc04d675666",
+        "main.js": "fd8076de2f7ea6d0738ef30a2f4005e0786bb248c14285fccc8c5d68f3198371"
+      }
+    },
+    {
+      "id": "missav",
+      "name": "MissAV",
+      "version": "1.0.1",
+      "description": "分类视频 · 在线搜索",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/missav",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "a3c81f5188a0c9ef00e46f0a30a045beab5b39493ba357d94b80718cb808e524",
+        "main.js": "06774ff7d89489bdd200efd1a224b82e750eca83da25a52ad12f6b8f95134681"
+      }
+    },
+    {
+      "id": "sorani",
+      "name": "青空",
+      "version": "1.0.1",
+      "description": "番剧 · 剧场动画 · 特摄",
+      "api": 1,
+      "adult": false,
+      "repo": "guoapp-modules/sorani",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "2a7ad59c3396a894b6a1829034e40bc226208678e770dafe6f50eb0edf9bdf9b",
+        "main.js": "1281e5b325c12407e1e438556ad63251d95e71c137501d52e2d2f919a37d4eaf"
+      }
+    },
+    {
+      "id": "yeguo",
+      "name": "野果",
+      "version": "1.0.1",
+      "description": "分类短剧 · 在线搜索",
+      "api": 1,
+      "adult": true,
+      "repo": "guoapp-modules/yeguo",
+      "tag": "v1.0.1",
+      "sha256": {
+        "manifest.json": "fccfda9ddd69c70c3fd339e9f02be77a6b62737324b9f94460ff409c6d29755e",
+        "main.js": "d6d98cb28188ae73a04439746381a5057e920bd4682bfd730ffdd0b39402aba1"
+      }
+    }
+  ]
+}

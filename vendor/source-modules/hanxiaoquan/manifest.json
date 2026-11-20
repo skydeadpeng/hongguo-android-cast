@@ -1,0 +1,14 @@
+{
+  "id": "hanxiaoquan",
+  "name": "韩小圈",
+  "version": "1.0.1",
+  "description": "韩剧 · 韩国电影 · 综艺动漫",
+  "runtime": "js",
+  "api": 1,
+  "adult": false,
+  "hosts": ["www.jennyhow.com", "jennyhow.com"],
+  "capabilities": ["search"],
+  "aliases": ["jennyhow.com", "www.jennyhow.com"],
+  "baseUrl": "https://www.jennyhow.com",
+  "allowEmptyCatalog": true
+}

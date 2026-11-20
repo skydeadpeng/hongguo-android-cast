@@ -161,6 +161,7 @@ final class PlaybackSources {
             if (!(value instanceof String) || !((String)value).matches("[0-9]{1,30}") || (sid!=null&&!sid.equals(value))) throw new IOException("片源与剧集不一致");
             sid=(String)value;
         }
+        requireCurrentSource(sid,vid);
         String url=input.getString("url"), source=input.optString("source",parent==null?"web":parent.source);
         if (!Arrays.asList("web","app","api").contains(source)) throw new IOException("片源类型无效");
         String requestedQuality=parent==null?"auto":parent.requestedQuality;
@@ -262,7 +263,6 @@ final class PlaybackSources {
     /** The explicit strategy belongs only to this playback plan, never the URL index or bridge JSON. */
     static Plan resolvePlayback(String sid,String vid,String quality,int ceiling,boolean fresh,boolean failedWeb,NativeLookup lookup) throws Exception {
         String requested=MediaQuality.normalize(quality);requireIdentity(sid,vid);
-        if(isHuangguoVid(vid))return huangguoPlan(sid,vid);
         if(ceiling<0||ceiling>16384)throw new IllegalArgumentException("播放清晰度边界无效");
         if(ceiling==0&&(requested.equals("480p")||requested.equals("360p")))ceiling=defaultPlaybackCeiling(requested);
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
@@ -287,18 +287,9 @@ final class PlaybackSources {
         synchronized(plans) { plans.put(planKey(plan.url,plan.requestedQuality),plan);while(plans.size()>128)plans.remove(plans.keySet().iterator().next()); }
         return plan;
     }
-    /** 黄果分集（99 前缀 14 位编号）不进入 App 片源链：直接取官方签名 m3u8 在线播放，单档无降档。 */
-    private static boolean isHuangguoVid(String vid) { return vid.length()==14&&vid.startsWith("99"); }
-    private static Plan huangguoPlan(String sid,String vid) throws Exception {
-        android.content.Context host; synchronized(PlaybackSources.class) { host=activity.get(); }
-        if(host!=null)HuangguoApi.attach(host);
-        String url=HuangguoApi.episodeUrl(sid,HuangguoApi.decodeEpisodeIndex(vid));
-        return register(new JSONObject().put("url",url).put("vid",vid).put("seriesId",sid).put("source","web").put("requestedQuality","auto"),vid,true);
-    }
     /** One caller-owned reconnect; always obtains a fresh App model at the same quality. */
     static Plan recover(String sid,String vid,String quality,boolean failedWeb) throws Exception {
         String requestedQuality=MediaQuality.normalize(quality);requireIdentity(sid,vid);
-        if(isHuangguoVid(vid))return huangguoPlan(sid,vid);
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放恢复已取消");
         if(failedWeb)markWebFailure(sid,vid);
         recoveryPause();
@@ -307,6 +298,12 @@ final class PlaybackSources {
     }
     private static void requireIdentity(String sid,String vid) throws IOException {
         if(sid==null||vid==null||!sid.matches("[0-9]{1,30}")||!vid.matches("[0-9]{1,30}"))throw new IOException("分集请求信息无效");
+        requireCurrentSource(sid,vid);
+    }
+    // Old history may retain synthetic IDs. Keep them out of all Hongguo online lookups.
+    static boolean isRetiredSeries(String sid) { return sid!=null && sid.length()==10 && sid.matches("99[0-9]{8}"); }
+    static void requireCurrentSource(String sid,String vid) throws IOException {
+        if (isRetiredSeries(sid) || (vid!=null && vid.matches("99[0-9]{12}"))) throw new IOException("原黄果来源已移除");
     }
     private static void markWebFailure(String sid,String vid) {
         synchronized(failedWebUntil) {

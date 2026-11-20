@@ -1,0 +1,15 @@
+{
+  "id": "jinguoduanju",
+  "name": "禁果短剧",
+  "version": "1.0.1",
+  "description": "推荐 · 分类短剧 · 在线搜索",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": ["jinguoduanju.app", "www.jinguoduanju.app", "play.jinguoduanju.app", "jgdj.app", "www.jgdj.app"],
+  "capabilities": ["search"],
+  "aliases": ["jinguoduanju.app", "www.jinguoduanju.app", "play.jinguoduanju.app", "jgdj.app", "www.jgdj.app"],
+  "baseUrl": "https://jinguoduanju.app",
+  "allowEmptyCatalog": true,
+  "keepDetailEpisodes": true
+}

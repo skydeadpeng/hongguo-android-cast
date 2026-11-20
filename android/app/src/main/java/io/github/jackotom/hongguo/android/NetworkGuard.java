@@ -13,22 +13,11 @@ final class NetworkGuard {
     static final String REFERER = "https://hongguoduanju.com/";
     static final int LIMIT = 8 * 1024 * 1024;
     private static final Set<String> OFFICIAL = new HashSet<>(Arrays.asList("hongguoduanju.com", "www.hongguoduanju.com"));
-    // 黄果系域（官方站/镜像/自建代理/视频与密钥 CDN）：部分路由器与运营商 DNS 解析失败或污染，
-    // 与官方站一样参与「系统 DNS 与可信 DoH 竞速」，先出的公网地址先用。
-    private static final String[] RACE_SUFFIXES = { "huangguoai.com", "rxzfszht.cc", "skydeadpeng.xyz", "hzjvlo.cn", "drleao.cn" };
-    private static boolean racesHost(String host) {
-        if (host == null || host.isEmpty()) return false;
-        host = host.toLowerCase(Locale.ROOT);
-        for (String suffix : RACE_SUFFIXES) if (host.equals(suffix) || host.endsWith("." + suffix)) return true;
-        return false;
-    }
     private static final Set<String> EXTERNAL = new HashSet<>(Arrays.asList("hongguoduanju.com", "www.hongguoduanju.com", "github.com", "www.github.com"));
     // Official lookups race two lanes each (system + DoH), so the pool must hold more
     // than one concurrent resolution; two workers rejected every second parallel
     // request with "域名解析繁忙" whenever the first DoH lane was slow. No queue: a
     // saturated pool still aborts instead of building an unbounded resolver backlog.
-    // 黄果线路首次并发探测（5 线 × 双车道）叠加首页/公告并发解析时 8 线程会被抢满，
-    // 探测车道遭拒导致全线误判失败；上限提到 12 容纳该突发，仍保持无队列语义。
     private static final ExecutorService DNS = new ThreadPoolExecutor(0, 12, 30, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), runnable -> { Thread thread = new Thread(runnable, "hongguo-source-dns"); thread.setDaemon(true); return thread; }, new ThreadPoolExecutor.AbortPolicy());
     /** One daemon timer closes stalled TCP/TLS/write/read operations on deadline or owner cancellation. */
     private static final ScheduledThreadPoolExecutor SOCKET_TIMEOUT = socketTimer();
@@ -156,7 +145,8 @@ final class NetworkGuard {
      * so a captured system resolver can only lose the race, never poison the winner.
      */
     static InetAddress[] officialAddresses(URI uri, long deadline) throws IOException {
-        if (!OFFICIAL.contains(uri.getHost().toLowerCase(Locale.ROOT)) && !uri.getHost().toLowerCase(Locale.ROOT).endsWith(".hongguoduanju.com") && !racesHost(uri.getHost())) return publicAddresses(uri, deadline);
+        String hostname = uri.getHost().toLowerCase(Locale.ROOT);
+        if (!OFFICIAL.contains(hostname) && !hostname.endsWith(".hongguoduanju.com")) return publicAddresses(uri, deadline);
         String host = uri.getHost();
         Callable<InetAddress[]> system = () -> InetAddress.getAllByName(host);
         Callable<InetAddress[]> trusted = () -> {
@@ -305,10 +295,6 @@ final class NetworkGuard {
     }
     static Reply get(String value) throws Exception { return request(value, true, false); }
     static Reply get(String value, long deadline) throws Exception { return request(value, true, false, deadline); }
-    /** Read-only public HTTPS GET for fixed third-party origins; the caller pins the host. */
-    static Reply publicGet(String value, long deadline) throws Exception { return request(value, false, false, deadline); }
-    /** Public HTTPS POST with an empty JSON body (2026-11 黄果取流端点仅收 POST); host pinned by the caller. */
-    static Reply publicPostJson(String value, long deadline) throws Exception { return request(value, false, false, deadline, "{}"); }
     /** The normal official guest-player request: fixed destination, one validated
      * public episode ID, no cookies/credentials, and never a redirected POST. */
     static Reply guestPlaybackPost(String itemId, long deadline) throws Exception {
@@ -327,22 +313,10 @@ final class NetworkGuard {
         download(value, destination, maxBytes, UA, REFERER, System.nanoTime() + 120_000_000_000L, progress);
     }
     static void download(String value, File destination, long maxBytes, String userAgent, String referer) throws Exception {
-        download(value, destination, maxBytes, userAgent, referer, System.nanoTime() + 120_000_000_000L);
-    }
-    /** Shared deadline keeps a multi-segment cast from receiving a fresh timeout per segment. */
-    static void download(String value, File destination, long maxBytes, String userAgent, String referer, long deadline) throws Exception {
-        downloadResource(value,destination,maxBytes,userAgent,referer,deadline,true,null);
+        download(value, destination, maxBytes, userAgent, referer, System.nanoTime() + 120_000_000_000L, null);
     }
     /** Foreground whole-file downloads surface transfer progress; totalBytes < 0 means the length is unknown. */
     static void download(String value, File destination, long maxBytes, String userAgent, String referer, long deadline, TransferProgress progress) throws Exception {
-        downloadResource(value,destination,maxBytes,userAgent,referer,deadline,true,progress);
-    }
-    /** Binary identity AES-128 HLS key only; some origins label these 16 bytes text/plain. */
-    static void downloadHlsKey(String value,File destination,long deadline) throws Exception {
-        downloadResource(value,destination,16,UA,"https://huangguoai.com/",deadline,false,null);
-    }
-    interface TransferProgress { void onProgress(long bytes, long totalBytes); }
-    private static void downloadResource(String value,File destination,long maxBytes,String userAgent,String referer,long deadline,boolean media,TransferProgress progress) throws Exception {
         remaining(deadline, Integer.MAX_VALUE);
         if (userAgent == null || referer == null || userAgent.length() > 2048 || referer.length() > 2048 || userAgent.indexOf('\r') >= 0 || userAgent.indexOf('\n') >= 0 || referer.indexOf('\r') >= 0 || referer.indexOf('\n') >= 0) throw new IOException("片源请求头无效");
         if (destination == null || maxBytes <= 0) throw new IllegalArgumentException("下载参数无效");
@@ -388,8 +362,7 @@ final class NetworkGuard {
                         if (status != 200) throw new IOException("片源响应 HTTP " + status);
                         touchedDestination = true;
                         try (FileOutputStream output = new FileOutputStream(destination)) {
-                            if(media)streamMediaBody(input, output, headers, maxBytes, deadline, progress);
-                            else streamBody(input, output, headers, maxBytes, deadline, progress);
+                            streamMediaBody(input, output, headers, maxBytes, deadline, progress);
                             output.flush();
                             output.getFD().sync();
                         }
@@ -403,6 +376,7 @@ final class NetworkGuard {
             if (touchedDestination && !complete && destination.exists() && !destination.delete()) destination.deleteOnExit();
         }
     }
+    interface TransferProgress { void onProgress(long bytes, long totalBytes); }
     /** The same writer handles first requests and validated redirects; empty means no header. */
     static void writeMediaRequest(OutputStream output, URI uri, String userAgent, String referer) throws IOException {
         if (userAgent == null || referer == null || userAgent.length() > 2048 || referer.length() > 2048 || userAgent.indexOf('\r') >= 0 || userAgent.indexOf('\n') >= 0 || referer.indexOf('\r') >= 0 || referer.indexOf('\n') >= 0) throw new IOException("片源请求头无效");
@@ -498,10 +472,7 @@ final class NetworkGuard {
         return request(value, officialOnly, head, System.nanoTime() + 25_000_000_000L);
     }
     private static Reply request(String value, boolean officialOnly, boolean head, long deadline) throws Exception {
-        return request(value, officialOnly, head, deadline, null);
-    }
-    private static Reply request(String value, boolean officialOnly, boolean head, long deadline, String postBody) throws Exception {
-        return request(value, officialOnly, head, deadline, postBody, false);
+        return request(value, officialOnly, head, deadline, null, false);
     }
     private static Reply request(String value, boolean officialOnly, boolean head, long deadline, String postBody, boolean guestPost) throws Exception {
         remaining(deadline, Integer.MAX_VALUE);
@@ -509,7 +480,7 @@ final class NetworkGuard {
         for (int redirects = 0; redirects <= 3; redirects++) {
             // Official pages race the system resolver against trusted DoH: a VPN's fake-IP
             // answer loses the race instead of hanging the episode.
-            InetAddress[] addresses = officialOnly || guestPost || racesHost(uri.getHost()) ? officialAddresses(uri, deadline) : publicAddresses(uri, deadline);
+            InetAddress[] addresses = officialOnly || guestPost ? officialAddresses(uri, deadline) : publicAddresses(uri, deadline);
             Socket raw = connectPublic(addresses, deadline);
             try (SocketGuard ignored = guardSocket(raw, deadline)) {
                 raw.setSoTimeout(remaining(deadline, 15_000));

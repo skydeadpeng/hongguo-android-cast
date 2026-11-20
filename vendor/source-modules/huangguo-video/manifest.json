@@ -1,0 +1,18 @@
+{
+  "id": "huangguo-video",
+  "name": "黄果视频",
+  "version": "1.0.1",
+  "description": "视频剧集",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": ["huangguo.video"],
+  "capabilities": ["cover", "mediaAuth"],
+  "mediaAuthPaths": ["/api/hls_key/"],
+  "group": "huangguo",
+  "groupName": "黄果",
+  "entryName": "视频",
+  "aliases": ["huangguo.video"],
+  "baseUrl": "https://huangguo.video",
+  "browserFingerprint": true
+}

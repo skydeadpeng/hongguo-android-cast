@@ -1,0 +1,15 @@
+{
+  "id": "dsd",
+  "name": "帝果",
+  "version": "1.0.1",
+  "description": "分类视频 · 在线搜索",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": ["dsd.com.se", "www.dsd.com.se"],
+  "capabilities": ["search"],
+  "aliases": ["dsd.com.se", "www.dsd.com.se"],
+  "baseUrl": "https://www.dsd.com.se",
+  "skipVipPrompt": true,
+  "allowEmptyCatalog": true
+}

@@ -379,15 +379,20 @@ public final class GuestPlaybackIntegrationTest {
     private static void activityInvariant(Path source) throws Exception {
         String text=Files.readString(source,StandardCharsets.UTF_8);
         String compact=text.replaceAll("\\s+","");
-        // Since 0.1.17 every non-Huangguo plan (guest included) takes the whole-file cache branch.
-        String condition="if(!huangguoStream){";
-        int start=compact.indexOf(condition);
-        check(start>=0,"PlayerActivity sends every non-Huangguo plan (guest included) through the whole-file cache branch");
-        int end=compact.indexOf("}else{media.remote=media.plan.url",start);
-        check(end>start,"guest cache branch ends before direct URL playback");
-        String branch=compact.substring(start,end);
-        check(branch.contains("cache.fetchForeground(media.seriesId,target.optString(\"vid\"),target.optInt(\"index\"),media.plan,stageQuality)"),"PlayerActivity uses captured plan foreground cache");
-        check(branch.contains("media.uri=Uri.fromFile(ready)")&&branch.contains("media.cached=true"),"PlayerActivity plays only resulting local file");
+        int fetch=compact.indexOf("cache.fetchForeground(media.seriesId,target.optString(\"vid\"),target.optInt(\"index\"),media.plan,stageQuality)");
+        int local=compact.indexOf("media.uri=Uri.fromFile(ready)",fetch);
+        check(fetch>=0,"PlayerActivity uses captured plan foreground cache");
+        check(local>fetch&&compact.indexOf("media.cached=true",local)>local,"PlayerActivity plays the resulting local file");
+        check(!compact.contains("media.remote=media.plan.url"),"retired direct-stream path cannot skip red-source cache");
+    }
+    private static void retiredSourceRejected() throws Exception {
+        String legacySeries="9912345678", legacyVid="99123456780001";
+        Exception legacy= fails(()->PlaybackSources.resolve(legacySeries,legacyVid,"auto"),"retired source pair");
+        check(legacy.getMessage().contains("已移除"),"retired source gets explicit error");
+        check(fails(()->PlaybackSources.resolve(SID,legacyVid,"auto"),"legacy vid under red series").getMessage().contains("已移除"),"legacy vid cannot enter red resolver");
+        check(fails(()->PlaybackSources.register(basic("web").put("seriesId",legacySeries),VID,true),"legacy series in prepared plan").getMessage().contains("已移除"),"retired plan cannot enter preflight");
+        check(EpisodeResolver.calls==0&&NetworkGuard.transfers.isEmpty(),"no page request or media transfer for retired source");
+        noEscape("retired source");
     }
     private static String compact(Path source) throws Exception {
         return Files.readString(source,StandardCharsets.UTF_8).replaceAll("\\s+","");
@@ -452,6 +457,7 @@ public final class GuestPlaybackIntegrationTest {
             run("fixed-quality-no-guest",GuestPlaybackIntegrationTest::fixedQuality,failures);
             run("complete2-cache-isolation",GuestPlaybackIntegrationTest::cacheRevision,failures);
             run("activity-foreground-source-invariant",()->activityInvariant(Paths.get(args[0])),failures);
+            run("retired-source-rejected-before-network",GuestPlaybackIntegrationTest::retiredSourceRejected,failures);
             run("download-and-cast-source-invariants",()->downloadEntryInvariants(Paths.get(args[0]).getParent()),failures);
             if(!failures.isEmpty())throw new AssertionError("GUEST_PLAYBACK_INTEGRATION_FAILED "+failures);
             System.out.println("GUEST_PLAYBACK_INTEGRATION_OK cases="+cases+" checks="+checks+" networkRequests=0 productionClasses=4 resolverHttpVerifier=boundaryDoubles activityCheck=sourceInvariant");

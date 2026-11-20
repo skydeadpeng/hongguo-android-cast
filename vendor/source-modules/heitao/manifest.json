@@ -1,0 +1,14 @@
+{
+  "id": "heitao",
+  "name": "黑桃",
+  "version": "1.0.1",
+  "description": "分类短剧 · 在线搜索",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": ["heitaodj.com", "www.heitaodj.com"],
+  "capabilities": ["search"],
+  "aliases": ["heitaodj.com", "www.heitaodj.com"],
+  "baseUrl": "https://heitaodj.com",
+  "allowEmptyCatalog": true
+}

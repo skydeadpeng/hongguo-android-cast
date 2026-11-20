@@ -20,6 +20,7 @@ final class NativeBridge {
     private volatile boolean closed;
     private final LibraryStore store;
     private final DownloadManager downloads;
+    private final SourceService sources;
     private final ThreadPoolExecutor worker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(16));
     // Page races have their own bounded lane and never queue behind media preparation.
     private final ThreadPoolExecutor httpWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(8));
@@ -34,8 +35,9 @@ final class NativeBridge {
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appDeviceIdentity", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "removeHistory", "clearHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo", "huangguoFeed", "huangguoSearch", "huangguoDetail", "huangguoPlay", "huangguoSettings", "huangguoVerifyPin"));
-    NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appDeviceIdentity", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "removeHistory", "clearHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo"));
+    static { METHODS.add("sourceService"); }
+    NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); sources = new SourceService(activity); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
         final JSONObject request;
@@ -49,6 +51,7 @@ final class NativeBridge {
         } catch (JSONException error) { return; }
         activity.runOnUiThread(() -> {
             if (closed || !activity.trusted()) return;
+            if (method.equals("sourceService")) { sourceService(id, params); return; }
             // Announcements are optional and may stall in system DNS. Keep them out of
             // playback/control workers, including after a WebView reload.
             if (method.equals("getAnnouncements")) {
@@ -83,9 +86,23 @@ final class NativeBridge {
                     AccountSync.get().requireCurrent(favoriteSelection);
                 } catch (Exception error) { respond(id, null, "账号正在切换，请稍后重试收藏"); return; }
             } else { favoriteSelection = null; favoriteStore = null; }
-            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") || method.equals("homeFeed") || method.startsWith("huangguo") ? searchWorker : method.equals("download") ? downloadWorker : worker;
+            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") || method.equals("homeFeed") ? searchWorker : method.equals("download") ? downloadWorker : worker;
             try { executor.execute(() -> { try (AutoCloseable updateLease = (method.equals("download") || method.equals("playDownload")) ? UpdateInstallCheckpoint.operation() : null) { handle(id, method, params, favoriteStore, favoriteSelection); } catch (Exception error) { respond(id, null, error.getMessage() == null ? "操作未成功，请重试" : error.getMessage()); } }); }
             catch (RejectedExecutionException error) { respond(id, null, "请求较多，请稍后重试"); }
+        });
+    }
+    private void sourceService(Object id, JSONObject params) {
+        sources.submit(params, new SourceService.Reply() {
+            @Override public void success(Object value, String session) {
+                if (closed || !activity.trusted()) return;
+                if (session != null) {
+                    if (!SourcePlaybackSessions.isPending(session)) { failure("ERR_CANCELED", "来源播放已取消"); return; }
+                    try { activity.startActivity(new Intent(activity, SourcePlaybackActivity.class).putExtra(SourcePlaybackSessions.EXTRA_SESSION, session)); }
+                    catch (RuntimeException error) { SourcePlaybackSessions.close(session); failure("SOURCE_PLAYER_ERROR", "来源播放器未能启动"); return; }
+                }
+                respond(id, value, null);
+            }
+            @Override public void failure(String code, String message) { respondHttpError(id, message, code); }
         });
     }
     /** One anonymous registered identity per process for the WebView signing chain;
@@ -380,66 +397,6 @@ final class NativeBridge {
                 }
                 break;
             }
-            case "huangguoFeed": {
-                HuangguoApi.attach(activity);
-                String category = params == null ? "ai-manju" : params.optString("category", "ai-manju");
-                int page = params == null ? 1 : Math.max(1, params.optInt("page", 1));
-                respond(id, HuangguoApi.feed(category, page), null);
-                break;
-            }
-            case "huangguoSearch": {
-                HuangguoApi.attach(activity);
-                String keyword = params == null ? "" : LibraryStore.text(params, "keyword", 120);
-                int page = params == null ? 1 : Math.max(1, params.optInt("page", 1));
-                respond(id, HuangguoApi.search(keyword, page), null);
-                break;
-            }
-            case "huangguoDetail": {
-                HuangguoApi.attach(activity);
-                String seriesId = params == null ? "" : LibraryStore.text(params, "seriesId", 30);
-                respond(id, HuangguoApi.detail(seriesId), null);
-                break;
-            }
-            // 设置读取/保存与密码校验：入口显隐、线路（auto/固定）、4-8 位数字密码（仅存摘要）。
-            case "huangguoSettings": {
-                HuangguoApi.attach(activity);
-                respond(id, params != null && params.length() > 0 ? HuangguoApi.updateSettings(params) : HuangguoApi.settings(), null);
-                break;
-            }
-            case "huangguoVerifyPin": {
-                HuangguoApi.attach(activity);
-                respond(id, new JSONObject().put("ok", HuangguoApi.verifyPin(params == null ? "" : params.optString("pin", ""))), null);
-                break;
-            }
-            case "huangguoPlay": {
-                HuangguoApi.attach(activity);
-                // 黄果分集直接取官方签名 m3u8 后复用原生播放器；不进入红果片源恢复链。
-                // 华为/荣耀不再特殊处理：与普通手机一致，官方 m3u8 直接在线播放。
-                String seriesId = LibraryStore.text(params, "seriesId", 30);
-                int index = Math.max(1, params.optInt("index", 1));
-                String url = HuangguoApi.episodeUrl(seriesId, index);
-                boolean localFile = false;
-                JSONObject series = new JSONObject().put("seriesId", seriesId)
-                    .put("title", LibraryStore.text(params, "title", 200))
-                    .put("coverUrl", LibraryStore.text(params, "coverUrl", 4096))
-                    .put("episodeCount", Math.max(0, Math.min(10000, params.optInt("episodeCount"))));
-                // 整剧队列交给播放器：选集、上一集/下一集与连播直接可用。
-                int episodeCount = series.optInt("episodeCount");
-                JSONArray episodeQueue = new JSONArray();
-                for (int ep = 1; ep <= episodeCount; ep++)
-                    episodeQueue.put(new JSONObject().put("vid", seriesId + String.format("%04d", ep)).put("index", ep));
-                JSONObject episode = episodeQueue.optJSONObject(index - 1);
-                if (episode == null) {
-                    episodeQueue.put(new JSONObject().put("vid", seriesId + String.format("%04d", index)).put("index", index));
-                    episode = episodeQueue.optJSONObject(episodeQueue.length() - 1);
-                }
-                JSONObject mediaOptions = PlayerOptions.read(activity);
-                if (!params.has("speed")) params.put("speed", mediaOptions.getDouble("speed"));
-                if (!(params.opt("speed") instanceof Number)) throw new JSONException("倍速无效");
-                PlayerOptions.validateSpeed(params.getDouble("speed"));
-                play(id, series, episode, episodeQueue, url, localFile, params);
-                break;
-            }
             case "getPlaybackOptions": respond(id, PlayerOptions.read(activity), null); break;
             case "setPlaybackOptions": respond(id, PlayerOptions.update(activity, params), null); break;
             case "getSearchHistory": respond(id, store.searchHistory(), null); break;
@@ -447,7 +404,7 @@ final class NativeBridge {
             case "removeSearchHistory": respond(id, store.removeSearchHistory(params), null); break;
             case "clearSearchHistory": respond(id, store.clearSearchHistory(), null); break;
             case "searchQuery": respond(id, SearchClient.search(activity, params), null); break;
-            case "getInfo": respond(id, new JSONObject().put("version", BuildConfig.VERSION_NAME).put("isTv", BuildConfig.IS_TV).put("platform", "android"), null); break;
+            case "getInfo": respond(id, new JSONObject().put("version", BuildConfig.VERSION_NAME).put("isTv", BuildConfig.IS_TV).put("platform", "android").put("sourceService", true), null); break;
             case "appRequest": respond(id, AppTransport.request(params), null); break;
             case "appDeviceIdentity": startDeviceIdentity(id); break;
             case "appResolveResult": PlaybackSources.result(params); respond(id, new JSONObject().put("accepted", true), null); break;
@@ -773,5 +730,5 @@ final class NativeBridge {
     private static String callbackScript(JSONObject response) {
         return "window.__androidResponse && window.__androidResponse(" + response.toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029") + ")";
     }
-    void close() { closed = true; closeRegisteredModels(); closeHttp(); worker.shutdownNow(); downloadWorker.shutdownNow(); searchWorker.shutdownNow(); accountWorker.shutdownNow(); try { AccountSync.get().cancelLogin(); } catch (Exception ignored) { } }
+    void close() { closed = true; sources.close(); closeRegisteredModels(); closeHttp(); worker.shutdownNow(); downloadWorker.shutdownNow(); searchWorker.shutdownNow(); accountWorker.shutdownNow(); try { AccountSync.get().cancelLogin(); } catch (Exception ignored) { } }
 }

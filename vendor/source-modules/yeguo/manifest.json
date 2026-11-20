@@ -1,0 +1,20 @@
+{
+  "id": "yeguo",
+  "name": "野果",
+  "version": "1.0.1",
+  "description": "分类短剧 · 在线搜索",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": [
+    "ygdj7.com", "www.ygdj7.com", "ygdj15.com", "www.ygdj15.com", "delta.ygrwdsgt.cc", "yeguodj.com", "www.yeguodj.com",
+    "*.buxefaex.cc", "*.fzchosdi.cc", "*.lwblvxvy.cc", "*.vgbyziuz.cc"
+  ],
+  "capabilities": ["search"],
+  "aliases": ["ygdj7.com", "www.ygdj7.com", "ygdj15.com", "www.ygdj15.com", "analyze.buxefaex.cc", "attract.vgbyziuz.cc", "delta.ygrwdsgt.cc", "yeguodj.com", "www.yeguodj.com"],
+  "hostSuffixes": [".buxefaex.cc", ".fzchosdi.cc", ".lwblvxvy.cc", ".vgbyziuz.cc"],
+  "baseUrl": "https://attract.vgbyziuz.cc",
+  "allowEmptyCatalog": true,
+  "noHostRotation": true,
+  "keepDetailEpisodes": true
+}

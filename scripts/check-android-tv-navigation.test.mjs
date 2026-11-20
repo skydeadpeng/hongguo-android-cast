@@ -13,7 +13,7 @@ function rect(left, top, width, height) { return { left, top, width, height }; }
 const NAV = {}, GRID = {}, CHIPS = {};
 
 const page = [
-  nav('发现', 40), nav('黄果', 116), nav('搜索', 192), nav('追剧', 268), nav('下载', 344), nav('关于', 420),
+  nav('发现', 40), nav('搜索', 116), nav('影视来源', 192), nav('追剧', 268), nav('下载', 344), nav('关于', 420),
   { element: 'search', kind: 'input', rect: rect(250, 24, 520, 56) },
   chip('真人剧', 0), chip('漫剧', 1), chip('AI剧', 2),
   poster(0, 0), poster(0, 1), poster(0, 2), poster(0, 3), poster(0, 4),
@@ -35,7 +35,7 @@ test('left edge of a grid deliberately enters the sidebar, nearest menu item fir
   // to the nav rail; mid-grid lefts never do.
   assert.equal(pickSpatialCandidate(page, at('p00'), 'ArrowLeft')?.element, '追剧');
   assert.equal(pickSpatialCandidate(page, at('p10'), 'ArrowLeft')?.element, '关于');
-  assert.equal(pickSpatialCandidate(page, at('真人剧'), 'ArrowLeft')?.element, '黄果');
+  assert.equal(pickSpatialCandidate(page, at('真人剧'), 'ArrowLeft')?.element, '搜索');
 });
 
 test('vertical moves stay spatial and cross containers as before', () => {
@@ -52,7 +52,7 @@ test('category chips move inside their own strip and stop at both ends', () => {
   assert.equal(pickSpatialCandidate(page, at('真人剧'), 'ArrowRight')?.element, '漫剧');
   assert.equal(pickSpatialCandidate(page, at('漫剧'), 'ArrowLeft')?.element, '真人剧');
   // Left edge of the strip enters the sidebar (deliberate menu access).
-  assert.equal(pickSpatialCandidate(page, at('真人剧'), 'ArrowLeft')?.element, '黄果');
+  assert.equal(pickSpatialCandidate(page, at('真人剧'), 'ArrowLeft')?.element, '搜索');
   assert.equal(pickSpatialCandidate(page, at('AI剧'), 'ArrowRight'), null);
 });
 
@@ -63,7 +63,7 @@ test('sidebar left/right: right leaves into main content, left has nowhere to go
   assert.equal(pickSpatialCandidate(page, at('发现'), 'ArrowRight')?.element, '真人剧');
   assert.equal(pickSpatialCandidate(page, at('下载'), 'ArrowRight')?.element, 'p00');
   assert.equal(pickSpatialCandidate(page, at('发现'), 'ArrowLeft'), null);
-  assert.equal(pickSpatialCandidate(page, at('发现'), 'ArrowDown')?.element, '黄果');
+  assert.equal(pickSpatialCandidate(page, at('发现'), 'ArrowDown')?.element, '搜索');
 });
 
 test('controls outside any grid keep the global spatial fallback', () => {
@@ -93,7 +93,7 @@ test('non-direction keys and unknown focus are inert', () => {
 // skipped: vertical moves follow the visual row order, nearest row first, then
 // nearest column inside that row.
 const sparse = [
-  nav('发现', 40), nav('黄果', 116), nav('搜索', 192), nav('追剧', 268), nav('下载', 344), nav('关于', 420),
+  nav('发现', 40), nav('搜索', 116), nav('影视来源', 192), nav('追剧', 268), nav('下载', 344), nav('关于', 420),
   { element: 'search', kind: 'input', rect: rect(250, 24, 520, 56) },
   chip('真人剧', 0), chip('漫剧', 1), chip('AI剧', 2),
   poster(0, 0), poster(0, 1), poster(0, 2), poster(0, 3), poster(0, 4),

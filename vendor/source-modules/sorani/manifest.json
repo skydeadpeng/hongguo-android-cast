@@ -1,0 +1,14 @@
+{
+  "id": "sorani",
+  "name": "青空",
+  "version": "1.0.1",
+  "description": "番剧 · 剧场动画 · 特摄",
+  "runtime": "js",
+  "api": 1,
+  "adult": false,
+  "hosts": ["api.sorani.cc"],
+  "capabilities": ["search", "account"],
+  "aliases": ["sorani.net", "www.sorani.net", "api.sorani.cc", "sorani.cc"],
+  "baseUrl": "https://www.sorani.net",
+  "allowEmptyCatalog": true
+}

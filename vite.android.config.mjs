@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 export default defineConfig({
   root: fileURLToPath(new URL('./src/android/', import.meta.url)),
   base: './',
+  define: { __HONGGUO_PACKAGED_ANDROID__: 'true' },
   plugins: [react(), {
     name: 'android-checked-startup',
     // Vite still builds the real module graph, but the classic ES5 bootstrap

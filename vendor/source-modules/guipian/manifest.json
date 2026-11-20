@@ -1,0 +1,14 @@
+{
+  "id": "guipian",
+  "name": "鬼片",
+  "version": "1.0.1",
+  "description": "鬼片 · 电视剧 · 动漫",
+  "runtime": "js",
+  "api": 1,
+  "adult": false,
+  "hosts": ["guipianwu.com", "www.guipianwu.com"],
+  "capabilities": ["search"],
+  "aliases": ["guipianwu.com", "www.guipianwu.com"],
+  "baseUrl": "https://guipianwu.com",
+  "allowEmptyCatalog": true
+}

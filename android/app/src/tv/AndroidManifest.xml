@@ -10,5 +10,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".PlayerActivity" android:screenOrientation="landscape" />
+        <activity android:name=".SourcePlaybackActivity" android:screenOrientation="landscape" />
     </application>
 </manifest>

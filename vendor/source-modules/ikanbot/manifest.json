@@ -1,0 +1,18 @@
+{
+  "id": "ikanbot",
+  "name": "爱看机器人",
+  "version": "1.0.4",
+  "description": "爱看机器人（ikanbot）——全网聚合搜索式影视源，多线路可切换",
+  "runtime": "js",
+  "api": 1,
+  "adult": false,
+  "baseUrl": "https://movie.douban.com",
+  "noHostRotation": true,
+  "hosts": [
+    "ikanbot.com",
+    "www.ikanbot.com",
+    "www1.ikanbot.com"
+  ],
+  "hostSuffixes": ["ikanbot.com"],
+  "capabilities": ["search"]
+}
