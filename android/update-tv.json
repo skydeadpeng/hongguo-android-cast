@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 105,
-  "versionName": "0.12.82",
+  "versionCode": 106,
+  "versionName": "0.12.83",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.82/Hongguo-0.12.82-tv-release-compatible.apk",
-  "size": 5922459,
-  "sha256": "d3c84d8af0a1facf5e27319545400855265062c2a6e13f9cb37ca1579eef8bbd",
-  "notes": "- 新增影视来源目录，保留 15 个来源及独立开关；移除旧独立黄果入口，已有本地记录和手动下载不受影响。\n- 优化发现、搜索、详情和来源页，调整浅色/深色样式及电视遥控焦点。\n- 内置来源播放器采用独立视频区与大尺寸控件，支持暂停、进度、全屏和默认静音，失败可返回选集。\n- 区分片单、分集和网络错误提示；红果本身仍使用上一正式版已验证的取源顺序。\n",
-  "publishedAt": "2026-11-20T13:09:35.516Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.83/Hongguo-0.12.83-tv-release-compatible.apk",
+  "size": 5924731,
+  "sha256": "b84802d6ba93b9cf3e13a47379067c3710c3553f46f77c73fb353830dff2a3db",
+  "notes": "- 播放取源对齐现行客户端形态：分集模型优先经 video_tab GET 获取，签名 POST 仅作回退，显著降低匿名身份消耗。\n- 双路径均为空响应时，自动注册一个全新匿名身份并重试一轮；带 30 秒冷却与单次额度，预取不消耗轮换额度，防止连续注册反而加重限流。\n- 连播切集空响应自愈：修复 0.12.82 连播数集后「App片源登记或取源未完成」的失败。\n- 保留原有画质、下载、投屏与更新逻辑；同包名同证书覆盖升级，数据不迁移不清理。\n",
+  "publishedAt": "2026-11-21T01:36:31.000Z"
 }

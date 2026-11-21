@@ -6,15 +6,23 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.82 / code105 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.82 / code105 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.33 / code34 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.83 / code106 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.83 / code106 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.34 / code35 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.82](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.82) · [原生 TV 0.1.33](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.33)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.83](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.83) · [原生 TV 0.1.34](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.34)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+
+## 0.12.83 / 0.1.34 连播取源自愈（2026-11-21）
+
+- 播放取源改为 video_tab GET 主路径、签名 POST 仅作回退，对齐现行客户端形态，降低匿名身份消耗。
+- 双路径均为空响应时自动注册全新匿名身份重试一轮；30 秒冷却与单次额度，预取不消耗轮换额度。
+- 修复 0.12.82 连播数集后「App片源登记或取源未完成」的失败；模拟器实测连播越过原失败集并持续播放。
+- 注册模型 27 组 294 检查、原生恢复 14 组 78 检查全部通过；release 兼容包模拟器冒烟起播成功。
+- 发行与验证边界见[本轮发行记录](docs/android-release-2026-11-21.md)。
 
 ## 0.12.82 / 0.1.33（2026-11-20）
 
