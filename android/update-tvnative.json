@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 36,
-  "versionName": "0.1.35",
+  "versionCode": 37,
+  "versionName": "0.1.36",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.35/HongguoNative-0.1.35-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 51073833,
-  "sha256": "9de5aa667d71691cb9218b9f564ffce39c50b945ead18cc6554038321c4c690a",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.36/HongguoNative-0.1.36-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 51073946,
+  "sha256": "0be85fc8ba3e1536d052807264db659d98aef991fb9e8de90dcee310022556e4",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.35/HongguoNative-0.1.35-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 51073833,
-      "sha256": "9de5aa667d71691cb9218b9f564ffce39c50b945ead18cc6554038321c4c690a"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.36/HongguoNative-0.1.36-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 51073946,
+      "sha256": "0be85fc8ba3e1536d052807264db659d98aef991fb9e8de90dcee310022556e4"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.35/HongguoNative-0.1.35-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 47346231,
-      "sha256": "3b09aec3345bae2088c51db94ed0ec24dd42f2290d98b609803e3b56417b546a"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.36/HongguoNative-0.1.36-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 47346332,
+      "sha256": "87c1ae2f8e34988acf94407f213838550aa24996397dd81fa4e73c9eedc26057"
     }
   },
-  "notes": "- 修复连播修复版下载与播放大量落 360p：video_tab 模型把各清晰度档挂在同一编码名下，旧排序以编码为主，会把选择钉在最低的 H.264 档。\n- 自动与边界档位按短边最高优先排序，同档优先 H.264；固定画质路径保持按满足画质的最接近档选择。\n- 保留 0.12.83 的连播取源自愈（video_tab 主路径 + 双空自动换身份）；同包名同证书覆盖升级，数据不迁移不清理。\n",
-  "publishedAt": "2026-11-21T02:02:33.000Z"
+  "notes": "- 影视来源「爱看机器人」恢复：原站 www1 已长期无响应，改用应答正常的 www2 镜像；分类、详情与签名取流接口全部恢复。\n- 韩小圈：列表/详情正常，播放接口 504 为源站流媒体节点过载，属源站侧波动，可稍后重试。\n- 青空：浏览正常，播放需在 设置 > 站源账号 登录青空账号（源站要求）。\n- 同包名同证书覆盖升级，数据不迁移不清理。\n",
+  "publishedAt": "2026-11-21T02:59:03.000Z"
 }

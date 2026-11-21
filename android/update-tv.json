@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 107,
-  "versionName": "0.12.84",
+  "versionCode": 108,
+  "versionName": "0.12.85",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.84/Hongguo-0.12.84-tv-release-compatible.apk",
-  "size": 5924319,
-  "sha256": "ed2699d04d5ae95cea1d1db2577b156b3e5a486ec57969bd8dfb4af8eaef6f1e",
-  "notes": "- 修复连播修复版下载与播放大量落 360p：video_tab 模型把各清晰度档挂在同一编码名下，旧排序以编码为主，会把选择钉在最低的 H.264 档。\n- 自动与边界档位按短边最高优先排序，同档优先 H.264；固定画质路径保持按满足画质的最接近档选择。\n- 保留 0.12.83 的连播取源自愈（video_tab 主路径 + 双空自动换身份）；同包名同证书覆盖升级，数据不迁移不清理。\n",
-  "publishedAt": "2026-11-21T02:02:33.000Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.85/Hongguo-0.12.85-tv-release-compatible.apk",
+  "size": 5924431,
+  "sha256": "fbc6a96978cc6eb6eed2eeef8fc4d392fe747b40bcbd03287ebf4d4b77433733",
+  "notes": "- 影视来源「爱看机器人」恢复：原站 www1 已长期无响应，改用应答正常的 www2 镜像；分类、详情与签名取流接口全部恢复。\n- 韩小圈：列表/详情正常，播放接口 504 为源站流媒体节点过载，属源站侧波动，可稍后重试。\n- 青空：浏览正常，播放需在 设置 > 站源账号 登录青空账号（源站要求）。\n- 同包名同证书覆盖升级，数据不迁移不清理。\n",
+  "publishedAt": "2026-11-21T02:59:03.000Z"
 }

@@ -1,4 +1,17 @@
-# Android 0.12.83 / 0.12.84 / 原生 TV 0.1.34 / 0.1.35 发行记录（2026-11-21）
+# Android 0.12.83 / 0.12.84 / 0.12.85 / 原生 TV 0.1.34 / 0.1.35 / 0.1.36 发行记录（2026-11-21）
+
+## 0.12.85 / 0.1.36（爱看机器人来源恢复，同日第三轮）
+
+冻结源码：`54e421f`。
+
+影视来源逐模块实测（tv34_dpad TV14 模拟器）：红果（发现/播放全通）、鬼片（列表/详情/播放全通，源站条目内容与简介不符属源站数据问题）、韩小圈（列表/详情/取流解析全通，播放接口 504 为源站流媒体节点过载）、青空（浏览/详情全通，播放需源站账号登录）、爱看机器人（原站 www1 整站超时）。
+
+爱看机器人修复：BASE 自 www1 切至 www2 镜像（www1 整站超时；www 的 /play/ 详情被 Cloudflare challenge 拦 403；www2 列表/详情/签名取流接口全通）。manifest.hosts 增补 www2，捆绑 index 双摘要同步刷新。模拟器实测片单与详情恢复（真实豆瓣级元数据）；宿主机完整复现 signToken→getResN 取流链路（四条 m3u8 线路）；第三方 CDN 在宿主网络 200 可达，模拟器直连对部分 CDN 不可达属网络环境限制。
+
+正式下载：
+- phone 0.12.85/code108：[APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.85/Hongguo-0.12.85-phone-release-compatible.apk)。
+- tv 0.12.85/code108：[APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.85/Hongguo-0.12.85-tv-release-compatible.apk)。
+- tvnative 0.1.36/code37：[APK（arm64-v8a）](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.36/HongguoNative-0.1.36-tvNative-release-compatible-arm64-v8a.apk)、[32 位 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.36/HongguoNative-0.1.36-tvNative-release-compatible-armeabi-v7a.apk)。
 
 ## 0.12.84 / 0.1.35（画质排序修复，同日追加）
 
