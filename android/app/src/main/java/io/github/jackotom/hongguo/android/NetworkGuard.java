@@ -164,6 +164,39 @@ final class NetworkGuard {
         try { return racePublic(DNS, system, trusted, deadline); }
         catch (RejectedExecutionException error) { return publicAddresses(uri, deadline); }
     }
+    /** Source-module mirror hosts whose DNS may be poisoned; declared in each manifest "hosts". */
+    private static final Set<String> DOH_FIRST_HOSTS = ConcurrentHashMap.newKeySet();
+    /** Registered per lane from module manifests; wildcard patterns are not matched here. */
+    static void registerDohFirstHosts(Collection<String> hosts) {
+        for (String entry : hosts) {
+            String host = entry == null ? "" : entry.toLowerCase(Locale.ROOT).trim();
+            if (host.indexOf('.') > 0 && !host.contains("*")) DOH_FIRST_HOSTS.add(host);
+        }
+    }
+    /**
+     * Source-module resolution for hosts whose system DNS answers can be poisoned to a
+     * real-but-wrong routable IP — a race cannot exclude those, so registered hosts resolve
+     * DoH-first (both trusted endpoints sequentially, each SSRF-checked), and only when both
+     * fail does resolution fall back to the system resolver.
+     */
+    static InetAddress[] sourceAddresses(URI uri, long deadline) throws IOException {
+        String hostname = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        if (!DOH_FIRST_HOSTS.contains(hostname)) return publicAddresses(uri, deadline);
+        IOException last = null;
+        for (String endpoint : DOH_ENDPOINTS) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException("网络请求已取消");
+            try {
+                InetAddress[] answer = dohProbe != null ? dohProbe.apply(uri.getHost()) : dohHttp(String.format(endpoint, URLEncoder.encode(uri.getHost(), "UTF-8")));
+                if (answer != null && answer.length > 0) {
+                    for (InetAddress address : answer) if (address == null || !publicAddress(address)) throw new IOException("域名解析到非公网地址");
+                    return answer;
+                }
+            } catch (IOException error) { last = error; }
+            catch (Exception invalid) { last = new IOException("可信解析不可用", invalid); }
+        }
+        try { return publicAddresses(uri, deadline); }
+        catch (IOException systemError) { throw last == null ? systemError : last; }
+    }
     /** Package-private executor seam for offline races; production always uses the bounded DNS pool. */
     static InetAddress[] racePublic(ExecutorService executor, Callable<InetAddress[]> system,
                                     Callable<InetAddress[]> trusted, long deadline) throws IOException {

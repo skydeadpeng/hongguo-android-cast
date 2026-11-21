@@ -293,8 +293,22 @@ public final class TvSourceActivity extends Activity {
             recentVariants=value instanceof JSONObject?((JSONObject)value).optJSONArray("variants"):null;
             if(session==null || !SourcePlaybackSessions.isPending(session)){status.setText("播放请求已取消");return;}
             status.setText("请选择分集");
-            TvPlay.launch(this,new Intent(this,SourcePlaybackActivity.class).putExtra(SourcePlaybackSessions.EXTRA_SESSION,session));
+            // The player reuses this activity's service lane for in-player episode switching;
+            // the lane holds the issued detail cache, so play requests stay bounded to it.
+            SourcePlaybackActivity.share(service);
+            TvPlay.launch(this,new Intent(this,SourcePlaybackActivity.class)
+                .putExtra(SourcePlaybackSessions.EXTRA_SESSION,session)
+                .putExtra("sourceId",source.optString("id"))
+                .putExtra("seriesId",detail.optString("seriesId"))
+                .putExtra("currentIndex",episodeIndex(episode)));
         });
+    }
+    private int episodeIndex(JSONObject episode){
+        JSONArray list=detail.optJSONArray("episodes");
+        String id=episode.optString("episodeId");
+        for(int i=0;list!=null&&i<list.length();i++)
+            if(list.optJSONObject(i)!=null&&id.equals(list.optJSONObject(i).optString("episodeId")))return i;
+        return -1;
     }
     private void backToCatalog() { resetRequest();detail=null;renderCatalog();status.setText(""); }
 
@@ -400,7 +414,7 @@ public final class TvSourceActivity extends Activity {
     }
     @Override protected void onDestroy() {
         closed=true; revision++;
-        if(service!=null)service.close();
+        if(service!=null){SourcePlaybackActivity.unshare(service);service.close();}
         super.onDestroy();
     }
 }

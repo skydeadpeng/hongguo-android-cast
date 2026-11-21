@@ -6,13 +6,13 @@
   "runtime": "js",
   "api": 1,
   "adult": true,
-  "hosts": ["huangguo.video"],
+  "hosts": ["huangguo.video", "huangguoai.fit"],
   "capabilities": ["cover", "mediaAuth"],
   "mediaAuthPaths": ["/api/hls_key/"],
   "group": "huangguo",
   "groupName": "黄果",
   "entryName": "视频",
-  "aliases": ["huangguo.video"],
-  "baseUrl": "https://huangguo.video",
+  "aliases": ["huangguo.video", "huangguoai.fit"],
+  "baseUrl": "https://huangguoai.fit",
   "browserFingerprint": true
 }

@@ -9,7 +9,7 @@ const androidSourcesApi = Object.freeze({
   catalog: ({ sourceId, category, page }) => nativeCall('sourceService', { operation: 'catalog', sourceId, category, page }, 50000),
   search: ({ sourceId, keyword, page }) => nativeCall('sourceService', { operation: 'search', sourceId, keyword, page }, 50000),
   detail: ({ sourceId, seriesId }) => nativeCall('sourceService', { operation: 'detail', sourceId, seriesId }, 50000),
-  play: ({ sourceId, seriesId, episodeId, variant }) => nativeCall('sourceService', { operation: 'play', sourceId, seriesId, episodeId, variant }, 65000),
+  play: ({ sourceId, seriesId, episodeId, variant, currentIndex }) => nativeCall('sourceService', { operation: 'play', sourceId, seriesId, episodeId, variant, currentIndex }, 65000),
   account: ({ sourceId, command = '', payload }) => {
     const params = { operation: 'account', sourceId, command };
     if (command === 'login' && payload) {

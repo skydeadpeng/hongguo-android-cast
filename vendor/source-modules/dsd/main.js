@@ -754,10 +754,11 @@ function parseDetail(document, pageUrl, sourceId) {
     channelName: channel,
     tags: [],
   };
-  const vip = htmlFirstClass(box, "noVip", "openVip") !== null;
-  if (vip) {
-    drama.vip = true;
-  }
+  // 站点播放器容器上的 noVip/openVip 只描述当前登录用户是否 VIP（游客看到的是登录引导层），
+  // 媒体接口（vplayer 签名、m3u8、密钥、分片）对游客实测全量开放，无服务端 VIP 墙；
+  // 不再据此把分集标成 vip（App 会把选集禁用成「部分分集暂不可播」）。
+  // 真正的预览限制仍由 resolveMedia 的 player.trysee 检查兜底。
+  const vip = false;
   const addTag = (tag) => {
     tag = tag.trim();
     if (tag !== "" && Array.from(tag).length <= 48 && drama.tags.length < 32 && !drama.tags.includes(tag)) {

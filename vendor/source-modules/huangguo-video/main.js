@@ -1,4 +1,10 @@
-const siteBaseUrl = "https://huangguo.video";
+// 官方 TG 频道（t.me/huangguo_xxx）置顶：主域名 huangguo.video，最新网址 huangguoai.fit。
+// huangguo.video 国内 DNS 被污染到不可路由 IP 且 TLS SNI 被阻断；huangguoai.fit 实测
+// SNI 未封、全站路径接受运行时默认 UA，故以 fit 为首选域，video 仅作末位镜像。
+// 两域都在 Cloudflare Bot 盾后（Worker 反代子请求被 1106 拦死），不走 source-proxy；
+// fit 的污染 DNS 由运行时 DoH 优先解析兜底（NetworkGuard.sourceAddresses）。
+const siteBaseUrl = "https://huangguoai.fit";
+const siteBaseMirrors = ["https://huangguo.video"];
 const userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1";
 const channel = "huangguo.video";
 const sourceAliases = ["huangguo-video", "huangguo.video"];
@@ -391,7 +397,39 @@ function validCategory(category) {
 }
 
 function fetchText(address, referer) {
-  return host.fetchText({ url: address, referer }).body;
+  return fetchTextMirrors(address, { referer: referer }).body;
+}
+
+// 地址一律由 siteBaseUrl（首选域）拼出。首选域失败（污染 DNS 通常 ~30ms 连接拒绝，
+// 最坏触到本次超时上限）后按镜像链换域重试同一路径；成功候选不写回全局状态，
+// 页面内的相对地址（data-hls、封面）天然跟随成功域解析。
+function fetchTextMirrors(address, options) {
+  const bases = [siteBaseUrl].concat(siteBaseMirrors);
+  // 旧任务遗留地址可能仍停在已失效的镜像域上，先归一到首选域再按链重试。
+  for (const base of bases) {
+    if (address.startsWith(base)) {
+      address = siteBaseUrl + address.slice(base.length);
+      break;
+    }
+  }
+  let lastError = null;
+  for (const base of bases) {
+    const target = base !== siteBaseUrl && address.startsWith(siteBaseUrl)
+      ? base + address.slice(siteBaseUrl.length)
+      : address;
+    try {
+      return host.fetchText(Object.assign({ url: target, timeoutMs: 8000 }, options));
+    } catch (error) {
+      // 只有网络层失败（DNS 污染/超时/连接失败）才值得换域重试；
+      // HTTP 终态（403/404 等访问拒绝）立即透传，避免对已拒绝的站反复请求。
+      const code = error && error.sourceCode ? String(error.sourceCode) : "";
+      if (code !== "SOURCE_NETWORK" && code !== "SOURCE_TIMEOUT") {
+        throw error;
+      }
+      lastError = error;
+    }
+  }
+  throw lastError === null ? new Error("黄果视频站点暂不可达") : lastError;
 }
 
 function cleanId(text) {
@@ -890,7 +928,7 @@ module.exports = {
     }
     const media = { url: chapter.videoUrl, referer: firstNonEmpty(chapter.referer || "", siteBaseUrl + "/") };
     if (chapter.pageUrl) {
-      const response = host.fetchText({ url: chapter.pageUrl, referer: media.referer });
+      const response = fetchTextMirrors(chapter.pageUrl, { referer: media.referer });
       media.url = dataHls(response.body, response.url);
       media.referer = response.url;
     }

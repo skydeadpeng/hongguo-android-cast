@@ -45,6 +45,8 @@ final class SourceModuleRuntime {
     private static final Set<String> REQUEST_HEADERS = new HashSet<>(Arrays.asList("user-agent","accept","accept-language","content-type",
         "referer","origin","authorization","sec-fetch-dest","sec-fetch-mode","sec-fetch-site","x-requested-with"));
     private static final Set<String> RESPONSE_HEADERS = new HashSet<>(Arrays.asList("set-cookie","retry-after","content-type","date","location"));
+    /** Synthetic site cookies a source may present: exact value, exact source. */
+    private static final Map<String,String> SITE_COOKIES = Collections.singletonMap("heitao","heitao_age_confirmed=1");
     private static final String ROOT = "source-modules/";
     private static final int MAX_PAGE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_OUTPUT_CHARS = 4 * 1024 * 1024;
@@ -147,6 +149,8 @@ final class SourceModuleRuntime {
         JSONArray hosts=manifest.getJSONArray("hosts");
         metadataHosts=new LinkedHashSet<>();
         for (int i=0; i<hosts.length();i++) metadataHosts.add(hosts.getString(i).toLowerCase(Locale.ROOT));
+        // Mirror-host DNS on these domains may be poisoned; module requests resolve DoH-first.
+        NetworkGuard.registerDohFirstHosts(metadataHosts);
     }
 
     private static void validateManifest(String id,JSONObject value) throws Exception {
@@ -525,8 +529,15 @@ final class SourceModuleRuntime {
         if (!user.isEmpty()) addHeader(opts,"user-agent",user);
         if (!referer.isEmpty()) addHeader(opts,"referer",referer);
         // Direct Cookie input is never accepted. In particular, raw HTML
-        // challenges and synthetic site age-confirmation markers stay blocked.
-        if (ScriptableObject.hasProperty(input,"cookie")) throw new Stopped("SOURCE_ACCESS");
+        // challenges stay blocked. The one exception is SITE_COOKIES: a site
+        // that refuses to serve its player page without an exact synthetic
+        // confirmation marker may present that marker, on its own source only.
+        Object rawCookie=ScriptableObject.getProperty(input,"cookie");
+        if (rawCookie!=Scriptable.NOT_FOUND && rawCookie!=null && !Undefined.isUndefined(rawCookie)) {
+            String value=rawCookie instanceof CharSequence ? rawCookie.toString() : "";
+            if (!value.equals(SITE_COOKIES.getOrDefault(sourceId,""))) throw new Stopped("SOURCE_ACCESS");
+            opts.headers.put("cookie",value);
+        }
         return opts;
     }
 
@@ -702,7 +713,7 @@ final class SourceModuleRuntime {
         RequestOptions options=job.request;
         long end=Math.min(job.deadline,System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(options.timeoutMs));
         // Use already checked public addresses for this exact TLS destination.
-        java.net.InetAddress[] addresses=NetworkGuard.publicAddresses(uri,end);
+        java.net.InetAddress[] addresses=NetworkGuard.sourceAddresses(uri,end);
         job.check();
         long remaining=end-System.nanoTime();
         if (remaining<=0) throw new InterruptedIOException();

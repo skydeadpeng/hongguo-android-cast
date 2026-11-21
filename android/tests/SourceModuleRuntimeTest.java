@@ -179,6 +179,34 @@ public final class SourceModuleRuntimeTest {
         });
         expect("SOURCE_ADDRESS", () -> redirect.invoke("detail", args("1234"), deadline()));
         require(count[0] == 3, "unlisted redirect stopped before network");
+        // heitao: the site serves its player page only with the synthetic
+        // age-confirmation cookie; resolveMedia must send exactly that value.
+        AtomicReference<String> sentCookie = new AtomicReference<>("");
+        SourceModuleRuntime heitaoPlayback = runtime(base, "heitao", (uri, agent, ref, job) -> {
+            sentCookie.set(job.request.headers.getOrDefault("cookie", ""));
+            if (uri.getPath().equals("/index.php/vod/player/id/1152/nid/1/sid/1.html")) {
+                require("heitao_age_confirmed=1".equals(sentCookie.get()), "heitao age cookie sent");
+                require("https://heitaodj.com/index.php/vod/play/id/1152/sid/1/nid/1.html".equals(job.request.headers.get("referer")), "player referer is the play page");
+                return new SourceModuleRuntime.Page(200, "<script>var player_aaaa = {\"flag\":\"play\",\"encrypt\":0,\"trysee\":0,\"url\":\"https://media.example.test/ht.m3u8\"};</script>", null);
+            }
+            return new SourceModuleRuntime.Page(200, "", null);
+        });
+        JSONObject heitaoTask = new JSONObject()
+            .put("dramaId", "heitao:1152")
+            .put("chapter", new JSONObject().put("id", "heitao:1152:1:1").put("pageUrl", ""))
+            .put("index", 1).put("total", 1);
+        JSONObject heitaoMedia = (JSONObject) heitaoPlayback.invoke("resolveMedia", args(heitaoTask), deadline());
+        require("hls".equals(heitaoMedia.getString("format")) && "https://media.example.test/ht.m3u8".equals(heitaoMedia.getString("url")), "heitao media resolved with age cookie");
+        // Only the allowlisted exact value on its own source may pass; any
+        // other cookie, or the same cookie on another source, stays blocked.
+        SourceModuleRuntime foreignCookie = new SourceModuleRuntime("guipian", assets(base, "guipian", "manifest.json"),
+            "module.exports={categories(){ host.fetchText({url:'https://guipianwu.com/index.html', cookie:'heitao_age_confirmed=1'}); return []; }};",
+            (u, a, r, j) -> { throw new AssertionError("unexpected network"); });
+        expect("SOURCE_ACCESS", () -> foreignCookie.invoke("categories", args(), deadline()));
+        SourceModuleRuntime wrongCookie = new SourceModuleRuntime("heitao", assets(base, "heitao", "manifest.json"),
+            "module.exports={categories(){ host.fetchText({url:'https://heitaodj.com/index.html', cookie:'heitao_age_confirmed=2'}); return []; }};",
+            (u, a, r, j) -> { throw new AssertionError("unexpected network"); });
+        expect("SOURCE_ACCESS", () -> wrongCookie.invoke("categories", args(), deadline()));
         SourceModuleRuntime noInterop = new SourceModuleRuntime("guipian", assets(base, "guipian", "manifest.json"),
             "module.exports={categories(){return [typeof Packages,typeof java,typeof eval,typeof Function,typeof (function(){}).constructor]}};",
             (u, a, r, j) -> { throw new AssertionError("unexpected network"); });

@@ -26,7 +26,7 @@
       "tag": "v1.0.1",
       "sha256": {
         "manifest.json": "011a74de3db2b69251d48a94fcbc565462074045adf739d1a753b4b9a6e4ddfa",
-        "main.js": "657c64bf98c58096b564eb02d716bf7117fcb958c8c93d703657d883a9b8d1bd"
+        "main.js": "946ce14f29a487cd29040df98f12099be4ea3335e8f981cd56e8e28256db6911"
       }
     },
     {
@@ -109,8 +109,8 @@
       "repo": "guoapp-modules/huangguo-video",
       "tag": "v1.0.1",
       "sha256": {
-        "manifest.json": "a08630adbd41b4856b251aa1f5588bbe5d8087147c823c75a70f176d5f8ab2d4",
-        "main.js": "317cc53266d1493b510e6d37cfd255a88e552224a469e0b96d41a8bfa21dc62e"
+        "manifest.json": "53ecaa7a0a8c207c7a9ebeb63cfad488ea1e1bb7c9eb08c9fa5ed739e625b76f",
+        "main.js": "420ed33de470335e0d1078a7dd58c24d1ecd19e2917d707761323c7a2501d7be"
       }
     },
     {

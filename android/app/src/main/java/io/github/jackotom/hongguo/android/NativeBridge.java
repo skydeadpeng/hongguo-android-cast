@@ -97,8 +97,16 @@ final class NativeBridge {
                 if (closed || !activity.trusted()) return;
                 if (session != null) {
                     if (!SourcePlaybackSessions.isPending(session)) { failure("ERR_CANCELED", "来源播放已取消"); return; }
-                    try { activity.startActivity(new Intent(activity, SourcePlaybackActivity.class).putExtra(SourcePlaybackSessions.EXTRA_SESSION, session)); }
-                    catch (RuntimeException error) { SourcePlaybackSessions.close(session); failure("SOURCE_PLAYER_ERROR", "来源播放器未能启动"); return; }
+                    // The player reuses this bridge's service lane for in-player episode switching.
+                    SourcePlaybackActivity.share(sources);
+                    try {
+                        activity.startActivity(new Intent(activity, SourcePlaybackActivity.class)
+                            .putExtra(SourcePlaybackSessions.EXTRA_SESSION, session)
+                            .putExtra("sourceId", params.optString("sourceId"))
+                            .putExtra("seriesId", params.optString("seriesId"))
+                            .putExtra("currentIndex", params.optInt("currentIndex", -1)));
+                    }
+                    catch (RuntimeException error) { SourcePlaybackActivity.unshare(sources); SourcePlaybackSessions.close(session); failure("SOURCE_PLAYER_ERROR", "来源播放器未能启动"); return; }
                 }
                 respond(id, value, null);
             }
@@ -730,5 +738,5 @@ final class NativeBridge {
     private static String callbackScript(JSONObject response) {
         return "window.__androidResponse && window.__androidResponse(" + response.toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029") + ")";
     }
-    void close() { closed = true; sources.close(); closeRegisteredModels(); closeHttp(); worker.shutdownNow(); downloadWorker.shutdownNow(); searchWorker.shutdownNow(); accountWorker.shutdownNow(); try { AccountSync.get().cancelLogin(); } catch (Exception ignored) { } }
+    void close() { closed = true; SourcePlaybackActivity.unshare(sources); sources.close(); closeRegisteredModels(); closeHttp(); worker.shutdownNow(); downloadWorker.shutdownNow(); searchWorker.shutdownNow(); accountWorker.shutdownNow(); try { AccountSync.get().cancelLogin(); } catch (Exception ignored) { } }
 }

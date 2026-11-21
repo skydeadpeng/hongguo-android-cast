@@ -277,6 +277,9 @@ final class SourcePlayerUiChecks {
     }
 
     private void press(SourcePlaybackActivity activity, String label, String id) throws Exception {
+        // The HUD auto-hides after 4s while playing (PlayerActivity parity); a navigation
+        // key wakes it first, exactly as a remote does, and never triggers an action.
+        test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
         await(() -> activity.hasWindowFocus() && control(activity, label) != null && control(activity, label).getHeight() > 0, "visible_control_" + id);
         onMain(() -> {
             View action = control(activity, label);

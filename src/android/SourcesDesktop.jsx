@@ -305,7 +305,9 @@ function SourceBrowser({ api, source, PosterGrid, Status, onOpenHongguo, android
       ...(android ? { variant, ...(previous.lastEpisodeId !== episode.episodeId ? { lastEpisodeId: null, variants: [] } : {}) } : {}),
     }));
     try {
-      const result = await api.play({ sourceId, seriesId: detail.data.seriesId, episodeId: episode.episodeId, ...(variant !== '' ? { variant } : {}) });
+      // currentIndex lets the native player switch episodes without leaving playback.
+      const currentIndex = detail.data.episodes.findIndex(item => item.episodeId === episode.episodeId);
+      const result = await api.play({ sourceId, seriesId: detail.data.seriesId, episodeId: episode.episodeId, currentIndex, ...(variant !== '' ? { variant } : {}) });
       if (epoch === playEpoch.current) setPlay(previous => ({ ...previous, episodeId: null, lastEpisodeId: episode.episodeId, variants: Array.isArray(result?.variants) ? result.variants : [] }));
     } catch (error) {
       if (epoch === playEpoch.current) {
