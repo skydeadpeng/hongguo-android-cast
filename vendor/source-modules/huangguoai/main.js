@@ -9,7 +9,7 @@ const edgeMaxLifetime = 600;
 const edgeSessionFailure = "黄果播放会话已失效";
 // baseMirrors 第 2 位是官方 API 的 CF Worker 反代（/api/* 同路径透传）：huangguoai.com 与
 // 全部镜像域国内 DNS 死路（快速失败 ~50ms），直连失败后立刻落到反代；镜像域仍在后面兜底。
-const baseMirrors = ["https://huangguoai.com", "https://huoguo.skydeadpeng.xyz", "https://thu.lbvrhyir.cc", "https://pku.xxbgwypx.cc", "https://ttvoij.ediayikma.cc", "https://thu.ediayikma.cc", "https://pku.ediayikma.cc", "https://fdu.ediayikma.cc", "https://thu.agdkczeyx.cc"];
+const baseMirrors = ["https://huangguoai.com", "https://huoguo.skydeadpeng.online", "https://thu.lbvrhyir.cc", "https://pku.xxbgwypx.cc", "https://ttvoij.ediayikma.cc", "https://thu.ediayikma.cc", "https://pku.ediayikma.cc", "https://fdu.ediayikma.cc", "https://thu.agdkczeyx.cc"];
 const mirrorDomains = ["lbvrhyir.cc", "xxbgwypx.cc", "ediayikma.cc", "agdkczeyx.cc"];
 const categories = [
   { id: "ai-duanju", name: "AI 短剧" },

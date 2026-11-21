@@ -6,7 +6,7 @@ const path = require('path');
 // key/分片均为绝对地址），无 vip 拦截；配合时长校验防"只下发预览片段"的个别情况。
 // 备用域名来自社区项目 HGXZ 的配置；末位为自建 Worker 代理（安卓/webOS 同款线路），
 // 兜底部分网络把官方全系域名 DNS 污染到假 IP 的情况。
-const ORIGINS = ['https://huangguoai.com', 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc', 'https://huoguo.skydeadpeng.xyz'];
+const ORIGINS = ['https://huangguoai.com', 'https://l5f9m.rxzfszht.cc', 'https://blolhh.rxzfszht.cc', 'https://mxz58.rxzfszht.cc', 'https://huoguo.skydeadpeng.online'];
 const ID = /^\d{1,30}$/;
 const PAGE_SIZE = 30;
 // 与官方站点导航一致的内容分类（ranks/topics 等聚合页不作为题材）。

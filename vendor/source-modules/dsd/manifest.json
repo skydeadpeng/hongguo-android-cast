@@ -6,7 +6,7 @@
   "runtime": "js",
   "api": 1,
   "adult": true,
-  "hosts": ["dsd.com.se", "www.dsd.com.se", "dsd.skydeadpeng.xyz"],
+  "hosts": ["dsd.com.se", "www.dsd.com.se", "dsd.skydeadpeng.online"],
   "capabilities": ["search"],
   "aliases": ["dsd.com.se", "www.dsd.com.se"],
   "baseUrl": "https://www.dsd.com.se",

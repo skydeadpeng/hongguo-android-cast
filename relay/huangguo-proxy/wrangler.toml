@@ -3,7 +3,7 @@ main = "worker.js"
 compatibility_date = "2024-09-01"
 
 routes = [
-  { pattern = "huoguo.skydeadpeng.xyz", custom_domain = true }
+  { pattern = "huoguo.skydeadpeng.online", custom_domain = true }
 ]
 
 # 部署后建议绑定自定义域名（workers.dev 在国内基本不可达）：

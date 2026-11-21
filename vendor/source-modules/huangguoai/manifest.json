@@ -6,7 +6,7 @@
   "runtime": "js",
   "api": 1,
   "adult": true,
-  "hosts": ["huangguoai.com", "huoguo.skydeadpeng.xyz", "*.lbvrhyir.cc", "*.xxbgwypx.cc", "*.ediayikma.cc", "*.agdkczeyx.cc"],
+  "hosts": ["huangguoai.com", "huoguo.skydeadpeng.online", "*.lbvrhyir.cc", "*.xxbgwypx.cc", "*.ediayikma.cc", "*.agdkczeyx.cc"],
   "capabilities": ["search", "rankings"],
   "group": "huangguo",
   "groupName": "黄果",

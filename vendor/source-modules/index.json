@@ -25,8 +25,8 @@
       "repo": "guoapp-modules/dsd",
       "tag": "v1.0.1",
       "sha256": {
-        "manifest.json": "19805be53f256e2cfec683fee70e74f35ea2019bb56b4e2ef95ad8489624dbe7",
-        "main.js": "6209408ad00d7627f36355bc8022852e66c0a88d279d73df23f3fad32f5f7167"
+        "manifest.json": "011a74de3db2b69251d48a94fcbc565462074045adf739d1a753b4b9a6e4ddfa",
+        "main.js": "657c64bf98c58096b564eb02d716bf7117fcb958c8c93d703657d883a9b8d1bd"
       }
     },
     {
@@ -123,8 +123,8 @@
       "repo": "guoapp-modules/huangguoai",
       "tag": "v1.0.1",
       "sha256": {
-        "manifest.json": "e705dae8113999a6cd62e832312287bad9e259af67828cbbec413827b45c8df3",
-        "main.js": "70c43b69a95dbcda5de7ec5ea4ed516eb87ba72b3cc3346b3dcf7d548c5933de"
+        "manifest.json": "fee8db8502fd6713df812491ec6719ebfde8b003efab044fcd712c6dba73eb0f",
+        "main.js": "f14381e721ab393384571e779980d0c9dbfc2f35db4953ab790976ccbb4f5a47"
       }
     },
     {
@@ -137,8 +137,8 @@
       "repo": "guoapp-modules/huangju",
       "tag": "v1.0.1",
       "sha256": {
-        "manifest.json": "66f2b77413a367e998e784a7fdff182d2d5e32a7ac8627da7058bf4f0ec304be",
-        "main.js": "f8640ff93b66123cb9439d4df9d2afa5617d66f44ee54c51f75413caf825927c"
+        "manifest.json": "ef3b687935c9c1ce9ee048c92c0086fd7443f8d551c0d67f5fb353204e4c68a4",
+        "main.js": "4c65fbb9b5de28c4947299ed93fcbe5bdaa68f680e28a0b844ff88b5e7d087cb"
       }
     },
     {

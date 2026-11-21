@@ -1,10 +1,10 @@
 const siteBaseUrl = "https://huangju.net";
-// huangju.net 全家（主域/API/video.*）DNS 国内直连死路；hanjuapi/hanjucdn.skydeadpeng.xyz
+// huangju.net 全家（主域/API/video.*）DNS 国内直连死路；hanjuapi/hanjucdn.skydeadpeng.online
 // 是同路径 CF Worker 反代：API、封面、m3u8 与分片全部可达（分片为相对路径，自动跟随反代域），
 // /play/ 的 CloudFront 凭证 Set-Cookie 由反代原样透传。源站恢复国内直连后再评估切回。
-const apiBaseUrl = "https://hanjuapi.skydeadpeng.xyz";
+const apiBaseUrl = "https://hanjuapi.skydeadpeng.online";
 const mediaOrigin = "https://video.huangju.net/";
-const mediaMirror = "https://hanjucdn.skydeadpeng.xyz/";
+const mediaMirror = "https://hanjucdn.skydeadpeng.online/";
 const rehostMedia = (value) => typeof value === "string" && value.startsWith(mediaOrigin)
   ? mediaMirror + value.slice(mediaOrigin.length)
   : value;

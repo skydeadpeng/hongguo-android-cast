@@ -3,13 +3,13 @@
 // 分片与封面一般在源站 CDN 上，不经本代理；若个别源连 CDN 也被墙，再单独扩。
 // 部署后各域名与源站路径一一对应，可直接作为来源模块的备用镜像域名。
 const ROUTES = {
-  "dsd.skydeadpeng.xyz": "https://www.dsd.com.se",
-  "hanju.skydeadpeng.xyz": "https://huangju.net",
-  "hanjuapi.skydeadpeng.xyz": "https://api.huangju.net",
-  "hanjucdn.skydeadpeng.xyz": "https://video.huangju.net",
-  "hgv.skydeadpeng.xyz": "https://huangguo.video",
-  "msv.skydeadpeng.xyz": "https://missav.live",
-  "h1.skydeadpeng.xyz": "https://hanime1.me",
+  "dsd.skydeadpeng.online": "https://www.dsd.com.se",
+  "hanju.skydeadpeng.online": "https://huangju.net",
+  "hanjuapi.skydeadpeng.online": "https://api.huangju.net",
+  "hanjucdn.skydeadpeng.online": "https://video.huangju.net",
+  "hgv.skydeadpeng.online": "https://huangguo.video",
+  "msv.skydeadpeng.online": "https://missav.live",
+  "h1.skydeadpeng.online": "https://hanime1.me",
 };
 
 export default {

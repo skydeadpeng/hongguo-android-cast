@@ -6,7 +6,7 @@
   "runtime": "js",
   "api": 1,
   "adult": true,
-  "hosts": ["huangju.net", "www.huangju.net", "api.huangju.net", "hanjuapi.skydeadpeng.xyz", "hanjucdn.skydeadpeng.xyz"],
+  "hosts": ["huangju.net", "www.huangju.net", "api.huangju.net", "hanjuapi.skydeadpeng.online", "hanjucdn.skydeadpeng.online"],
   "capabilities": ["search"],
   "aliases": ["huangju.net", "www.huangju.net", "api.huangju.net"],
   "baseUrl": "https://huangju.net",

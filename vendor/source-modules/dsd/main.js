@@ -1,6 +1,6 @@
-// www.dsd.com.se 国内直连全程连接超时；dsd.skydeadpeng.xyz 为同路径 CF Worker 反代
+// www.dsd.com.se 国内直连全程连接超时；dsd.skydeadpeng.online 为同路径 CF Worker 反代
 // （页面与分类 HTML 实测 ~2s 返回）。源站恢复国内直连后再评估切回。
-const siteBaseUrl = "https://dsd.skydeadpeng.xyz";
+const siteBaseUrl = "https://dsd.skydeadpeng.online";
 const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const channel = "帝果";
 const categoriesKey = "categories";
