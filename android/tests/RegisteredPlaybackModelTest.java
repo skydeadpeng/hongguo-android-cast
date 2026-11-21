@@ -58,19 +58,19 @@ public final class RegisteredPlaybackModelTest {
  }
  public static void main(String[]args)throws Exception{
   group("compatibility ConnectException is typed for the existing outer retry owner",()->{
-   AtomicInteger requests=new AtomicInteger();Exception error=reject(()->operation(r->registration(),r->{requests.incrementAndGet();if(r.method.equals("POST"))return response(200,"");throw new ConnectException("synthetic connection refusal");}).fetch(VID));
+   AtomicInteger requests=new AtomicInteger();Exception error=reject(()->operation(r->registration(),r->{requests.incrementAndGet();if(r.method.equals("GET"))return response(200,"");throw new ConnectException("synthetic connection refusal");}).fetch(VID));
    String code=error instanceof RegisteredPlaybackModel.ModelError?((RegisteredPlaybackModel.ModelError)error).code:error.getClass().getSimpleName();
    System.out.println("TAB_CONNECT_CLASSIFICATION actual="+code+" requests="+requests.get()+" expected=ECONNREFUSED expectedRequests=2 networkRequests=0");
-   check(error instanceof RegisteredPlaybackModel.ModelError&&code.equals("ECONNREFUSED")&&requests.get()==2,"one POST and one GET; typed connection refusal without a nested retry");
+   check(error instanceof RegisteredPlaybackModel.ModelError&&code.equals("ECONNREFUSED")&&requests.get()==2,"one tab GET then one POST; typed connection refusal without a nested retry");
   });
-  group("tab connection classification preserves cancellation deadline and primary POST errors",()->{
-   AtomicInteger calls=new AtomicInteger();Exception canceled=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("POST"))return response(200,"");Thread.currentThread().interrupt();throw new ConnectException("synthetic canceled connect");}).fetch(VID));
+  group("tab connection classification preserves cancellation deadline and fallback POST errors",()->{
+   AtomicInteger calls=new AtomicInteger();Exception canceled=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("GET"))return response(200,"");Thread.currentThread().interrupt();throw new ConnectException("synthetic canceled connect");}).fetch(VID));
    check(canceled instanceof InterruptedIOException&&!(canceled instanceof SocketTimeoutException)&&calls.get()==2,"cancel wins before ECONNREFUSED and no additional request");Thread.interrupted();
    calls.set(0);long stop=System.nanoTime()+100_000_000L;
-   Exception expired=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("POST"))return response(200,"");Thread.sleep(150);throw new ConnectException("synthetic late connect");},stop).fetch(VID));
-   check(expired instanceof SocketTimeoutException&&calls.get()==2,"original deadline wins before ECONNREFUSED and no nested retry");
-   calls.set(0);Exception primary=reject(()->operation(r->registration(),r->{calls.incrementAndGet();throw new ConnectException("synthetic primary refusal");}).fetch(VID));
-   check(primary instanceof ConnectException&&calls.get()==1,"POST connection classification unchanged and no tab after a POST transport error");
+   Exception expired=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("GET"))return response(200,"");Thread.sleep(150);throw new ConnectException("synthetic late connect");},stop).fetch(VID));
+   check(expired instanceof SocketTimeoutException&&calls.get()==2,"original deadline wins before ECONNREFUSED after both tab GET and fallback POST");
+   calls.set(0);Exception fallback=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("GET"))return response(200,"");throw new ConnectException("synthetic fallback refusal");}).fetch(VID));
+   check(fallback instanceof RegisteredPlaybackModel.ModelError&&"ECONNREFUSED".equals(((RegisteredPlaybackModel.ModelError)fallback).code)&&calls.get()==2,"empty tab falls through to the POST and its refusal stays typed and terminal");
   });
   group("compatibility GET uses the full DNS list while POST retains its selected pin",()->{
    InetAddress selected=InetAddress.getByAddress(new byte[]{1,1,1,1});AtomicInteger selectors=new AtomicInteger(),engines=new AtomicInteger();List<InetAddress>pins=new ArrayList<>();
@@ -87,8 +87,10 @@ public final class RegisteredPlaybackModelTest {
    System.out.println("MODEL_DNS_POLICY_OK getPin=null getSelectorCalls=0 postSelectorCalls=2 engineCalls=3 networkRequests=0");
   });
   group("zero-byte gzip headers preserve empty-model and backoff classification",()->{
+   RegisteredPlaybackModel.resetRotationQuotaForTest();
    List<String> mismatches=new ArrayList<>();
    for(String name:new String[]{"recover","backoff","malformed","truncated","unknown-encoding","speculative","double-empty","tab-backoff"}){
+    RegisteredPlaybackModel.resetRotationQuotaForTest();
     AtomicInteger calls=new AtomicInteger();
     RegisteredPlaybackModel op=operation(r->registration(),r->{
      calls.incrementAndGet();
@@ -101,26 +103,24 @@ public final class RegisteredPlaybackModelTest {
     String outcome;
     try{JSONObject out=op.fetch(VID,name.equals("speculative"));outcome=out.has("video_model")?"MODEL":"MISSING";}
     catch(Exception failure){outcome=failure instanceof RegisteredPlaybackModel.ModelError?((RegisteredPlaybackModel.ModelError)failure).code:failure.getClass().getSimpleName();}
-    String expected=name.equals("recover")?"MODEL":name.equals("backoff")||name.equals("tab-backoff")?"APP_SERVICE_BACKOFF":name.equals("unknown-encoding")?"APP_INVALID_RESPONSE":name.equals("malformed")?"ZipException":name.equals("truncated")?"EOFException":"APP_EMPTY_RESPONSE";
-    int expectedRequests=name.equals("recover")||name.equals("double-empty")||name.equals("tab-backoff")?2:1;
+    String expected=name.equals("recover")?"MODEL":name.equals("backoff")?"APP_SERVICE_BACKOFF":name.equals("unknown-encoding")?"APP_INVALID_RESPONSE":name.equals("malformed")?"ZipException":name.equals("truncated")?"EOFException":"APP_EMPTY_RESPONSE";
+    int expectedRequests=name.equals("recover")?1:name.equals("speculative")?2:name.equals("double-empty")||name.equals("tab-backoff")?4:2;
     System.out.println("ZERO_GZIP_CASE name="+name+" outcome="+outcome+" requests="+calls.get()+" expected="+expected+" expectedRequests="+expectedRequests);
     if(!outcome.equals(expected)||calls.get()!=expectedRequests)mismatches.add(name);
    }
    check(mismatches.isEmpty(),"zero-byte gzip is an empty response, not decompressor EOF; cases="+mismatches);
   });
-  group("foreground empty v5 recovers once from exact-episode video_tab",()->{
+  group("foreground model is served by the exact-episode video_tab GET",()->{
    AtomicInteger registrations=new AtomicInteger();List<OfficialApiClient.Request> requests=new ArrayList<>();
    RegisteredPlaybackModel op=operation(r->{registrations.incrementAndGet();return response(200,new JSONObject(new String(registration().body,StandardCharsets.UTF_8)).put("cookies","install_id="+IID+"; ttreq=fixture-register; store-region=cn; store-region-src=did; sessionid=private-account-cookie").toString());},r->{
     requests.add(r);return r.method.equals("POST")?response(200," \n\t "):response(200,tabEnvelope(VID,model()));});
    JSONObject out=op.fetch(VID);
    check(out.getString("vid").equals(VID)&&out.getJSONObject("video_model").getJSONArray("video_list").length()==1,"current episode model recovered");
-   check(registrations.get()==1&&requests.size()==2&&requests.get(0).method.equals("POST")&&requests.get(1).method.equals("GET"),"one identity and one tab fallback only");
-   OfficialApiClient.Request post=requests.get(0),tab=requests.get(1);Map<String,String>pq=query(post.url),tq=query(tab.url);
-   for(String key:new String[]{"device_id","iid","cdid"})check(pq.get(key).equals(tq.get(key)),"same registered "+key+" on both requests");
+   check(registrations.get()==1&&requests.size()==1&&requests.get(0).method.equals("GET"),"one identity and one leading tab GET only; POST fallback unused");
+   OfficialApiClient.Request tab=requests.get(0);Map<String,String>tq=query(tab.url);
    check(tq.get("cdid").equals(CDID)&&tq.get("video_id").equals(VID)&&tq.get("device_level").equals("1")&&!tq.containsKey("ts"),"profile identity and selected episode on exact tab query");
-   check(tab.url.startsWith(RegisteredPlaybackModel.VIDEO_TAB_API+"?")&&tab.body.length==0&&post.deadlineNanos==tab.deadlineNanos,"fixed GET target empty body and unchanged total deadline");
+   check(tab.url.startsWith(RegisteredPlaybackModel.VIDEO_TAB_API+"?")&&tab.body.length==0,"fixed GET target with empty body");
    for(String name:new String[]{"x-khronos","x-helios","x-medusa"})check(!header(tab,name).isEmpty(),"tab signature header "+name);
-   check(header(post,"Cookie").isEmpty()&&header(post,"X-Tt-Token").isEmpty(),"primary never receives registration or account credentials");
    check(header(tab,"Cookie").contains("install_id="+IID)&&header(tab,"Cookie").contains("ttreq=fixture-register")&&!header(tab,"Cookie").contains("sessionid")&&!header(tab,"Cookie").contains("private-account"),"only registration-cookie allowlist reaches tab");
    check(header(tab,"X-Tt-Token").isEmpty()&&!out.toString().contains("fixture-register"),"no account token or identity/cookie in result");
   });
@@ -128,63 +128,67 @@ public final class RegisteredPlaybackModelTest {
    List<OfficialApiClient.Request> requests=new ArrayList<>();AtomicInteger bootCalls=new AtomicInteger();
    RegisteredPlaybackModel op=operation(r->{bootCalls.incrementAndGet();return registration();},r->{
     requests.add(r);check(bootCalls.get()==1,"register exactly once before model");
-    check(new URI(r.url).getHost().equals("api5-normal-sinfonlinea.fqnovel.com")&&new URI(r.url).getPath().equals("/novel/player/multi_video_model/player/v1")&&r.method.equals("POST")&&r.body.length>0,"current v5 player/v1 target first");
+    if(r.method.equals("GET"))return response(404,""); // tab refusal falls through to the signed POST
+    check(new URI(r.url).getHost().equals("api5-normal-sinfonlinea.fqnovel.com")&&new URI(r.url).getPath().equals("/novel/player/multi_video_model/player/v1")&&r.method.equals("POST")&&r.body.length>0,"current v5 player/v1 target after tab refusal");
     Map<String,String> q=query(r.url);check(DID.equals(q.get("device_id"))&&IID.equals(q.get("iid")),"only registered response identity signs model");check(!q.containsKey("openudid"),"probe profile excludes extra passport fields");check(q.get("cdid").equals(CDID),"v5 uses the registered profile cdid shared by its fallback");check(q.get("version_code").equals("74332")&&q.get("aid").equals("8662")&&q.get("video_id")==null&&!q.containsKey("ts")&&q.containsKey("_rticket"),"v5 profile exact with no ts parameter");
     for(String header:new String[]{"x-khronos","x-helios","x-medusa","x-ss-stub"})check(r.headers.get(header)!=null&&!r.headers.get(header).isEmpty(),"v5 signing header "+header);
     for(String retired:new String[]{"X-Ladon","X-Argus","X-SS-Req-Ticket","X-Gorgon"})check(!r.headers.containsKey(retired),"v3-era header retired: "+retired);
     long khronos=Long.parseLong(r.headers.get("x-khronos")),ticket=Long.parseLong(q.get("_rticket"));check(ticket>=khronos*1000&&ticket<khronos*1000+1024,"v5 ticket search stays within the signed second");check(r.headers.get("x-ss-stub").equalsIgnoreCase(DanmakuSigner.hex(DanmakuSigner.md5(r.body))),"v5 signature hashes actual gzip body");check(PlaybackSignerV5.PLAYER_V1_UA.equals(r.headers.get("User-Agent")),"v5 player UA exact");check(!r.headers.containsKey("Cookie")&&!r.headers.containsKey("X-Tt-Token"),"anonymous model never copies registration/account cookies");return response(200,envelope(model()));});
-   JSONObject result=op.fetch(VID);check(requests.size()==1&&result.length()==2&&result.getString("vid").equals(VID),"one bootstrap plus one v5 model only");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"real model projected");check(reject(()->op.fetch(VID)) instanceof IOException,"one lookup instance cannot reuse consumed identity");
+   JSONObject result=op.fetch(VID);check(requests.size()==2&&result.length()==2&&result.getString("vid").equals(VID),"one bootstrap plus tab refusal and one v5 model");check(requests.get(0).method.equals("GET")&&requests.get(1).method.equals("POST"),"tab leads and the v5 POST is the fallback");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"real model projected");check(reject(()->op.fetch(VID)) instanceof IOException,"one lookup instance cannot reuse consumed identity");
   });
-  group("speculative hollowed v5 surfaces without a compatibility GET",()->{
+  group("speculative hollowed paths surface without an identity rotation",()->{
    AtomicInteger registrations=new AtomicInteger();List<OfficialApiClient.Request> requests=new ArrayList<>();
    RegisteredPlaybackModel op=operation(r->{requests.add(r);registrations.incrementAndGet();return registration();},r->{
-    requests.add(r);check(new URI(r.url).getPath().endsWith("/player/v1"),"single-shot v5 only");
-    return response(200," ");});
+    requests.add(r);return response(200," ");});
    try { op.fetch(VID,true); check(false,"hollow must throw"); }
    catch (Exception failure) {
      check(failure instanceof RegisteredPlaybackModel.ModelError && "APP_EMPTY_RESPONSE".equals(((RegisteredPlaybackModel.ModelError)failure).code),"hollow error surfaced");
    }
-   check(registrations.get()==1&&requests.size()==2,"register plus one v5, no ladder");
+   check(registrations.get()==1&&requests.size()==3&&requests.get(1).method.equals("GET")&&requests.get(2).method.equals("POST"),"register plus one tab GET and one v5 POST, no rotation");
   });
 group("same identity recovers on the retry (UI-level)",()->{
    AtomicInteger models=new AtomicInteger(),registrations=new AtomicInteger();
-   // First fetch hollows, second fetch on the SAME identity succeeds (UI retry)
-   OfficialApiClient.Transport model=r->{int call=models.incrementAndGet();return response(200,call<=2?" ":envelope(model()));};
+   RegisteredPlaybackModel.resetRotationQuotaForTest();
+   // First fetch hollows both paths and spends the rotation; second fetch on the SAME identity succeeds (UI retry)
+   OfficialApiClient.Transport model=r->{int call=models.incrementAndGet();return response(200,call<=4?" ":envelope(model()));};
    try { operation(r->{registrations.incrementAndGet();return registration();},model).fetch(VID); } catch (Exception expected) { }
    JSONObject result=operation(r->{registrations.incrementAndGet();return registration();},model).fetch(VID);
-   check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1&&models.get()==3,"second fetch on same identity succeeds after one empty POST/GET pair");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"recovered model projected");
+   check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1&&models.get()==5,"second fetch on same identity succeeds after the hollow pair and one rotated attempt");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"recovered model projected");
   });
-  group("foreground gzip empties recover but double-empty does not add requests",()->{
+  group("foreground gzip empties recover but double-empty rotates once",()->{
+   RegisteredPlaybackModel.resetRotationQuotaForTest();
    for(boolean packed:new boolean[]{false,true}){
+    RegisteredPlaybackModel.resetRotationQuotaForTest();
     AtomicInteger calls=new AtomicInteger();RegisteredPlaybackModel op=operation(r->registration(),r->{
      calls.incrementAndGet();if(r.method.equals("GET"))return response(200,tabEnvelope(VID,model()));
      return packed?new OfficialApiClient.Response(200,Collections.singletonMap("Content-Encoding",Arrays.asList("gzip")),gzip(" \n ".getBytes(StandardCharsets.UTF_8))):response(200,"");});
-    check(op.fetch(VID).has("video_model")&&calls.get()==2,"raw or decoded gzip empty recovers exactly once");
+    check(op.fetch(VID).has("video_model")&&calls.get()==1,"leading tab GET serves the model without a POST");
    }
+   RegisteredPlaybackModel.resetRotationQuotaForTest();
    AtomicInteger calls=new AtomicInteger();Exception empty=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(200," ");}).fetch(VID));
-   check(empty instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)empty).code.equals("APP_EMPTY_RESPONSE")&&calls.get()==2,"double-empty retains typed primary error without another model or identity");
+   check(empty instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)empty).code.equals("APP_EMPTY_RESPONSE")&&calls.get()==4,"double-empty rotates once: two tab GET and two v5 POST");
   });
   group("Retry-After whitespace plain and gzip answers stay terminal",()->{
    for(boolean packed:new boolean[]{false,true})for(String spelling:new String[]{"Retry-After","rEtRy-AfTeR"}){
     AtomicInteger calls=new AtomicInteger();Map<String,List<String>>headers=new LinkedHashMap<>();headers.put(spelling,Arrays.asList("30"));if(packed)headers.put("Content-Encoding",Arrays.asList("gzip"));
     byte[] body=" \n\t ".getBytes(StandardCharsets.UTF_8);byte[] wire=packed?gzip(body):body;
     Exception busy=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return new OfficialApiClient.Response(200,headers,wire);}).fetch(VID));
-    check(busy instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)busy).code.equals("APP_SERVICE_BACKOFF")&&calls.get()==1,"busy header prevents GET and remains distinct from recoverable empty");
+    check(busy instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)busy).code.equals("APP_SERVICE_BACKOFF")&&calls.get()==2,"tab backoff falls to the POST whose busy header stays terminal");
    }
    AtomicInteger calls=new AtomicInteger();Map<String,List<String>>blank=Collections.singletonMap("Retry-After",Arrays.asList(" \t "));
-   check(operation(r->registration(),r->{calls.incrementAndGet();return r.method.equals("POST")?new OfficialApiClient.Response(200,blank,new byte[0]):response(200,tabEnvelope(VID,model()));}).fetch(VID).has("video_model")&&calls.get()==2,"blank backoff field is not a service backoff");
+   check(operation(r->registration(),r->{calls.incrementAndGet();return r.method.equals("POST")?new OfficialApiClient.Response(200,blank,new byte[0]):response(200,tabEnvelope(VID,model()));}).fetch(VID).has("video_model")&&calls.get()==1,"leading tab GET with a blank backoff field elsewhere serves the model");
    calls.set(0);check(operation(r->registration(),r->{calls.incrementAndGet();return new OfficialApiClient.Response(200,Collections.singletonMap("Retry-After",Arrays.asList("30")),envelope(model()).getBytes(StandardCharsets.UTF_8));}).fetch(VID).has("video_model")&&calls.get()==1,"healthy model is not discarded merely because a backoff header exists");
   });
   group("compatibility response cannot substitute another episode or ignore refusal",()->{
    for(String body:new String[]{tabEnvelope("123",model()),"{bad}","{\"code\":1,\"data\":{}}",tabEnvelope(VID,model().put("item_id","123")),new JSONObject(tabEnvelope(VID,model())).put("is_trial_video",true).toString()}){
-    AtomicInteger calls=new AtomicInteger();Exception bad=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(200,r.method.equals("POST")?"":body);}).fetch(VID));
-    check(bad instanceof RegisteredPlaybackModel.ModelError&&calls.get()==2,"wrong identity invalid JSON or business refusal ends one compatibility request");
+    AtomicInteger calls=new AtomicInteger();Exception bad=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(200,body);}).fetch(VID));
+    check(bad instanceof RegisteredPlaybackModel.ModelError&&calls.get()==2,"wrong identity invalid JSON or business refusal ends one tab GET plus one POST");
    }
    for(int code:new int[]{302,403,429,500}){
-    AtomicInteger calls=new AtomicInteger();Exception bad=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return r.method.equals("POST")?response(200,""):response(code,tabEnvelope(VID,model()));}).fetch(VID));
+    AtomicInteger calls=new AtomicInteger();Exception bad=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(code,tabEnvelope(VID,model()));}).fetch(VID));
     check(bad instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)bad).code.equals("HTTP_ERROR")&&calls.get()==2,"compatibility HTTP failure stays typed and terminal");
    }
-   AtomicInteger calls=new AtomicInteger();Exception busy=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return r.method.equals("POST")?response(200,""):new OfficialApiClient.Response(200,Collections.singletonMap("Retry-After",Arrays.asList("30")),new byte[0]);}).fetch(VID));
+   AtomicInteger calls=new AtomicInteger();Exception busy=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return r.method.equals("POST")?new OfficialApiClient.Response(200,Collections.singletonMap("Retry-After",Arrays.asList("30")),new byte[0]):response(200,"");}).fetch(VID));
    check(busy instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)busy).code.equals("APP_SERVICE_BACKOFF")&&calls.get()==2,"compatibility service backoff is terminal too");
   });
   group("compatibility success persists all identity fields without returning them",()->{
@@ -199,22 +203,22 @@ group("same identity recovers on the retry (UI-level)",()->{
   });
   group("fallback cancellation and deadline never publish late compatibility models",()->{
    AtomicInteger calls=new AtomicInteger();long stop=System.nanoTime()+100_000_000L;
-   Exception late=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("POST"))return response(200,"");Thread.sleep(150);return response(200,tabEnvelope(VID,model()));},stop).fetch(VID));
-   check(late instanceof SocketTimeoutException&&calls.get()==2,"GET shares the original deadline and rejects late success");
+   Exception late=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("GET")){Thread.sleep(150);return response(200,tabEnvelope(VID,model()));}return response(200,"");},stop).fetch(VID));
+   check(late instanceof SocketTimeoutException&&calls.get()==1,"leading tab GET shares the original deadline and rejects late success");
    calls.set(0);long postStop=System.nanoTime()+100_000_000L;
-   Exception tooLate=reject(()->operation(r->registration(),r->{calls.incrementAndGet();Thread.sleep(150);return response(200,"");},postStop).fetch(VID));
-   check(tooLate instanceof SocketTimeoutException&&calls.get()==1,"expired POST must not start GET");
+   Exception tooLate=reject(()->operation(r->registration(),r->{calls.incrementAndGet();if(r.method.equals("GET"))return response(200,"");Thread.sleep(150);return response(200,"");},postStop).fetch(VID));
+   check(tooLate instanceof SocketTimeoutException&&calls.get()==2,"expired fallback POST never publishes a late model");
    CountDownLatch entered=new CountDownLatch(1),released=new CountDownLatch(1);AtomicReference<Throwable>result=new AtomicReference<>();AtomicBoolean closed=new AtomicBoolean();
    OfficialApiClient.Transport model=new OfficialApiClient.Transport(){public OfficialApiClient.Response execute(OfficialApiClient.Request r)throws Exception{if(r.method.equals("POST"))return response(200,"");entered.countDown();while(released.getCount()>0)try{released.await();}catch(InterruptedException ignored){}return response(200,tabEnvelope(VID,model()));}public void close(){closed.set(true);released.countDown();}};
    RegisteredPlaybackModel op=operation(r->registration(),model);Thread worker=new Thread(()->{try{op.fetch(VID);result.set(new AssertionError("late fallback success"));}catch(Throwable failure){result.set(failure);}});
    worker.start();check(entered.await(2,TimeUnit.SECONDS),"fallback reached");op.close();worker.join(2000);
    check(!worker.isAlive()&&closed.get()&&result.get() instanceof InterruptedIOException&&!op.current(),"cancel closes fallback transport and rejects deliberately late successful model");
   });
-group("HTTP refusal fails typed from single attempt",()->{
+group("HTTP refusal fails typed after one tab GET and one v5 POST",()->{
    AtomicInteger both=new AtomicInteger();
    Exception failure=reject(()->operation(r->registration(),r->{both.incrementAndGet();return response(404,"");}).fetch(VID));
    check(failure instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)failure).code.equals("HTTP_ERROR"),"refusal stays typed");
-   check(both.get()==1,"one v5 attempt per fetch");
+   check(both.get()==2,"one tab GET and one v5 POST per fetch");
   });
 group("only media projection reaches RPC and source objects are deeply isolated",()->{
    JSONObject source=model();source.put("device_id",DID).put("token","private-token").put("cookies",new JSONObject().put("sessionid","private-session"));JSONObject row=source.getJSONArray("video_list").getJSONObject(0);row.put("install_id",IID);row.getJSONObject("video_meta").put("session","private-meta");row.getJSONObject("encrypt_info").put("token","private-encryption-token");
@@ -254,7 +258,7 @@ group("only media projection reaches RPC and source objects are deeply isolated"
     AtomicInteger registrations=new AtomicInteger(),requests=new AtomicInteger();RegisteredPlaybackModel op=operation(r->{registrations.incrementAndGet();return registration();},r->{requests.incrementAndGet();return response(200,trialBody.toString());});
     if(Boolean.FALSE.equals(flag)){check(op.fetch(VID).has("video_model"),"explicit non-trial marker succeeds at "+location);}
     else {Exception failure=reject(()->op.fetch(VID));check(failure instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)failure).code.equals(Boolean.TRUE.equals(flag)?"BUSINESS_REJECTED":"APP_INVALID_RESPONSE"),"trial or malformed marker never publishes model at "+location+": "+flag);}
-    check(registrations.get()==1&&requests.get()==1,"trial handling never retries registration or model");
+    check(registrations.get()==1&&requests.get()==(Boolean.FALSE.equals(flag)?1:2),"trial handling never retries registration; tab leads and POST is the only fallback");
    }
   });
   group("string JSON and object-keyed quality models normalize without fallback network",()->{for(boolean text:new boolean[]{false,true}){JSONObject m=model();if(!text)m.put("video_list",new JSONObject().put("video_1",m.getJSONArray("video_list").get(0)));Object value=text?m.toString():m;String body=new JSONObject().put("code","0").put("data",new JSONObject().put(VID,new JSONObject().put("video_model",value))).toString();JSONObject result=operation(r->registration(),r->response(200,body)).fetch(VID);check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"either upstream quality shape supported");}});
@@ -265,7 +269,7 @@ group("only media projection reaches RPC and source objects are deeply isolated"
    List<String> bad=new ArrayList<>(Arrays.asList("{}","[]","{bad}","{\"code\":1,\"data\":{}}","{\"code\":false,\"data\":{}}","{\"code\":0,\"error_code\":1,\"data\":{}}","{\"code\":0,\"data\":{\"error_code\":1}}"));
    for(String key:new String[]{"item_id","episode_id"}){bad.add(new JSONObject().put("code",0).put(key,"123").put("data",new JSONObject().put("video_model",model())).toString());bad.add(envelope(model().put(key,"123")));}
    for(String body:bad)check(reject(()->operation(r->registration(),r->response(200,body)).fetch(VID)) instanceof RegisteredPlaybackModel.ModelError,"invalid response cannot appear successful");
-   for(int status:new int[]{301,302,307,403,500}){AtomicInteger calls=new AtomicInteger();check(reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(status,envelope(model()));}).fetch(VID)) instanceof RegisteredPlaybackModel.ModelError,"non200 refused");check(calls.get()==1,"one v5 attempt per fetch for an HTTP refusal");}
+   for(int status:new int[]{301,302,307,403,500}){AtomicInteger calls=new AtomicInteger();check(reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(status,envelope(model()));}).fetch(VID)) instanceof RegisteredPlaybackModel.ModelError,"non200 refused");check(calls.get()==2,"one tab GET and one v5 POST for an HTTP refusal");}
   });
   group("empty and oversized raw or gzip model bodies have precise bounded failures",()->{
    Exception empty=reject(()->operation(r->registration(),r->response(200,"  ")).fetch(VID));check(empty instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)empty).code.equals("APP_EMPTY_RESPONSE"),"empty model typed not success");

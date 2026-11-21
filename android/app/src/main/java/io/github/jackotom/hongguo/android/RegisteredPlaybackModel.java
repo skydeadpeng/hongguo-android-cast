@@ -139,23 +139,28 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             String cookies = identity.length > 3 && identity[3] != null ? identity[3] : "";
             if (!OfficialApiClient.validID(did) || !OfficialApiClient.validID(iid))
                 throw new ModelError("App片源设备登记未完成", "APP_INVALID_RESPONSE");
-            // hongguoTV 0.16.10: only an empty foreground v5 response may check
-            // video_tab once. Both requests keep the exact identity and deadline;
-            // HTTP/business/format failures and service backoff remain terminal.
-            JSONObject projected;
-            try { projected = playerV1(did, iid, cdid, vid); }
-            catch (ModelError failure) {
-                if (speculative || !"APP_EMPTY_RESPONSE".equals(failure.code)) throw failure;
-                check();
-                try { projected = videoTab(did, iid, cdid, vid, cookies); }
-                catch (ModelError fallback) {
-                    if ("APP_EMPTY_RESPONSE".equals(fallback.code)) throw failure;
-                    throw fallback;
-                }
+            // hongguoTV 2026-11-20: anonymous POSTs (v1 included) return hollow 200s
+            // while GET video_tab still serves models, so GET leads and the signed POST
+            // is only the fallback. When both paths answer hollow for a foreground
+            // fetch, rotate the identity once (fresh registration, 30s quota) and walk
+            // the same tab→POST order on it. HTTP/business/format failures and service
+            // backoff stay terminal; speculative prefetch never spends a registration.
+            String[] used = identity;
+            JSONObject projected = resolve(did, iid, cdid, vid, cookies);
+            if (projected == null) {
+                if (speculative || !mayRotateForeground()) throw new ModelError("App接口未返回有效数据", "APP_EMPTY_RESPONSE");
+                String[] rotated = reRegister();
+                if (rotated == null) throw new ModelError("App接口未返回有效数据", "APP_EMPTY_RESPONSE");
+                String rCdid = rotated.length > 2 && rotated[2] != null && !rotated[2].isEmpty() ? rotated[2] : PlaybackSignerV5.newCdid();
+                String rCookies = rotated.length > 3 && rotated[3] != null ? rotated[3] : "";
+                traceV5("rotated did=" + rotated[0]);
+                projected = resolve(rotated[0], rotated[1], rCdid, vid, rCookies);
+                used = rotated;
+                if (projected == null) throw new ModelError("App接口未返回有效数据", "APP_EMPTY_RESPONSE");
             }
             check();
             HOLLOW_STREAK.set(0);
-            persistIdentity(new String[]{did, iid, cdid, cookies});
+            persistIdentity(used);
             return new JSONObject().put("vid", vid).put("video_model", projected);
         } finally {
             registering = null; owner = null;
@@ -168,6 +173,18 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     private static boolean recoverable(ModelError failure) {
         return "APP_EMPTY_RESPONSE".equals(failure.code) || "HTTP_ERROR".equals(failure.code);
     }
+    /** Foreground-only rotation quota: at most one fresh registration per 30 seconds
+     * (hongguoTV playbackRotationAt). Claimed before registering so concurrent fetches
+     * cannot each spend a registration on the same failure. */
+    private static volatile long lastRotateClaimMs;
+    private static boolean mayRotateForeground() {
+        long now = System.currentTimeMillis();
+        if (now - lastRotateClaimMs < 30_000) return false;
+        lastRotateClaimMs = now;
+        return true;
+    }
+    /** Test hook: clears the 30s rotation quota between offline cases. */
+    static void resetRotationQuotaForTest() { lastRotateClaimMs = 0; }
     /** True while enough of the shared budget remains to start another ladder attempt and
      * still leave the JS web fallback time to finish within the overall resolve deadline. */
     private boolean ladderTimeLeft() { return deadline - System.nanoTime() > TimeUnit.SECONDS.toNanos(8); }
@@ -206,6 +223,20 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         }
         return null;
     }
+    /** hongguoTV fetch(): GET video_tab leads; the signed POST is only the fallback.
+     * Tab failures (typed errors, malformed gzip) fall through to the POST like
+     * tabVideoModel's null return; cancellation and deadline still win first.
+     * Returns null exclusively when the POST itself answers hollow — the rotation
+     * signal. Any other POST failure propagates unchanged. */
+    private JSONObject resolve(String did, String iid, String cdid, String vid, String cookies) throws Exception {
+        try { return videoTab(did, iid, cdid, vid, cookies); }
+        catch (ModelError | java.util.zip.ZipException | java.io.EOFException tabFailure) { check(); }
+        try { return playerV1(did, iid, cdid, vid); }
+        catch (ModelError postFailure) {
+            if ("APP_EMPTY_RESPONSE".equals(postFailure.code)) return null;
+            throw postFailure;
+        }
+    }
     /** Primary v5 player request: gzip JSON and no account/registration cookies.
      * The profile cdid is shared with the single foreground compatibility GET. */
     private JSONObject playerV1(String did, String iid, String cdid, String vid) throws Exception {
@@ -231,7 +262,12 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         headers.put("Content-Encoding", "gzip");
         headers.put("Connection", "close");
         check();
-        OfficialApiClient.Response response = modelTransport.execute(new OfficialApiClient.Request(signed.url, "POST", headers, body, deadline));
+        OfficialApiClient.Response response;
+        try { response = modelTransport.execute(new OfficialApiClient.Request(signed.url, "POST", headers, body, deadline)); }
+        catch (ConnectException refused) {
+            check(); // Cancellation/deadline wins over the connection classification.
+            throw new ModelError("App片源连接暂未建立，请重试", "ECONNREFUSED");
+        }
         check();
         traceV5("player/v1 vid=" + vid + " http=" + response.status + " bytes=" + response.body.length);
         // Per-attempt hollow bookkeeping (a deadline-killed fetch must still arm the
