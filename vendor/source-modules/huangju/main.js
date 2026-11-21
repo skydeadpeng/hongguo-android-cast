@@ -1,5 +1,13 @@
 const siteBaseUrl = "https://huangju.net";
-const apiBaseUrl = "https://api.huangju.net";
+// huangju.net 全家（主域/API/video.*）DNS 国内直连死路；hanjuapi/hanjucdn.skydeadpeng.xyz
+// 是同路径 CF Worker 反代：API、封面、m3u8 与分片全部可达（分片为相对路径，自动跟随反代域），
+// /play/ 的 CloudFront 凭证 Set-Cookie 由反代原样透传。源站恢复国内直连后再评估切回。
+const apiBaseUrl = "https://hanjuapi.skydeadpeng.xyz";
+const mediaOrigin = "https://video.huangju.net/";
+const mediaMirror = "https://hanjucdn.skydeadpeng.xyz/";
+const rehostMedia = (value) => typeof value === "string" && value.startsWith(mediaOrigin)
+  ? mediaMirror + value.slice(mediaOrigin.length)
+  : value;
 const userAgent = "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36";
 const newestCategory = "@new";
 const channel = "剧果";
@@ -341,7 +349,7 @@ function dramaFromRow(row, sourceId) {
     status = "";
   }
   const description = typeof row.description === "string" ? row.description : "";
-  const cover = coverAddress(row.coverUrl, siteBaseUrl + "/");
+  const cover = coverAddress(rehostMedia(row.coverUrl), siteBaseUrl + "/");
   return {
     id: host.dramaId(sourceId),
     source: host.source,
@@ -639,7 +647,7 @@ module.exports = {
     }
     const response = apiGet("/play/" + pathEscape(id), null, 64 << 10);
     const row = payload(response.value);
-    const address = isRecord(row) && typeof row.url === "string" ? row.url : "";
+    const address = isRecord(row) && typeof row.url === "string" ? rehostMedia(row.url) : "";
     const credentials = mediaCredentials(response.headers, address, isRecord(row) ? row.expiresAt : undefined);
     const media = { url: address, referer: credentials.referer, credentials };
     if (parseAddress(address).path.toLowerCase().endsWith(".m3u8")) {
