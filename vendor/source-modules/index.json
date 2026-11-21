@@ -151,8 +151,8 @@
       "repo": "guoapp-modules/ikanbot",
       "tag": "v1.0.4",
       "sha256": {
-        "manifest.json": "aa973e87f75aaee68e36881a3bda7b5eebaea80788b70e3a9141dcf9006fcc1a",
-        "main.js": "db1b3ddc6477f3cbb738c73f407e63b530831916b64410f9a002fc2f86b04a92"
+        "manifest.json": "d6c094a4a31e95aaebca4986d9b55ee4b50db0b71e63c6907d5d075b83a276c2",
+        "main.js": "a70c0f1f0b0fe784d4b9b032a81b228f307dbb9dc13925d5764e881f297f828b"
       }
     },
     {

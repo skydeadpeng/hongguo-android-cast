@@ -2,7 +2,9 @@
 // 从 guoappxp 的 ikanbot.go 移植：搜索式聚合站，线路接口需 current_id + e_token 签名。
 // 运行环境是 goja：所有导出函数同步，访问网络只能走 host.*，域名需在 manifest.hosts。
 
-const BASE = "https://www1.ikanbot.com";
+// www1 整站长时间无响应；www 的 /play/ 详情路径被 Cloudflare challenge 拦截（403）。
+// www2 的列表与 /play/ 详情均正常应答。
+const BASE = "https://www2.ikanbot.com";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 const PAGE_SIZE = 36;
 const MAX_LINES = 40;
