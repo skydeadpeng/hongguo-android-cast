@@ -1,4 +1,19 @@
-# Android 0.12.83 / 原生 TV 0.1.34 发行记录（2026-11-21）
+# Android 0.12.83 / 0.12.84 / 原生 TV 0.1.34 / 0.1.35 发行记录（2026-11-21）
+
+## 0.12.84 / 0.1.35（画质排序修复，同日追加）
+
+冻结源码：`e35b6cb`。
+
+0.12.83 上线后用户反馈下载大量落 360p。根因：video_tab 模型把各清晰度档挂在同一编码名下（每档单编码），而旧选档排序以编码为主——bounded 按像素升序、auto 按 H.264 优先——把选择钉在最低的 H.264 档。修复：bounded 与 auto 改为短边最高优先、同档 H.264 优先（Java `AppMediaSource.rank` 与 JS `app-source-registered.js` 同步修改，android mac source bundle 构建时重新生成，不入库）；固定画质非边界路径保持按满足画质的最接近档选择。
+
+验证：AppMediaSource 31 检查（含「单编码低档不得压过高档」回归用例）、JS mac-source 52、entitlement 240、source budget 186、播放原生恢复 78 检查全部通过；TV 模拟器实测连播至第 18 集，控制面板显示实际分辨率 1080×1920（修复前同链路 720p 及以下）。
+
+正式下载：
+- phone 0.12.84/code107：[APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.84/Hongguo-0.12.84-phone-release-compatible.apk)。
+- tv 0.12.84/code107：[APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.84/Hongguo-0.12.84-tv-release-compatible.apk)。
+- tvnative 0.1.35/code36：[APK（arm64-v8a）](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.35/HongguoNative-0.1.35-tvNative-release-compatible-arm64-v8a.apk)、[32 位 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.35/HongguoNative-0.1.35-tvNative-release-compatible-armeabi-v7a.apk)。
+
+## 0.12.83 / 0.1.34（连播取源自愈）
 
 冻结源码：`6c0fc4a`（本轮迁移修复 + 版本 bump 的合并提交）。
 

@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 35,
-  "versionName": "0.1.34",
+  "versionCode": 36,
+  "versionName": "0.1.35",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.34/HongguoNative-0.1.34-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 51073837,
-  "sha256": "b7f39b9a57f32fbb6f7d289525485af88c7509054a045dd6b7f7b3ed5c163672",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.35/HongguoNative-0.1.35-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 51073833,
+  "sha256": "9de5aa667d71691cb9218b9f564ffce39c50b945ead18cc6554038321c4c690a",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.34/HongguoNative-0.1.34-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 51073837,
-      "sha256": "b7f39b9a57f32fbb6f7d289525485af88c7509054a045dd6b7f7b3ed5c163672"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.35/HongguoNative-0.1.35-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 51073833,
+      "sha256": "9de5aa667d71691cb9218b9f564ffce39c50b945ead18cc6554038321c4c690a"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.34/HongguoNative-0.1.34-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 47346232,
-      "sha256": "d5a1d7d3b460b0049a02cee06b8234383377860d3eee1b78bf9874246f6057e6"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.35/HongguoNative-0.1.35-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 47346231,
+      "sha256": "3b09aec3345bae2088c51db94ed0ec24dd42f2290d98b609803e3b56417b546a"
     }
   },
-  "notes": "- 播放取源对齐现行客户端形态：分集模型优先经 video_tab GET 获取，签名 POST 仅作回退，显著降低匿名身份消耗。\n- 双路径均为空响应时，自动注册一个全新匿名身份并重试一轮；带 30 秒冷却与单次额度，预取不消耗轮换额度，防止连续注册反而加重限流。\n- 连播切集空响应自愈：修复 0.12.82 连播数集后「App片源登记或取源未完成」的失败。\n- 保留原有画质、下载、投屏与更新逻辑；同包名同证书覆盖升级，数据不迁移不清理。\n",
-  "publishedAt": "2026-11-21T01:36:31.000Z"
+  "notes": "- 修复连播修复版下载与播放大量落 360p：video_tab 模型把各清晰度档挂在同一编码名下，旧排序以编码为主，会把选择钉在最低的 H.264 档。\n- 自动与边界档位按短边最高优先排序，同档优先 H.264；固定画质路径保持按满足画质的最接近档选择。\n- 保留 0.12.83 的连播取源自愈（video_tab 主路径 + 双空自动换身份）；同包名同证书覆盖升级，数据不迁移不清理。\n",
+  "publishedAt": "2026-11-21T02:02:33.000Z"
 }
