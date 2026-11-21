@@ -1,0 +1,14 @@
+name = "source-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+# 每个源站一个自定义域名，Worker 按 Host 白名单路由（见 worker.js ROUTES）。
+routes = [
+  { pattern = "dsd.skydeadpeng.xyz", custom_domain = true },
+  { pattern = "hanju.skydeadpeng.xyz", custom_domain = true },
+  { pattern = "hanjuapi.skydeadpeng.xyz", custom_domain = true },
+  { pattern = "hanjucdn.skydeadpeng.xyz", custom_domain = true },
+  { pattern = "hgv.skydeadpeng.xyz", custom_domain = true },
+  { pattern = "msv.skydeadpeng.xyz", custom_domain = true },
+  { pattern = "h1.skydeadpeng.xyz", custom_domain = true },
+]
