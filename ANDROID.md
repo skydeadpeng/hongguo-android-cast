@@ -6,15 +6,23 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.85 / code108 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.85 / code108 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.36 / code37 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.86 / code109 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.86 / code109 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.37 / code38 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.85](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.85) · [原生 TV 0.1.36](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.36)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.86](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.86) · [原生 TV 0.1.37](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.37)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+
+## 0.12.86 / 0.1.37 黄果视频来源恢复（2026-11-21）
+
+- 影视来源「黄果视频」改用官方频道公布的最新网址 huangguoai.fit 直连；原主域名 huangguo.video 国内被 DNS 污染且 TLS 握手被阻断。分类、片单、详情、播放清单、AES-128 密钥与分片在真实网络下全链路验证通过。
+- 新增污染域名 DoH 优先解析：来源站域名先经加密 DNS（1.1.1.1 → 223.5.5.5，逐应答公网校验，全部失败才回退系统解析），来源列表与播放取流共用；解析被污染时自动按镜像域切换。
+- 黑桃：播放页年龄确认标记按源精确放行，其他来源的任意 Cookie 输入保持拒绝。
+- 已知边界：黄果视频封面在污染且加密 DNS 不可用的网络上可能暂缺；两域均在 Cloudflare Bot 盾后，Worker 反代路线不可用（1106），封面以外内容不受影响。
+- 发行与验证边界见[本轮发行记录](docs/android-release-2026-11-21.md)。
 
 ## 0.12.85 / 0.1.36 爱看机器人来源恢复（2026-11-21）
 

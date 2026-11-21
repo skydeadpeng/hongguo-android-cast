@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 108,
-  "versionName": "0.12.85",
+  "versionCode": 109,
+  "versionName": "0.12.86",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.85/Hongguo-0.12.85-tv-release-compatible.apk",
-  "size": 5924431,
-  "sha256": "fbc6a96978cc6eb6eed2eeef8fc4d392fe747b40bcbd03287ebf4d4b77433733",
-  "notes": "- 影视来源「爱看机器人」恢复：原站 www1 已长期无响应，改用应答正常的 www2 镜像；分类、详情与签名取流接口全部恢复。\n- 韩小圈：列表/详情正常，播放接口 504 为源站流媒体节点过载，属源站侧波动，可稍后重试。\n- 青空：浏览正常，播放需在 设置 > 站源账号 登录青空账号（源站要求）。\n- 同包名同证书覆盖升级，数据不迁移不清理。\n",
-  "publishedAt": "2026-11-21T02:59:03.000Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.86/Hongguo-0.12.86-tv-release-compatible.apk",
+  "size": 5932003,
+  "sha256": "99ab74b9ab830bb430639e7d0422b6b1e6cd06a71a51f5664861ca3e58a190d8",
+  "notes": "红果 Android 0.12.86 / 原生 TV 0.1.37\n\n- 影视来源「黄果视频」恢复：改用官方频道公布的最新网址 huangguoai.fit 直连（原主域名 huangguo.video 在国内被 DNS 污染且 TLS 握手被阻断，直连失效）。分类、片单、详情、播放清单、AES-128 密钥与分片下载在真实网络下全链路验证通过。\n- 新增污染域名 DoH 优先解析：来源站域名先经加密 DNS（1.1.1.1 → 223.5.5.5，逐应答公网校验，全部失败才回退系统解析），来源列表与播放取流共用；解析被污染时自动按镜像域切换，快速失败不拖慢界面。\n- 黑桃：来源站播放页要求年龄确认标记的，按源精确放行该标记；其他来源的任意 Cookie 输入仍保持拒绝。\n- 已知边界：黄果视频封面图片在系统 DNS 被污染且加密 DNS 不可用的网络上可能暂缺，列表与播放不受影响；黄果视频等站点的 Cloudflare 盾策略由源站控制，个别时段需重试。\n- 同包名同证书覆盖升级，数据不迁移不清理。\n",
+  "publishedAt": "2026-11-21T09:54:03.308Z"
 }

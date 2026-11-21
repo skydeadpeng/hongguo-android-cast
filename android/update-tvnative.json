@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 37,
-  "versionName": "0.1.36",
+  "versionCode": 38,
+  "versionName": "0.1.37",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.36/HongguoNative-0.1.36-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 51073946,
-  "sha256": "0be85fc8ba3e1536d052807264db659d98aef991fb9e8de90dcee310022556e4",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.37/HongguoNative-0.1.37-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 51075341,
+  "sha256": "447411e11727233496eaff64ca9fd91ac199c03644ffbd91c06c127dba95e54c",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.36/HongguoNative-0.1.36-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 51073946,
-      "sha256": "0be85fc8ba3e1536d052807264db659d98aef991fb9e8de90dcee310022556e4"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.37/HongguoNative-0.1.37-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 51075341,
+      "sha256": "447411e11727233496eaff64ca9fd91ac199c03644ffbd91c06c127dba95e54c"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.36/HongguoNative-0.1.36-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 47346332,
-      "sha256": "87c1ae2f8e34988acf94407f213838550aa24996397dd81fa4e73c9eedc26057"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.37/HongguoNative-0.1.37-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 47347736,
+      "sha256": "746d0cef0814cab8fb83ce2bbf5fc88d9344752dc228b64ed7da9fc7efff844e"
     }
   },
-  "notes": "- 影视来源「爱看机器人」恢复：原站 www1 已长期无响应，改用应答正常的 www2 镜像；分类、详情与签名取流接口全部恢复。\n- 韩小圈：列表/详情正常，播放接口 504 为源站流媒体节点过载，属源站侧波动，可稍后重试。\n- 青空：浏览正常，播放需在 设置 > 站源账号 登录青空账号（源站要求）。\n- 同包名同证书覆盖升级，数据不迁移不清理。\n",
-  "publishedAt": "2026-11-21T02:59:03.000Z"
+  "notes": "红果原生 TV 0.1.37（同 0.12.86 来源修复）\n\n- 「黄果视频」恢复：改用官方频道公布的最新网址 huangguoai.fit 直连（原主域名被 DNS 污染且 TLS 阻断）。分类、片单、详情、播放清单、AES-128 密钥与分片下载在真实网络下全链路验证通过。\n- 污染域名 DoH 优先解析：来源站域名先经加密 DNS（1.1.1.1 → 223.5.5.5，逐应答公网校验，全部失败才回退系统解析），来源列表与播放取流共用；解析被污染时自动按镜像域切换。\n- 黑桃：年龄确认标记按源精确放行，其余来源的任意 Cookie 输入保持拒绝。\n- 已知边界：黄果视频封面在系统 DNS 被污染且加密 DNS 不可用的网络上可能暂缺，列表与播放不受影响。\n- 同包名同证书覆盖升级，数据不迁移不清理。\n",
+  "publishedAt": "2026-11-21T09:54:04.158Z"
 }
