@@ -15,6 +15,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import okhttp3.*;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Exercises the production MediaSource/DataSource with previously downloaded real footage.
@@ -38,7 +39,10 @@ final class SourcePilotMediaChecks {
 
     private static void verify(Instrumentation test, File directory, String name) throws Exception {
         final String prefix = "https://media-fixture.invalid/";
-        String token = SourcePlaybackSessions.open("guipian", "红果真实下载素材", new JSONObject().put("url", prefix + name));
+        JSONObject manifest = new JSONObject().put("id", "media-fixture").put("api", 1).put("runtime", "js")
+            .put("baseUrl", prefix)
+            .put("hosts", new JSONArray().put("media-fixture.invalid"));
+        String token = SourcePlaybackSessions.open("media-fixture", "红果真实下载素材", new JSONObject().put("url", prefix + name), manifest);
         SourcePlaybackSessions.Session session = SourcePlaybackSessions.take(token, () -> {});
         if (session == null) throw new AssertionError("session unavailable");
         CountDownLatch first = new CountDownLatch(1);

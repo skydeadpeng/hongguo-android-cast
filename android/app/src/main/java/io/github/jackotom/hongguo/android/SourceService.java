@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 import org.json.*;
 
@@ -26,11 +25,8 @@ final class SourceService {
     private static final int MAX_VARIANTS = 50;
     private static final int INIT_QUEUE = 16;
     private static final String NATIVE_SOURCE = "hongguo";
-    private static final String ACCOUNT_SOURCE = "sorani";
     private static final Pattern TAGS = Pattern.compile("<[^>]*>");
     private static final Pattern CONTROLS = Pattern.compile("[\\x00-\\x1f\\x7f-\\x9f]");
-    private static final Pattern CAPTCHA_ID = Pattern.compile("[A-Za-z0-9_-]{1,128}");
-    private static final Pattern CAPTCHA_IMAGE = Pattern.compile("data:image/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}", Pattern.CASE_INSENSITIVE);
     private final Context context;
     private final SharedPreferences preferences;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -54,7 +50,7 @@ final class SourceService {
             boolean loaded;
             try {
                 JSONArray manifests = SourceModuleRuntime.listManifests(context);
-                if (manifests.length() != 15) throw invalidResult();
+                if (manifests.length() != 1) throw invalidResult();
                 Set<String> ids = new HashSet<>();
                 int restricted = 0;
                 for (int i = 0; i < manifests.length(); i++) {
@@ -63,7 +59,7 @@ final class SourceService {
                     if (!ids.add(lane.id)) throw invalidResult();
                     if (lane.adult) restricted++;
                 }
-                if (!ids.contains(NATIVE_SOURCE) || restricted != 10) throw invalidResult();
+                if (!ids.contains(NATIVE_SOURCE) || restricted != 0) throw invalidResult();
                 // Keep the native entry and ordinary sources at the start of the row.
                 Collections.sort(rows, Comparator.comparingInt(lane -> lane.nativePlayback ? 0 : lane.adult ? 2 : 1));
                 loaded = true;
@@ -140,16 +136,12 @@ final class SourceService {
             if ("search".equals(operation) && !lane.capabilities.contains("search")) {
                 throw new Failure("SOURCE_UNSUPPORTED", "此来源未提供搜索");
             }
-            if ("account".equals(operation) && !lane.hasAccount()) {
+            if ("account".equals(operation)) {
                 throw new Failure("SOURCE_UNSUPPORTED", "此来源未提供账号接口");
             }
 
             // Validate renderer-supplied IDs and parameters before creating any network work.
             Request request = Request.read(operation, params, lane.id);
-            if ("account".equals(operation) && ("savedStatus".equals(request.value) || "forgetSaved".equals(request.value))) {
-                reply.success(new JSONObject().put("available", false).put("remembered", false), null);
-                return;
-            }
             if ("play".equals(operation) && activePlay != null) retire(activePlay, true, "ERR_CANCELED", "已选择其他分集");
             Job job = new Job(lane, request, reply);
             lane.pending.add(job);
@@ -168,7 +160,6 @@ final class SourceService {
         lane.epoch++;
         for (Job job : new ArrayList<>(lane.pending)) retire(job, true, "ERR_CANCELED", "来源操作已取消");
         SourcePlaybackSessions.closeSource(lane.id);
-        lane.cancelAuthorization();
     }
 
     void close() {
@@ -219,23 +210,20 @@ final class SourceService {
                 else if ("LOGIN_REQUIRED".equals(sourceFailure.code)) job.reply.failure("LOGIN_REQUIRED", "请先登录此来源");
                 else if ("SOURCE_SIZE".equals(sourceFailure.code)) job.reply.failure("SOURCE_SIZE", "来源返回的内容超过大小限制");
                 else if ("SOURCE_ADDRESS".equals(sourceFailure.code)) job.reply.failure("SOURCE_ADDRESS", "来源返回了不支持的地址");
-                else job.reply.failure("SOURCE_ERROR", job.accountTransition ? "账号请求未完成，请核对登录信息和验证码" : "来源请求未完成，请重试");
+                else job.reply.failure("SOURCE_ERROR", "来源请求未完成，请重试");
             }
             else if (failure instanceof java.net.SocketTimeoutException) job.reply.failure("ETIMEDOUT", "来源请求超时，请重试");
             else job.reply.failure("SOURCE_ERROR", "来源请求未完成，请检查网络或稍后重试");
             return;
         }
         if (!(value instanceof Playback)) {
-            if (job.accountTransition) cancel(job.lane);
             job.reply.success(value, null);
             return;
         }
         Playback play = (Playback) value;
         try {
             Lane lane = job.lane;
-            SourcePlaybackSessions.KeyAuthorization auth = lane.hasMediaAuthorization()
-                ? (keyUrl, referer, deadline) -> lane.authorizeKey(job.epoch, keyUrl, referer, deadline) : null;
-            String session = SourcePlaybackSessions.open(lane.id, play.title, play.media, lane.manifest, auth);
+            String session = SourcePlaybackSessions.open(lane.id, play.title, play.media, lane.manifest);
             job.reply.success(new JSONObject().put("ok", true).put("variants", play.variants), session);
         } catch (Exception error) {
             job.reply.failure("SOURCE_MEDIA_INVALID", "此分集的播放地址、格式或授权未通过校验");
@@ -250,7 +238,6 @@ final class SourceService {
         final Lane lane;
         final Reply reply;
         final long epoch, deadline;
-        final boolean accountTransition;
         final Runnable timeout;
         final FutureTask<Void> task;
         Job(Lane lane, Request request, Reply reply) {
@@ -258,7 +245,6 @@ final class SourceService {
             this.reply = reply;
             epoch = lane.epoch;
             deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(TIMEOUT_MS);
-            accountTransition = "account".equals(request.op) && ("login".equals(request.value) || "logout".equals(request.value));
             timeout = () -> retire(this, true, "ETIMEDOUT", "来源请求超时，请重试");
             task = new FutureTask<>(() -> {
                 lane.start(this);
@@ -277,7 +263,6 @@ final class SourceService {
         final String op, value, episode;
         final int page;
         int variant = -1;
-        JSONObject payload;
         Request(String op, String value, String episode, int page) {
             this.op = op; this.value = value; this.episode = episode; this.page = page;
         }
@@ -300,12 +285,6 @@ final class SourceService {
                         }
                     }
                     return play;
-                case "account":
-                    String command = params.has("command") ? string(params, "command", 16, true) : "";
-                    if (!Arrays.asList("", "captcha", "login", "logout", "savedStatus", "forgetSaved").contains(command)) throw invalid();
-                    Request account = new Request(op, command, "", 1);
-                    account.payload = "login".equals(command) ? loginPayload(params.optJSONObject("payload")) : new JSONObject();
-                    return account;
                 default: throw invalid();
             }
         }
@@ -326,11 +305,9 @@ final class SourceService {
         if ((!empty && value.isEmpty()) || !value.trim().equals(value) || value.length() > max || CONTROLS.matcher(value).find()) throw invalid();
         return value;
     }
-    // A provider may advertise a slug (including Unicode) rather than an integer, and
-    // Huangguo Video distinguishes "video/<id>" from "series/<id>". A renderer URL
-    // or path traversal is never accepted as a series identity.
+    // A provider may advertise a slug (including Unicode) rather than an integer.
+    // A renderer URL or path traversal is never accepted as a series identity.
     private static String seriesKey(String source, String value) throws Failure {
-        if ("huangguo-video".equals(source) && value.matches("(?:series|video)/[a-zA-Z0-9_-]{1,100}")) return value;
         if (value.equals(".") || value.equals("..") || value.getBytes(StandardCharsets.UTF_8).length > 512 ||
             value.matches("(?s).*[/\\\\:?#%|\"<>].*")) throw invalid();
         return value;
@@ -340,43 +317,6 @@ final class SourceService {
         double n = ((Number) raw).doubleValue();
         if (n != Math.rint(n) || n < min || n > max) throw invalid();
         return (int) n;
-    }
-    private static JSONObject loginPayload(JSONObject raw) throws Exception {
-        if (raw == null) throw invalid();
-        String identifier = string(raw, "identifier", 128, false);
-        Object candidate = raw.opt("password");
-        if (!(candidate instanceof String) || ((String) candidate).isEmpty() ||
-            ((String) candidate).length() > 128 || CONTROLS.matcher((String) candidate).find()) throw invalid();
-        String captchaId = string(raw, "captchaId", 128, false);
-        if (!CAPTCHA_ID.matcher(captchaId).matches()) throw invalid();
-        JSONObject track = raw.optJSONObject("track");
-        if (track == null) throw invalid();
-        JSONObject clean = new JSONObject();
-        for (String part : Arrays.asList("bgImageWidth", "bgImageHeight", "templateImageWidth", "templateImageHeight")) {
-            clean.put(part, integer(track.opt(part), 1, 4000));
-        }
-        long now = System.currentTimeMillis();
-        Object startValue = track.opt("startTime"), stopValue = track.opt("stopTime");
-        if (!(startValue instanceof Number) || !(stopValue instanceof Number)) throw invalid();
-        long start = ((Number) startValue).longValue(), stop = ((Number) stopValue).longValue();
-        if (start < now - 5 * 60_000L || start > stop || stop > now + 60_000L) throw invalid();
-        JSONArray points = track.optJSONArray("trackList"), cleanPoints = new JSONArray();
-        if (points == null || points.length() < 2 || points.length() > 5000) throw invalid();
-        int lastTime = 0;
-        for (int i = 0; i < points.length(); i++) {
-            JSONObject point = points.optJSONObject(i);
-            if (point == null) throw invalid();
-            String type = i == 0 ? "down" : i == points.length() - 1 ? "up" : "move";
-            if (!type.equals(point.opt("type"))) throw invalid();
-            int timestamp = integer(point.opt("t"), lastTime, 300_000);
-            cleanPoints.put(new JSONObject().put("type", type)
-                .put("x", integer(point.opt("x"), 0, 4000)).put("y", integer(point.opt("y"), -10000, 10000))
-                .put("t", timestamp));
-            lastTime = timestamp;
-        }
-        clean.put("startTime", start).put("stopTime", stop).put("trackList", cleanPoints);
-        if (clean.toString().getBytes(StandardCharsets.UTF_8).length > 240 * 1024) throw invalid();
-        return new JSONObject().put("identifier", identifier).put("password", candidate).put("captchaId", captchaId).put("track", clean);
     }
     private static Failure invalid() { return new Failure("INVALID_INPUT", "来源参数无效"); }
     private static Failure invalidResult() { return new Failure("SOURCE_RESPONSE_INVALID", "来源返回的数据格式不受支持"); }
@@ -463,10 +403,6 @@ final class SourceService {
         // Owned by this lane's one worker. Epoch changes invalidate detail identities.
         long detailEpoch = -1;
         private volatile SourceModuleRuntime runtime;
-        private volatile SourceModuleRuntime keyRuntime;
-        private final ReentrantLock keyLock = new ReentrantLock(true);
-        private String issuedCaptcha = "";
-        private long captchaDeadline;
         private Job running;
         final LinkedHashMap<String, Detail> details = new LinkedHashMap<>(16, .75f, true);
         Lane(Context context, JSONObject manifest) throws Exception {
@@ -494,12 +430,9 @@ final class SourceService {
                 runnable -> new Thread(runnable, "android-source-" + id));
             worker.allowCoreThreadTimeOut(true);
         }
-        boolean hasAccount() { return ACCOUNT_SOURCE.equals(id) && capabilities.contains("account"); }
-        boolean hasMediaAuthorization() { return "huangguo-video".equals(id) && capabilities.contains("mediaAuth"); }
         JSONArray publicCapabilities() {
             JSONArray result = new JSONArray();
             if (capabilities.contains("search")) result.put("search");
-            if (hasAccount()) result.put("account");
             return result;
         }
         synchronized void start(Job job) { running = job; }
@@ -508,42 +441,16 @@ final class SourceService {
             // Do not cancel a different job if this one was still queued or just finished.
             if (running == job && runtime != null) runtime.cancel();
         }
-        void cancelAuthorization() {
-            SourceModuleRuntime current = keyRuntime;
-            if (current != null) current.cancel();
-        }
-        String authorizeKey(long revision, String keyUrl, String referer, long deadline) throws Exception {
-            if (!hasMediaAuthorization()) throw invalid();
-            URI endpoint = SourceModuleRuntime.validateMedia(keyUrl);
-            if (!"huangguo.video".equalsIgnoreCase(endpoint.getHost()) || !endpoint.getPath().startsWith("/api/hls_key/")) throw invalid();
-            URI page = SourceModuleRuntime.validateMedia(referer);
-            if (!endpoint.getHost().equalsIgnoreCase(page.getHost())) throw invalid();
-            if (!keyLock.tryLock(Math.max(1, NetworkGuard.remaining(deadline, 12000)), TimeUnit.MILLISECONDS)) {
-                throw new IOException("来源授权请求繁忙");
-            }
-            try {
-                if (epoch != revision) throw new IOException("来源已停止");
-                if (keyRuntime == null) keyRuntime = new SourceModuleRuntime(context, id);
-                if (epoch != revision) throw new IOException("来源已停止");
-                JSONObject grant = object(keyRuntime.invoke("mediaAuthorization", new JSONArray().put(keyUrl).put(referer), deadline));
-                if (epoch != revision || !"X-Preview-Token".equals(grant.opt("header"))) throw invalidResult();
-                String value = string(grant, "value", 4096, false);
-                if (!value.matches("[!-~]+")) throw invalidResult();
-                return value;
-            } finally { keyLock.unlock(); }
-        }
-
         Object execute(Request request, long revision, long deadline) throws Exception {
             NetworkGuard.remaining(deadline, 25000);
             if (epoch != revision) throw new Failure("ERR_CANCELED", "来源操作已取消");
-            if (detailEpoch != revision) { details.clear(); issuedCaptcha = ""; detailEpoch = revision; }
+            if (detailEpoch != revision) { details.clear(); detailEpoch = revision; }
             if (runtime == null) runtime = new SourceModuleRuntime(context, id);
             switch (request.op) {
                 case "categories": return categories(invoke("categories", deadline, false));
                 case "catalog": return listing(invoke("catalogPage", deadline, request.page, request.value));
                 case "search": return listing(invoke("search", deadline, request.page, request.value));
                 case "detail": return fetchDetail(request.value, deadline).display;
-                case "account": return account(request, deadline);
                 case "play": {
                     Detail detail = details.get(request.value);
                     if (detail == null || detail.expires <= System.nanoTime()) {
@@ -571,38 +478,6 @@ final class SourceService {
             JSONArray input = new JSONArray();
             for (Object value : args) input.put(value);
             return runtime.invoke(method, input, deadline);
-        }
-        JSONObject account(Request request, long deadline) throws Exception {
-            String command = request.value;
-            if ("login".equals(command)) {
-                boolean current = issuedCaptcha.equals(request.payload.getString("captchaId")) && System.nanoTime() < captchaDeadline;
-                issuedCaptcha = "";
-                if (!current) throw new Failure("SOURCE_CAPTCHA_EXPIRED", "请重新获取验证码并完成拼图验证");
-            }
-            if ("captcha".equals(command) || "logout".equals(command)) issuedCaptcha = "";
-            JSONObject raw = object(invoke("account", deadline, command, request.payload));
-            if ("captcha".equals(command)) {
-                String token = string(raw, "id", 128, false);
-                if (!CAPTCHA_ID.matcher(token).matches()) throw invalidResult();
-                JSONObject clean = new JSONObject().put("id", token);
-                for (String field : Arrays.asList("backgroundImage", "templateImage")) {
-                    String image = raw.optString(field);
-                    if (image.length() > 256 * 1024 || !CAPTCHA_IMAGE.matcher(image).matches()) throw invalidResult();
-                    clean.put(field, image);
-                }
-                for (String dim : Arrays.asList("backgroundWidth", "backgroundHeight", "templateWidth", "templateHeight")) {
-                    clean.put(dim, integer(raw.opt(dim), 1, 4000));
-                }
-                issuedCaptcha = token;
-                captchaDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(5);
-                return clean;
-            }
-            Object loggedIn = raw.opt("loggedIn");
-            if (!(loggedIn instanceof Boolean)) throw invalidResult();
-            String name = text(raw.opt("name"), 128);
-            String submittedSecret = request.payload.optString("password");
-            if (!submittedSecret.isEmpty() && name.contains(submittedSecret)) name = "";
-            return new JSONObject().put("loggedIn", loggedIn).put("name", name);
         }
 
         Playback selectMedia(JSONObject resolved, Episode episode, int selected, String title) throws Exception {

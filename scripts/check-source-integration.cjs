@@ -34,12 +34,12 @@ let failures=0;async function check(name,fn){if(process.argv[2]&&!name.includes(
   context.testTask=task;vm.runInContext('downloadTasks=[testTask]',context);
   await context.executeHongguoDownload(task);assert.equal(task.status,'failed');assert.match(task.error,/锁定/);assert.equal(fs.statSync(saved).size,120000);
  });
- await check('Hema detail and play routes never fall through to Hongguo',async()=>{
-  const route={fetchEpisodeList:async id=>({series_id:id,source:'hema'}),fetchPlayUrlSingle:async(vid,sid)=>({vid,sid,source:'hema'})};
-  const m={exports:{}};const sandbox={module:m,exports:m.exports,require:n=>n==='./hema'?route:n==='axios'?{get:()=>{throw Error('wrong source')}}:req(n.startsWith('.')?path.join(__dirname,'../src/native',n):n),Buffer,URL,console,process};
+ await check('Custom source detail and play routes never fall through to Hongguo',async()=>{
+  const route={fetchEpisodeList:async id=>({series_id:id,source:'custom'}),fetchPlayUrlSingle:async(vid,sid)=>({vid,sid,source:'custom'})};
+  const m={exports:{}};const sandbox={module:m,exports:m.exports,require:n=>n==='./custom-source'?route:n==='axios'?{get:()=>{throw Error('wrong source')}}:req(n.startsWith('.')?path.join(__dirname,'../src/native',n):n),Buffer,URL,console,process};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/native/hongguo.js'),'utf8'),sandbox);
-  assert.equal((await m.exports.fetchEpisodeList('hema:1')).source,'hema');
-  assert.equal((await m.exports.fetchPlayUrlSingle('hema:1:2','hema:1')).source,'hema');
+  assert.equal((await m.exports.fetchEpisodeList('custom:550e8400-e29b-41d4-a716-446655440000:1')).source,'custom');
+  assert.equal((await m.exports.fetchPlayUrlSingle('custom:550e8400-e29b-41d4-a716-446655440000:1:2','custom:550e8400-e29b-41d4-a716-446655440000:1')).source,'custom');
  });
  await check('Hema media uses its own directory',()=>{assert.equal(path.basename(path.dirname(context.seriesDownloadDir(root,'hema:1','同名剧'))),'河马短剧');});
  if(failures)process.exitCode=1;

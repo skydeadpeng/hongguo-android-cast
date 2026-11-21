@@ -20,8 +20,19 @@ public final class SourcePlaybackSessionsTest {
         catch (IOException expected) { check(true, label); return; }
         check(false, label);
     }
+    private static final JSONObject MANIFEST = fixtureManifest();
+    private static JSONObject fixtureManifest() {
+        try { return new JSONObject()
+            .put("id", "media-fixture").put("api", 1).put("runtime", "js")
+            .put("baseUrl", "https://fixture.example.com/")
+            .put("hosts", new JSONArray().put("fixture.example.com"));
+        } catch (org.json.JSONException error) { throw new AssertionError(error); }
+    }
     private static JSONObject media(String suffix) throws Exception {
         return new JSONObject().put("url", "https://media.example.com/program." + suffix + "?sig=fixture");
+    }
+    private static String open(String suffix) throws Exception {
+        return SourcePlaybackSessions.open("media-fixture", "第1集", media(suffix), MANIFEST);
     }
     private static void playlist(String text) throws IOException {
         SourcePlaybackSessions.checkPlaylist(text.getBytes(StandardCharsets.UTF_8));
@@ -30,21 +41,21 @@ public final class SourcePlaybackSessionsTest {
     public static void main(String[] args) throws Exception {
         AtomicInteger releases = new AtomicInteger();
         AtomicInteger cancelled = new AtomicInteger();
-        String id = SourcePlaybackSessions.open("guipian", "第1集", media("m3u8"));
+        String id = open("m3u8");
         check(!id.contains("sig") && SourcePlaybackSessions.isPending(id), "opaque pending token");
         check(SourcePlaybackSessions.take("other", () -> {}) == null, "unknown token");
         SourcePlaybackSessions.Session hls = SourcePlaybackSessions.take(id, releases::incrementAndGet);
-        check(hls != null && hls.hls && hls.referer.equals("https://guipianwu.com/"), "HLS plan");
+        check(hls != null && hls.hls && hls.referer.equals("https://fixture.example.com/"), "HLS plan");
         check(hls.active() && !SourcePlaybackSessions.isPending(id) && SourcePlaybackSessions.take(id, () -> {}) == null, "single claim");
         check(hls.begin(cancelled::incrementAndGet), "register network call");
-        SourcePlaybackSessions.closeSource("hanxiaoquan");
+        SourcePlaybackSessions.closeSource("another-source");
         check(hls.active(), "another source cannot close current session");
-        SourcePlaybackSessions.closeSource("guipian");
+        SourcePlaybackSessions.closeSource("media-fixture");
         check(!hls.active() && releases.get() == 1 && cancelled.get() == 1, "disable revokes player and its live network");
         check(!hls.begin(cancelled::incrementAndGet), "no late network request");
 
-        String replaced = SourcePlaybackSessions.open("guipian", "替换", media("m3u8"));
-        String mp4id = SourcePlaybackSessions.open("hanxiaoquan", "第2集", media("mp4"));
+        String replaced = open("m3u8");
+        String mp4id = open("mp4");
         check(!SourcePlaybackSessions.isPending(replaced), "new opening revokes pending token");
         SourcePlaybackSessions.Session mp4 = SourcePlaybackSessions.take(mp4id, releases::incrementAndGet);
         check(mp4 != null && !mp4.hls && "video/mp4".equals(mp4.mimeType), "MP4 plan");
@@ -54,35 +65,27 @@ public final class SourcePlaybackSessionsTest {
         SourcePlaybackSessions.close(mp4id);
         check(releases.get() == 2 && cancelled.get() == 2, "closing error view does not double cancel");
 
-        rejected("source allowlist", () -> SourcePlaybackSessions.open("other", "第2集", media("mp4")));
-        rejected("unknown format", () -> SourcePlaybackSessions.open("guipian", "第2集", media("txt")));
-        rejected("wrong format", () -> SourcePlaybackSessions.open("guipian", "第2集", media("m3u8").put("format", "mp4")));
-        rejected("credentials", () -> SourcePlaybackSessions.open("guipian", "第2集", media("mp4").put("credentials", new JSONObject())));
-        rejected("protocol", () -> SourcePlaybackSessions.open("guipian", "第2集", media("mp4").put("url", "http://media.example.com/video.mp4")));
-        rejected("nonvideo header", () -> SourcePlaybackSessions.open("guipian", "第2集", media("mp4").put("userAgent", "Example\r\nX: value")));
-        rejected("cross-source referer", () -> SourcePlaybackSessions.open("guipian", "第2集", media("mp4").put("referer", "https://www.jennyhow.com/")));
-        rejected("referer query", () -> SourcePlaybackSessions.open("guipian", "第2集", media("mp4").put("referer", "https://guipianwu.com/?sig=fixture")));
+        rejected("source allowlist", () -> SourcePlaybackSessions.open("other", "第2集", media("mp4"), MANIFEST));
+        rejected("manifest mismatch", () -> SourcePlaybackSessions.open("a-different-source", "第2集", media("mp4"), MANIFEST));
+        rejected("unknown format", () -> SourcePlaybackSessions.open("media-fixture", "第2集", open2("txt"), MANIFEST));
+        rejected("wrong format", () -> SourcePlaybackSessions.open("media-fixture", "第2集", open2("m3u8").put("format", "mp4"), MANIFEST));
+        rejected("credentials", () -> SourcePlaybackSessions.open("media-fixture", "第2集", open2("mp4").put("credentials", new JSONObject()), MANIFEST));
+        rejected("protocol", () -> SourcePlaybackSessions.open("media-fixture", "第2集", open2("mp4").put("url", "http://media.example.com/video.mp4"), MANIFEST));
+        rejected("nonvideo header", () -> SourcePlaybackSessions.open("media-fixture", "第2集", open2("mp4").put("userAgent", "Example\r\nX: value"), MANIFEST));
+        rejected("cross-source referer", () -> SourcePlaybackSessions.open("media-fixture", "第2集", open2("mp4").put("referer", "https://www.jennyhow.com/"), MANIFEST));
+        rejected("referer query", () -> SourcePlaybackSessions.open("media-fixture", "第2集", open2("mp4").put("referer", "https://fixture.example.com/?sig=fixture"), MANIFEST));
 
-        JSONObject manifest = new JSONObject().put("id", "huangguo-video").put("api", 1).put("runtime", "js")
-            .put("hosts", new JSONArray().put("fixture.example.com")).put("mediaAuthPaths", new JSONArray().put("/api/hls_key/"));
         JSONObject credentials = new JSONObject().put("origin", "https://media.example.com").put("cookie", "session=fixture")
             .put("expiresMs", System.currentTimeMillis() + 60000);
-        JSONObject authorized = media("m3u8").put("credentials", credentials).put("referer", "https://fixture.example.com/video/1");
-        AtomicInteger grants = new AtomicInteger();
-        String authorizedId = SourcePlaybackSessions.open("huangguo-video", "测试", authorized, manifest, (url, referer, deadline) -> {
-            grants.incrementAndGet(); return "fixture-token";
-        });
+        JSONObject authorized = open2("m3u8").put("credentials", credentials).put("referer", "https://fixture.example.com/video/1");
+        String authorizedId = SourcePlaybackSessions.open("media-fixture", "测试", authorized, MANIFEST);
         SourcePlaybackSessions.Session session = SourcePlaybackSessions.take(authorizedId, () -> {});
         check(session != null && session.cookieFor(new URI("https://media.example.com/segment.ts")).equals("session=fixture"), "signed cookie sent to exact authorized origin");
         check(session.cookieFor(new URI("https://cdn.example.com/segment.ts")).isEmpty(), "signed cookie not forwarded across origin");
-        check(session.authorizeKey(new URI("https://fixture.example.com/api/hls_key/1"), 1).equals("fixture-token"), "declared key endpoint receives normal grant");
-        check(session.authorizeKey(new URI("https://fixture.example.com/api/hls_key/../elsewhere"), 1).isEmpty(), "normalization cannot escape grant scope");
-        check(session.authorizeKey(new URI("https://other.example.com/api/hls_key/1"), 1).isEmpty() && grants.get()==1, "grant not forwarded to a different host");
         SourcePlaybackSessions.close(authorizedId);
-        rejected("no key grant after close", () -> session.authorizeKey(new URI("https://fixture.example.com/api/hls_key/1"), 1));
         credentials.put("expiresMs", 1);
-        rejected("expired scoped cookie", () -> SourcePlaybackSessions.open("huangguo-video", "测试", authorized, manifest));
-        rejected("manifest mismatch", () -> SourcePlaybackSessions.open("a-different-source", "测试", media("mp4"), manifest));
+        JSONObject expired = open2("m3u8").put("credentials", credentials).put("referer", "https://fixture.example.com/video/1");
+        rejected("expired scoped cookie", () -> SourcePlaybackSessions.open("media-fixture", "测试", expired, MANIFEST));
 
         URI base = new URI("https://media.example.com/path/index.m3u8?sig=fixture");
         check(SourcePlaybackSessions.redirect(base, "../next.m3u8").equals(new URI("https://media.example.com/next.m3u8")), "relative redirects");
@@ -106,5 +109,8 @@ public final class SourcePlaybackSessionsTest {
         rejected("steering", () -> playlist(vod.replace("#EXTINF", "#EXT-X-CONTENT-STEERING:SERVER-URI=\"steer.json\"\n#EXTINF")));
 
         System.out.println("PASS SourcePlaybackSessionsTest checks=" + count + " networkRequests=0");
+    }
+    private static JSONObject open2(String suffix) throws Exception {
+        return media(suffix);
     }
 }

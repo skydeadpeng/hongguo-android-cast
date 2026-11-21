@@ -8,6 +8,10 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 const episode = (n) => ({ vid: `vid${n}`, vid_index: n, status: 'missing' });
 const detail = (id) => ({ series_id: id, series_title: id, total: 2, episodes: [episode(1), episode(2)] });
 const ok = data => ({ success: true, data });
+// 删除内置多源后，夹具来源一律用 normalizeMediaSources 接受的自定义源 ID。
+const CUSTOM_XIFAN = 'custom:11111111-1111-4111-8111-111111111111';
+const CUSTOM_HEMA = 'custom:22222222-2222-4222-8222-222222222222';
+const CUSTOM_HUANGGUO = 'custom:33333333-3333-4333-8333-333333333333';
 const memoryStorage = (entries = {}) => ({ memory: new Map(Object.entries(entries)), getItem(key) { return this.memory.get(key) ?? null; }, setItem(key, value) { this.memory.set(String(key), String(value)); }, removeItem(key) { this.memory.delete(key); } });
 
 const transformed = new Map();
@@ -121,52 +125,26 @@ async function mount(file, api, props = {}, storage = null) {
 (async () => {
   let failures = 0;
   const test = async (name, fn) => { if (process.argv[2] && !new RegExp(process.argv[2]).test(name)) return; try { await fn(); console.log(`PASS ${name}`); } catch (e) { failures++; console.error(`FAIL ${name}: ${e.stack}`); } };
-  await test('builtin sources settings lock hongguo and persist toggles with failure recovery', async () => {
-    let enabled = true, fail = false;
-    const saved = [];
-    const ui = await mount('BuiltinSources', {
-      getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果' }, ...(enabled ? [{ id: 'xifan', label: '西饭' }] : []), { id: 'hema', label: '河马' }] }),
-      setBuiltinSourceEnabled: async (id, value) => {
-        saved.push([id, value]);
-        if (fail) return { success: false, error: '磁盘空间不足' };
-        enabled = value; ui.dispatchEvent(new Event('custom-sources-changed'));
-        return { success: true };
-      },
-    });
-    await ui.flush();
-    const toggle = id => ui.find(n => n.props['aria-label'] === `${id}来源`);
-    assert.equal(toggle('红果').props.checked, true);
-    assert.equal(toggle('红果').props.disabled, true);
-    await toggle('西饭').props.onChange({ target: { checked: false } }); await ui.flush();
-    assert.deepEqual(saved, [['xifan', false]]);
-    assert.equal(toggle('西饭').props.checked, false);
-    assert.equal(toggle('河马').props.checked, true);
-    fail = true;
-    await toggle('西饭').props.onChange({ target: { checked: true } }); await ui.flush();
-    assert.equal(toggle('西饭').props.checked, false);
-    assert.ok(ui.text().includes('磁盘空间不足'));
-    ui.unmount();
-  });
   await test('builtin source changes invalidate global search and catalogs including late responses', async () => {
     for (const component of ['SearchPanel', 'Browse', 'DramaFeed', 'RandomDrama']) {
       let enabled = true;
       const calls = [], late = deferred();
       const ui = await mount(component, {
-        getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果' }, ...(enabled ? [{ id: 'xifan', label: '西饭' }] : [])] }),
+        getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果' }, ...(enabled ? [{ id: CUSTOM_XIFAN, label: '西饭' }] : [])] }),
         getSeriesList: async () => [], browseCategories: async () => [],
-        browseList: async request => { calls.push(request.source); return request.source === 'xifan' ? late.promise : { success: true, results: [] }; },
-        searchSeries: async (kw, request) => { calls.push(request.source); return request.source === 'xifan' ? late.promise : { success: true, results: [] }; },
+        browseList: async request => { calls.push(request.source); return request.source === CUSTOM_XIFAN ? late.promise : { success: true, results: [] }; },
+        searchSeries: async (kw, request) => { calls.push(request.source); return request.source === CUSTOM_XIFAN ? late.promise : { success: true, results: [] }; },
       }, { active: true });
       await ui.flush();
-      const source = ui.find(n => n.type === 'select' && n.children.some(c => c?.type === 'option' && c.props.value === 'xifan'));
-      source.props.onChange({ target: { value: 'xifan' } }); await ui.flush();
+      const source = ui.find(n => n.type === 'select' && n.children.some(c => c?.type === 'option' && c.props.value === CUSTOM_XIFAN));
+      source.props.onChange({ target: { value: CUSTOM_XIFAN } }); await ui.flush();
       if (component === 'SearchPanel') {
         ui.find(n => n.type === 'input' && n.props.type === 'text').props.onChange({ target: { value: '测试短剧' } }); ui.render();
         ui.button('搜索').props.onClick(); await ui.flush();
       }
       enabled = false;
       ui.dispatchEvent(new Event('custom-sources-changed')); await ui.flush();
-      assert.equal(ui.find(n => n.type === 'option' && n.props.value === 'xifan'), undefined, component);
+      assert.equal(ui.find(n => n.type === 'option' && n.props.value === CUSTOM_XIFAN), undefined, component);
       late.resolve({ success: true, results: [{ series_id: 'xifan:drama:1', series_title: '已关闭来源的迟到片单' }] }); await ui.flush();
       assert.ok(!ui.text().includes('已关闭来源的迟到片单'), component);
       if (component === 'SearchPanel') {
@@ -346,19 +324,18 @@ async function mount(file, api, props = {}, storage = null) {
     const ui = await mount('DramaFeed', { browseList: h.browse }); await ui.flush();
     assert.ok(ui.text().includes('完整简介')); ui.unmount();
   });
-  await test('catalog integration hema and xifan keep hasMore pagination without totalPages', async () => {
-    for (const source of ['hema', 'xifan']) {
-      const calls = [];
-      const ui = await mount('Browse', { getSeriesList: async () => [], browseCategories: async () => [], browseList: async request => {
-        calls.push(request);
-        return { success: true, results: [{ series_id: '7000001', series_title: `${request.source}第${request.page}页` }], hasMore: request.page === 1, totalPages: 0 };
-      } }); await ui.flush();
-      ui.find(n => n.props['aria-label'] === '短剧来源').props.onChange({ target: { value: source } }); await ui.flush();
-      ui.button('下一页').props.onClick(); await ui.flush();
-      assert.equal(calls.at(-1).page, 2); assert.equal(calls.at(-1).source, source);
-      assert.ok(ui.text().includes('第 2 页')); assert.equal(ui.button('下一页').props.disabled, true);
-      ui.button('上一页').props.onClick(); await ui.flush(); assert.ok(ui.text().includes('第 1 页')); ui.unmount();
-    }
+  await test('catalog integration custom sources keep hasMore pagination without totalPages', async () => {
+    const source = CUSTOM_XIFAN;
+    const calls = [];
+    const ui = await mount('Browse', { getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: source, label: '西饭短剧' }] }), getSeriesList: async () => [], browseCategories: async () => [], browseList: async request => {
+      calls.push(request);
+      return { success: true, results: [{ series_id: '7000001', series_title: `${request.source}第${request.page}页` }], hasMore: request.page === 1, totalPages: 0 };
+    } }); await ui.flush();
+    ui.find(n => n.props['aria-label'] === '短剧来源').props.onChange({ target: { value: source } }); await ui.flush();
+    ui.button('下一页').props.onClick(); await ui.flush();
+    assert.equal(calls.at(-1).page, 2); assert.equal(calls.at(-1).source, source);
+    assert.ok(ui.text().includes('第 2 页')); assert.equal(ui.button('下一页').props.disabled, true);
+    ui.button('上一页').props.onClick(); await ui.flush(); assert.ok(ui.text().includes('第 1 页')); ui.unmount();
   });
   await test('feed source switching recovers from failure and cancels stale lists and playback', async () => {
     const custom = 'custom:550e8400-e29b-41d4-a716-446655440000';
@@ -371,13 +348,13 @@ async function mount(file, api, props = {}, storage = null) {
         if (request.source === 'hongguo') return delayHongguo
           ? lateList.promise : Promise.resolve({ success: false, error: '红果连接失败' });
         return Promise.resolve({ success: true, results: [
-          { series_id: request.source === 'xifan' ? 'xifan:drama:7' : `${custom}:8`, series_title: request.source === 'xifan' ? '西饭真实短剧' : '自定义真实短剧', rank: 1 },
+          { series_id: request.source === CUSTOM_XIFAN ? `${CUSTOM_XIFAN}:7` : `${custom}:8`, series_title: request.source === CUSTOM_XIFAN ? '西饭真实短剧' : '自定义真实短剧', rank: 1 },
           { series_id: '123456', series_title: '混入的红果剧集' },
         ] });
       },
       searchResolve: id => {
         resolved.push(id);
-        if (id === 'xifan:drama:7') return latePlay.promise;
+        if (id === `${CUSTOM_XIFAN}:7`) return latePlay.promise;
         const data = detail(id); data.episodes[0].locked = true;
         return Promise.resolve(ok(data));
       },
@@ -386,27 +363,27 @@ async function mount(file, api, props = {}, storage = null) {
     await ui.flush();
     assert.equal(ui.button('取消加载'), undefined, 'source registry loading must not expose an ineffective list cancellation');
     registry.resolve({ success: true, sources: [
-      { id: 'hongguo', label: '红果短剧' }, { id: 'xifan', label: '西饭短剧' },
-      { id: 'hema', label: '河马短剧', enabled: false }, { id: custom, label: '测试片库' },
+      { id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' },
+      { id: CUSTOM_HEMA, label: '河马短剧', enabled: false }, { id: custom, label: '测试片库' },
     ] });
     await ui.flush();
     assert.ok(ui.text().includes('红果连接失败'));
     const source = () => ui.find(n => n.props['aria-label'] === '推荐来源');
     assert.ok(source(), 'failed feed must still expose source switching');
-    assert.equal(ui.find(n => n.type === 'option' && n.props.value === 'hema'), undefined, 'disabled sources stay hidden');
+    assert.equal(ui.find(n => n.type === 'option' && n.props.value === CUSTOM_HEMA), undefined, 'disabled sources stay hidden');
     delayHongguo = true;
     ui.button('重新加载').props.onClick(); await ui.flush();
-    source().props.onChange({ target: { value: 'xifan' } }); await ui.flush();
+    source().props.onChange({ target: { value: CUSTOM_XIFAN } }); await ui.flush();
     assert.ok(ui.text().includes('西饭真实短剧'));
     assert.ok(ui.text().includes('西饭短剧'));
     assert.ok(!ui.text().includes('榜单第 1 名'), 'directory order must not be presented as rankings');
     assert.ok(!ui.text().includes('混入的红果剧集'));
-    assert.equal(requests.at(-1).source, 'xifan'); assert.equal(requests.at(-1).category, 'real-drama');
+    assert.equal(requests.at(-1).source, CUSTOM_XIFAN); assert.equal(requests.at(-1).category, 'real-drama');
     lateList.resolve({ success: true, results: [{ series_id: '654321', series_title: '过期的红果榜单', rank: 2 }] }); await ui.flush();
     assert.ok(!ui.text().includes('过期的红果榜单'));
     ui.button('在剧库播放').props.onClick(); await ui.flush();
     source().props.onChange({ target: { value: custom } }); await ui.flush();
-    latePlay.resolve(ok(detail('xifan:drama:7'))); await ui.flush();
+    latePlay.resolve(ok(detail(`${CUSTOM_XIFAN}:7`))); await ui.flush();
     assert.equal(played.length, 0, 'switching sources must prevent a pending resolve opening the old player');
     assert.ok(ui.text().includes('自定义真实短剧'));
     assert.equal(ui.button('在剧库播放').props.disabled, false, 'switching source resets playback loading');
@@ -428,9 +405,9 @@ async function mount(file, api, props = {}, storage = null) {
   });
   await test('feed channel defaults to App and remembers its own route without changing discovery', async () => {
     const calls = [], storage = memoryStorage({ 'hongguo.catalog.channel.v1': 'web' });
-    const api = { browseList: async request => {
+    const api = { getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }] }), browseList: async request => {
       calls.push(request);
-      return { success: true, results: [{ series_id: request.source === 'xifan' ? 'xifan:drama:7' : '7000001', series_title: '测试片单' }] };
+      return { success: true, results: [{ series_id: request.source === CUSTOM_XIFAN ? `${CUSTOM_XIFAN}:7` : '7000001', series_title: '测试片单' }] };
     } };
     const ui = await mount('DramaFeed', api, {}, storage); await ui.flush();
     const route = () => ui.find(n => n.props['aria-label'] === '推荐目录线路');
@@ -442,7 +419,7 @@ async function mount(file, api, props = {}, storage = null) {
     assert.equal(storage.getItem('hongguo.feed.catalog.channel.v1'), 'web');
     assert.equal(storage.getItem('hongguo.catalog.channel.v1'), 'web');
     ui.button('真人短剧').props.onClick(); await ui.flush(); assert.equal(calls.at(-1).catalogChannel, 'web');
-    ui.find(n => n.props['aria-label'] === '推荐来源').props.onChange({ target: { value: 'xifan' } }); await ui.flush();
+    ui.find(n => n.props['aria-label'] === '推荐来源').props.onChange({ target: { value: CUSTOM_XIFAN } }); await ui.flush();
     assert.equal(route(), undefined); assert.equal(calls.at(-1).catalogChannel, undefined);
     ui.find(n => n.props['aria-label'] === '推荐来源').props.onChange({ target: { value: 'hongguo' } }); await ui.flush();
     assert.equal(route().props.value, 'web');
@@ -838,6 +815,7 @@ async function mount(file, api, props = {}, storage = null) {
   await test('browse App route defaults to dynamic genres and cursor paging with a first-page preview', async () => {
     const calls = [];
     const ui = await mount('Browse', {
+      getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }] }),
       getSeriesList: async () => [],
       browseCategories: async () => [{ slug: 'real-drama', label: '真人剧' }, ...['hot-drama', 'hot-real-drama', 'hot-comic-drama', 'hot-ai-drama'].map(slug => ({ slug, label: slug }))],
       browseList: async request => {
@@ -872,7 +850,7 @@ async function mount(file, api, props = {}, storage = null) {
     assert.equal(calls.at(-1).category, 'hot-comic-drama');
     assert.equal(calls.at(-1).genre, '');
     assert.equal(calls.at(-1).page, 1);
-    ui.find(n => n.props['aria-label'] === '短剧来源').props.onChange({ target: { value: 'xifan' } }); await ui.flush();
+    ui.find(n => n.props['aria-label'] === '短剧来源').props.onChange({ target: { value: CUSTOM_XIFAN } }); await ui.flush();
     assert.equal(ui.find(n => n.props['aria-label'] === '红果目录线路'), undefined);
     assert.equal(calls.at(-1).catalogChannel, undefined, 'other providers must not receive the Hongguo route');
     ui.unmount();
@@ -979,6 +957,7 @@ async function mount(file, api, props = {}, storage = null) {
   await test('browse change batch supports numbered catalogs and preserves genre filters', async () => {
     const calls = [];
     const ui = await mount('Browse', {
+      getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }] }),
       getSeriesList: async () => [], browseCategories: async () => [],
       browseList: async options => {
         calls.push(options);
@@ -987,12 +966,12 @@ async function mount(file, api, props = {}, storage = null) {
       },
     });
     await ui.flush();
-    ui.find(n => n.props['aria-label'] === '短剧来源').props.onChange({ target: { value: 'xifan' } }); await ui.flush();
+    ui.find(n => n.props['aria-label'] === '短剧来源').props.onChange({ target: { value: CUSTOM_XIFAN } }); await ui.flush();
     ui.button('爱情').props.onClick(); await ui.flush();
     assert.ok(ui.button('换一批'));
     ui.button('换一批').props.onClick(); await ui.flush();
     assert.equal(calls.at(-1).page, 2);
-    assert.equal(calls.at(-1).source, 'xifan');
+    assert.equal(calls.at(-1).source, CUSTOM_XIFAN);
     assert.equal(calls.at(-1).genre, 'romance');
     assert.ok(ui.text().includes('分类片单2'));
     assert.equal(ui.button('换一批').props.disabled, true);
@@ -1020,11 +999,12 @@ async function mount(file, api, props = {}, storage = null) {
     });
     const requests = [];
     const ui = await mount('Browse', {
+      getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }] }),
       getSeriesList: async () => [],
       browseCategories: async () => [{ slug: 'real-drama', label: '真人剧' }, { slug: 'hot-drama', label: '综合热播榜' }],
       browseList: request => {
         requests.push({ ...request });
-        return request.source === 'xifan'
+        return request.source === CUSTOM_XIFAN
           ? Promise.resolve({ success: true, results: [{ series_id: 'xifan:A:1', series_title: '西饭片单' }], genres: [] })
           : h.browse(request);
       },
@@ -1070,7 +1050,7 @@ async function mount(file, api, props = {}, storage = null) {
     ui.render();
     await Promise.resolve(); await Promise.resolve();
     assert.equal(typeof resolveLate, 'function', 'the late refresh must reach the App catalog');
-    ui.find(n => n.props['aria-label'] === '短剧来源').props.onChange({ target: { value: 'xifan' } });
+    ui.find(n => n.props['aria-label'] === '短剧来源').props.onChange({ target: { value: CUSTOM_XIFAN } });
     await ui.flush();
     resolveLate();
     await ui.flush();
@@ -1204,12 +1184,12 @@ async function mount(file, api, props = {}, storage = null) {
 
   await test('xifan browse source switch rejects late lists and opens the current source URL', async () => {
     const old = deferred(), opened = [], pages = []; let calls = 0;
-    const ui = await mount('Browse', { getSeriesList: async () => [], browseCategories: async () => [], browseList: p => p.source === 'xifan' ? (pages.push(p.page), Promise.resolve({ success: true, results: [{ series_id: 'X', series_title: '西饭片单' }], genres: [{ slug: '68', label: '都市' }], total: 0, totalPages: 0, hasMore: p.page === 1 })) : ++calls === 1 ? Promise.resolve({ success: true, results: [{ series_id: 'H', series_title: '红果片单' }], sourceUrl: 'https://www.hongguoduanju.com/category/real-drama' }) : old.promise, searchWindowShow: async (...args) => opened.push(args) }, {}, memoryStorage({ 'hongguo.catalog.channel.v1': 'web' }));
+    const ui = await mount('Browse', { getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }] }), getSeriesList: async () => [], browseCategories: async () => [], browseList: p => p.source === CUSTOM_XIFAN ? (pages.push(p.page), Promise.resolve({ success: true, results: [{ series_id: 'X', series_title: '西饭片单' }], genres: [{ slug: '68', label: '都市' }], total: 0, totalPages: 0, hasMore: p.page === 1 })) : ++calls === 1 ? Promise.resolve({ success: true, results: [{ series_id: 'H', series_title: '红果片单' }], sourceUrl: 'https://www.hongguoduanju.com/category/real-drama' }) : old.promise, searchWindowShow: async (...args) => opened.push(args) }, {}, memoryStorage({ 'hongguo.catalog.channel.v1': 'web' }));
     await ui.flush(); await ui.button('打开来源页面').props.onClick();
     assert.equal(opened[0][1], 'https://www.hongguoduanju.com/category/real-drama');
     ui.button('刷新片单').props.onClick(); ui.render();
     const source = ui.find(n => n.props['aria-label'] === '短剧来源'); assert.ok(source, 'source selector missing');
-    source.props.onChange({ target: { value: 'xifan' } }); await ui.flush();
+    source.props.onChange({ target: { value: CUSTOM_XIFAN } }); await ui.flush();
     old.resolve({ success: true, results: [{ series_id: 'late', series_title: '旧红果片单' }] }); await ui.flush();
     assert.ok(ui.text().includes('西饭片单')); assert.ok(!ui.text().includes('旧红果片单'));
     assert.equal(ui.button('打开来源页面'), undefined); assert.ok(ui.button('都市'));
@@ -1218,11 +1198,11 @@ async function mount(file, api, props = {}, storage = null) {
   });
   await test('all-source search merges both sources and resolves the original source ID', async () => {
     const first = deferred(), second = deferred(), calls = [], resolved = [], picked = [];
-    const ui = await mount('SearchPanel', { searchSeries: (kw, options) => { calls.push([kw, options.source]); return options.source === 'hongguo' ? first.promise : options.source === 'xifan' ? second.promise : Promise.resolve({ success: true, results: [] }); }, searchResolve: async id => { resolved.push(id); return ok(detail(id)); } }, { onSelectSeries: d => picked.push(d) });
+    const ui = await mount('SearchPanel', { getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }, { id: CUSTOM_HEMA, label: '河马短剧' }, { id: CUSTOM_HUANGGUO, label: '黄果短剧' }] }), searchSeries: (kw, options) => { calls.push([kw, options.source]); return options.source === 'hongguo' ? first.promise : options.source === CUSTOM_XIFAN ? second.promise : Promise.resolve({ success: true, results: [] }); }, searchResolve: async id => { resolved.push(id); return ok(detail(id)); } }, { onSelectSeries: d => picked.push(d) });
     assert.equal(ui.find(n => n.props['aria-label'] === '短剧来源').props.value, 'all');
     assert.ok(ui.find(n => n.type === 'option' && n.props.value === 'all'));
     ui.find(n => n.type === 'input').props.onChange({ target: { value: '同名剧' } }); ui.render(); ui.button('搜索').props.onClick();
-    assert.deepEqual(calls, [['同名剧', 'hongguo'], ['同名剧', 'xifan'], ['同名剧', 'hema'], ['同名剧', 'huangguo']], 'all searches start without waiting for each other');
+    assert.deepEqual(calls, [['同名剧', 'hongguo'], ['同名剧', CUSTOM_XIFAN], ['同名剧', CUSTOM_HEMA], ['同名剧', CUSTOM_HUANGGUO]], 'all searches start without waiting for each other');
     second.resolve({ success: true, results: [{ series_id: 'xifan:test:123', series_title: '同名剧' }] });
     first.resolve({ success: true, results: [{ series_id: '123', series_title: '同名剧' }] }); await ui.flush();
     const cards = ui.nodes().filter(n => n.props.className?.startsWith('search-card '));
@@ -1246,7 +1226,7 @@ async function mount(file, api, props = {}, storage = null) {
   });
   await test('all-source search keeps successful results when the other source fails', async () => {
     for (const failure of [{ success: false, error: '来源暂不可用' }, new Error('连接超时')]) {
-      const ui = await mount('SearchPanel', { searchSeries: async (kw, { source }) => { if (source === 'hongguo') return { success: true, results: [{ series_id: '123', series_title: '仍可查看' }] }; if (failure instanceof Error) throw failure; return failure; } });
+      const ui = await mount('SearchPanel', { getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }] }), searchSeries: async (kw, { source }) => { if (source === 'hongguo') return { success: true, results: [{ series_id: '123', series_title: '仍可查看' }] }; if (failure instanceof Error) throw failure; return failure; } });
       ui.find(n => n.type === 'input').props.onChange({ target: { value: '剧名' } }); ui.render(); ui.button('搜索').props.onClick(); await ui.flush();
       assert.ok(ui.text().includes('仍可查看')); assert.ok(ui.find(n => n.props.role === 'alert'), 'failed source must not be silently omitted');
       assert.ok(ui.text().includes(failure.message || failure.error)); assert.ok(!ui.text().includes('没有找到相关短剧')); ui.unmount();
@@ -1284,7 +1264,7 @@ async function mount(file, api, props = {}, storage = null) {
     await ui.button('搜索').props.onClick(); await ui.flush();
     const oldTask = ui.button('加载更多').props.onClick(); await ui.flush();
     if (transition === 'keyword') { input().props.onChange({ target: { value: '新词' } }); ui.render(); }
-    if (transition === 'source') { source().props.onChange({ target: { value: 'hema' } }); ui.render(); }
+    if (transition === 'source') { source().props.onChange({ target: { value: CUSTOM_HEMA } }); ui.render(); }
     if (transition === 'active') { ui.setProps({ active: false }); ui.setProps({ active: true }); await ui.flush(); }
     else { await ui.button('搜索').props.onClick(); await ui.flush(); }
     const more = ui.button('加载更多');
@@ -1301,11 +1281,12 @@ async function mount(file, api, props = {}, storage = null) {
   await test('load more deadline keeps completed sources and retries only the unfinished page', async () => {
     const old = deferred(), retry = deferred(), calls = [];
     const ui = await mount('SearchPanel', {
-      searchSeries: async (_kw, { source }) => ({ success: true, results: source === 'xifan' || source === 'huangguo' ? [] : [{ series_id: `${source}:1`, series_title: `${source}首屏` }], channel: 'web', page: 1, cursor: { page: 1 }, hasMore: source !== 'xifan' && source !== 'huangguo' }),
+      getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }, { id: CUSTOM_HEMA, label: '河马短剧' }, { id: CUSTOM_HUANGGUO, label: '黄果短剧' }] }),
+      searchSeries: async (_kw, { source }) => ({ success: true, results: source === CUSTOM_XIFAN || source === CUSTOM_HUANGGUO ? [] : [{ series_id: `${source}:1`, series_title: `${source}首屏` }], channel: 'web', page: 1, cursor: { page: 1 }, hasMore: source !== CUSTOM_XIFAN && source !== CUSTOM_HUANGGUO }),
       searchSeriesMore: (_kw, options) => {
         calls.push(options);
         if (options.source === 'hongguo') return Promise.resolve({ success: true, results: [{ series_id: '1000002', series_title: '已完成第二页' }], channel: 'web', page: 2, hasMore: false });
-        return calls.filter(call => call.source === 'hema').length === 1 ? old.promise : retry.promise;
+        return calls.filter(call => call.source === CUSTOM_HEMA).length === 1 ? old.promise : retry.promise;
       },
     });
     ui.find(n => n.props['aria-label'] === '搜索短剧名称').props.onChange({ target: { value: '剧名' } }); ui.render();
@@ -1317,7 +1298,7 @@ async function mount(file, api, props = {}, storage = null) {
     assert.ok(!ui.button('加载更多').props.disabled, 'the deadline must release its own request lock');
     const nextTask = ui.button('加载更多').props.onClick(); await ui.flush();
     assert.equal(calls.length, 3, 'a completed source must not be requested again');
-    assert.equal(calls[2].source, 'hema'); assert.equal(calls[2].page, 2); assert.equal(calls[2].cursor.page, 1);
+    assert.equal(calls[2].source, CUSTOM_HEMA); assert.equal(calls[2].page, 2); assert.equal(calls[2].cursor.page, 1);
     old.resolve({ success: true, results: [{ series_id: 'hema:8', series_title: '超时迟到页' }], channel: 'web', page: 2, hasMore: false });
     await firstTask; await ui.flush();
     assert.ok(ui.button('加载中…')?.props.disabled); assert.ok(!ui.text().includes('超时迟到页'));
@@ -1365,7 +1346,7 @@ async function mount(file, api, props = {}, storage = null) {
   });
   await test('a search timeout still keeps results from sources that already finished', async () => {
     const pending = deferred();
-    const ui = await mount('SearchPanel', { searchSeries: (kw, options) => options.source === 'hongguo'
+    const ui = await mount('SearchPanel', { getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }] }), searchSeries: (kw, options) => options.source === 'hongguo'
       ? pending.promise
       : Promise.resolve({ success: true, results: [{ series_id: 'X', series_title: '先返回的剧' }] }) });
     ui.find(n => n.type === 'input').props.onChange({ target: { value: '剧名' } }); ui.render();
@@ -1380,6 +1361,7 @@ async function mount(file, api, props = {}, storage = null) {
   await test('a failed progressive search pick stops loading and permits the same search again', async () => {
     const slow = deferred(); let calls = 0;
     const ui = await mount('SearchPanel', {
+      getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }, { id: CUSTOM_XIFAN, label: '西饭短剧' }] }),
       searchSeries: (_kw, options) => ++calls === 1 && options.source === 'hongguo'
         ? slow.promise
         : Promise.resolve({ success: true, results: [{ series_id: options.source + ':1', series_title: '先返回的剧' }] }),
@@ -1396,7 +1378,7 @@ async function mount(file, api, props = {}, storage = null) {
     ui.advanceTimers(26000); await ui.flush();
     assert.ok(!ui.text().includes('正在寻找相关短剧'));
     ui.button('搜索').props.onClick(); await ui.flush();
-    assert.equal(calls, 8, 'the same keyword must start a new search even while an old source is pending');
+    assert.equal(calls, 4, 'the same keyword must start a new search even while an old source is pending');
     slow.resolve({ success: true, results: [{ series_id: 'old', series_title: '过期结果' }] }); await ui.flush();
     assert.ok(!ui.text().includes('过期结果'));
     assert.equal(ui.button('搜索').props.disabled, false);
@@ -1416,10 +1398,10 @@ async function mount(file, api, props = {}, storage = null) {
 
   await test('xifan search source change ignores late searches and detail picks', async () => {
     const old = deferred(), pick = deferred(), picked = []; const calls = [];
-    const ui = await mount('SearchPanel', { searchSeries: (kw, options) => { calls.push(options); return options?.source === 'xifan' ? Promise.resolve({ success: true, results: [{ series_id: 'X', series_title: '西饭搜索' }] }) : old.promise; }, searchResolve: () => pick.promise }, { onSelectSeries: d => picked.push(d) });
+    const ui = await mount('SearchPanel', { searchSeries: (kw, options) => { calls.push(options); return options?.source === CUSTOM_XIFAN ? Promise.resolve({ success: true, results: [{ series_id: 'X', series_title: '西饭搜索' }] }) : old.promise; }, searchResolve: () => pick.promise }, { onSelectSeries: d => picked.push(d) });
     ui.find(n => n.type === 'input').props.onChange({ target: { value: '剧名' } }); ui.render(); ui.button('搜索').props.onClick(); ui.render();
     const source = ui.find(n => n.props['aria-label'] === '短剧来源'); assert.ok(source, 'source selector missing');
-    source.props.onChange({ target: { value: 'xifan' } }); ui.render(); ui.button('搜索').props.onClick(); await ui.flush();
+    source.props.onChange({ target: { value: CUSTOM_XIFAN } }); ui.render(); ui.button('搜索').props.onClick(); await ui.flush();
     old.resolve({ success: true, results: [{ series_id: 'H', series_title: '旧搜索' }] }); await ui.flush();
     assert.ok(ui.text().includes('西饭搜索')); assert.ok(!ui.text().includes('旧搜索'));
     ui.find(n => n.props.className?.startsWith('search-card ')).props.onClick(); ui.render();
@@ -1602,7 +1584,7 @@ async function mount(file, api, props = {}, storage = null) {
     input().props.onKeyDown({ key: 'Enter', preventDefault() {} });
     input().props.onKeyDown({ key: 'Enter', preventDefault() {} }); ui.render();
     input().props.onKeyDown({ key: 'Enter', preventDefault() {} });
-    assert.equal(calls, 4, 'same pending all-source search must call each source only once');
+    assert.equal(calls, 1, 'same pending all-source search must call each source only once');
     pending.resolve({ success: true, results: [] }); await ui.flush(); ui.unmount();
   });
   await test('resolve keyboard ignores IME confirmation and duplicate Enter', async () => {

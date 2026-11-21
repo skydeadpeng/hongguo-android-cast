@@ -30,53 +30,32 @@ final class SourcePilotChecks {
                 !android.os.Build.MODEL.contains("sdk")) throw new AssertionError("Use an isolated test emulator");
             service = new SourceService(app);
             JSONArray sources = (JSONArray) call(test, service, request("list", null)).value;
-            java.util.Set<String> expected = new java.util.HashSet<>(java.util.Arrays.asList("beabox", "dsd", "guipian", "hanime1", "hanxiaoquan",
-                "heitao", "hongguo", "huangguo-video", "huangguoai", "huangju", "ikanbot", "jinguoduanju", "missav", "sorani", "yeguo"));
-            check(sources.length() == expected.size(), "all locked modules registered");
-            int restricted = 0;
-            for (int i = 0; i < sources.length(); i++) {
-                JSONObject source = sources.getJSONObject(i);
-                String id = source.getString("id");
-                check(expected.remove(id), "source ID unique and expected");
-                boolean adult = source.getBoolean("adult");
-                if (adult) restricted++;
-                check(source.getBoolean("enabled") != adult, "only ordinary sources enabled by default");
-                if (!id.equals("guipian") && !id.equals("hanxiaoquan")) continue;
-                Result category = call(test, service, request("categories", id));
-                check(category.code == null && category.value instanceof JSONArray, "runtime categories " + id + " code=" + category.code);
-                JSONArray categories = (JSONArray) category.value;
-                check(categories.length() > 1 && categories.getJSONObject(0).has("label"), "normalized categories");
-            }
-            check(restricted == 10, "ten restricted sources still default off");
-            check("SOURCE_DISABLED".equals(call(test, service, request("categories", "yeguo")).code), "restricted source does not run before enable");
+            check(sources.length() == 1, "only the native module registered");
+            JSONObject source = sources.getJSONObject(0);
+            check("hongguo".equals(source.getString("id")), "native source present");
+            check(!source.getBoolean("adult") && source.getBoolean("enabled"), "native source enabled by default");
 
             Result unsupported = call(test, service, request("categories", "unknown"));
             check("INVALID_INPUT".equals(unsupported.code), "unknown source");
-            check("INVALID_INPUT".equals(call(test, service, request("play", "guipian")
-                .put("seriesId", "12345").put("episodeId", "https://example.invalid/not-an-episode")).code),
-                "reject renderer URL");
-            check("SOURCE_DETAIL_EXPIRED".equals(call(test, service, request("play", "guipian").put("seriesId", "12345")
-                .put("episodeId", "ep_" + String.format("%064d", 0))).code), "unissued session cannot reach resolveMedia");
+            check("SOURCE_NATIVE".equals(call(test, service, request("categories", "hongguo")).code), "native source routes to discovery");
 
-            call(test, service, request("settings", "guipian").put("enabled", false));
-            check("SOURCE_DISABLED".equals(call(test, service, request("categories", "guipian")).code), "disabled source blocks work");
-            check(call(test, service, request("categories", "hanxiaoquan")).code == null, "other source stays usable");
+            call(test, service, request("settings", "hongguo").put("enabled", false));
+            check("SOURCE_DISABLED".equals(call(test, service, request("categories", "hongguo")).code), "disabled source blocks work");
             SourceService previous = service;
             test.runOnMainSync(previous::close);
             service = new SourceService(app);
             JSONArray after = (JSONArray) call(test, service, request("list", null)).value;
-            check(!source(after, "guipian").getBoolean("enabled"), "persisted setting");
-            call(test, service, request("settings", "guipian").put("enabled", true));
+            check(!source(after, "hongguo").getBoolean("enabled"), "persisted setting");
+            call(test, service, request("settings", "hongguo").put("enabled", true));
 
             Result cancelled = new Result(), cancel = new Result();
             SourceService active = service;
-            JSONObject categories = request("categories", "guipian");
-            JSONObject stop = request("cancel", "guipian");
+            JSONObject categories = request("categories", "hongguo");
+            JSONObject stop = request("cancel", "hongguo");
             test.runOnMainSync(() -> { active.submit(categories, cancelled); active.submit(stop, cancel); });
             check("ERR_CANCELED".equals(cancelled.await().code) && cancel.await().code == null, "late result cancelled");
-            check(call(test, service, categories).code == null, "source works after cancellation");
 
-            result.putString("stream", "\nANDROID_ALL_SOURCES_PASS registered=15 defaultOff=10 offlineCategories=2 opaqueEpisodes=true persistence=true cancellation=true networkRequests=0\n");
+            result.putString("stream", "\nANDROID_ALL_SOURCES_PASS registered=1 nativeOnly=true persistence=true cancellation=true networkRequests=0\n");
             test.finish(Activity.RESULT_OK, result);
         } catch (Throwable error) {
             result.putString("stream", "\nANDROID_SOURCE_PILOT_FAIL " + error.getClass().getSimpleName() + ": " + error.getMessage() + "\n");

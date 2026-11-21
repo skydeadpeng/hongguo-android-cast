@@ -9,7 +9,7 @@ const { build, SOURCE_IDS } = require('./build-android-source-modules.cjs');
 const hash = data => createHash('sha256').update(data).digest('hex');
 const original = path.resolve(__dirname, '../vendor/source-modules');
 
-test('all 15 Android source assets retain pinned bytes, grading, and runtime hashes', () => {
+test('all Android source assets retain pinned bytes, grading, and runtime hashes', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'android-source-bundle-'));
   try {
     const bundle = path.join(directory, 'vendor');
@@ -18,7 +18,7 @@ test('all 15 Android source assets retain pinned bytes, grading, and runtime has
     const modules = build(output, bundle);
     const assets = path.join(output, 'source-modules');
     assert.deepEqual(modules.map(row => row.id), SOURCE_IDS);
-    assert.equal(modules.filter(row => row.adult).length, 10);
+    assert.equal(modules.filter(row => row.adult).length, 0);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(assets, 'index.json'), 'utf8')).modules, modules);
     for (const entry of modules) {
       for (const name of ['main.js', 'manifest.json', 'runtime.js']) {
@@ -28,8 +28,10 @@ test('all 15 Android source assets retain pinned bytes, grading, and runtime has
       }
     }
     const savedIndex = fs.readFileSync(path.join(assets, 'index.json'));
+    const pinnedMain = fs.readFileSync(path.join(original, SOURCE_IDS.at(-1), 'main.js'));
     fs.appendFileSync(path.join(bundle, SOURCE_IDS.at(-1), 'main.js'), '\n// tampered');
     assert.throws(() => build(output, bundle), /SHA-256 mismatch/);
+    fs.writeFileSync(path.join(bundle, SOURCE_IDS.at(-1), 'main.js'), pinnedMain);
     assert.deepEqual(fs.readFileSync(path.join(assets, 'index.json')), savedIndex);
     const indexFile = path.join(bundle, 'index.json');
     const index = JSON.parse(fs.readFileSync(indexFile, 'utf8'));

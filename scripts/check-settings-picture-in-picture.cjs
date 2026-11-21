@@ -15,8 +15,8 @@ const text = node => typeof node === 'string' || typeof node === 'number' ? Stri
   const appSource = fs.readFileSync(path.join(__dirname, '../src/App.jsx'), 'utf8');
   const shortcutIndex = settingsSource.indexOf('<ShortcutSettings');
   const pictureModeIndex = settingsSource.indexOf('aria-label="画中画小窗设置"');
-  const builtinIndex = settingsSource.indexOf('<BuiltinSources');
-  assert.ok(shortcutIndex >= 0 && shortcutIndex < pictureModeIndex && pictureModeIndex < builtinIndex, 'picture-in-picture setting must sit between shortcuts and built-in sources');
+  const customIndex = settingsSource.indexOf('<CustomSources');
+  assert.ok(shortcutIndex >= 0 && shortcutIndex < pictureModeIndex && pictureModeIndex < customIndex, 'picture-in-picture setting must sit between shortcuts and custom sources');
   assert.match(appSource, /label: '红果账号'/);
   assert.match(appSource, /id: 'manager'[^\n]+\n\s*\{ id: 'account', label: '红果账号'/, 'account follows download management');
   const sidebarMenu = appSource.split('<nav className="sidebar-menu">')[1].split('</nav>')[0];

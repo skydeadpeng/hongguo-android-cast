@@ -208,7 +208,7 @@ if (process.argv[2] !== 'main') {
     } finally { ui.unmount(); }
   });
   await check('third-party online playback never requests unsupported 1080 or 720 tiers', async () => {
-    const ui = mount({ props: { target: { seriesId: 'xifan:A', vidIndex: 1, ts: 1 } }, seriesId: 'xifan:A' });
+    const ui = mount({ props: { target: { seriesId: 'custom:A', vidIndex: 1, ts: 1 } }, seriesId: 'custom:A' });
     try { await ui.flush(); assert.deepEqual(ui.prepares.map(p => p.quality), ['auto']); }
     finally { ui.unmount(); }
   });
@@ -259,7 +259,7 @@ if (process.argv[2] !== 'main') {
     const storage=new Map([['hongguo:online-quality','1080p']]);
     const ui=mount({local:true,storage}); await ui.flush();
     assert.equal(ui.prepares.at(-1)?.quality,'1080p'); ui.unmount();
-    const third=mount({local:true,storage,seriesId:'xifan:A'}); await third.flush();
+    const third=mount({local:true,storage,seriesId:'custom:A'}); await third.flush();
     assert(select(third).props.disabled); assert.equal(select(third).props.value,'auto');
     assert.equal(third.find(n=>n.type==='video').props.src,'file:///mock-1.mp4'); third.unmount();
   });

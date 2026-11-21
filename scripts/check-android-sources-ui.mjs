@@ -20,17 +20,9 @@ function installFixture() {
   if (restoredSource) localStorage.setItem('hongguo.session.v1', JSON.stringify({ tab: 'huangguo', detail: retiredRecord }));
   const rows = [
     { id: 'hongguo', name: '红果', enabled: true, nativePlayback: true, capabilities: ['search'] },
-    { id: 'guipian', name: '鬼片', enabled: true, capabilities: ['search'] },
-    { id: 'hanxiaoquan', name: '韩小圈', enabled: false, capabilities: ['search'] },
-    { id: 'ikanbot', name: '爱看机器人', enabled: true, capabilities: ['search'] },
-    { id: 'sorani', name: '青空', enabled: true, capabilities: ['search', 'account'] },
-    ...[['beabox', '笔盒'], ['dsd', '帝果'], ['hanime1', 'Hanime1'], ['heitao', '黑桃'],
-      ['huangguo-video', '黄果视频'], ['huangguoai', '黄果 AI'], ['huangju', '剧果'], ['jinguoduanju', '禁果短剧'],
-      ['missav', 'MissAV'], ['yeguo', '野果']].map(([id, name]) => ({ id, name, adult: true, enabled: false, capabilities: id === 'huangguo-video' ? [] : ['search'] })),
   ];
   const native = window.sourceFixture = { calls: [], desktopCalls: 0, delayed: null, delayGui: false };
   if (mode === 'desktop') window.DesktopSources = { list: async () => { native.desktopCalls++; return []; } };
-  const card = (sourceId, title = '离线来源测试') => ({ sourceId, seriesId: `${sourceId}:9007199254740993`, title, episodeCount: 2 });
   window.AndroidBridge = { postMessage(raw) {
     const request = JSON.parse(raw);
     const { params: p } = request;
@@ -44,18 +36,6 @@ function installFixture() {
       if (p.operation === 'list' || p.operation === 'settings') {
         if (p.operation === 'settings') rows.find(row => row.id === p.sourceId).enabled = p.enabled === true;
         result = rows.map(row => ({ ...row }));
-      } else if (p.operation === 'categories') {
-        result = [{ id: 'all', label: p.sourceId === 'guipian' ? '鬼片分类' : '韩小圈分类' }];
-        if (p.sourceId === 'guipian' && native.delayGui) { native.delayed = respond; return; }
-      } else if (p.operation === 'catalog' || p.operation === 'search') {
-        result = { items: [card(p.sourceId, p.keyword || `片单 ${p.sourceId}`)], hasMore: false };
-      } else if (p.operation === 'detail') {
-        result = { ...card(p.sourceId), episodes: [{ episodeId: 'first', index: 1, playable: true }, { episodeId: 'second', index: 2, playable: p.sourceId === 'ikanbot' }] };
-      } else if (p.operation === 'account') {
-        result = p.command === 'savedStatus' ? { available: false, remembered: false } : { loggedIn: false, name: '' };
-      } else if (p.operation === 'play') {
-        if (p.sourceId === 'ikanbot') result = { ok: true, variants: [{ id: '0', label: '线路一' }, { id: '1', label: '线路二' }] };
-        else { error = '上游返回 HTTP 403'; errorCode = 'HTTP_403'; }
       }
     }
     queueMicrotask(respond);
@@ -135,82 +115,36 @@ try {
   assert.deepEqual(await navLabels(), ['发现', '搜索', '我的追剧', '下载', '关于']);
   assert.ok(await evaluate('document.querySelector(".android-source-shortcuts .button").getBoundingClientRect().height >= 44 && document.querySelector(".main-content").scrollWidth === document.querySelector(".main-content").clientWidth'));
   await click('.android-source-shortcuts .button');
-  await wait('document.querySelectorAll(".sources-choices button").length === 15');
+  await wait('document.querySelectorAll(".sources-choices button").length === 1');
   assert.deepEqual(await ops(), [{ operation: 'list' }]);
-  assert.equal(await evaluate('Array.from(document.querySelectorAll(".sources-choices button")).filter(button => button.textContent.endsWith("限制级（未启用）")).length'), 10);
+  assert.equal(await evaluate('Array.from(document.querySelectorAll(".sources-choices button")).filter(button => button.textContent.endsWith("限制级（未启用）")).length'), 0);
   await selectSource('红果');
   await wait('document.querySelector(".desktop-sources .state-panel button")?.textContent === "打开红果发现页"');
   assert.deepEqual(await ops(), [{ operation: 'list' }], 'native Hongguo does not invoke archived module');
   await click('.desktop-sources .state-panel button');
   await wait('document.querySelector(".android-source-shortcuts .button")');
   await click('.android-source-shortcuts .button');
-  await wait('document.querySelectorAll(".sources-choices button").length === 15');
-  await selectSource('黄果 AI');
-  await wait('document.querySelector(".desktop-sources .state-panel h2")?.textContent.includes("未启用")');
-  assert.equal((await ops()).filter(op => op.sourceId === 'huangguoai').length, 0, 'disabled restricted source sends no request');
-  await selectSource('韩小圈');
-  assert.deepEqual(await ops(), [{ operation: 'list' }, { operation: 'list' }]);
-  await click('.desktop-sources .state-panel button');
-  await wait('document.querySelector(".poster")?.textContent.includes("hanxiaoquan")');
-  await evaluate('sourceFixture.delayGui = true');
-  await selectSource('鬼片');
-  await wait('sourceFixture.delayed');
-  await selectSource('韩小圈');
-  await wait('document.querySelector(".poster")?.textContent.includes("hanxiaoquan")');
-  await evaluate('sourceFixture.delayed()');
-  assert.ok((await ops()).some(request => request.operation === 'cancel' && request.sourceId === 'guipian'));
-  assert.equal(await evaluate('document.querySelector(".desktop-sources").textContent.includes("鬼片分类")'), false);
-  await evaluate('document.querySelector(".poster").focus()');
-  await click('.poster');
-  await wait('document.querySelectorAll(".episode-grid button").length === 2');
-  await click('.episode-grid button:first-child');
-  await wait('document.querySelector(".episode-note[role=alert]")?.textContent.includes("HTTP 403")');
-  assert.deepEqual((await ops()).filter(request => request.operation === 'play'), [{ operation: 'play', sourceId: 'hanxiaoquan', seriesId: 'hanxiaoquan:9007199254740993', episodeId: 'first' }]);
-  await evaluate('window.__androidBack()');
-  await wait('!document.querySelector(".sources-detail") && document.activeElement.classList.contains("poster")');
-  await selectSource('爱看机器人');
-  await wait('document.querySelector(".poster")?.textContent.includes("ikanbot")');
-  await click('.poster');
-  await wait('document.querySelectorAll(".episode-grid button").length === 2');
-  await click('.episode-grid button:first-child');
-  await wait('document.querySelector(".sources-variants select")');
-  await evaluate('(()=>{const s=document.querySelector(".sources-variants select");s.value="1";s.dispatchEvent(new Event("change",{bubbles:true}));})()');
-  await click('.sources-variants button');
-  await wait('document.querySelector(".episode-grid button:nth-child(2)")?.disabled === false');
-  await click('.episode-grid button:nth-child(2)');
-  const lineRequests = (await ops()).filter(request => request.sourceId === 'ikanbot' && request.operation === 'play');
-  assert.deepEqual(lineRequests.map(({ episodeId, variant }) => [episodeId, variant]), [['first', undefined], ['first', '1'], ['second', undefined]]);
-  await evaluate('window.__androidBack()');
-  await wait('!document.querySelector(".sources-detail")');
-  await selectSource('青空');
-  await wait('document.querySelector(".sources-account > button")');
-  await click('.sources-account > button');
-  await wait('document.querySelector(".sources-login")');
-  assert.equal(await evaluate('document.querySelector("#sources-account-remember")'), null, 'Android does not save passwords');
-  assert.ok((await ops()).some(request => request.operation === 'account' && request.sourceId === 'sorani' && request.command === ''));
-  await evaluate('window.__androidBack()');
-  await wait('document.activeElement === document.querySelector(".android-source-shortcuts .button")');
+  await wait('document.querySelectorAll(".sources-choices button").length === 1');
   await useNav('关于', 'click');
   await wait('document.querySelector(".page-heading h1")?.textContent === "关于红果短剧"');
   assert.equal(await evaluate('document.body.textContent.includes("黄果")'), false);
   assert.deepEqual(await legacyOps(), []);
-  console.log('PASS phone all 15 source entries, 10 restricted defaults, native Hongguo handoff, source cancellation, episode-bound variants, Sorani account and focus restoration');
+  console.log('PASS phone single native source entry, native Hongguo handoff and focus restoration');
 
   await visit('tv');
   await wait('Array.from(document.querySelectorAll(".tv-layout .nav-items button")).some(button => button.textContent === "影视来源")');
   assert.deepEqual(await navLabels(), ['发现', '影视来源', '搜索', '我的追剧', '下载', '关于']);
   await useNav('影视来源', 'focus');
   await key('Enter');
-  await wait('document.querySelectorAll(".sources-choices button").length === 15');
+  await wait('document.querySelectorAll(".sources-choices button").length === 1');
   await key('ArrowRight');
   assert.equal(await evaluate('document.activeElement.closest(".sources-choices") !== null'), true);
   await key('Enter');
   await wait('document.querySelector(".sources-choices [aria-pressed=true]")');
-  for (let i = 0; i < 14; i++) await key('ArrowRight');
-  assert.ok((await evaluate('document.activeElement.textContent')).startsWith('野果'), 'remote reaches the final source in the strip');
+  assert.ok((await evaluate('document.activeElement.textContent')).startsWith('红果'), 'remote keeps focus on the only native source');
   assert.equal(await evaluate('document.querySelector(".android-source-shortcuts")'), null);
   assert.deepEqual(await legacyOps(), []);
-  console.log('PASS TV sidebar and remote focus select an Android source');
+  console.log('PASS TV sidebar and remote focus select the native source');
 
   await visit('restore-old-source');
   await wait('document.querySelector(".nav-items button[aria-current=page]")?.textContent === "发现"');

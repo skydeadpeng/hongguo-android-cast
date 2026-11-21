@@ -36,6 +36,7 @@ function routeFixture(appError = false) {
     } },
     './hema': { fetchPlayUrlSingle: async () => { calls.push('hema'); return { url: mediaUrl('hema') }; } },
     './xifan': { fetchPlayUrlSingle: async () => { calls.push('xifan'); return { url: mediaUrl('xifan') }; } },
+    './custom-source': { fetchPlayUrlSingle: async (vid, sid, options) => { calls.push(`custom:${options.quality}`); return { url: mediaUrl(`custom-${options.quality}`), quality: options.quality }; } },
   });
   return { ...native, calls };
 }
@@ -130,10 +131,12 @@ const checks = [
     const result = await f.fetchPlayUrlSingle('11', '1', { quality: '1080p' });
     assert.equal(result.url, null); assert.match(result.error, /清晰度/); assert.deepEqual(f.calls, ['1080p']);
   }],
-  ['third-party source keeps its authorized URL for later local resolution check', async () => {
+  ['custom source keeps its authorized URL for later local resolution check', async () => {
     const f = routeFixture();
-    for (const name of ['hema', 'xifan']) assert.equal((await f.fetchPlayUrlSingle(`${name}:11`, `${name}:1`, { quality: '1080p' })).url, mediaUrl(name));
-    assert.deepEqual(f.calls, ['hema', 'xifan']);
+    const customId = 'custom:550e8400-e29b-41d4-a716-446655440000';
+    const result = await f.fetchPlayUrlSingle(`${customId}:11`, `${customId}:1`, { quality: '1080p' });
+    assert.equal(result.url, mediaUrl('custom-1080p'));
+    assert.deepEqual(f.calls, ['custom:1080p']);
   }],
   ['shared quality validator handles landscape, portrait, missing and higher dimensions', () => {
     const file = path.join(nativeDir, 'download-quality.js');

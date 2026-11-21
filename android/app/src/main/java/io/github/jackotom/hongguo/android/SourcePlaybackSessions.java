@@ -27,10 +27,6 @@ final class SourcePlaybackSessions {
 
     private SourcePlaybackSessions() {}
 
-    interface KeyAuthorization {
-        String token(String keyUrl, String referer, long deadlineNanos) throws Exception;
-    }
-
     static final class Session {
         final String id = UUID.randomUUID().toString();
         final String sourceId, title, userAgent, referer, mimeType;
@@ -39,7 +35,6 @@ final class SourcePlaybackSessions {
         private final Set<String> metadataHosts;
         private final String credentialOrigin, cookie;
         private final long expiresMs;
-        private final KeyAuthorization keyAuthorization;
         final long issued = System.nanoTime();
         private boolean claimed;
         private boolean revoked;
@@ -48,7 +43,7 @@ final class SourcePlaybackSessions {
         private final Set<Runnable> requests = new HashSet<>();
         private int requestCount;
 
-        Session(String sourceId, String title, JSONObject media, JSONObject manifest, KeyAuthorization authorization) throws Exception {
+        Session(String sourceId, String title, JSONObject media, JSONObject manifest) throws Exception {
             if (!sourceId.equals(manifest.opt("id")) || manifest.optInt("api") != 1 || !"js".equals(manifest.opt("runtime")))
                 throw new IOException("来源媒体清单无效");
             this.sourceId = sourceId;
@@ -88,8 +83,6 @@ final class SourcePlaybackSessions {
             if (agent.isEmpty() && credentials != null) agent = string(credentials, "userAgent");
             if (agent.length() > 1000 || !agent.matches("[\\x20-\\x7e]*")) throw new IOException("来源媒体请求头无效");
             userAgent = agent.isEmpty() ? NetworkGuard.UA : agent;
-            JSONArray paths = manifest.optJSONArray("mediaAuthPaths");
-            keyAuthorization = "huangguo-video".equals(sourceId) && paths != null && contains(paths, "/api/hls_key/") ? authorization : null;
         }
 
         private String checkedReferer(String value) throws IOException {
@@ -101,18 +94,6 @@ final class SourcePlaybackSessions {
             return ref.getPath().isEmpty() ? origin(ref) + "/" : ref.toASCIIString();
         }
         String cookieFor(URI target) { return credentialOrigin.equals(origin(target)) ? cookie : ""; }
-
-        String authorizeKey(URI target, long deadline) throws IOException {
-            String path = target.getRawPath();
-            if (keyAuthorization == null || !hostMatches(target.getHost().toLowerCase(Locale.ROOT), metadataHosts) || !path.startsWith("/api/hls_key/") ||
-                !path.equals(target.normalize().getRawPath()) || path.toLowerCase(Locale.ROOT).matches(".*%(?:2e|2f|5c).*")) return "";
-            if (!active()) throw new IOException("来源播放已取消");
-            try {
-                String token = keyAuthorization.token(target.toASCIIString(), referer, deadline);
-                if (!active() || token == null || !token.matches("[\\x21-\\x7e]{1,4096}")) throw new IOException();
-                return token;
-            } catch (Exception error) { throw new IOException("来源未授予本次播放"); }
-        }
 
         private boolean fresh() { return expiresMs == 0 || System.currentTimeMillis() < expiresMs; }
         private synchronized boolean pending() { return !claimed && !revoked && fresh() && System.nanoTime() - issued < PENDING_NANOS; }
@@ -155,23 +136,10 @@ final class SourcePlaybackSessions {
         }
     }
 
-    static String open(String sourceId, String title, JSONObject media) throws Exception {
-        if (!"guipian".equals(sourceId) && !"hanxiaoquan".equals(sourceId)) throw new IOException("来源未开放播放");
-        String bare = "guipian".equals(sourceId) ? "guipianwu.com" : "jennyhow.com";
-        JSONObject fixtureManifest = new JSONObject().put("id", sourceId).put("api", 1).put("runtime", "js")
-            .put("baseUrl", "https://" + ("guipian".equals(sourceId) ? bare : "www." + bare) + "/")
-            .put("hosts", new JSONArray().put(bare).put("www." + bare));
-        return open(sourceId, title, media, fixtureManifest);
-    }
-
     static String open(String sourceId, String title, JSONObject media, JSONObject manifest) throws Exception {
-        return open(sourceId, title, media, manifest, null);
-    }
-
-    static String open(String sourceId, String title, JSONObject media, JSONObject manifest, KeyAuthorization authorization) throws Exception {
         if (sourceId == null || !sourceId.matches("[a-z0-9][a-z0-9_-]{0,31}") || "hongguo".equals(sourceId) || manifest == null ||
             title == null || title.trim().isEmpty() || title.length() > 512 || media == null) throw new IOException("来源媒体资料无效");
-        Session session = new Session(sourceId, title, media, manifest, authorization);
+        Session session = new Session(sourceId, title, media, manifest);
         Session previous;
         synchronized (LOCK) {
             previous = current;
@@ -276,11 +244,6 @@ final class SourcePlaybackSessions {
     }
 
     private static String origin(URI url) { return "https://" + url.getHost().toLowerCase(Locale.ROOT); }
-
-    private static boolean contains(JSONArray array, String value) {
-        for (int i=0;i<array.length();i++) if (value.equals(array.opt(i))) return true;
-        return false;
-    }
 
     private static String string(JSONObject data, String key) throws IOException {
         if (!data.has(key) || data.isNull(key)) return "";

@@ -36,17 +36,12 @@ import org.mozilla.javascript.Undefined;
 
 /** Bounded API-1 host for reviewed APK assets. Never evaluates remote JavaScript. */
 final class SourceModuleRuntime {
-    static final Set<String> IDS = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(
-        "beabox", "dsd", "guipian", "hanime1", "hanxiaoquan", "heitao", "hongguo", "huangguo-video",
-        "huangguoai", "huangju", "ikanbot", "jinguoduanju", "missav", "sorani", "yeguo")));
-    private static final Set<String> ORDINARY = new HashSet<>(Arrays.asList("guipian","hanxiaoquan","hongguo","ikanbot","sorani"));
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("categories","catalogPage","search","detail","resolveMedia","account","mediaAuthorization"));
-    private static final Set<String> BEARER = new HashSet<>(Arrays.asList("huangju","jinguoduanju","sorani"));
+    static final Set<String> IDS = Collections.unmodifiableSet(new LinkedHashSet<>(Collections.singletonList("hongguo")));
+    private static final Set<String> ORDINARY = new HashSet<>(Collections.singletonList("hongguo"));
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("categories","catalogPage","search","detail","resolveMedia"));
     private static final Set<String> REQUEST_HEADERS = new HashSet<>(Arrays.asList("user-agent","accept","accept-language","content-type",
         "referer","origin","authorization","sec-fetch-dest","sec-fetch-mode","sec-fetch-site","x-requested-with"));
-    private static final Set<String> RESPONSE_HEADERS = new HashSet<>(Arrays.asList("set-cookie","retry-after","content-type","date","location"));
-    /** Synthetic site cookies a source may present: exact value, exact source. */
-    private static final Map<String,String> SITE_COOKIES = Collections.singletonMap("heitao","heitao_age_confirmed=1");
+    private static final Set<String> RESPONSE_HEADERS = new HashSet<>(Arrays.asList("retry-after","content-type","date","location"));
     private static final String ROOT = "source-modules/";
     private static final int MAX_PAGE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_OUTPUT_CHARS = 4 * 1024 * 1024;
@@ -121,29 +116,23 @@ final class SourceModuleRuntime {
     private final JSONObject manifest;
     private final Set<String> metadataHosts;
     private final Wire wire;
-    private final SourceRuntimeState state;
-    private final Map<String,String> fixtureState=new HashMap<>();
     private final LinkedHashMap<String,CacheEntry> cache=new LinkedHashMap<>(16,0.75f,true);
     private int cacheBytes;
     private String preferred="";
     private final AtomicReference<Job> active = new AtomicReference<>();
 
     SourceModuleRuntime(Context context, String sourceId) throws Exception {
-        this(sourceId, readBundle(context, sourceId), SourceModuleRuntime::loadPage,new SourceRuntimeState(context,sourceId));
+        this(sourceId, readBundle(context, sourceId), SourceModuleRuntime::loadPage);
     }
 
-    private SourceModuleRuntime(String sourceId, String[] bundle, Wire wire,SourceRuntimeState state) throws Exception {
-        this(sourceId, bundle[0], bundle[1], wire,state);
+    private SourceModuleRuntime(String sourceId, String[] bundle, Wire wire) throws Exception {
+        this(sourceId, bundle[0], bundle[1], wire);
     }
 
     // Package-local injection allows offline transport and interpreter fixtures.
-    SourceModuleRuntime(String sourceId, String manifestJson, String code, Wire wire) throws Exception {
-        this(sourceId,manifestJson,code,wire,null);
-    }
-
-    private SourceModuleRuntime(String sourceId, String manifestJson,String code,Wire wire,SourceRuntimeState state) throws Exception {
+    SourceModuleRuntime(String sourceId, String manifestJson,String code,Wire wire) throws Exception {
         if (!IDS.contains(sourceId)) throw new Failure("SOURCE_UNKNOWN", "来源未收录");
-        this.sourceId=sourceId; this.code=code; this.wire=wire; this.state=state;
+        this.sourceId=sourceId; this.code=code; this.wire=wire;
         manifest=new JSONObject(manifestJson);
         validateManifest(sourceId,manifest);
         JSONArray hosts=manifest.getJSONArray("hosts");
@@ -176,9 +165,7 @@ final class SourceModuleRuntime {
     }
 
     Object invoke(String method, JSONArray args, long deadlineNanos) throws Exception {
-        if (!METHODS.contains(method) || ("account".equals(method) && !"sorani".equals(sourceId))
-            || ("mediaAuthorization".equals(method) && !"huangguo-video".equals(sourceId))
-            || args == null || args.toString().length() > 2 * 1024 * 1024)
+        if (!METHODS.contains(method) || args == null || args.toString().length() > 2 * 1024 * 1024)
             throw new Failure("SOURCE_INVALID", "来源调用无效");
         long now = System.nanoTime();
         long deadline = deadlineNanos - now > CALL_LIMIT_NANOS ? now + CALL_LIMIT_NANOS : deadlineNanos;
@@ -275,8 +262,6 @@ final class SourceModuleRuntime {
         });
         hostFunction(host, scope, "cacheGet", (c,s,i) -> cacheGet(param(i,0)));
         hostFunction(host, scope, "cacheSet", (c,s,i) -> { cacheSet(param(i,0),first(i,1),first(i,2)); return null; });
-        hostFunction(host, scope, "loadState", (c,s,i) -> loadState(stateName(i)));
-        hostFunction(host, scope, "saveState", (c,s,i) -> { saveState(stateName(i),param(i,1)); return null; });
         hostFunction(host, scope, "catalogContext", (c,s,i) -> parseJson(c,s,"{\"more\":false,\"background\":false}"));
         hostFunction(host, scope, "isKnown", (c,s,i) -> false);
         hostFunction(host, scope, "reportProgress", (c,s,i) -> null);
@@ -356,25 +341,6 @@ final class SourceModuleRuntime {
         Scriptable json=(Scriptable)ScriptableObject.getProperty(scope,"JSON");
         Function parse=(Function)ScriptableObject.getProperty(json,"parse");
         return parse.call(cx,scope,json,new Object[]{value});
-    }
-
-    private String stateName(Object[] args) throws Failure {
-        String value=param(args,0);
-        if (value.length()<1 || value.length()>256 ||
-                !("sorani".equals(sourceId) || "beabox".equals(sourceId)))
-            throw new Failure("SOURCE_INVALID","来源状态字段无效");
-        return value;
-    }
-
-    private String loadState(String key) throws Exception {
-        return state==null?fixtureState.getOrDefault(key,""):state.load(key);
-    }
-
-    private void saveState(String key,String value) throws Exception {
-        if (value.getBytes(StandardCharsets.UTF_8).length>1024*1024) throw new Failure("SOURCE_SIZE","来源状态过大");
-        if (state!=null) state.save(key,value);
-        else if (value.isEmpty()) fixtureState.remove(key);
-        else fixtureState.put(key,value);
     }
 
     private Object cacheGet(String key) {
@@ -483,8 +449,7 @@ final class SourceModuleRuntime {
         URI uri=validateMedia(value);
         // Some sites deliberately use a distinct frontend origin. It may be
         // identified to the server, but never added to the API destination set.
-        if (!metadataHost(uri.getHost()) && !("sorani".equals(sourceId)&&"www.sorani.net".equalsIgnoreCase(uri.getHost())))
-            return "";
+        if (!metadataHost(uri.getHost())) return "";
         if (originOnly || uri.getRawQuery()!=null) return SourceRuntimeSupport.origin(uri)+(originOnly?"":"/");
         return value;
     }
@@ -528,24 +493,17 @@ final class SourceModuleRuntime {
         String referer=property(input,"referer","");
         if (!user.isEmpty()) addHeader(opts,"user-agent",user);
         if (!referer.isEmpty()) addHeader(opts,"referer",referer);
-        // Direct Cookie input is never accepted. In particular, raw HTML
-        // challenges stay blocked. The one exception is SITE_COOKIES: a site
-        // that refuses to serve its player page without an exact synthetic
-        // confirmation marker may present that marker, on its own source only.
+        // Direct Cookie input is never accepted; raw HTML challenges stay blocked.
         Object rawCookie=ScriptableObject.getProperty(input,"cookie");
-        if (rawCookie!=Scriptable.NOT_FOUND && rawCookie!=null && !Undefined.isUndefined(rawCookie)) {
-            String value=rawCookie instanceof CharSequence ? rawCookie.toString() : "";
-            if (!value.equals(SITE_COOKIES.getOrDefault(sourceId,""))) throw new Stopped("SOURCE_ACCESS");
-            opts.headers.put("cookie",value);
-        }
+        if (rawCookie!=Scriptable.NOT_FOUND && rawCookie!=null && !Undefined.isUndefined(rawCookie))
+            throw new Stopped("SOURCE_ACCESS");
         return opts;
     }
 
     private void addHeader(RequestOptions opts,String key,String value) throws Exception {
         if (value.isEmpty()) return;
         if (value.length()>8192 || !value.matches("[ -~]+")) throw new Failure("SOURCE_INVALID","来源请求头无效");
-        if ("authorization".equals(key) && (!BEARER.contains(sourceId)||!value.matches("Bearer [!-~]+")))
-            throw new Stopped("SOURCE_ACCESS");
+        if ("authorization".equals(key)) throw new Stopped("SOURCE_ACCESS");
         if ("referer".equals(key)||"origin".equals(key)) value=allowedReferrer(value,"origin".equals(key));
         if (!value.isEmpty()) opts.headers.put(key,value);
     }
@@ -588,7 +546,7 @@ final class SourceModuleRuntime {
         JSONObject result=new JSONObject();
         for (Map.Entry<String,List<String>> entry:values.entrySet()) {
             String key=entry.getKey().toLowerCase(Locale.ROOT);
-            if (!RESPONSE_HEADERS.contains(key) || ("set-cookie".equals(key)&&!"huangju".equals(sourceId))) continue;
+            if (!RESPONSE_HEADERS.contains(key)) continue;
             StringBuilder title=new StringBuilder();
             for(int i=0;i<key.length();i++) title.append(i==0||key.charAt(i-1)=='-'?Character.toUpperCase(key.charAt(i)):key.charAt(i));
             JSONArray rows=new JSONArray();
@@ -634,23 +592,14 @@ final class SourceModuleRuntime {
                 }
                 address=target; continue;
             }
-            if (page.status==429 || ((page.status==401||page.status==403) && !isRefreshRejection(address,opts,page,media)))
+            if (page.status==429 || page.status==401 || page.status==403)
                 throw new Stopped("HTTP_"+page.status,page.status);
-            if ((page.status<200||page.status>=300) && !opts.allowStatus && !opts.status.contains(page.status) &&
-                !isRefreshRejection(address,opts,page,media))
+            if ((page.status<200||page.status>=300) && !opts.allowStatus && !opts.status.contains(page.status))
                 throw new Failure("HTTP_"+page.status,"HTTP "+page.status,page.status);
             if (!media && page.status>=200 && page.status<300) preferred=SourceRuntimeSupport.origin(address);
             return new Result(address,page);
         }
         throw new Failure("SOURCE_ADDRESS","来源跳转无效");
-    }
-
-    private boolean isRefreshRejection(URI url,RequestOptions opts,Page page,boolean media) {
-        if (media || !"sorani".equals(sourceId) || !"POST".equals(opts.method) || !(page.status==401||page.status==403) ||
-            !"api.sorani.cc".equalsIgnoreCase(url.getHost()) || !"/sorani-cms/api/auth/refresh".equals(url.getRawPath()) ||
-            url.getRawQuery()!=null || page.body.length()>65536) return false;
-        try { return Integer.toString(page.status).equals(new JSONObject(page.body).optString("code")); }
-        catch(Exception invalid) { return false; }
     }
 
     private JSONObject playlist(Scriptable input,Job job) throws Exception {
@@ -663,19 +612,7 @@ final class SourceModuleRuntime {
         addHeader(request,"user-agent",property(input,"userAgent",""));
         addHeader(request,"referer",property(input,"referer",""));
         Object raw=ScriptableObject.getProperty(input,"credentials");
-        if (raw instanceof Scriptable) {
-            if(!"huangju".equals(sourceId)) throw new Stopped("SOURCE_ACCESS");
-            Scriptable credentials=(Scriptable)raw;
-            String origin=property(credentials,"origin","");
-            String cookie=property(credentials,"cookie","");
-            Object expires=ScriptableObject.getProperty(credentials,"expiresMs");
-            if (expires instanceof Number && ((Number)expires).doubleValue()!=0 &&
-                    ((Number)expires).doubleValue()<=System.currentTimeMillis()) throw new Stopped("SOURCE_ACCESS");
-            if (!SourceRuntimeSupport.origin(address).equals(origin) || !validCloudFrontCookie(cookie)) throw new Stopped("SOURCE_ACCESS");
-            request.headers.put("cookie",cookie);
-            addHeader(request,"user-agent",property(credentials,"userAgent",""));
-            addHeader(request,"referer",property(credentials,"referer",""));
-        }
+        if (raw instanceof Scriptable) throw new Stopped("SOURCE_ACCESS");
         for (int depth=0;depth<4;depth++) {
             Result fetched=fetchChecked(address,request,job,true);
             String body=fetched.page.body.replaceFirst("^\\ufeff","").trim();
@@ -702,10 +639,6 @@ final class SourceModuleRuntime {
             }
         }
         throw new Failure("SOURCE_INVALID","来源 HLS 清单层级过深");
-    }
-
-    static boolean validCloudFrontCookie(String value) {
-        return value.length()<=24640 && value.matches("CloudFront-Policy=[a-zA-Z0-9+/_~=.-]{1,8192}; CloudFront-Signature=[a-zA-Z0-9+/_~=.-]{1,8192}; CloudFront-Key-Pair-Id=[a-zA-Z0-9_-]{1,256}");
     }
 
     private static Page loadPage(URI uri,String agent,String referer,Job job) throws Exception {
@@ -735,16 +668,8 @@ final class SourceModuleRuntime {
                 ResponseBody responseBody=response.body();
                 String text="";
                 boolean accessError=status==401||status==403||status==429;
-                // Preserve terminal access status even with a huge challenge
-                // response. Only the exact ordinary session refresh path may
-                // read a small JSON rejection envelope to clear stale state.
-                boolean refresh=accessError && (status==401||status==403) &&
-                    "POST".equals(options.method) && "api.sorani.cc".equalsIgnoreCase(uri.getHost()) &&
-                    "/sorani-cms/api/auth/refresh".equals(uri.getRawPath()) && uri.getRawQuery()==null;
-                if (responseBody!=null && refresh && responseBody.contentLength()<=65536) {
-                    try { text=readText(responseBody.byteStream(),65536,job); }
-                    catch(IOException unusableErrorBody) { text=""; }
-                } else if (responseBody!=null && !accessError && !(status>=300&&status<400)) {
+                // Preserve terminal access status even with a huge challenge response.
+                if (responseBody!=null && !accessError && !(status>=300&&status<400)) {
                     if(responseBody.contentLength()>options.maxBytes) throw new Failure("SOURCE_SIZE","来源网页内容过大");
                     text=readText(responseBody.byteStream(),options.maxBytes,job);
                 }

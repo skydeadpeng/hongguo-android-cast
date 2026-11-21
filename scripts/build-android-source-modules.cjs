@@ -12,10 +12,7 @@ const { transformSync } = require('esbuild');
 
 const ROOT = path.resolve(__dirname, '..');
 const BUNDLE = path.join(ROOT, 'vendor', 'source-modules');
-const SOURCE_IDS = Object.freeze([
-  'beabox', 'dsd', 'guipian', 'hanime1', 'hanxiaoquan', 'heitao', 'hongguo',
-  'huangguo-video', 'huangguoai', 'huangju', 'ikanbot', 'jinguoduanju', 'missav', 'sorani', 'yeguo',
-]);
+const SOURCE_IDS = Object.freeze(['hongguo']);
 const FILES = ['manifest.json', 'main.js'];
 const MAX_BYTES = 1024 * 1024;
 const digest = (data) => createHash('sha256').update(data).digest('hex');

@@ -33,14 +33,9 @@ public final class SourceBundleSyntaxTest {
         host.chapterId = function (id, part) { return host.source + ":" + id + ":" + part; };
         host.randomBytes = function (count) { return new Uint8Array(count); };
         host.cacheGet = function (key) {
-          if (host.source === "yeguo" && key === "access") {
-            return JSON.stringify({base: "https://fixture.invalid", site: "https://fixture.invalid", identifier: "fixture"});
-          }
           return Object.prototype.hasOwnProperty.call(fixtureCache, key) ? fixtureCache[key] : null;
         };
         host.cacheSet = function (key, body) { fixtureCache[key] = body; };
-        host.loadState = function () { return ""; };
-        host.saveState = function () {};
         host.exclusive = function (callback) { return callback(); };
         host.preserveIntegers = function (value) { return value; };
         host.parseUrl = function (value) {
@@ -55,38 +50,15 @@ public final class SourceBundleSyntaxTest {
           return base.scheme + "://" + base.host + (reference.charAt(0) === "/" ? reference : "/" + reference);
         };
         host.fetchText = function (request) {
-          var body = "";
-          if (host.source === "huangguo-video") body = '<a href="https://fixture.invalid/videos?category=1">' + categoryFixture + '</a>';
-          return {status: 200, body: body, url: request.url};
+          return {status: 200, body: "", url: request.url};
         };
         host.parseHtml = function () {
-          var href = "/index.php/vod/type/id/1.html";
-          if (host.source === "hanime1") href = "/search?genre=Offline";
-          if (host.source === "missav") href = "https://fixture.invalid/cn/genres/fixture";
           return { tag: "html", children: [{
-            tag: "a", attrs: { href: href, "class": "nav-desktop-items" }, children: [{text: categoryFixture}]
+            tag: "a", attrs: { href: "/fixture", "class": "nav-desktop-items" }, children: [{text: categoryFixture}]
           }] };
         };
         host.fetch = function (request) {
-          var data;
-          if (host.source === "beabox" && request.url.indexOf("/configs?") !== -1) {
-            data = {code: 200, data: {home_tags: categoryFixture}};
-          } else if (host.source === "huangju" && /\\/auth\\/guest$/.test(request.url)) {
-            data = {token: "offline-fixture"};
-          } else if (host.source === "huangju" && /\\/categories$/.test(request.url)) {
-            data = [{slug: "fixture", name: categoryFixture}];
-          } else if (host.source === "jinguoduanju" && /\\/auth\\/device$/.test(request.url)) {
-            data = {token: "offline-fixture"};
-          } else if (host.source === "jinguoduanju" && /\\/top-navigation$/.test(request.url)) {
-            data = [];
-          } else if (host.source === "jinguoduanju" && /\\/filter-config$/.test(request.url)) {
-            data = {};
-          } else if (host.source === "yeguo" && request.url.indexOf("/api/home/contentOptions?") !== -1) {
-            data = {status: 1, data: {video_filter: {theme: {list: [{value: "1", name: categoryFixture}]}}}};
-          } else {
-            throw new Error("offline fixture has no host response");
-          }
-          return {status: 200, url: request.url, body: JSON.stringify(data), headers: {}};
+          throw new Error("offline fixture has no host response");
         };
         """;
 
@@ -95,7 +67,7 @@ public final class SourceBundleSyntaxTest {
     }
 
     public static void main(String[] args) throws Exception {
-        check(args.length == 16, "expected the assets directory and all fifteen module IDs");
+        check(args.length >= 2, "expected the assets directory and every module ID");
         var assets = Path.of(args[0]);
         Set<String> seen = new HashSet<>();
         int categories = 0;

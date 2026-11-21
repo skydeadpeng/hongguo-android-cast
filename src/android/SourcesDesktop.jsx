@@ -3,202 +3,7 @@ import { ChevronRight, Film, Search } from '../components/icons.jsx';
 import './sources-desktop.css';
 
 const failureText = error => error?.message?.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '').replace(/^\[[A-Z][A-Z0-9_]{0,63}\]\s+/, '') || '请求未完成，请重试。';
-const failureCode = error => error?.code || /\[([A-Z][A-Z0-9_]{0,63})\]/.exec(error?.message || '')?.[1];
 const supports = (source, capability) => Array.isArray(source.capabilities) && source.capabilities.includes(capability);
-const safeCaptchaImage = value => typeof value === 'string' && /^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\r\n]+$/i.test(value) ? value : '';
-
-function CaptchaSlider({ captcha, busy, onComplete }) {
-  const [offset, setOffset] = useState(0);
-  const gesture = useRef(null);
-  const frame = useRef(null);
-  const [availableWidth, setAvailableWidth] = useState(300);
-  const validDimensions = ['backgroundWidth', 'backgroundHeight', 'templateWidth', 'templateHeight'].every(key => Number.isInteger(captcha[key]) && captcha[key] > 0 && captcha[key] <= 4000);
-  const maximumWidth = validDimensions ? Math.min(300, captcha.backgroundWidth) : 300;
-  const width = Math.min(maximumWidth, availableWidth);
-  const scale = width / captcha.backgroundWidth;
-  const height = captcha.backgroundHeight * scale;
-  const templateWidth = captcha.templateWidth * scale;
-  const templateHeight = captcha.templateHeight * scale;
-  const limit = Math.max(0, Math.floor(width - templateWidth));
-  const background = safeCaptchaImage(captcha.backgroundImage);
-  const template = safeCaptchaImage(captcha.templateImage);
-  useEffect(() => {
-    const node = frame.current;
-    if (!node) return undefined;
-    const measure = () => setAvailableWidth(Math.max(1, Math.floor(node.getBoundingClientRect().width)));
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-  useEffect(() => { gesture.current = null; setOffset(0); }, [width]);
-  const resetGesture = () => { gesture.current = null; setOffset(0); };
-  const record = (x, y, type) => {
-    const current = gesture.current;
-    if (!current) return;
-    const next = Math.round(Math.max(0, Math.min(limit, x)));
-    current.offset = next;
-    if (current.points.length < 4999 || type === 'up') current.points.push({ x: next, y: Math.round(y), type, t: Math.max(0, Date.now() - current.startTime) });
-    setOffset(next);
-  };
-  const begin = (x, y, keyboard = false, pointerId) => {
-    if (busy || gesture.current) return;
-    gesture.current = { originX: x, originY: y, keyboard, pointerId, startTime: Date.now(), points: [], offset: 0 };
-    record(0, 0, 'down');
-  };
-  const finish = () => {
-    const current = gesture.current;
-    if (!current || busy) return;
-    record(current.offset, current.keyboard ? 0 : current.lastY || 0, 'up');
-    gesture.current = null;
-    if (current.offset < 2 || current.points.length < 2) { setOffset(0); return; }
-    onComplete({ bgImageWidth: Math.round(width), bgImageHeight: Math.round(height), templateImageWidth: Math.round(templateWidth), templateImageHeight: Math.round(templateHeight), startTime: current.startTime, stopTime: Date.now(), trackList: current.points });
-  };
-  if (!validDimensions || !background || !template || !Number.isFinite(limit) || !width || !height) return <p className="text-error" role="alert">验证码图片无效，请重新获取。</p>;
-  return <div className="sources-captcha" ref={frame} style={{ width: '100%', maxWidth: maximumWidth }}>
-    <div className="sources-captcha-image" style={{ width, height }} aria-hidden="true">
-      <img src={background} alt="" draggable="false" />
-      <img className="sources-captcha-piece" src={template} alt="" draggable="false" style={{ left: offset, width: templateWidth, height: templateHeight }} />
-    </div>
-    <p id="sources-captcha-help">拖动滑块完成拼图。键盘可用左右键移动，Enter 确认。</p>
-    <div className="sources-captcha-slider" role="slider" aria-label="拼图验证" aria-describedby="sources-captcha-help" aria-valuemin={0} aria-valuemax={limit} aria-valuenow={offset} aria-disabled={busy} tabIndex={busy ? -1 : 0}
-      onPointerDown={event => { if (busy || event.button !== 0) return; event.preventDefault(); if (gesture.current) return; event.currentTarget.setPointerCapture(event.pointerId); begin(event.clientX, event.clientY, false, event.pointerId); }}
-      onPointerMove={event => { const current = gesture.current; if (!current || current.keyboard || current.pointerId !== event.pointerId) return; current.lastY = event.clientY - current.originY; record(event.clientX - current.originX, current.lastY, 'move'); }}
-      onPointerUp={event => { const current = gesture.current; if (!current || current.keyboard || current.pointerId !== event.pointerId) return; current.lastY = event.clientY - current.originY; record(event.clientX - current.originX, current.lastY, 'move'); finish(); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
-      onPointerCancel={resetGesture}
-      onLostPointerCapture={() => { if (gesture.current && !gesture.current.keyboard) resetGesture(); }}
-      onBlur={resetGesture}
-      onKeyDown={event => {
-        if (busy) return;
-        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); if (!gesture.current) begin(0, 0, true); if (gesture.current?.keyboard) record(gesture.current.offset + (event.key === 'ArrowRight' ? 4 : -4), 0, 'move'); }
-        else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (gesture.current?.keyboard) finish(); }
-        else if (event.key === 'Escape') { gesture.current = null; setOffset(0); }
-      }}><span style={{ left: offset }}>↔</span></div>
-  </div>;
-}
-
-const noSavedCredentials = { available: false, remembered: false, identifier: '' };
-const savedCredentialsStatus = value => {
-  if (value?.available !== true) return noSavedCredentials;
-  const identifier = value.remembered === true && typeof value.identifier === 'string' && value.identifier.length <= 128 ? value.identifier.trim() : '';
-  return { available: true, remembered: Boolean(identifier), identifier };
-};
-
-function SourceAccount({ api, sourceId, name, refreshKey }) {
-  const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState(null);
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [captcha, setCaptcha] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [saved, setSaved] = useState(noSavedCredentials);
-  const [rememberCredentials, setRememberCredentials] = useState(false);
-  const [credentialWriteFailed, setCredentialWriteFailed] = useState(false);
-  const pending = useRef(false);
-  const epoch = useRef(0);
-  const savedRead = useRef(0);
-  useEffect(() => () => { epoch.current++; }, []);
-  const refreshSaved = useCallback(async () => {
-    if (sourceId !== 'sorani') return;
-    const current = epoch.current, read = ++savedRead.current;
-    let next = noSavedCredentials;
-    try { next = savedCredentialsStatus(await api.account({ sourceId, command: 'savedStatus' })); }
-    catch { /* Older or isolated bridges may not support local storage. */ }
-    if (current !== epoch.current || read !== savedRead.current) return;
-    setSaved(next);
-    if (next.remembered) setIdentifier(previous => previous || next.identifier);
-  }, [api, sourceId]);
-  const perform = useCallback(async (command, payload = {}) => {
-    if (pending.current) return null;
-    pending.current = true;
-    const current = epoch.current;
-    setBusy(true); setError('');
-    try {
-      const value = await api.account({ sourceId, command, payload });
-      if (current !== epoch.current) return null;
-      if (command === 'captcha') setCaptcha(value);
-      else if (command === 'forgetSaved') {
-        const next = savedCredentialsStatus(value);
-        if (next.remembered) throw new Error('本机已保存的账号和密码未清除，请重试。');
-        setSaved(next);
-      } else {
-        if (typeof value?.loggedIn !== 'boolean') throw new Error('登录状态返回无效，请重新读取。');
-        setStatus({ loggedIn: value.loggedIn, name: typeof value.name === 'string' ? value.name : '' });
-      }
-      return value;
-    } catch (failure) { if (current === epoch.current) setError(failureText(failure)); return null; }
-    finally { if (current === epoch.current) { pending.current = false; setBusy(false); } }
-  }, [api, sourceId]);
-  const previousRefresh = useRef(refreshKey);
-  useEffect(() => {
-    if (refreshKey === previousRefresh.current) return;
-    previousRefresh.current = refreshKey;
-    if (open && !pending.current) perform('');
-  }, [refreshKey, open, perform]);
-  const cancel = () => {
-    epoch.current++;
-    const wasPending = pending.current;
-    pending.current = false;
-    setBusy(false); setError(''); setPassword(''); setCaptcha(null); setRememberCredentials(false); setCredentialWriteFailed(false);
-    if (wasPending) Promise.resolve(api.cancel?.({ sourceId })).catch(() => {});
-  };
-  const close = () => { cancel(); setOpen(false); };
-  const useSavedCredentials = sourceId === 'sorani' && saved.remembered && !password && identifier.trim() === saved.identifier;
-  const forgetSaved = async () => {
-    if (pending.current || !saved.remembered) return;
-    const current = epoch.current;
-    savedRead.current++;
-    const result = await perform('forgetSaved');
-    if (!result || current !== epoch.current) return;
-    setIdentifier(previous => previous.trim() === saved.identifier ? '' : previous);
-    setPassword(''); setCaptcha(null); setRememberCredentials(false); setCredentialWriteFailed(false);
-  };
-  const loadCaptcha = event => {
-    event?.preventDefault();
-    if (!identifier.trim() || (!password && !useSavedCredentials)) { setError('请输入用户名或邮箱和密码。'); return; }
-    setCaptcha(null);
-    perform('captcha');
-  };
-  const submitTrack = async track => {
-    if (!captcha || pending.current) return;
-    const current = epoch.current;
-    const payload = { identifier: identifier.trim(), password, captchaId: captcha.id, track,
-      ...(sourceId === 'sorani' ? { useSavedCredentials, rememberCredentials: saved.available && rememberCredentials && !!password } : {}) };
-    setPassword('');
-    const result = await perform('login', payload);
-    if (current !== epoch.current) return;
-    setCaptcha(null);
-    if (result?.loggedIn) {
-      setIdentifier(''); setRememberCredentials(false);
-      setCredentialWriteFailed(result.credentialWriteFailed === true);
-      if (sourceId === 'sorani' && result.savedCredentials) {
-        const next = savedCredentialsStatus(result.savedCredentials);
-        savedRead.current++;
-        setSaved(next);
-        if (next.remembered) setIdentifier(next.identifier);
-      } else void refreshSaved();
-    }
-  };
-  return <section className="sources-account" aria-label={`${name}账号`}>
-    <button className="button" type="button" aria-expanded={open} onClick={() => { if (open) close(); else { setOpen(true); perform(''); void refreshSaved(); } }}>{open ? '收起来源账号' : '来源账号'}</button>
-    {open && <div className="sources-account-content">
-      {busy && <div className="sources-account-pending"><p role="status">正在处理账号请求…</p><button className="button" type="button" onClick={cancel}>取消账号请求</button></div>}
-      {error && <p className="text-error" role="alert">{error}</p>}
-      {credentialWriteFailed && <p role="status">已登录，但本机未能加密保存此次输入的账号和密码。</p>}
-      {!busy && <button className="button sources-account-refresh" type="button" onClick={() => perform('')}>{status ? '刷新登录状态' : '重新读取登录状态'}</button>}
-      {saved.remembered && <div className="sources-form-actions"><p>此来源的账号和密码已在本机加密保存。退出登录不会清除。</p><button className="button" type="button" disabled={busy || !!captcha} onClick={forgetSaved}>清除已保存的账号和密码</button></div>}
-      {status?.loggedIn ? <div className="sources-account-status"><p>已登录：{status.name || name}</p><button className="button" type="button" disabled={busy} onClick={() => { setPassword(''); setCaptcha(null); setCredentialWriteFailed(false); if (saved.remembered) setIdentifier(saved.identifier); perform('logout'); }}>退出登录</button></div> : status && <form onSubmit={loadCaptcha} className="sources-login">
-        <p>登录信息由当前来源独立保存。{saved.available ? '只有勾选记住并成功登录后才会在本机加密保存密码。' : '本次不保存密码。'}</p>
-        <label htmlFor="sources-account-identifier">用户名或邮箱<input id="sources-account-identifier" value={identifier} onChange={event => setIdentifier(event.target.value)} autoComplete="username" maxLength={128} required disabled={busy || !!captcha} /></label>
-        <label htmlFor="sources-account-password">密码<input id="sources-account-password" type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="off" maxLength={128} required={!useSavedCredentials} placeholder={useSavedCredentials ? '留空使用本机已保存的密码' : undefined} disabled={busy || !!captcha} /></label>
-        {saved.available && <div><label htmlFor="sources-account-remember"><input id="sources-account-remember" type="checkbox" checked={rememberCredentials} onChange={event => setRememberCredentials(event.target.checked)} disabled={busy || !!captcha} style={{ width: 'auto', minHeight: 0, marginInlineEnd: 8 }} />记住本次输入的账号和密码</label></div>}
-        {!captcha && <button className="button" type="submit" disabled={busy}>获取登录验证码</button>}
-        {captcha && <><CaptchaSlider key={captcha.id} captcha={captcha} busy={busy} onComplete={submitTrack} /><div className="sources-form-actions"><button className="button" type="button" disabled={busy} onClick={loadCaptcha}>换一张</button><button className="button" type="button" disabled={busy} onClick={() => { setCaptcha(null); setPassword(''); }}>返回填写</button></div></>}
-      </form>}
-    </div>}
-  </section>;
-}
 
 function AndroidSourceCover({ url }) {
   const [broken, setBroken] = useState(false);
@@ -216,7 +21,6 @@ function SourceBrowser({ api, source, PosterGrid, Status, onOpenHongguo, android
   const [list, setList] = useState({ busy: false, items: [], hasMore: false, error: '', warning: '' });
   const [selected, setSelected] = useState(null);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
-  const [accountRevision, setAccountRevision] = useState(0);
   const [detail, setDetail] = useState({ busy: false, data: null, error: '' });
   const [play, setPlay] = useState({ episodeId: null, error: '', variants: [], variant: '' });
   const categoryEpoch = useRef(0);
@@ -312,7 +116,6 @@ function SourceBrowser({ api, source, PosterGrid, Status, onOpenHongguo, android
     } catch (error) {
       if (epoch === playEpoch.current) {
         setPlay(previous => ({ ...previous, episodeId: null, error: `第 ${episode.index} 集播放失败：${failureText(error)}` }));
-        if (failureCode(error) === 'LOGIN_REQUIRED' || /需要登录|登录已失效|请[^。]*登录/.test(failureText(error))) setAccountRevision(value => value + 1);
       }
     }
     finally { if (epoch === playEpoch.current) playPending.current = false; }
@@ -333,7 +136,6 @@ function SourceBrowser({ api, source, PosterGrid, Status, onOpenHongguo, android
   const activeCategory = android ? categories.items.find(item => item.id === view?.category) : null;
   return <div className="sources-browser">
     {android && !selected && <h2 className="source-catalog-title">{source.name}</h2>}
-    {supports(source, 'account') && <SourceAccount key={sourceId} api={api} sourceId={sourceId} name={source.name} refreshKey={accountRevision} />}
     <div hidden={!!selected}>
       {supports(source, 'search') && <form className="search-form" onSubmit={search}>
         <label htmlFor="desktop-source-query">搜索{source.name}</label>
@@ -368,7 +170,7 @@ function SourceBrowser({ api, source, PosterGrid, Status, onOpenHongguo, android
         </header>
           <section className="episode-section" aria-label="选集"><header><h2>选集</h2><p>{android && detail.data.episodes.some(episode => !episode.playable) ? '部分分集暂不可播' : '在线播放'}</p></header>
             {!!play.episodeId && <p className="episode-note" role="status">{android ? "正在读取分集片源，随后打开播放器…" : "正在打开播放器…"}</p>}
-            {play.error && <p className="text-error episode-note" role="alert">{play.error}</p>}
+            {play.error && <p className="text-error" role="alert">{play.error}</p>}
             {lineChoices.length > 1 && <div className="sources-variants"><label htmlFor="desktop-source-variant">播放线路<select id="desktop-source-variant" value={play.variant} disabled={!!play.episodeId} onChange={event => setPlay(previous => ({ ...previous, variant: event.target.value }))}><option value="">{publicLines.length ? '站点默认线路' : '自动'}</option>{lineChoices.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>{play.lastEpisodeId && <button type="button" className="button" disabled={!!play.episodeId} onClick={() => { const episode = detail.data.episodes.find(item => item.episodeId === play.lastEpisodeId); if (episode) playEpisode(episode); }}>切换线路并播放</button>}</div>}
             {detail.data.episodes.length ? <div className="episode-grid">{detail.data.episodes.map(episode => <button type="button" key={episode.episodeId} title={episode.title || `第 ${episode.index} 集`} aria-label={`${episode.title || `第 ${episode.index} 集`}${episode.playable ? '' : '（暂不可播）'}`} disabled={episode.playable !== true || !!play.episodeId} onClick={() => playEpisode(episode)}>{episode.index}</button>)}</div> : <p className="empty-episodes">来源未返回分集。</p>}
           </section></>}

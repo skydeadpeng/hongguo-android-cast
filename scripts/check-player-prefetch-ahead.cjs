@@ -139,7 +139,7 @@ const flushWithoutBuffering = async ui => {
 
   await test('fixed quality, compatible mode and other sources never use the automatic prefetch ladder', async () => {
     for (const [seriesId, choice, expected] of [['A', '1080p', '1080p'], ['A', '720p', '720p'], ['A', 'compat', 'auto'],
-      ['xifan:A', 'auto', 'auto'], ['hema:A', 'auto', 'auto'], ['custom:A', 'auto', 'auto']]) {
+      ['custom:A', 'auto', 'auto'], ['custom:B', 'auto', 'auto'], ['custom:C', 'auto', 'auto']]) {
       const ui = await openEpisode({ seriesId, storage: new Map([['hongguo:online-quality', choice]]),
         props: { target: { seriesId, vidIndex: 1, ts: 1 } },
         prepare: async payload => payload.prefetch ? { success: false, error: 'unavailable' }

@@ -951,10 +951,6 @@ public final class SourcePlaybackActivity extends Activity {
                 if (initialHost.equalsIgnoreCase(target.getHost()) && !session.referer.isEmpty()) request.header("Referer", session.referer);
                 String cookie = session.cookieFor(target);
                 if (!cookie.isEmpty()) request.header("Cookie", cookie);
-                if (type == C.DATA_TYPE_DRM) {
-                    String token = session.authorizeKey(target, deadline);
-                    if (!token.isEmpty()) request.header("X-Preview-Token", token);
-                }
                 if (range) request.header("Range", "bytes=" + spec.position + "-" +
                     (spec.length == C.LENGTH_UNSET ? "" : spec.position + spec.length - 1));
                 Call call = client.newCall(request.build());

@@ -5,7 +5,6 @@ import './Settings.css';
 import AppearanceSettings from './AppearanceSettings';
 import ShortcutSettings from './ShortcutSettings';
 import CustomSources from './CustomSources';
-import BuiltinSources from './BuiltinSources';
 import AnnouncementSettings from './AnnouncementSettings';
 import { Settings, Folder, Check, Globe, X, RefreshCw, AlertCircle } from './icons';
 
@@ -263,7 +262,6 @@ function SettingsPage({ active = true, preview = false, appInfo = null }) {
           {pictureModeError && <p className="appearance-error" role="alert">{pictureModeError}</p>}
         </div>
       </section>
-      <BuiltinSources />
       <CustomSources active={active} />
       <p className="settings-hint">播放页顶部可开启小窗模式：窗口缩小、置顶并在支持的系统上跨虚拟桌面可见；鼠标移开时暂停隐藏，移回继续，Esc 或 Dock 可恢复主窗口。</p>
       <fieldset className="settings-card" disabled={saving}>

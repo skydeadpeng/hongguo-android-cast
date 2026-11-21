@@ -19,11 +19,11 @@ public final class NetworkGuardTest {
         // 失败后兜底；通配模式与未注册域不经过 DoH 探针；DoH 答案同样过公网校验。
         long dnsDeadline = System.nanoTime() + 25_000_000_000L;
         NetworkGuard.dohProbe = null;
-        NetworkGuard.registerDohFirstHosts(java.util.List.of("huangguoai.fit", "*.poison.example", "nodot", "huangguoai.fit"));
+        NetworkGuard.registerDohFirstHosts(java.util.List.of("doh-fixture.example", "*.poison.example", "nodot", "doh-fixture.example"));
         InetAddress[] clean = { InetAddress.getByName("104.26.1.244") };
         InetAddress[] privateAnswer = { InetAddress.getByName("10.0.0.1") };
-        NetworkGuard.dohProbe = host -> { check("huangguoai.fit".equals(host), "probe receives queried host"); return clean; };
-        check(NetworkGuard.sourceAddresses(java.net.URI.create("https://huangguoai.fit/x"), dnsDeadline)[0].equals(clean[0]), "DoH-first answer wins over poisoned system DNS");
+        NetworkGuard.dohProbe = host -> { check("doh-fixture.example".equals(host), "probe receives queried host"); return clean; };
+        check(NetworkGuard.sourceAddresses(java.net.URI.create("https://doh-fixture.example/x"), dnsDeadline)[0].equals(clean[0]), "DoH-first answer wins over poisoned system DNS");
         NetworkGuard.dohProbe = host -> { throw new java.io.UncheckedIOException(new java.io.IOException("DoH down")); };
         check(NetworkGuard.sourceAddresses(java.net.URI.create("https://example.com/"), dnsDeadline).length > 0, "DoH endpoint failure falls back to system resolver");
         NetworkGuard.dohProbe = host -> privateAnswer;

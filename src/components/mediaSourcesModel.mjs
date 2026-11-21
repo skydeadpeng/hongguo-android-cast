@@ -1,7 +1,4 @@
-export const BUILTIN_MEDIA_SOURCES = [
-  { id: 'hongguo', label: '红果短剧' }, { id: 'xifan', label: '西饭短剧' }, { id: 'hema', label: '河马短剧' },
-  { id: 'huangguo', label: '黄果漫剧' },
-];
+export const BUILTIN_MEDIA_SOURCES = [{ id: 'hongguo', label: '红果短剧' }];
 export const CUSTOM_SOURCE_ID = /^custom:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function normalizeMediaSources(sources) {

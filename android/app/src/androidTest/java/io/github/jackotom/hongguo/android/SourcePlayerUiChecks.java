@@ -38,12 +38,14 @@ import okhttp3.OkHttpClient;
 import okhttp3.Protocol;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Actual debug Activity, with offline transport of real, previously downloaded footage. */
 @UnstableApi
 final class SourcePlayerUiChecks {
     private static final String FIXTURE_HOST = "media-fixture.invalid";
+    private static final String FIXTURE_ID = "media-fixture";
     private static final String TITLE = "红果真实下载样片";
     private static final long WAIT_MS = 18_000;
     private final Instrumentation test;
@@ -202,7 +204,10 @@ final class SourcePlayerUiChecks {
     }
 
     private static String session(String path) throws Exception {
-        return SourcePlaybackSessions.open("guipian", TITLE, new JSONObject().put("url", "https://" + FIXTURE_HOST + "/" + path));
+        JSONObject manifest = new JSONObject().put("id", FIXTURE_ID).put("api", 1).put("runtime", "js")
+            .put("baseUrl", "https://" + FIXTURE_HOST + "/")
+            .put("hosts", new JSONArray().put(FIXTURE_HOST));
+        return SourcePlaybackSessions.open(FIXTURE_ID, TITLE, new JSONObject().put("url", "https://" + FIXTURE_HOST + "/" + path), manifest);
     }
 
     private SourcePlaybackActivity launch(String token, OkHttpClient client) throws Exception {

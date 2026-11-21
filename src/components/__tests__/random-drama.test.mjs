@@ -9,27 +9,25 @@ test('pool keeps available sources, validates IDs and deduplicates', async () =>
   const requests = [];
   const result = await model.loadRandomPool(async options => {
     requests.push(options);
-    if (options.source === 'xifan') throw new Error('offline');
-    return { success: true, results: options.source === 'hongguo'
-      ? [drama('123456'), drama('123456'), drama('hema:1'), drama('bad'), drama('654321', ' ')]
-      : options.source === 'huangguo' ? [drama('huangguo:787')]
-      : [drama('hema:1'), drama('hema:2')] };
+    return { success: true, results: [drama('123456'), drama('123456'), drama('hema:1'), drama('bad'), drama('654321', ' ')] };
   });
-  assert.deepEqual(result.items.map(item => item.series_id), ['123456', 'hema:1', 'hema:2', 'huangguo:787']);
-  assert.deepEqual(result.unavailable, ['xifan']);
-  assert.equal(requests.length, 4);
-  assert.ok(requests.every(request => request.page === 1 && request.category === 'real-drama'));
+  assert.deepEqual(result.items.map(item => item.series_id), ['123456']);
+  assert.deepEqual(result.unavailable, []);
+  assert.equal(requests.length, 1);
+  assert.ok(requests.every(request => request.source === 'hongguo' && request.page === 1 && request.category === 'real-drama'));
 });
 
-test('single-source pool never requests other sources and reports empty directories', async () => {
+test('unavailable or unknown pool sources are rejected before any request', async () => {
   const requests = [];
+  await assert.rejects(model.loadRandomPool(async request => { requests.push(request); return { success: true, results: [] }; }, { source: 'xifan' }), /有效来源/);
+  assert.deepEqual(requests, []);
   const result = await model.loadRandomPool(async request => {
     requests.push(request.source);
     return { success: true, results: [] };
-  }, { source: 'xifan' });
-  assert.deepEqual(requests, ['xifan']);
+  }, { source: 'hongguo' });
+  assert.deepEqual(requests, ['hongguo']);
   assert.deepEqual(result.items, []);
-  assert.deepEqual(result.unavailable, ['xifan']);
+  assert.deepEqual(result.unavailable, ['hongguo']);
 });
 
 test('draw excludes the previous ID and the same title across sources', () => {
@@ -40,12 +38,10 @@ test('draw excludes the previous ID and the same title across sources', () => {
   assert.equal(model.pickRandomDrama([]), null);
 });
 
-test('slow source times out without discarding a working source', async () => {
-  const result = await model.loadRandomPool(({ source }) => source === 'hongguo'
-    ? Promise.resolve({ success: true, results: [drama('123456')] })
-    : new Promise(() => {}), { timeoutMs: 10 });
-  assert.equal(result.items.length, 1);
-  assert.deepEqual(result.unavailable, ['xifan', 'hema', 'huangguo']);
+test('slow source times out and is reported unavailable', async () => {
+  const result = await model.loadRandomPool(() => new Promise(() => {}), { timeoutMs: 10 });
+  assert.deepEqual(result.items, []);
+  assert.deepEqual(result.unavailable, ['hongguo']);
 });
 
 test('cancelling a pending pool rejects promptly', async () => {

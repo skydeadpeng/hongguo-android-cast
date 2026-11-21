@@ -75,16 +75,6 @@ x264 是唯一非系统静态依赖（GPLv2-or-later），整体构建为 GPLv3-
 
 3.6 的 App 目录复用项目已有签名实现。目录参数、返回结构与官方图片对象的 JPEG 变体参考 [aston314/hongguo-tv 公开实现](https://github.com/aston314/hongguo-tv/tree/d6a75e3d8e014d50904e24813cb23cff9aa9044c)；不使用其中的固定设备或账号身份。目录接口可访问不代表剧集获准再分发，发行包不包含测试剧集媒体。
 
-## 西饭接口参考
-
-独立编写适配器；接口路径核对参考 [Hululu007/drpy-node](https://github.com/Hululu007/drpy-node/tree/295f2b7047e14122d542a7736cb931e81abcf85c)（GPL-3.0）。
-未复制其中的会话标识或解锁流程。公开接口可访问不代表作品获得再分发授权；安装包不包含剧集媒体。
-
-## 剧果接口参考（桌面开发版）
-
-独立编写适配器；分类、目录、搜索、详情与访客播放接口参考 [GuoApp 的剧果模块 v1.0.1](https://github.com/guoapp-modules/huangju/tree/v1.0.1)（GPL-3.0）。HLS.js 用于桌面在线播放，随其 npm 包保留 Apache-2.0 许可。
-
-
 ## Anime4K-WebGPU
 
 Package: anime4k-webgpu 1.0.0
@@ -156,11 +146,11 @@ SOFTWARE.
 
 ## GuoApp source modules (desktop source layer, 2026-11-19)
 
-- Upstream module repositories: all 15 repositories listed in `vendor/source-modules/index.json` under https://github.com/guoapp-modules .
+- Upstream module repository: `hongguo`, listed in `vendor/source-modules/index.json` under https://github.com/guoapp-modules .
 - License: GPL-3.0. Original module JavaScript and manifests are preserved without modification under `vendor/source-modules/`; full upstream GPL text is included in `vendor/source-modules/LICENSE`.
-- The pinned release tags, upstream content classifications and SHA-256 hashes for every included module file are recorded in `vendor/source-modules/index.json`, from https://github.com/guoapp-modules/index . Restricted sources are disabled by default and enabled individually.
+- The pinned release tag, upstream content classification and SHA-256 hashes for every included module file are recorded in `vendor/source-modules/index.json`, from https://github.com/guoapp-modules/index .
 - Module API behavior follows https://github.com/Xanerix/guoapp/blob/51f39b58bce6b4c9d464e382e86e5f79aa2e9d2b/DEVELOPMENT.md . The desktop host compatibility layer and normalized provider are local implementations, not the upstream Flutter application or Go runtime.
-- The existing desktop Hongguo provider/player remains the active Hongguo implementation; the pinned Hongguo module is reference material and does not replace that playback path. No media files, source-site accounts, or credentials are bundled.
+- The existing desktop Hongguo provider/player remains the active Hongguo implementation; the pinned Hongguo module is reference material and does not replace that playback path. No media files, source-site accounts, or credentials are bundled. All other previously bundled sources were removed on 2026-11-21 to shrink app size.
 
 ## Android bundled source pilot (initial stage)
 
@@ -170,5 +160,5 @@ SOFTWARE.
 
 ## Android full bundled source layer
 
-- All 15 pinned GuoApp module originals (GPL-3.0) now ship in the Android source assets, with the license and verified SHA-256 index. Android executes only derived compatible scripts from that bundle; Hongguo itself keeps the existing native implementation.
+- The pinned GuoApp `hongguo` module original (GPL-3.0) ships in the Android source assets, with the license and verified SHA-256 index. Android executes only derived compatible scripts from that bundle; Hongguo itself keeps the existing native implementation. All other previously bundled sources were removed on 2026-11-21 to shrink app size.
 - jsoup 1.23.2: MIT. Used to parse source responses as HTML data, not to run site scripts. Source and license: https://github.com/jhy/jsoup/tree/jsoup-1.23.2 .

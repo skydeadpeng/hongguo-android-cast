@@ -24,7 +24,7 @@ for id in $(node -p 'require("./vendor/source-modules/index.json").modules.map(m
     cmp "$ROOT/vendor/source-modules/$id/$name" "$TMP/source-modules/$id/$name"
   done
 done
-[[ "$(find "$TMP/source-modules" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" == 15 ]]
+[[ "$(find "$TMP/source-modules" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" == 1 ]]
 node - "$ROOT" "$TMP" <<'NODE'
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -35,11 +35,11 @@ const tampered = path.join(dir, 'tampered');
 fs.mkdirSync(tampered);
 fs.copyFileSync(path.join(repo, 'vendor/source-modules/index.json'), path.join(tampered, 'index.json'));
 for (const id of SOURCE_IDS) fs.cpSync(path.join(repo, 'vendor/source-modules', id), path.join(tampered, id), { recursive: true });
-fs.appendFileSync(path.join(tampered, 'guipian/main.js'), '\n// Modified fixture\n');
-assert.throws(() => build(dir, tampered), /Android source SHA-256 mismatch: guipian\/main\.js/);
+fs.appendFileSync(path.join(tampered, 'hongguo/main.js'), '\n// Modified fixture\n');
+assert.throws(() => build(dir, tampered), /Android source SHA-256 mismatch: hongguo\/main\.js/);
 assert.equal(fs.existsSync(path.join(dir, 'source-modules/index.json')), true);
 NODE
 CP="$JSON_JAR:$SDK_JAR:$RHINO_JAR:$OKHTTP_JAR:$OKIO_JAR:$KOTLIN_JAR:$JSOUP_JAR"
 SRC="$ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
-"$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$CP" -d "$TMP/classes" "$SRC/NetworkGuard.java" "$SRC/SourceModuleRuntime.java" "$SRC/SourceRuntimeSupport.java" "$SRC/SourceRuntimeState.java" "$ROOT/android/tests/SourceModuleRuntimeTest.java"
+"$JAVA_HOME/bin/javac" -encoding UTF-8 -cp "$CP" -d "$TMP/classes" "$SRC/NetworkGuard.java" "$SRC/SourceModuleRuntime.java" "$SRC/SourceRuntimeSupport.java" "$ROOT/android/tests/SourceModuleRuntimeTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$CP" io.github.jackotom.hongguo.android.SourceModuleRuntimeTest "$TMP/source-modules"
