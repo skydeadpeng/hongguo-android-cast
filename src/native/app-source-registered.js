@@ -534,9 +534,11 @@ async function fetchAppPlayUrl(vid, options = {}) {
     }).filter(row => row.codecRank < 2 && (playbackBounded
         ? Number.isSafeInteger(row.width) && Number.isSafeInteger(row.height) && row.width > 0 && row.height > 0 &&
             row.pixels >= playbackFloor && (playbackCeiling === 0 || row.pixels <= playbackCeiling)
-        : meetsDownloadQuality(row, requestedQuality))).sort((a, b) => playbackBounded
-        ? a.codecRank - b.codecRank || a.pixels - b.pixels
-        : requestedQuality === 'auto' ? a.codecRank - b.codecRank || b.pixels - a.pixels
+        : meetsDownloadQuality(row, requestedQuality))).sort((a, b) => playbackBounded || requestedQuality === 'auto'
+        // Highest short edge first: the multi-rung video_tab model lists every rung
+        // under a single codec, so a codec-major order would pin downloads and
+        // playback to the lowest H.264 rung. Same-rung ties keep H.264 ahead.
+        ? b.pixels - a.pixels || a.codecRank - b.codecRank
         : Math.min(a.width, a.height) - Math.min(b.width, b.height) || a.codecRank - b.codecRank);
     if (!rows.length) {
         if (playbackBounded) throw Object.assign(new Error('本集暂无尺寸可确认且满足播放清晰度边界的片源'), { code: 'QUALITY_UNAVAILABLE' });

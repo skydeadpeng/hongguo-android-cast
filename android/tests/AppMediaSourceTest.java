@@ -33,7 +33,7 @@ public final class AppMediaSourceTest {
         catch (AppMediaSource.AppSourceException expected) { check(code.equals(expected.code), "code " + code + " got " + expected.code); }
     }
     public static void main(String[] unused) throws Exception {
-        // auto: codecRank asc then pixels desc → 1080p h264 first, 480p second, hevc third; unsupported codec dropped.
+        // auto: pixels desc then codecRank asc → 1080p h264 first, 720p hevc second, 480p third; unsupported codec dropped.
         JSONObject auto = resolve(model(
             row(encoded("hevc720"), "bytevc1", "720p", 1280, 720, KEY_B),
             row(encoded("h264-480"), "h264", "480p", 854, 480, null),
@@ -44,16 +44,26 @@ public final class AppMediaSourceTest {
         check(auto.getString("userAgent").equals(DanmakuSigner.USER_AGENT) && auto.getString("referer").isEmpty(), "registered headers");
         JSONArray autoVariants = auto.getJSONArray("variants");
         check(autoVariants.length() == 2, "variants exclude rejected codec");
-        check(autoVariants.getJSONObject(0).getString("url").equals(url("h264-480")) && autoVariants.getJSONObject(0).isNull("contentKey"), "no spade → null key");
-        check(autoVariants.getJSONObject(1).getString("url").equals(url("hevc720")), "hevc ranked after both h264 rows");
+        check(autoVariants.getJSONObject(0).getString("url").equals(url("hevc720")) && !autoVariants.getJSONObject(0).isNull("contentKey"), "higher rung outranks lower h264");
+        check(autoVariants.getJSONObject(1).getString("url").equals(url("h264-480")) && autoVariants.getJSONObject(1).isNull("contentKey"), "no spade → null key");
         check(auto.getString("quality").equals("1080p") && auto.getString("requestedQuality").equals("auto"), "quality labels");
-        // bounded: ceiling 719 keeps only confirmed ≤719 short edge, sorted ascending
+        // The reported 360p regression: video_tab lists one codec per rung, so a
+        // codec-major order pinned the pick to a lone low H.264 rung. Resolution leads now.
+        JSONObject singleCodecLow = resolve(model(
+            row(encoded("h264-360"), "h264", "360p", 640, 360, null),
+            row(encoded("hevc-1080"), "bytevc1", "1080p", 1080, 1920, KEY_B)), "auto", null);
+        check(singleCodecLow.getString("url").equals(url("hevc-1080")), "auto never trades resolution for codec");
+        // bounded: ceiling 719 filters confirmed sizes, then keeps the highest survivor
         JSONObject bounded = resolve(model(
             row(encoded("h264-1080"), "h264", "1080p", 1920, 1080, KEY_A),
             row(encoded("h264-480"), "h264", "480p", 854, 480, null),
             row(encoded("hevc-720"), "hevc", "720p", 1280, 720, KEY_B)), "auto", 719);
-        check(bounded.getString("url").equals(url("h264-480")), "bounded keeps lowest within ceiling");
+        check(bounded.getString("url").equals(url("h264-480")), "bounded keeps highest surviving rung within ceiling");
         check(bounded.getInt("playbackCeiling") == 719, "ceiling echoed");
+        JSONObject inCeiling = resolve(model(
+            row(encoded("h264-480"), "h264", "480p", 854, 480, null),
+            row(encoded("hevc-720"), "hevc", "720p", 1280, 720, KEY_B)), "auto", 1080);
+        check(inCeiling.getString("url").equals(url("hevc-720")), "bounded prefers the largest rung within a wide ceiling");
         // fixed 720p: only confirmed ≥720 rows, min size ascending
         JSONObject fixed = resolve(model(
             row(encoded("h264-1080"), "h264", "1080p", 1920, 1080, KEY_A),

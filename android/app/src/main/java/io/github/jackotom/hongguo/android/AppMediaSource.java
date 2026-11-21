@@ -84,11 +84,13 @@ final class AppMediaSource {
             if (!bounded && !quality.equals("auto") && !MediaQuality.meets(size[0], size[1], quality)) continue;
             ranked.add(new Object[]{ row, rank, pixels, size[0], size[1], label });
         }
-        Comparator<Object[]> order = bounded
-            ? Comparator.<Object[], Integer>comparing(a -> (Integer) a[1]).thenComparing(a -> (Integer) a[2])
-            : quality.equals("auto")
-                ? Comparator.<Object[], Integer>comparing(a -> (Integer) a[1]).thenComparing(a -> -((Integer) a[2]))
-                : Comparator.<Object[], Integer>comparing(a -> Math.min((Integer) a[3], (Integer) a[4])).thenComparing(a -> (Integer) a[1]);
+        // Highest short edge first for bounded and auto: the video_tab model lists
+        // every rung under a single codec, so a codec-major order pinned selections
+        // to the lowest H.264 rung. Same-rung ties keep H.264 ahead; a fixed
+        // non-bounded quality keeps its meets-filtered closest-match order.
+        Comparator<Object[]> order = bounded || quality.equals("auto")
+            ? Comparator.<Object[], Integer>comparing((Object[] a) -> -((Integer) a[2])).thenComparing(a -> (Integer) a[1])
+            : Comparator.<Object[], Integer>comparing(a -> Math.min((Integer) a[3], (Integer) a[4])).thenComparing(a -> (Integer) a[1]);
         ranked.sort(order);
         return ranked;
     }
