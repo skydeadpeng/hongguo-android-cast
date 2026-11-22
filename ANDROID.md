@@ -14,7 +14,12 @@
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.88](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.88) · [原生 TV 0.1.39](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.39)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.89](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.89) · [原生 TV 0.1.39](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.39)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+
+## 0.12.89 深色沉浸界面改版（2026-11-22 深夜）
+
+- WebView 界面锁定深色沉浸短剧风：品牌渐变顶栏与状态栏融合、海报投影与骨架屏加载、底部导航选中胶囊、关于页卡片化并精简说明文字；tvNative 与原生播放器不动。
+- 发行与验证边界见[本轮发行记录](docs/android-release-2026-11-22-c.md)。
 
 ## 0.12.88 / 0.1.39 取源身份自动恢复（2026-11-22 晚）
 

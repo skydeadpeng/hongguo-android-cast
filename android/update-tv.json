@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 111,
-  "versionName": "0.12.88",
+  "versionCode": 112,
+  "versionName": "0.12.89",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.88/Hongguo-0.12.88-tv-release-compatible.apk",
-  "size": 1701258,
-  "sha256": "c426a16ad0868d485f1a8a3cc86041fe3689a0da7148a9eb049b589a6bfd6d5a",
-  "notes": "红果 Android 0.12.88 / 原生 TV 0.1.39\n\n- 播放持续失败时自动恢复：匿名取源身份被临时限流时，应用会自动注册全新身份重试，无需手动干预。\n- 关于页新增「重置播放身份」手动入口；观看记录、收藏与下载不受影响。\n- 修复已知问题。\n",
-  "publishedAt": "2026-11-22T12:18:58.408Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.89/Hongguo-0.12.89-tv-release-compatible.apk",
+  "size": 1701466,
+  "sha256": "3ec54ea67e396d7e1b110a14a6d6b145f34a1760d891f9e81f8446de3f7c0cde",
+  "notes": "红果 Android 0.12.89\n\n- 全新深色沉浸界面：品牌红渐变顶栏与状态栏融合、卡片阴影层次、骨架屏加载、底部导航选中胶囊。\n- 关于页说明文字精简，新增「重置播放身份」入口。\n- 红果发现、搜索、播放、下载与观看记录链路不变；同包名同证书覆盖升级，数据不迁移不清理。修复已知问题。\n",
+  "publishedAt": "2026-11-22T13:37:18.571Z"
 }
