@@ -152,10 +152,27 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             // while GET video_tab still serves models, so GET leads and the signed POST
             // is only the fallback. When both paths answer hollow for a foreground
             // fetch, rotate the identity once (fresh registration, 30s quota) and walk
-            // the same tab→POST order on it. HTTP/business/format failures and service
-            // backoff stay terminal; speculative prefetch never spends a registration.
+            // the same tab→POST order on it. A degraded identity instead answers with
+            // business denials (code!=0): those also rotate once, bounded by a process
+            // allowance so a looping failure cannot spend registrations forever. HTTP,
+            // format failures, service backoff and trial markers stay terminal;
+            // speculative prefetch never spends a registration.
             String[] used = identity;
-            JSONObject projected = resolve(did, iid, cdid, vid, cookies);
+            JSONObject projected;
+            try {
+                projected = resolve(did, iid, cdid, vid, cookies);
+            } catch (ModelError denialFailure) {
+                if (!"BUSINESS_DENIED".equals(denialFailure.code) || speculative
+                    || !denialAutoRotateAllowed() || !mayRotateForeground()) throw denialFailure;
+                noteDenialRotation();
+                String[] rotated = reRegister();
+                if (rotated == null) throw denialFailure;
+                String rCdid = rotated.length > 2 && rotated[2] != null && !rotated[2].isEmpty() ? rotated[2] : PlaybackSignerV5.newCdid();
+                String rCookies = rotated.length > 3 && rotated[3] != null ? rotated[3] : "";
+                traceV5("denial-rotated did=" + rotated[0]);
+                projected = resolve(rotated[0], rotated[1], rCdid, vid, rCookies);
+                used = rotated;
+            }
             if (projected == null) {
                 if (speculative || !mayRotateForeground()) throw new ModelError("App接口未返回有效数据", "APP_EMPTY_RESPONSE");
                 String[] rotated = reRegister();
@@ -169,6 +186,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             }
             check();
             HOLLOW_STREAK.set(0);
+            DENIAL_ROTATIONS.set(0);
             persistIdentity(used);
             return new JSONObject().put("vid", vid).put("video_model", projected);
         } finally {
@@ -194,6 +212,19 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     }
     /** Test hook: clears the 30s rotation quota between offline cases. */
     static void resetRotationQuotaForTest() { lastRotateClaimMs = 0; }
+    /** Business-denial rotation allowance: a degraded identity answers code!=0 instead of
+     * hollow bodies, so denials rotate too — at most three fresh registrations per quiet
+     * window per process. Any served model clears the count; the manual About-page reset
+     * is the unbounded escape hatch. */
+    private static final AtomicInteger DENIAL_ROTATIONS = new AtomicInteger();
+    private static volatile long denialMarkMs;
+    private static boolean denialAutoRotateAllowed() {
+        if (System.currentTimeMillis() - denialMarkMs >= 600_000) DENIAL_ROTATIONS.set(0);
+        return DENIAL_ROTATIONS.getAndIncrement() < 3;
+    }
+    private static void noteDenialRotation() { denialMarkMs = System.currentTimeMillis(); }
+    /** Test hook: clears the denial-rotation allowance between offline cases. */
+    static void resetDenialAllowanceForTest() { DENIAL_ROTATIONS.set(0); denialMarkMs = 0; }
     /** True while enough of the shared budget remains to start another ladder attempt and
      * still leave the JS web fallback time to finish within the overall resolve deadline. */
     private boolean ladderTimeLeft() { return deadline - System.nanoTime() > TimeUnit.SECONDS.toNanos(8); }
@@ -357,7 +388,10 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         try { envelope = OfficialApiClient.parse(data); }
         catch (Exception invalid) { check(); throw new ModelError("App片源模型响应格式无效", "APP_INVALID_RESPONSE"); }
         if (!zero(envelope.opt("code")) || envelope.has("error_code") && !zero(envelope.opt("error_code")))
-            throw new ModelError("App接口暂未提供本集播放信息", "BUSINESS_REJECTED");
+            // code!=0 is how a degraded identity is told no; the denial-rotation path
+            // (BUSINESS_DENIED) treats it as transient. Trial markers below stay
+            // BUSINESS_REJECTED: those describe the episode, not the identity.
+            throw new ModelError("App接口暂未提供本集播放信息", "BUSINESS_DENIED");
         // The legacy POST nests the entry under data[vid]; video_tab adds one more video_model_data
         // layer; player/v1 groups the episode map under data["1004"].
         JSONObject dataObject = envelope.optJSONObject("data");

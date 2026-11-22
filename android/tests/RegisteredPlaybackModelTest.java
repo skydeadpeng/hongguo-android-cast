@@ -180,9 +180,9 @@ group("same identity recovers on the retry (UI-level)",()->{
    calls.set(0);check(operation(r->registration(),r->{calls.incrementAndGet();return new OfficialApiClient.Response(200,Collections.singletonMap("Retry-After",Arrays.asList("30")),envelope(model()).getBytes(StandardCharsets.UTF_8));}).fetch(VID).has("video_model")&&calls.get()==1,"healthy model is not discarded merely because a backoff header exists");
   });
   group("compatibility response cannot substitute another episode or ignore refusal",()->{
-   for(String body:new String[]{tabEnvelope("123",model()),"{bad}","{\"code\":1,\"data\":{}}",tabEnvelope(VID,model().put("item_id","123")),new JSONObject(tabEnvelope(VID,model())).put("is_trial_video",true).toString()}){
+   for(String body:new String[]{tabEnvelope("123",model()),"{bad}",tabEnvelope(VID,model().put("item_id","123")),new JSONObject(tabEnvelope(VID,model())).put("is_trial_video",true).toString()}){
     AtomicInteger calls=new AtomicInteger();Exception bad=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(200,body);}).fetch(VID));
-    check(bad instanceof RegisteredPlaybackModel.ModelError&&calls.get()==2,"wrong identity invalid JSON or business refusal ends one tab GET plus one POST");
+    check(bad instanceof RegisteredPlaybackModel.ModelError&&calls.get()==2,"wrong identity invalid JSON or trial refusal ends one tab GET plus one POST");
    }
    for(int code:new int[]{302,403,429,500}){
     AtomicInteger calls=new AtomicInteger();Exception bad=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(code,tabEnvelope(VID,model()));}).fetch(VID));
@@ -190,6 +190,14 @@ group("same identity recovers on the retry (UI-level)",()->{
    }
    AtomicInteger calls=new AtomicInteger();Exception busy=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return r.method.equals("POST")?new OfficialApiClient.Response(200,Collections.singletonMap("Retry-After",Arrays.asList("30")),new byte[0]):response(200,"");}).fetch(VID));
    check(busy instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)busy).code.equals("APP_SERVICE_BACKOFF")&&calls.get()==2,"compatibility service backoff is terminal too");
+  });
+  group("degraded-identity business denial rotates once then stays terminal",()->{
+   RegisteredPlaybackModel.resetRotationQuotaForTest();RegisteredPlaybackModel.resetDenialAllowanceForTest();
+   AtomicInteger calls=new AtomicInteger();Exception denied=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(200,"{\"code\":1,\"data\":{}}");}).fetch(VID));
+   check(denied instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)denied).code.equals("BUSINESS_DENIED")&&calls.get()==4,"code!=0 denial registers a fresh identity (tab+POST each) then surfaces BUSINESS_DENIED");
+   AtomicInteger single=new AtomicInteger();RegisteredPlaybackModel.resetRotationQuotaForTest();RegisteredPlaybackModel.resetDenialAllowanceForTest();
+   Exception quick=reject(()->operation(r->registration(),r->{single.incrementAndGet();return response(200,"{\"code\":1,\"data\":{}}");},System.nanoTime()+100_000_000L).fetch(VID));
+   check(quick instanceof RegisteredPlaybackModel.ModelError&&single.get()==2,"a nearly-expired budget cannot spend a rotation");
   });
   group("compatibility success persists all identity fields without returning them",()->{
    java.io.File slot=java.io.File.createTempFile("hongguo-model-identity-",".json");RegisteredPlaybackModel.identityStore(slot);

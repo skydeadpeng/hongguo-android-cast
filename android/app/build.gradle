@@ -28,7 +28,7 @@ android {
         minSdk 23
         targetSdk 35
         versionCode 111
-        versionName '0.12.87'
+        versionName '0.12.88'
         testInstrumentationRunner 'io.github.jackotom.hongguo.android.ProductionPlaybackInstrumentation'
     }
     flavorDimensions 'device'
