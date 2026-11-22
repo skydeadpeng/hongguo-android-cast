@@ -14,7 +14,13 @@
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.86](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.86) · [原生 TV 0.1.37](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.37)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.87](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.87) · [原生 TV 0.1.38](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.38)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+
+## 0.12.87 / 0.1.38 多源子系统拆除、安装包瘦身（2026-11-22）
+
+- 来源已收敛至只剩红果，本轮拆除 0.12.82 引入的多源播放子系统（Media3/Rhino/jsoup 与来源页），手机 / TV 安装包从约 5.7MB 缩至约 1.7MB，原生 TV 各架构瘦身约 4MB。
+- 红果发现、搜索、播放、下载与观看记录不变；影视来源入口移除，旧已删源观看记录维持降级展示。
+- 发行与验证边界见[本轮发行记录](docs/android-release-2026-11-22.md)。
 
 ## 0.12.86 / 0.1.37 黄果视频来源恢复（2026-11-21）
 

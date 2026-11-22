@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 38,
-  "versionName": "0.1.37",
+  "versionCode": 39,
+  "versionName": "0.1.38",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.37/HongguoNative-0.1.37-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 51075341,
-  "sha256": "447411e11727233496eaff64ca9fd91ac199c03644ffbd91c06c127dba95e54c",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.38/HongguoNative-0.1.38-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 47035675,
+  "sha256": "787ac982a4d10383dbe62837431c258488048d8452fa18a2e9ea4c7e88f04837",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.37/HongguoNative-0.1.37-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 51075341,
-      "sha256": "447411e11727233496eaff64ca9fd91ac199c03644ffbd91c06c127dba95e54c"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.38/HongguoNative-0.1.38-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 47035675,
+      "sha256": "787ac982a4d10383dbe62837431c258488048d8452fa18a2e9ea4c7e88f04837"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.37/HongguoNative-0.1.37-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 47347736,
-      "sha256": "746d0cef0814cab8fb83ce2bbf5fc88d9344752dc228b64ed7da9fc7efff844e"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.38/HongguoNative-0.1.38-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 43308072,
+      "sha256": "9415d3a32857703153d8ac5bfb936330210defa8f49287bfa660e85a90bd5891"
     }
   },
-  "notes": "红果原生 TV 0.1.37（同 0.12.86 来源修复）\n\n- 「黄果视频」恢复：改用官方频道公布的最新网址 huangguoai.fit 直连（原主域名被 DNS 污染且 TLS 阻断）。分类、片单、详情、播放清单、AES-128 密钥与分片下载在真实网络下全链路验证通过。\n- 污染域名 DoH 优先解析：来源站域名先经加密 DNS（1.1.1.1 → 223.5.5.5，逐应答公网校验，全部失败才回退系统解析），来源列表与播放取流共用；解析被污染时自动按镜像域切换。\n- 黑桃：年龄确认标记按源精确放行，其余来源的任意 Cookie 输入保持拒绝。\n- 已知边界：黄果视频封面在系统 DNS 被污染且加密 DNS 不可用的网络上可能暂缺，列表与播放不受影响。\n- 同包名同证书覆盖升级，数据不迁移不清理。\n",
-  "publishedAt": "2026-11-21T09:54:04.158Z"
+  "notes": "红果原生 TV 0.1.38（同 0.12.87 组件精简）\n\n- 移除已下线的多来源播放组件，各架构安装包瘦身约 4MB。\n- 红果发现、搜索、播放、下载与观看记录链路不变；侧边栏不再有「影视来源」入口。\n- 同包名同证书覆盖升级，数据不迁移不清理。\n",
+  "publishedAt": "2026-11-22T08:44:10.748Z"
 }
