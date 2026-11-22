@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "phone",
   "packageName": "io.github.jackotom.hongguo.android",
-  "versionCode": 110,
-  "versionName": "0.12.87",
+  "versionCode": 111,
+  "versionName": "0.12.88",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.87/Hongguo-0.12.87-phone-release-compatible.apk",
-  "size": 1701930,
-  "sha256": "3430b9a450e627a3b90eb6159212712b029ac977f7d990f654261b10561d7510",
-  "notes": "红果 Android 0.12.87 / 原生 TV 0.1.38\n\n- 精简安装包：移除已下线的多来源播放组件，手机/TV 安装包从约 5.7MB 缩至约 1.7MB，启动与更新下载更快。\n- 红果发现、搜索、播放、下载与观看记录链路不变。\n- 同包名同证书覆盖升级，数据不迁移不清理。修复已知问题。\n",
-  "publishedAt": "2026-11-22T08:44:10.748Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.88/Hongguo-0.12.88-phone-release-compatible.apk",
+  "size": 1702814,
+  "sha256": "0473ebf90273e06701957cbdd02a7f08e5543745e29312419c6d4c19b74e0ab3",
+  "notes": "红果 Android 0.12.88 / 原生 TV 0.1.39\n\n- 播放持续失败时自动恢复：匿名取源身份被临时限流时，应用会自动注册全新身份重试，无需手动干预。\n- 关于页新增「重置播放身份」手动入口；观看记录、收藏与下载不受影响。\n- 修复已知问题。\n",
+  "publishedAt": "2026-11-22T12:18:58.408Z"
 }
