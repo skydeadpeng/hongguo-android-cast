@@ -738,6 +738,16 @@ function About({ info, notify, accountFocus, announcementsRef, juguoSettings }) 
     catch (error) { if (mounted.current) setCache((previous) => ({ ...previous, error: errorText(error) })); }
     finally { if (mounted.current) setClearing(false); }
   };
+  const [resettingIdentity, setResettingIdentity] = useState(false);
+  const resetIdentity = async () => {
+    setResettingIdentity(true);
+    try {
+      const result = await nativeCall('resetPlaybackIdentity');
+      if (mounted.current) notify(result?.discarded ? '播放身份已重置，下次播放将注册全新匿名身份。' : '本机没有已保存的播放身份，下次播放将注册全新匿名身份。');
+    }
+    catch (error) { if (mounted.current) notify(errorText(error)); }
+    finally { if (mounted.current) setResettingIdentity(false); }
+  };
   const external = async (url) => { try { await nativeCall('openExternal', { url }); } catch (error) { notify(errorText(error)); } };
   return <>
     <header className="page-heading"><h1>关于红果短剧</h1><p>适配手机触控与电视遥控器。</p></header>
@@ -747,6 +757,7 @@ function About({ info, notify, accountFocus, announcementsRef, juguoSettings }) 
     {juguoSettings && <JuguoSettings config={juguoSettings} />}
     <section className="about-section"><h2>应用信息</h2><dl><div><dt>版本</dt><dd>{info.version || '读取中'}</dd></div><div><dt>设备界面</dt><dd>{info.isTv ? 'Android TV / 电视盒子' : 'Android 手机 / 平板'}</dd></div><div><dt>播放方式</dt><dd>安卓原生全屏播放器</dd></div><div><dt>数据存储</dt><dd>本机记录；官方账号同步收藏、历史与进度</dd></div></dl></section>
     <section className="about-section"><h2>播放缓存</h2><p className="cache-status" role="status">{cache.busy ? '正在读取缓存…' : typeof cache.files === 'number' ? `${cache.files} 个文件 · ${byteText(cache.bytes)}${cache.budgetBytes ? ` / 预算 ${byteText(cache.budgetBytes)}` : ''}` : '缓存状态暂未读取'}</p><p className="cache-note">自动清理开启时，保留前 1 集和当前集；本机播放预取下一集，投屏连播时依次预缓存后面 5 集，优先下一集，不等待全部缓存再开播。预取与清理均限于当前季，不自动跨季。普通缓存预算 256 MiB，投屏期间 768 MiB，单集上限 96 MiB；容量不足或取源失败时预缓存可能不足 5 集。更早已看缓存自动释放，手动下载保留，正在供流的文件受保护。</p><div className="about-links"><button className="button" disabled={cache.busy || clearing} onClick={clearCache}>{clearing ? '清理中…' : '清理播放缓存'}</button><button className="button" disabled={clearing} onClick={refreshCache}><RefreshCw />刷新缓存状态</button></div>{cache.error && <p className="text-error" role="alert">{cache.error}</p>}</section>
+    <section className="about-section"><h2>播放身份</h2><p className="cache-note">在线播放使用一个匿名取源身份，长期观看后可能被临时限流。播放持续失败时，可重置本机身份：下次播放会注册全新身份，通常等待一两分钟即可恢复。观看记录、收藏与下载不受影响；请勿在短时间内反复重置。</p><div className="about-links"><button className="button" disabled={resettingIdentity} onClick={resetIdentity}>{resettingIdentity ? '重置中…' : '重置播放身份'}</button></div></section>
     <section className="about-section"><h2>使用说明</h2><p>电视可用方向键移动焦点、确认键打开。返回键先关闭详情，再回到发现页；播放器左上角可直接返回选集。</p><p>完整分集都可选择；播放和下载依次尝试网页常规入口、网页备用入口与 App 片源。选集中的「自动取源」不是锁定标志，也不表示所有分集已经验证可播；失败会显示实际原因。</p><p>自动连播默认开启，当前集结束后继续为下一集自动取源；取源失败时保留重试和返回入口。下载完成后，可在「下载」页面离线播放。</p></section>
     <section className="about-section"><h2>开源与许可</h2><p>本应用基于 jackotom/hongguo-drama，遵循 GPL-3.0 许可。安卓适配代码与构建说明随完整项目源码提供，分发修改版时需保留许可与源码。</p><div className="about-links"><button className="button" onClick={() => external('https://github.com/jackotom/hongguo-drama')}><ExternalLink />上游项目</button><button className="button" onClick={() => external('https://www.gnu.org/licenses/gpl-3.0.html')}><ExternalLink />GPL-3.0 许可网页</button></div><details className="license-details"><summary tabIndex={0}>GPL-3.0 许可全文（离线）</summary><pre className="license-text" tabIndex={0} aria-label="GPL-3.0 许可全文，可滚动阅读">{gplLicense}</pre></details></section>
   </>;

@@ -50,6 +50,15 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     private static volatile java.io.File identityFile;
     /** Wire the on-disk identity slot once from the application context. */
     static void identityStore(java.io.File file) { identityFile = file; }
+    /** User-invoked identity reset: forget the shared and persisted identity so the next
+     * foreground resolve registers a fresh one. Watch history and downloads are untouched.
+     * Returns whether a persisted identity actually existed and was discarded. */
+    static synchronized boolean resetSharedIdentity() {
+        String[] previous = SHARED_IDENTITY.getAndSet(null);
+        java.io.File file = identityFile;
+        boolean persisted = file != null && file.isFile() && file.delete();
+        return (previous != null) || persisted;
+    }
     static synchronized String[] cachedBootstrap() throws Exception {
         String[] identity = SHARED_IDENTITY.get();
         if (identity != null) return identity;
