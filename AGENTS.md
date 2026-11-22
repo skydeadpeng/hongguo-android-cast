@@ -7,6 +7,11 @@
 - 2026-11-08 的「黄果漫剧接入」与解除「来源边界」禁令的决定已被本轮删除取代；历史发行文档按惯例不改。
 - 红果仍是默认且唯一内置来源；用户自定义源功能保留（仅冻结代桌面入口接线）。旧观看记录里的已删源条目按「原来源已移除」降级展示，不再发起取址。
 
+## 多源子系统拆除（2026-11-22）
+
+- 来源只剩红果后，Android 整套多源子系统（SourceService/SourceModuleRuntime/SourcePlaybackSessions/SourcePlaybackActivity/TvSourceActivity/SourceRuntimeSupport、Rhino/jsoup/Media3 依赖、vendor/source-modules、影视来源 WebView 页面与 tvNative「影视来源」菜单）整体拆除；红果自身播放/下载不依赖 Media3，不受影响。
+- NativeBridge getInfo 的 sourceService 恒为 false；手机包预期回到 0.12.80 时代量级（Media3/Rhino 三件套是 0.12.82 涨到 5.9M 的主因）。
+
 ## 黄果漫剧来源（2026-11-08 接入，已于 2026-11-21 删除）
 
 - 用户已解除原「来源边界」禁令（该节已删除）；黄果漫剧接入为内置来源，设置 → 内置来源可开关，默认开启。

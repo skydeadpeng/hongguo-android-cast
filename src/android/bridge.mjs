@@ -8,7 +8,6 @@ const METHODS = new Set([
   'getPlaybackCache', 'clearPlaybackCache',
   'appRequest', 'appDeviceIdentity', 'appRegisteredModel', 'appResolveResult', 'getPlaybackOptions', 'setPlaybackOptions',
   'getSearchHistory', 'addSearchHistory', 'removeSearchHistory', 'clearSearchHistory', 'searchQuery',
-  'sourceService',
 ]);
 const pending = new Map();
 let sequence = 0;
@@ -60,7 +59,7 @@ export function nativeCall(method, params = {}, timeoutMs = method === 'download
       cleanup();
       if (cancellable) cancelNative();
       const error = new Error('设备操作超时，请检查网络后重试。');
-      if (method === 'appRequest' || method === 'sourceService' || cancellable) error.code = 'ETIMEDOUT';
+      if (method === 'appRequest' || cancellable) error.code = 'ETIMEDOUT';
       reject(error);
     }, timeoutMs);
     pending.set(id, { method, resolve, reject, cleanup });
@@ -85,8 +84,7 @@ if (typeof window !== 'undefined') {
     request.cleanup();
     if (message.error != null) {
       const error = new Error(String(message.error));
-      if (['ETIMEDOUT', 'ERR_CANCELED', 'INVALID_INPUT', 'APP_EMPTY_RESPONSE', 'APP_SERVICE_BACKOFF', 'APP_INVALID_RESPONSE', 'BUSINESS_REJECTED', 'HTTP_ERROR', 'SECURITY_BLOCKED'].includes(message.errorCode)
-          || (request.method === 'sourceService' && typeof message.errorCode === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(message.errorCode))) error.code = message.errorCode;
+      if (['ETIMEDOUT', 'ERR_CANCELED', 'INVALID_INPUT', 'APP_EMPTY_RESPONSE', 'APP_SERVICE_BACKOFF', 'APP_INVALID_RESPONSE', 'BUSINESS_REJECTED', 'HTTP_ERROR', 'SECURITY_BLOCKED'].includes(message.errorCode)) error.code = message.errorCode;
       request.reject(error);
     }
     else request.resolve(message.result);

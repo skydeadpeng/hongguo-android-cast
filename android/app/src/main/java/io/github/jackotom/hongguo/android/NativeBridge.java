@@ -20,7 +20,6 @@ final class NativeBridge {
     private volatile boolean closed;
     private final LibraryStore store;
     private final DownloadManager downloads;
-    private final SourceService sources;
     private final ThreadPoolExecutor worker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(16));
     // Page races have their own bounded lane and never queue behind media preparation.
     private final ThreadPoolExecutor httpWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(8));
@@ -36,8 +35,7 @@ final class NativeBridge {
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appDeviceIdentity", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "removeHistory", "clearHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo"));
-    static { METHODS.add("sourceService"); }
-    NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); sources = new SourceService(activity); }
+    NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
         final JSONObject request;
@@ -51,7 +49,6 @@ final class NativeBridge {
         } catch (JSONException error) { return; }
         activity.runOnUiThread(() -> {
             if (closed || !activity.trusted()) return;
-            if (method.equals("sourceService")) { sourceService(id, params); return; }
             // Announcements are optional and may stall in system DNS. Keep them out of
             // playback/control workers, including after a WebView reload.
             if (method.equals("getAnnouncements")) {
@@ -89,28 +86,6 @@ final class NativeBridge {
             ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") || method.equals("homeFeed") ? searchWorker : method.equals("download") ? downloadWorker : worker;
             try { executor.execute(() -> { try (AutoCloseable updateLease = (method.equals("download") || method.equals("playDownload")) ? UpdateInstallCheckpoint.operation() : null) { handle(id, method, params, favoriteStore, favoriteSelection); } catch (Exception error) { respond(id, null, error.getMessage() == null ? "操作未成功，请重试" : error.getMessage()); } }); }
             catch (RejectedExecutionException error) { respond(id, null, "请求较多，请稍后重试"); }
-        });
-    }
-    private void sourceService(Object id, JSONObject params) {
-        sources.submit(params, new SourceService.Reply() {
-            @Override public void success(Object value, String session) {
-                if (closed || !activity.trusted()) return;
-                if (session != null) {
-                    if (!SourcePlaybackSessions.isPending(session)) { failure("ERR_CANCELED", "来源播放已取消"); return; }
-                    // The player reuses this bridge's service lane for in-player episode switching.
-                    SourcePlaybackActivity.share(sources);
-                    try {
-                        activity.startActivity(new Intent(activity, SourcePlaybackActivity.class)
-                            .putExtra(SourcePlaybackSessions.EXTRA_SESSION, session)
-                            .putExtra("sourceId", params.optString("sourceId"))
-                            .putExtra("seriesId", params.optString("seriesId"))
-                            .putExtra("currentIndex", params.optInt("currentIndex", -1)));
-                    }
-                    catch (RuntimeException error) { SourcePlaybackActivity.unshare(sources); SourcePlaybackSessions.close(session); failure("SOURCE_PLAYER_ERROR", "来源播放器未能启动"); return; }
-                }
-                respond(id, value, null);
-            }
-            @Override public void failure(String code, String message) { respondHttpError(id, message, code); }
         });
     }
     /** One anonymous registered identity per process for the WebView signing chain;
@@ -412,7 +387,7 @@ final class NativeBridge {
             case "removeSearchHistory": respond(id, store.removeSearchHistory(params), null); break;
             case "clearSearchHistory": respond(id, store.clearSearchHistory(), null); break;
             case "searchQuery": respond(id, SearchClient.search(activity, params), null); break;
-            case "getInfo": respond(id, new JSONObject().put("version", BuildConfig.VERSION_NAME).put("isTv", BuildConfig.IS_TV).put("platform", "android").put("sourceService", true), null); break;
+            case "getInfo": respond(id, new JSONObject().put("version", BuildConfig.VERSION_NAME).put("isTv", BuildConfig.IS_TV).put("platform", "android").put("sourceService", false), null); break;
             case "appRequest": respond(id, AppTransport.request(params), null); break;
             case "appDeviceIdentity": startDeviceIdentity(id); break;
             case "appResolveResult": PlaybackSources.result(params); respond(id, new JSONObject().put("accepted", true), null); break;
@@ -738,5 +713,5 @@ final class NativeBridge {
     private static String callbackScript(JSONObject response) {
         return "window.__androidResponse && window.__androidResponse(" + response.toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029") + ")";
     }
-    void close() { closed = true; SourcePlaybackActivity.unshare(sources); sources.close(); closeRegisteredModels(); closeHttp(); worker.shutdownNow(); downloadWorker.shutdownNow(); searchWorker.shutdownNow(); accountWorker.shutdownNow(); try { AccountSync.get().cancelLogin(); } catch (Exception ignored) { } }
+    void close() { closed = true; closeRegisteredModels(); closeHttp(); worker.shutdownNow(); downloadWorker.shutdownNow(); searchWorker.shutdownNow(); accountWorker.shutdownNow(); try { AccountSync.get().cancelLogin(); } catch (Exception ignored) { } }
 }

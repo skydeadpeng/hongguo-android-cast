@@ -10,9 +10,6 @@ import gplLicense from '../../LICENSE?raw';
 import AccountPanel from './AccountPanel.jsx';
 import UpdatePanel from './UpdatePanel.jsx';
 import { JuguoPage, JuguoSettings, useJuguoSettings } from './JuguoDesktop.jsx';
-import { SourcesDesktop } from './SourcesDesktop.jsx';
-import { getAndroidSourcesApi } from './android-sources.mjs';
-import './android-sources.css';
 import { createOfficialSeasonLookup, requestOfficialSeries } from './official-series.mjs';
 import { announcementLink, createAnnouncements } from './announcements.mjs';
 import { completedEpisode, filterHistory, withHistoryHints } from './history-view.mjs';
@@ -122,7 +119,7 @@ function PosterGrid({ items, onOpen, history = false, onDelete }) {
   return <div className="poster-grid">{items.map((item, index) => <Poster key={`${item.seriesId}-${index}`} item={item} onOpen={onOpen} history={history ? item : null} onDelete={onDelete} />)}</div>;
 }
 
-function Discover({ onOpen, library, onSearch, onUpdates, onSources, sourceEntry, polishUi }) {
+function Discover({ onOpen, library, onSearch, onUpdates, polishUi }) {
   const [category, setCategory] = useState(CATEGORIES[0]?.id || 'all');
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
@@ -229,7 +226,7 @@ function Discover({ onOpen, library, onSearch, onUpdates, onSources, sourceEntry
   return <>
     {polishUi ? <header className="page-heading discover-heading"><h1>发现短剧</h1></header> : <h1 className="visually-hidden">发现短剧</h1>}
     {update && <button type="button" className="home-update" onClick={onUpdates}><RefreshCw size={16} /><span>新版本 {update.versionName} 已发布 · 查看更新</span></button>}
-    {onSources ? <div className="android-source-shortcuts">{searchButton}<button ref={sourceEntry} type="button" className="button" onClick={onSources}><Film size={16} />影视来源</button></div> : searchButton}
+    {searchButton}
     {feedMode && <div className="category-tabs" role="group" aria-label="短剧分类">{feedChips.map(chip => <button key={chip.id} aria-pressed={feed.genre === chip.id} disabled={!!feed.busy} onClick={() => loadFeed(0, '', false, chip.id)}>{chip.label}</button>)}</div>}
     {feedError && <div className="category-tabs" role="group" aria-label="短剧分类">{CATEGORIES.map((item) => <button key={item.id} aria-pressed={item.id === category} onClick={() => changeCategory(item.id)}>{item.label}</button>)}</div>}
     {!!continueRows.length && <section className="home-continue" aria-label="继续观看">
@@ -1401,14 +1398,11 @@ export default function App() {
   const [tab, setTab] = useState(() => restored?.tab || 'discover');
   const [detail, setDetail] = useState(null);
   const androidPackage = typeof __HONGGUO_PACKAGED_ANDROID__ !== 'undefined' && __HONGGUO_PACKAGED_ANDROID__;
-  const desktopSourcesApi = androidPackage || typeof window === 'undefined' ? undefined : window.DesktopSources;
   const juguoApi = androidPackage || typeof window === 'undefined' ? undefined : window.JuguoDesktop;
   const juguoSettings = useJuguoSettings(juguoApi);
   const juguoEnabled = !!juguoApi && juguoSettings.enabled;
-  const polishUi = !desktopSourcesApi && !juguoApi;
+  const polishUi = !juguoApi;
   const [info, setInfo] = useState({ isTv: false, version: '' });
-  const androidSourcesApi = desktopSourcesApi ? undefined : getAndroidSourcesApi(info);
-  const sourcesApi = desktopSourcesApi || androidSourcesApi;
   const [infoError, setInfoError] = useState('');
   const [library, setLibrary] = useState(EMPTY_LIBRARY);
   const [libraryBusy, setLibraryBusy] = useState(true);
@@ -1417,8 +1411,6 @@ export default function App() {
   const [accountFocus, setAccountFocus] = useState(0);
   const content = useRef(null);
   const lastDetailFocus = useRef(null);
-  const sourceEntry = useRef(null);
-  const restoreSourceEntry = useRef(false);
   const libraryReadEpoch = useRef(0);
   const libraryOwner = useRef(null);
   const accountTransition = useRef(false);
@@ -1466,7 +1458,6 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.tv = String(!!info.isTv); }, [info.isTv]);
   useTvNavigation(!!info.isTv);
   const closeDetail = useCallback(() => { setDetail(null); setTimeout(() => lastDetailFocus.current?.isConnected && lastDetailFocus.current.focus(), 0); }, []);
-  const closeSources = useCallback(() => { restoreSourceEntry.current = true; setTab('discover'); }, []);
   const openDetail = (series, vid) => {
     if (isRetiredSeriesId(series?.seriesId)) { notify('原黄果来源已移除，观看记录仍保留。'); return; }
     lastDetailFocus.current = document.activeElement;
@@ -1474,7 +1465,6 @@ export default function App() {
     setDetail({ seed: series, initialVid: vid });
   };
   const navigate = (id) => {
-    if (id === 'sources' && !sourcesApi) return;
     if (id === 'juguo' && !juguoEnabled) return;
     previousScroll.current = 0; setDetail(null); setTab(id);
   };
@@ -1497,15 +1487,9 @@ export default function App() {
     if (!result.success) notify(result.error);
   };
   useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [tab]);
-  useEffect(() => {
-    if (tab === 'discover' && restoreSourceEntry.current) {
-      restoreSourceEntry.current = false;
-      sourceEntry.current?.focus();
-    }
-  }, [tab]);
   useEffect(() => { if (content.current) content.current.scrollTop = detail ? 0 : previousScroll.current; if (detail) content.current?.querySelector('.back-button')?.focus(); }, [detail?.seed?.seriesId]);
   useEffect(() => {
-    const back = () => { if (!window.dispatchEvent(new CustomEvent('androiddownloadback', { cancelable: true }))) return true; if (tab === 'juguo' && !window.dispatchEvent(new CustomEvent('juguoback', { cancelable: true }))) return true; if (tab === 'sources' && !window.dispatchEvent(new CustomEvent('desktopsourcesback', { cancelable: true }))) return true; if (detail) { closeDetail(); return true; } if (tab === 'sources' && androidSourcesApi && !info.isTv) { closeSources(); return true; } if (tab !== 'discover') { setTab('discover'); return true; } return false; };
+    const back = () => { if (!window.dispatchEvent(new CustomEvent('androiddownloadback', { cancelable: true }))) return true; if (tab === 'juguo' && !window.dispatchEvent(new CustomEvent('juguoback', { cancelable: true }))) return true; if (detail) { closeDetail(); return true; } if (tab !== 'discover') { setTab('discover'); return true; } return false; };
     window.__androidBack = back;
     // A share link resolves to a series id natively; only an exact numeric id may open a detail.
     window.__androidOpenSeries = (seriesId) => { const id = String(seriesId || ''); if (/^\d{1,30}$/.test(id)) openDetail({ seriesId: id, title: '' }); };
@@ -1516,19 +1500,15 @@ export default function App() {
       if (window.__androidBack === back) delete window.__androidBack;
       if (window.__androidOpenSeries) delete window.__androidOpenSeries;
     };
-  }, [detail, tab, closeDetail, closeSources, androidSourcesApi, info.isTv, notify]);
-  // Keep mobile sources beside Discover search; TV has room for a sidebar destination.
-  const mobileSourcesShortcut = !!androidSourcesApi && !info.isTv;
-  const mediaNav = desktopSourcesApi || androidSourcesApi && info.isTv ? [...NAV.slice(0, 1), { id: 'sources', label: '影视来源', Icon: Film }, ...NAV.slice(1)] : NAV;
-  const navItems = juguoEnabled ? [...mediaNav.slice(0, 1), { id: 'juguo', label: '剧果', Icon: Film }, ...mediaNav.slice(1)] : mediaNav;
+  }, [detail, tab, closeDetail, info.isTv, notify]);
+  const navItems = juguoEnabled ? [...NAV.slice(0, 1), { id: 'juguo', label: '剧果', Icon: Film }, ...NAV.slice(1)] : NAV;
   return <div className={`android-app ${info.isTv ? 'tv-layout' : 'phone-layout'}${polishUi ? ' android-ui-polish' : ''}`}>
     <nav className="app-nav" aria-label="主要导航"><div className="nav-brand"><span><Play size={21} /></span><strong>红果短剧</strong></div><div className="nav-items">{navItems.map(({ id, label, Icon }) => <button key={id} aria-current={!detail && tab === id ? 'page' : undefined} onClick={() => navigate(id)}><Icon size={22} /><span>{label === '我的追剧' ? <><span className="nav-word">我的</span><span className="nav-word">追剧</span></> : label}</span></button>)}</div>{info.isTv && <p className="nav-version">遥控器方向键选择<br />v{info.version || '—'}</p>}</nav>
     <div className="content-shell"><div className="phone-brand"><span><Play size={18} /></span><strong>红果短剧</strong>{(!polishUi || !detail && tab !== 'discover' && tab !== 'search') && <button className="brand-search" type="button" aria-label="搜索短剧" onClick={() => navigate('search')}><Search size={20} /></button>}</div>{infoError && <div className="environment-error" role="alert"><span>{infoError}</span><button onClick={loadInfo}>重试连接</button></div>}<main ref={content} className={`main-content${detail ? ' detail-open' : ''}`} id="main-content" data-page={detail ? 'detail' : tab}>
       {detail && <SeasonDetails key={detail.seed.seriesId} {...detail} library={library} onBack={closeDetail} onLibrary={replaceLibrary} notify={notify} isTv={!!info.isTv} polishUi={polishUi} />}
       <div className="page-slot" hidden={!!detail}>
-        {tab === 'discover' && <Discover onOpen={openDetail} library={library} onSearch={() => navigate('search')} onUpdates={() => navigate('about')} onSources={mobileSourcesShortcut ? () => navigate('sources') : undefined} sourceEntry={sourceEntry} polishUi={polishUi} />}
+        {tab === 'discover' && <Discover onOpen={openDetail} library={library} onSearch={() => navigate('search')} onUpdates={() => navigate('about')} polishUi={polishUi} />}
         {tab === 'juguo' && juguoEnabled && <JuguoPage api={juguoApi} PosterGrid={PosterGrid} Status={Status} />}
-        {tab === 'sources' && sourcesApi && <>{mobileSourcesShortcut && <button type="button" className="back-button source-discover-back" autoFocus onClick={closeSources}><ChevronRight />返回发现</button>}<SourcesDesktop api={sourcesApi} PosterGrid={PosterGrid} Status={Status} onOpenHongguo={openDetail} onOpenNativeHongguo={() => navigate('discover')} sourceButtons={!!androidSourcesApi} /></>}
         {tab === 'search' && <SearchPage onOpen={openDetail} />}
         {tab === 'library' && <Library library={library} error={libraryError} busy={libraryBusy} onRetry={loadLibrary} onOpen={openDetail} onAccount={() => { navigate('about'); setAccountFocus(value => value + 1); }} onLibrary={replaceLibrary} notify={notify} />}
         {tab === 'downloads' && !detail && <Downloads notify={notify} />}

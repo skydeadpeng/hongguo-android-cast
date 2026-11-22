@@ -14,10 +14,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".PlayerActivity" android:screenOrientation="landscape" />
-        <activity android:name=".SourcePlaybackActivity" android:screenOrientation="landscape" />
-        <activity android:name=".TvSourceActivity" android:exported="false"
-            android:screenOrientation="landscape"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
         <activity android:name=".TvDetailActivity" android:exported="false"
             android:screenOrientation="landscape"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />

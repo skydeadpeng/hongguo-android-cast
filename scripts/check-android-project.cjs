@@ -36,14 +36,13 @@ try {
   for (const file of ['src/android/App.jsx', 'src/android/source.mjs', 'src/android/bridge.mjs']) {
     assert.doesNotMatch(read(file), /window\.electronAPI|require\(['"]electron['"]\)/, file);
   }
-  // Remove the old Android-only source without disabling the new source service.
+  // The multi-source subsystem was removed on 2026-11-22; the legacy huangguo classes stay gone.
   const java = 'android/app/src/main/java/io/github/jackotom/hongguo/android/';
   for (const file of ['src/android/bridge.mjs', java + 'NativeBridge.java']) {
-    const bridge = read(file);
-    assert.match(bridge, /['"]sourceService['"]/);
-    assert.doesNotMatch(bridge, /huangguo(?:Feed|Search|Detail|Play|Settings|VerifyPin)/);
+    assert.doesNotMatch(read(file), /huangguo(?:Feed|Search|Detail|Play|Settings|VerifyPin)/);
   }
-  for (const name of ['HuangguoApi', 'HuangguoCastSource', 'HuangguoHls', 'HuangguoMp4Remuxer', 'TvHuangguoDetailActivity']) {
+  for (const name of ['HuangguoApi', 'HuangguoCastSource', 'HuangguoHls', 'HuangguoMp4Remuxer', 'TvHuangguoDetailActivity',
+    'SourceModuleRuntime', 'SourceService', 'SourcePlaybackActivity', 'SourcePlaybackSessions', 'TvSourceActivity']) {
     assert.equal(fs.existsSync(path.join(root, java + name + '.java')), false, name);
   }
   assert.doesNotMatch(read('android/app/src/tvNative/AndroidManifest.xml'), /TvHuangguoDetailActivity/);

@@ -14,7 +14,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".PlayerActivity" android:exported="false" android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
-        <activity android:name=".SourcePlaybackActivity" android:exported="false" android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
         <provider android:name=".UpdateProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true" />
         <provider android:name=".MediaProvider" android:authorities="${applicationId}.media" android:exported="false" android:grantUriPermissions="true" />
     </application>

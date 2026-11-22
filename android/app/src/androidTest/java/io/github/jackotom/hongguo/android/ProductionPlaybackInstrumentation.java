@@ -71,9 +71,6 @@ public final class ProductionPlaybackInstrumentation extends Instrumentation {
     }
 
     @Override public void onStart() {
-        if ("android_sources".equals(arguments.getString("scenario"))) { SourcePilotChecks.run(this); return; }
-        if ("android_source_media".equals(arguments.getString("scenario"))) { SourcePilotMediaChecks.run(this); return; }
-        if ("android_source_player_ui".equals(arguments.getString("scenario"))) { SourcePlayerUiChecks.run(this); return; }
         started = SystemClock.elapsedRealtime();
         Thread deadline = new Thread(() -> {
             SystemClock.sleep(BUDGET_MS);

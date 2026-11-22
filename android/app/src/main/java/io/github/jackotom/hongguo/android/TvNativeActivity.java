@@ -80,7 +80,7 @@ public class TvNativeActivity extends Activity {
         header.setPadding(dp(edge), dp(narrow ? 12 : 20), dp(edge), dp(12));
         TextView brand = TvUi.heading(this, "红果", narrow ? 20 : 24);
         header.addView(brand, new LinearLayout.LayoutParams(dp(narrow ? 54 : 80), -2));
-        String[][] destinations = { { "catalog", "发现" }, { "search", "搜索" }, { "sources", "影视来源" }, { "library", "我的追剧" }, { "downloads", "下载" }, { "settings", "设置" } };
+        String[][] destinations = { { "catalog", "发现" }, { "search", "搜索" }, { "library", "我的追剧" }, { "downloads", "下载" }, { "settings", "设置" } };
         for (String[] destination : destinations) {
             Button button = TvUi.navigationButton(this, destination[1]);
             button.setTag(destination[0]);
@@ -89,7 +89,6 @@ public class TvNativeActivity extends Activity {
             button.setPadding(dp(4), dp(4), dp(4), dp(4));
             button.setOnClickListener(view -> {
                 if (destination[0].equals("search")) TvPlay.launch(this, new Intent(this, TvSearchActivity.class));
-                else if (destination[0].equals("sources")) TvPlay.launch(this, new Intent(this, TvSourceActivity.class));
                 else if (!mode.equals(destination[0])) select(destination[0], category);
             });
             float weight = destination[1].length() > 2 ? 1.32f : 1f;
