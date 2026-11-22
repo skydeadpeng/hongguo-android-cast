@@ -3,6 +3,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application android:name=".HongguoApplication" android:label="红果" android:icon="@drawable/app_icon" android:banner="@drawable/tv_banner" android:theme="@style/AppTheme" android:usesCleartextTraffic="false" android:allowBackup="false" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true" android:configChanges="keyboard|keyboardHidden|orientation|screenSize">
             <intent-filter>
@@ -15,6 +19,7 @@
         </activity>
         <activity android:name=".PlayerActivity" android:exported="false" android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
         <activity android:name=".SourcePlaybackActivity" android:exported="false" android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
+        <service android:name=".AudioPlaybackService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
         <provider android:name=".UpdateProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true" />
         <provider android:name=".MediaProvider" android:authorities="${applicationId}.media" android:exported="false" android:grantUriPermissions="true" />
     </application>
