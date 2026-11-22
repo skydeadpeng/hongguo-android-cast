@@ -41,8 +41,8 @@ android {
         tvNative {
             dimension 'device'
             applicationIdSuffix '.tvnative'
-            versionCode 39
-            versionName '0.1.38'
+            versionCode 40
+            versionName '0.1.39'
             buildConfigField 'boolean', 'IS_TV', 'true'
             buildConfigField 'boolean', 'NATIVE_UI', 'true'
         }
