@@ -71,6 +71,11 @@ public final class MainActivity extends Activity {
         softwareRendering = BuildConfig.IS_TV && state != null && state.getBoolean("startupSoftwareRendering", false);
         FrameLayout container = new FrameLayout(this); webContainer = container;
         container.setBackgroundColor(0xff131516);
+        // Immersive brand chrome: the status bar melts into the gradient header,
+        // the gesture strip into the dark surface. Light icons on both (set after
+        // setContentView — the insets controller needs the decor view in place).
+        getWindow().setStatusBarColor(0xffc23a2a);
+        getWindow().setNavigationBarColor(0xff0e0f12);
         if (!BuildConfig.IS_TV) getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         if (Build.VERSION.SDK_INT >= 30) {
             // Inset the native parent, not WebView padding: CSS fixed elements use its viewport.
@@ -84,6 +89,14 @@ public final class MainActivity extends Activity {
         }
         setContentView(container);
         container.requestApplyInsets();
+        // Light system-bar icons now that the decor view exists (null before setContentView).
+        if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().getInsetsController().setSystemBarsAppearance(0,
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+        } else {
+            View decor = getWindow().getDecorView();
+            decor.setSystemUiVisibility(decor.getSystemUiVisibility() & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        }
         PlaybackSources.attach(this);
         startWebView(softwareRendering);
     }

@@ -71,7 +71,7 @@ function Status({ busy, error, onRetry, empty, children, preserve = false, error
     {busy ? <div className="state-inline" role="status"><RefreshCw size={18} /><p>正在更新，仍可查看已有内容。</p></div> : error ? <div className="state-inline error-state" role="alert"><p><strong>{errorTitle}</strong><span>{error}，仍显示上次内容。</span></p><button type="button" className="button" onClick={onRetry}><RefreshCw />{retryLabel}</button></div> : null}
     {children}
   </>;
-  if (busy) return <div className="state-panel" role="status"><RefreshCw size={24} /><h2>正在读取…</h2><p>请稍候，正在获取最新内容。</p></div>;
+  if (busy) return <div className="skeleton-grid" role="status" aria-label="正在加载">{Array.from({ length: 9 }, (_, i) => <div className="skeleton-item" key={i}><div className="skeleton-card" /><div className="skeleton-line" /><div className="skeleton-line short" /></div>)}</div>;
   if (error) return <div className="state-panel error-state" role="alert"><h2>{errorTitle}</h2><p>{error}</p><button type="button" className="button" onClick={onRetry}><RefreshCw />{retryLabel}</button></div>;
   if (empty) return <div className="state-panel"><Film size={28} /><h2>{empty.title}</h2><p>{empty.text}</p></div>;
   return children;
@@ -224,7 +224,7 @@ function Discover({ onOpen, library, onSearch, onUpdates, polishUi }) {
   const feedMode = feed !== null;
   const searchButton = <button type="button" className="home-search" onClick={onSearch}><Search size={17} /><span>搜索短剧名称</span></button>;
   return <>
-    {polishUi ? <header className="page-heading discover-heading"><h1>发现短剧</h1></header> : <h1 className="visually-hidden">发现短剧</h1>}
+    <h1 className="visually-hidden">发现短剧</h1>
     {update && <button type="button" className="home-update" onClick={onUpdates}><RefreshCw size={16} /><span>新版本 {update.versionName} 已发布 · 查看更新</span></button>}
     {searchButton}
     {feedMode && <div className="category-tabs" role="group" aria-label="短剧分类">{feedChips.map(chip => <button key={chip.id} aria-pressed={feed.genre === chip.id} disabled={!!feed.busy} onClick={() => loadFeed(0, '', false, chip.id)}>{chip.label}</button>)}</div>}
@@ -755,11 +755,10 @@ function About({ info, notify, accountFocus, announcementsRef, juguoSettings }) 
     <UpdatePanel />
     <AnnouncementSettings announcementsRef={announcementsRef} notify={notify} />
     {juguoSettings && <JuguoSettings config={juguoSettings} />}
-    <section className="about-section"><h2>应用信息</h2><dl><div><dt>版本</dt><dd>{info.version || '读取中'}</dd></div><div><dt>设备界面</dt><dd>{info.isTv ? 'Android TV / 电视盒子' : 'Android 手机 / 平板'}</dd></div><div><dt>播放方式</dt><dd>安卓原生全屏播放器</dd></div><div><dt>数据存储</dt><dd>本机记录；官方账号同步收藏、历史与进度</dd></div></dl></section>
-    <section className="about-section"><h2>播放缓存</h2><p className="cache-status" role="status">{cache.busy ? '正在读取缓存…' : typeof cache.files === 'number' ? `${cache.files} 个文件 · ${byteText(cache.bytes)}${cache.budgetBytes ? ` / 预算 ${byteText(cache.budgetBytes)}` : ''}` : '缓存状态暂未读取'}</p><p className="cache-note">自动清理开启时，保留前 1 集和当前集；本机播放预取下一集，投屏连播时依次预缓存后面 5 集，优先下一集，不等待全部缓存再开播。预取与清理均限于当前季，不自动跨季。普通缓存预算 256 MiB，投屏期间 768 MiB，单集上限 96 MiB；容量不足或取源失败时预缓存可能不足 5 集。更早已看缓存自动释放，手动下载保留，正在供流的文件受保护。</p><div className="about-links"><button className="button" disabled={cache.busy || clearing} onClick={clearCache}>{clearing ? '清理中…' : '清理播放缓存'}</button><button className="button" disabled={clearing} onClick={refreshCache}><RefreshCw />刷新缓存状态</button></div>{cache.error && <p className="text-error" role="alert">{cache.error}</p>}</section>
-    <section className="about-section"><h2>播放身份</h2><p className="cache-note">在线播放使用一个匿名取源身份，长期观看后可能被临时限流。播放持续失败时，可重置本机身份：下次播放会注册全新身份，通常等待一两分钟即可恢复。观看记录、收藏与下载不受影响；请勿在短时间内反复重置。</p><div className="about-links"><button className="button" disabled={resettingIdentity} onClick={resetIdentity}>{resettingIdentity ? '重置中…' : '重置播放身份'}</button></div></section>
-    <section className="about-section"><h2>使用说明</h2><p>电视可用方向键移动焦点、确认键打开。返回键先关闭详情，再回到发现页；播放器左上角可直接返回选集。</p><p>完整分集都可选择；播放和下载依次尝试网页常规入口、网页备用入口与 App 片源。选集中的「自动取源」不是锁定标志，也不表示所有分集已经验证可播；失败会显示实际原因。</p><p>自动连播默认开启，当前集结束后继续为下一集自动取源；取源失败时保留重试和返回入口。下载完成后，可在「下载」页面离线播放。</p></section>
-    <section className="about-section"><h2>开源与许可</h2><p>本应用基于 jackotom/hongguo-drama，遵循 GPL-3.0 许可。安卓适配代码与构建说明随完整项目源码提供，分发修改版时需保留许可与源码。</p><div className="about-links"><button className="button" onClick={() => external('https://github.com/jackotom/hongguo-drama')}><ExternalLink />上游项目</button><button className="button" onClick={() => external('https://www.gnu.org/licenses/gpl-3.0.html')}><ExternalLink />GPL-3.0 许可网页</button></div><details className="license-details"><summary tabIndex={0}>GPL-3.0 许可全文（离线）</summary><pre className="license-text" tabIndex={0} aria-label="GPL-3.0 许可全文，可滚动阅读">{gplLicense}</pre></details></section>
+    <section className="about-section"><h2>应用信息</h2><dl><div><dt>版本</dt><dd>{info.version || '读取中'}</dd></div><div><dt>设备</dt><dd>{info.isTv ? 'Android TV' : 'Android 手机 / 平板'}</dd></div></dl></section>
+    <section className="about-section"><h2>播放缓存</h2><p className="cache-status" role="status">{cache.busy ? '正在读取缓存…' : typeof cache.files === 'number' ? `${cache.files} 个文件 · ${byteText(cache.bytes)}` : '缓存状态暂未读取'}</p><div className="about-links"><button className="button" disabled={cache.busy || clearing} onClick={clearCache}>{clearing ? '清理中…' : '清理播放缓存'}</button>{cache.error && <p className="text-error" role="alert">{cache.error}</p>}</div></section>
+    <section className="about-section"><h2>播放身份</h2><p className="cache-note">播放持续失败时重置取源身份，观看记录与下载不受影响。</p><div className="about-links"><button className="button" disabled={resettingIdentity} onClick={resetIdentity}>{resettingIdentity ? '重置中…' : '重置播放身份'}</button></div></section>
+    <section className="about-section"><h2>开源与许可</h2><div className="about-links"><button className="button" onClick={() => external('https://github.com/jackotom/hongguo-drama')}><ExternalLink />上游项目</button><button className="button" onClick={() => external('https://www.gnu.org/licenses/gpl-3.0.html')}><ExternalLink />GPL-3.0 许可</button></div><details className="license-details"><summary tabIndex={0}>许可全文</summary><pre className="license-text" tabIndex={0} aria-label="GPL-3.0 许可全文，可滚动阅读">{gplLicense}</pre></details></section>
   </>;
 }
 

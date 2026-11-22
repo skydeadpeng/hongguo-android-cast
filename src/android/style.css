@@ -759,3 +759,65 @@
   .android-ui-polish.phone-layout .main-content:not(.detail-open) { padding-top: 14px; }
   .android-ui-polish.phone-layout .nav-items>button { min-height: 44px; }
 }
+
+/* ============ 沉浸深色主题层（2026-11-22）============ */
+/* 锁定深色短剧沉浸风：源顺序覆盖浅色 tokens 与 prefers-color-scheme 分支。 */
+:root{
+  color-scheme:dark;
+  --bg:#0e0f12;--surface:#17191d;--inset:#1e2126;--sidebar:#101216;
+  --border:#24272d;--border-strong:#34383f;
+  --accent-border:#5b3129;--text:#f2f3f5;--muted:#9aa0a8;--faint:#5f646c;
+  --primary:#e8503a;--primary-hover:#ff5a3c;--accent:#ff5a3c;--accent-soft:#2b1713;
+  --error:#ff6b5c;--ring:#ff5a3c;
+  --grad-brand:linear-gradient(135deg,#ff6a4a 0%,#e8402e 55%,#c93122 100%);
+  --shadow-card:0 4px 16px rgba(0,0,0,.46);
+  --shadow-poster:0 6px 18px rgba(0,0,0,.5);
+}
+/* 顶栏：品牌渐变延伸到状态栏底色（原生同色），白 logo。 */
+.phone-brand{background:var(--grad-brand);border-bottom:0;padding-top:calc(12px + env(safe-area-inset-top));padding-bottom:12px;box-shadow:0 2px 14px rgba(214,58,42,.4)}
+.phone-brand>span,.nav-brand>span{background:rgba(255,255,255,.16);border-radius:9px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
+/* 底部导航：深色浮层 + 选中胶囊。 */
+.phone-layout .app-nav{background:rgba(16,18,22,.92);backdrop-filter:blur(14px);border-top:1px solid rgba(255,255,255,.06);padding-top:6px}
+.phone-layout .nav-items{padding:0 10px;gap:4px}
+.phone-layout .nav-items>button{border-radius:14px;min-height:50px;color:var(--faint);transition:background .18s,color .18s}
+.phone-layout .nav-items>button[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.phone-layout .nav-items>button:hover{background:rgba(255,255,255,.05)}
+.phone-layout .nav-items>button:hover[aria-current="page"]{background:var(--accent-soft)}
+/* 海报：阴影 + 按压反馈 + 渐变角标。 */
+.poster-art{border-radius:12px;box-shadow:var(--shadow-poster);border:0;transition:transform .18s ease,box-shadow .18s ease}
+.poster:active .poster-art{transform:scale(.97)}
+.poster-label{background:linear-gradient(135deg,rgba(232,64,46,.95),rgba(201,49,34,.9));font-weight:600;border-radius:8px 0 8px 0;padding:3px 8px;left:0;bottom:0}
+.poster-fallback{background:var(--inset)}
+/* 分类胶囊：深色描边，选中实心红。 */
+.category-tabs button{background:var(--surface);border-color:var(--border)}
+.category-tabs button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 3px 10px rgba(232,80,58,.35)}
+/* 主按钮：品牌渐变。 */
+.button.primary{background:var(--grad-brand);border-color:transparent;box-shadow:0 4px 14px rgba(214,58,42,.4)}
+.button.primary:hover:not(:disabled){filter:brightness(1.08)}
+/* 详情：封面阴影、选集深色、播放栏深色浮层。 */
+.detail-cover{border-radius:12px;box-shadow:var(--shadow-poster)}
+.episode-grid>button{background:var(--surface);border-color:var(--border);border-radius:9px}
+.episode-grid>button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.play-actions{background:rgba(14,15,18,.94);backdrop-filter:blur(14px);border-top:1px solid rgba(255,255,255,.06);border-radius:16px 16px 0 0;margin-inline:-16px;box-shadow:var(--shadow-float)}
+/* Toast：毛玻璃。 */
+.toast{background:rgba(24,26,31,.92);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.09);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+/* 搜索胶囊深色。 */
+.search-controls input{background:var(--surface);border-color:var(--border)}
+.search-controls input:focus{border-color:var(--accent)}
+/* 骨架屏：海报 shimmer。 */
+.skeleton-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 10px}
+.skeleton-item{min-width:0}
+.skeleton-card{aspect-ratio:3/4;border-radius:12px;background:var(--inset);position:relative;overflow:hidden}
+.skeleton-card::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 32%,rgba(255,255,255,.06) 50%,transparent 68%);transform:translateX(-100%);animation:skeleton-shimmer 1.5s infinite}
+.skeleton-line{height:12px;border-radius:6px;background:var(--inset);margin-top:9px;overflow:hidden;position:relative}
+.skeleton-line::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 32%,rgba(255,255,255,.06) 50%,transparent 68%);transform:translateX(-100%);animation:skeleton-shimmer 1.5s infinite}
+.skeleton-line.short{width:55%}
+@keyframes skeleton-shimmer{100%{transform:translateX(100%)}}
+@media (prefers-reduced-motion:reduce){.skeleton-card::after,.skeleton-line::after{animation:none}}
+/* 关于页：卡片化分组。 */
+.about-section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 16px;margin-top:14px;box-shadow:var(--shadow-card)}
+.about-section h2{font-size:16px}
+.about-links .button{background:var(--inset);border-color:var(--border)}
+.about-links .button:hover:not(:disabled){background:var(--border)}
+/* 空态更轻。 */
+.state-panel>svg{opacity:.7}
