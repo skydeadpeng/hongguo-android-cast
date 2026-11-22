@@ -54,7 +54,16 @@ public final class PlayerActivity extends Activity {
     private int hudDialogs, wakeKey = KeyEvent.KEYCODE_UNKNOWN;
     private SeekBar seek;
     private Button previous, toggle, next, autoplayButton, qualityButton, speedButton;
-    private Button castButton;
+    private Button castButton, audioButton;
+
+    // Auto hand-off between video and audio when the app goes background / screen turns off.
+    private boolean autoAudioMode;                  // true while the audio service owns playback
+    private boolean screenReceiverRegistered;
+    private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction()) && !BuildConfig.IS_TV) enterAutoAudio();
+        }
+    };
     private DlnaCastService castService;
     private BrowserCastService browserCastService;
     private boolean browserCastBound, browserCastSelected, showBrowserPairWhenReady;
@@ -124,6 +133,13 @@ public final class PlayerActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        // Returning from background audio (fresh activity, e.g. the old one was reclaimed):
+        // capture the service's latest episode/position before stopping it, then restore below.
+        Bundle audioResume = null;
+        if (!BuildConfig.IS_TV && AudioPlaybackService.active()) {
+            audioResume = AudioPlaybackService.snapshot();
+            stopService(new Intent(this, AudioPlaybackService.class));
+        }
         LIVE_PLAYERS.incrementAndGet(); registeredPlayer = true;
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
             WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -147,6 +163,17 @@ public final class PlayerActivity extends Activity {
                 }
                 queue.sort(Comparator.comparingInt(item -> item.optInt("index")));
             }
+            int resumeFromAudio = -1;
+            if (audioResume != null) {
+                try {
+                    JSONObject snapEpisode = LibraryStore.episode(new JSONObject(audioResume.getString("episode")));
+                    int found = PlaybackPlaylist.find(queue, series.getString("seriesId"), snapEpisode.getString("vid"), snapEpisode.getInt("index"), queueSeries);
+                    if (found >= 0) { selected = snapEpisode; current = found; }
+                    resumeFromAudio = Math.max(0, audioResume.getInt("position"));
+                    float snapSpeed = audioResume.getFloat("speed", Float.NaN);
+                    if (Float.isFinite(snapSpeed) && snapSpeed > 0) requestedSpeed = snapSpeed;
+                } catch (Exception ignored) { }
+            }
             current = PlaybackPlaylist.find(queue, series.getString("seriesId"), selected.getString("vid"), selected.getInt("index"), queueSeries);
             if (current < 0) throw new Exception("分集不在队列中");
             autoplay = state == null ? getIntent().getBooleanExtra("autoplay", true) : state.getBoolean("autoplay", true);
@@ -157,17 +184,23 @@ public final class PlayerActivity extends Activity {
             quality = PlayerOptions.quality(state == null ? getIntent().getStringExtra("quality") == null ? defaults.getString("quality") : getIntent().getStringExtra("quality") : state.getString("quality", defaults.getString("quality")));
             actualQuality = state == null ? quality : MediaQuality.normalize(state.getString("actualQuality", quality));
             automaticCeiling = restoreAutomaticCeiling(state);
-            requestedSpeed = PlayerOptions.speed(state == null ? getIntent().getDoubleExtra("speed", defaults.getDouble("speed")) : state.getDouble("speed", defaults.getDouble("speed")));
+            if (!(resumeFromAudio >= 0 && Float.isFinite(requestedSpeed)))
+                requestedSpeed = PlayerOptions.speed(state == null ? getIntent().getDoubleExtra("speed", defaults.getDouble("speed")) : state.getDouble("speed", defaults.getDouble("speed")));
             boolean restored = restoreSelection(state);
             series = owner(queue.get(current));
             buildViews();
-            int position = restored ? Math.max(0, state.getInt("position")) : store.position(series, queue.get(current));
+            int position = resumeFromAudio >= 0 ? resumeFromAudio
+                : restored ? Math.max(0, state.getInt("position")) : store.position(series, queue.get(current));
             String initial = state == null ? getIntent().getStringExtra("url") : null;
             loadAt(current, initial, position, restored && state.getBoolean("userPaused", false));
             main.post(tick);
             if (!BuildConfig.IS_TV) {
                 castBound = bindService(new Intent(this, DlnaCastService.class), castConnection, BIND_AUTO_CREATE);
                 browserCastBound = bindService(new Intent(this, BrowserCastService.class), browserCastConnection, BIND_AUTO_CREATE);
+                // Detect screen-off so playback switches to audio even when no Activity
+                // transition occurs (power button while the player is in the foreground).
+                registerReceiver(screenReceiver, new IntentFilter(Intent.ACTION_SCREEN_OFF));
+                screenReceiverRegistered = true;
             }
         } catch (Exception error) {
             android.util.Log.e("HongguoPlayer", "播放信息无效", error);
@@ -229,7 +262,8 @@ public final class PlayerActivity extends Activity {
         Button select = button("选集", this::selectEpisode);
         autoplayButton = button("连播 开", () -> { autoplay = !autoplay; if (!castCommand("autoplay", autoplay ? 1 : 0) && autoplay && prepared && !offline) schedulePrefetch(generation); updateButtons(); });
         castButton = BuildConfig.IS_TV ? null : button("投屏", this::showCastChoices);
-        episodeActions = BuildConfig.IS_TV ? new Button[]{previous, toggle, next, select, autoplayButton} : new Button[]{previous, toggle, next, select, autoplayButton, castButton};
+        audioButton = BuildConfig.IS_TV ? null : button("听音频", this::startBackgroundAudio);
+        episodeActions = BuildConfig.IS_TV ? new Button[]{previous, toggle, next, select, autoplayButton} : new Button[]{previous, toggle, next, select, autoplayButton, castButton, audioButton};
         for (Button b : episodeActions) actions.addView(b, new LinearLayout.LayoutParams(0, dp(50), 1));
         content.addView(actions); phoneActions = BuildConfig.IS_TV ? null : actions;
         LinearLayout options = new LinearLayout(this);
@@ -1480,6 +1514,119 @@ public final class PlayerActivity extends Activity {
         if (browserCastBound) { unbindService(browserCastConnection); browserCastBound = false; }
         browserCastService = null;
     }
+    /**
+     * Hand the current episode/queue over to the background audio service. The service replays
+     * the already-prepared local file with a Surface-free MediaPlayer so playback survives
+     * screen-off; returning via the notification reopens this player at the saved position.
+     */
+    private void startBackgroundAudio() {
+        if (BuildConfig.IS_TV) return;
+        showControls();
+        if (casting()) { Toast.makeText(this, "投屏中无法切换后台音频，请先停止投屏", Toast.LENGTH_LONG).show(); return; }
+        if (!prepared || episode == null || video == null) { Toast.makeText(this, "请先等待本集开始播放", Toast.LENGTH_SHORT).show(); return; }
+        if (handOffToAudio(true)) Toast.makeText(this, "已切换到后台音频播放", Toast.LENGTH_SHORT).show();
+    }
+
+    /** Build the hand-off Intent from current player state. Returns null on invalid state. */
+    private Intent audioHandoffIntent(int position) {
+        try {
+            Bundle launch = new Bundle();
+            Intent source = getIntent();
+            String seriesJson = source.getStringExtra("series");
+            if (seriesJson == null || episode == null) return null;
+            // Keep the original top-level series so a cross-season playlist descriptor parses
+            // exactly as it did in onCreate; per-episode owners live inside the descriptor.
+            launch.putString("series", seriesJson);
+            launch.putString("episode", episode.toString());
+            String descriptor = source.getStringExtra("playlist");
+            if (descriptor != null && !descriptor.isEmpty()) {
+                launch.putString("playlist", descriptor);
+                launch.putBoolean("resolveInPlayer", true);
+            } else {
+                JSONArray list = new JSONArray();
+                for (JSONObject e : queue) list.put(e);
+                launch.putString("episodes", list.toString());
+            }
+            launch.putBoolean("download", offline);
+            launch.putBoolean("autoplay", autoplay);
+            String uriHint = adoptedMedia != null && adoptedMedia.uri != null ? adoptedMedia.uri.toString()
+                : source.getStringExtra("url") != null && offline ? source.getStringExtra("url") : null;
+            return new Intent(this, AudioPlaybackService.class).setAction(AudioPlaybackService.ACTION_START)
+                .putExtra(AudioPlaybackService.EXTRA_LAUNCH, launch)
+                .putExtra(AudioPlaybackService.EXTRA_POSITION, position)
+                .putExtra(AudioPlaybackService.EXTRA_QUALITY, actualQuality)
+                .putExtra(AudioPlaybackService.EXTRA_CEILING, automaticCeiling)
+                .putExtra(AudioPlaybackService.EXTRA_SPEED, Float.isFinite(actualSpeed) ? actualSpeed : requestedSpeed)
+                .putExtra(AudioPlaybackService.EXTRA_AUTOPLAY, autoplay)
+                .putExtra(AudioPlaybackService.EXTRA_URI, uriHint);
+        } catch (Exception error) { return null; }
+    }
+
+    /**
+     * @param finishActivity manual taps finish the video screen; automatic hand-off keeps it
+     *                       alive so onResume can switch straight back to video.
+     */
+    private boolean handOffToAudio(boolean finishActivity) {
+        if (!prepared || episode == null || video == null || destroyed || isFinishing()) return false;
+        saveProgress();
+        int position = completed ? 0 : Math.max(0, video.getCurrentPosition());
+        Intent service = audioHandoffIntent(position);
+        if (service == null) return false;
+        try {
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(service); else startService(service);
+            if (finishActivity) {
+                finish();
+            } else {
+                autoAudioMode = true;
+                // Release the video decoder so only audio is active with the screen off.
+                ++generation;
+                cancelPlaybackWatchdogs();
+                try { video.stopPlayback(); } catch (Exception ignored) { }
+                mediaPlayer = null; prepared = false; buffering = false;
+            }
+            return true;
+        } catch (Exception error) {
+            Toast.makeText(this, "后台音频启动失败：" + error.getMessage(), Toast.LENGTH_LONG).show();
+            return false;
+        }
+    }
+
+    /** Called when the app is left (Home / recent apps) or the screen turns off. */
+    private void enterAutoAudio() {
+        if (BuildConfig.IS_TV || autoAudioMode || destroyed || isFinishing() || casting()) return;
+        // 'active' is already false by the time onPause/screen-off run, so don't use it here.
+        // Guard with playback state instead; respect an explicit user pause.
+        if (userPaused || !prepared || completed) return;
+        handOffToAudio(false);
+    }
+
+    /** Restore video from the audio service at its exact episode/position. */
+    private void exitAutoAudio() {
+        if (!autoAudioMode) return;
+        autoAudioMode = false;
+        int resume = -1;
+        Bundle snapshot = AudioPlaybackService.snapshot();
+        stopService(new Intent(this, AudioPlaybackService.class));
+        if (snapshot != null) {
+            try {
+                JSONObject snapEpisode = LibraryStore.episode(new JSONObject(snapshot.getString("episode")));
+                // Locate the episode the service reached (it may have auto-advanced).
+                for (int i = 0; i < queue.size(); i++) {
+                    if (snapEpisode.getString("vid").equals(queue.get(i).optString("vid"))) { current = i; break; }
+                }
+                episode = queue.get(current);
+                series = owner(episode);
+                resume = Math.max(0, snapshot.getInt("position"));
+                float snapSpeed = snapshot.getFloat("speed", Float.NaN);
+                if (Float.isFinite(snapSpeed) && snapSpeed > 0) requestedSpeed = snapSpeed;
+            } catch (Exception ignored) { }
+        }
+        if (resume < 0) resume = Math.max(0, store.position(series, episode));
+        userPaused = false; completed = false;
+        prepared = false;
+        loadAt(current, null, resume, false);
+    }
+
     private void exitPlayer() { if (controlsHud != null) controlsHud.suspend(); saveProgress(); finish(); }
     @Override public void onBackPressed() { exitPlayer(); }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
@@ -1507,8 +1654,31 @@ public final class PlayerActivity extends Activity {
         if (video.hasFocus() && (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN)) { showControls(); toggle.requestFocus(); return true; }
         return super.onKeyDown(key, event);
     }
-    @Override protected void onPause() { active = false; cancelPlaybackWatchdogs(); if (danmaku != null) danmaku.suspend(); touchingControls = false; wakeKey = KeyEvent.KEYCODE_UNKNOWN; if (controlsHud != null) controlsHud.suspend(); saveProgress(); if (!casting() && video != null && prepared) video.pause(); super.onPause(); }
-    @Override protected void onResume() { super.onResume(); active = true; if (decoderPreparing && !casting() && !castWasActive) armPreparationTimeout(generation, video); updateBufferingWatchdog(generation, video); if (!casting() && prepared && !completed && !userPaused) video.start(); showControls(); }
+    @Override protected void onUserLeaveHint() {
+        // User pressed Home / opened recents / followed a notification: leave via audio.
+        super.onUserLeaveHint();
+        enterAutoAudio();
+    }
+    @Override protected void onPause() {
+        active = false; cancelPlaybackWatchdogs(); if (danmaku != null) danmaku.suspend();
+        touchingControls = false; wakeKey = KeyEvent.KEYCODE_UNKNOWN; if (controlsHud != null) controlsHud.suspend();
+        if (!autoAudioMode) {
+            saveProgress();
+            if (!casting() && video != null && prepared) video.pause();
+        }
+        super.onPause();
+        // Some devices pause without a user-leave hint (e.g. covering the sensor / app switch).
+        enterAutoAudio();
+    }
+    @Override protected void onResume() {
+        super.onResume();
+        active = true;
+        if (autoAudioMode) { exitAutoAudio(); showControls(); return; }
+        if (decoderPreparing && !casting() && !castWasActive) armPreparationTimeout(generation, video);
+        updateBufferingWatchdog(generation, video);
+        if (!casting() && prepared && !completed && !userPaused) video.start();
+        showControls();
+    }
     @Override protected void onSaveInstanceState(Bundle state) { savePlaybackState(state); super.onSaveInstanceState(state); }
     @Override protected void onDestroy() {
         // Keep file deletion/update blocked until all media handles have been released.
@@ -1516,6 +1686,10 @@ public final class PlayerActivity extends Activity {
         if (danmaku != null) danmaku.close();
         detachCast();
         if (controlsHud != null) controlsHud.destroy();
+        if (screenReceiverRegistered) { try { unregisterReceiver(screenReceiver); } catch (Exception ignored) { } screenReceiverRegistered = false; }
+        // A manual "听音频" hand-off finished this activity into the audio service; do not stop it.
+        // An automatic hand-off is reverted here so a destroyed player doesn't leave orphan audio.
+        if (autoAudioMode) stopService(new Intent(this, AudioPlaybackService.class));
         cancelQualitySwitch(); cancelPlaybackWatchdogs(); decoderPreparing = false; destroyed = true; ++generation; discardPendingMedia(); main.removeCallbacksAndMessages(null);
         if (video != null) video.stopPlayback(); releaseCurrent(); closeLocalWindow(); resolver.shutdownNow(); cacheWorker.shutdownNow();
         if (registeredPlayer) { registeredPlayer = false; LIVE_PLAYERS.decrementAndGet(); }
