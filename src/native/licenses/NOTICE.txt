@@ -33,3 +33,22 @@ without requesting the legacy fallback endpoint.
 The Android port carries the same chain: RegisteredPlaybackModel.java and
 OfficialApiClient.registerDevice() adapt the same registration protocol, and
 DanmakuSigner.java implements the comment-client signatures.
+
+The Android SDK playback route (0.12.91, native TV 0.1.41) was ported by
+reading jackotom/hongguo-drama at commit b20413b, directory
+scripts/sdk-playback/vendor/phone_account (GPL-3.0):
+https://github.com/jackotom/hongguo-drama
+That project attributes the subset to the third-party source archive of
+waligoraamodio288-rgb/hongguo-desktop-releases v1.0.137 (archive SHA256
+beebd9847e3214ca280cfe71320fb89eb2d5b4db18659803a3404ddac75dd5db). The
+ported parts are the token exchange codec, the playback request layout and
+the v5 envelope and digest framing, rewritten in Java (SdkWire, SdkMaterials,
+SdkSigner, SdkRequest) and checked byte for byte against that unmodified
+Python as golden vectors; none of its Python, Unicorn or Unidbg runtime is
+included. The digest core is not ported code: the app fetches the SDK image
+and its configuration at run time as two byte ranges of the official APK,
+both pinned by SHA-256, and a locally written adapter (src/main/cpp) calls
+one function of that image inside the arm64 process. The image is not
+bundled. The license text of the phone_account subset inside that archive
+was not separately verified; the upstream project distributes the subset
+under GPL-3.0 and this application remains GPL-3.0.

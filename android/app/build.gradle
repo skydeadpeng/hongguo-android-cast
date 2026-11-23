@@ -48,6 +48,12 @@ android {
         }
     }
     buildFeatures { buildConfig true }
+    // libhongguo_sdk.so is the SDK playback route's digest adapter (src/main/cpp). CMakeLists.txt
+    // builds it for arm64 only, so other ABIs install without it and keep the signed-request
+    // ladder. The choice is made there and not with ndk.abiFilters, which would also drop the
+    // prebuilt libraries the other ABIs depend on (libVLC in the 32-bit tvNative APK).
+    ndkVersion '28.2.13676358'
+    externalNativeBuild { cmake { path file('src/main/cpp/CMakeLists.txt'); version '3.22.1' } }
     // Per-ABI APKs: libVLC ships ~60MB of native libraries per architecture, so the software
     // decoder line ships one APK per ABI and the updater picks by the device's supported ABIs.
     splits {

@@ -88,12 +88,14 @@ VERSION="$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" android/app/build.gradle 
 [[ -n "$VERSION" ]] || VERSION=dev
 mkdir -p dist/android
 if [[ "$MODE" == --debug ]]; then
+  # ABI splits apply to every flavor (libhongguo_sdk.so since 0.12.91 gives phone/TV an arm64 lib),
+  # so each debug build is the universal APK, exactly like the phone/TV release channel ships.
   for flavor in phone tv; do
-    cp "android/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk" "dist/android/Hongguo-$VERSION-$flavor-debug.apk"
+    cp "android/app/build/outputs/apk/$flavor/debug/app-$flavor-universal-debug.apk" "dist/android/Hongguo-$VERSION-$flavor-debug.apk"
   done
   # tvNative is an independent version line; name it with its own versionName.
   NATIVE_VERSION="$(sed -n '/tvNative {/,/^        }/s/.*versionName '\''\([^'\'']*\)'\''.*/\1/p' android/app/build.gradle | head -1)"
-  cp "android/app/build/outputs/apk/tvNative/debug/app-tvNative-debug.apk" \
+  cp "android/app/build/outputs/apk/tvNative/debug/app-tvNative-universal-debug.apk" \
      "dist/android/HongguoNative-${NATIVE_VERSION:-dev}-tvNative-debug.apk"
   shasum -a 256 dist/android/Hongguo-*-*-debug.apk > dist/android/SHA256SUMS.txt
   SUMS=dist/android/SHA256SUMS.txt

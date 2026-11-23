@@ -124,6 +124,7 @@ final class RegisteredPlaybackModel implements AutoCloseable {
     @Override public void close() {
         closed = true;
         OfficialApiClient client = registering; if (client != null) client.close();
+        SdkPlaybackClient.cancel();
         try { registration.close(); } catch (RuntimeException ignored) { }
         try { modelTransport.close(); } catch (RuntimeException ignored) { }
         Thread thread = owner; if (thread != null && thread != Thread.currentThread()) thread.interrupt();
@@ -135,6 +136,18 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         if (!started.compareAndSet(false, true)) throw new IOException("App片源请求已经结束");
         owner = Thread.currentThread();
         try {
+            check();
+            // 2026-11-23 evening: the platform stopped answering every locally signed shape. The SDK
+            // route (SdkPlaybackClient) leads on devices that can run it; whenever it cannot serve an
+            // episode — unsupported device, not prepared yet, refusal or empty answer — the ladder
+            // below runs exactly as before.
+            JSONObject sdkModel = sdkModel(vid, speculative);
+            check();
+            if (sdkModel != null) {
+                HOLLOW_STREAK.set(0); DENIAL_ROTATIONS.set(0);
+                return new JSONObject().put("vid", vid).put("video_model", sdkModel);
+            }
+            check();
             // This fresh in-memory device is unrelated to AccountSync/OfficialAccountVault.
             // The upstream registration line matches the working TV clients' profile; the
             // older PassportDevice line yields identities the v5 model endpoint hollows.
@@ -200,6 +213,24 @@ final class RegisteredPlaybackModel implements AutoCloseable {
      * malformed models stay terminal for the alternate form as well. */
     private static boolean recoverable(ModelError failure) {
         return "APP_EMPTY_RESPONSE".equals(failure.code) || "HTTP_ERROR".equals(failure.code);
+    }
+    /** The SDK route's answer, projected like the ladder's, or null for the ladder to take over.
+     * Cancellation, deadline, service backoff and trial-only verdicts are terminal and surface
+     * unchanged; every other SDK failure only changes which source serves this episode. */
+    private JSONObject sdkModel(String vid, boolean speculative) throws Exception {
+        OfficialApiClient.Response response;
+        try { response = SdkPlaybackClient.fetch(vid, deadline, speculative); }
+        catch (Exception failure) { check(); traceV5("sdk failed: " + failure); return null; }
+        if (response == null) return null;
+        try { return adopt(response, vid, deadline); }
+        catch (ModelError failure) {
+            check();
+            // An empty SDK answer counts towards the hollow fast-fail like any other empty v5 answer.
+            if ("APP_EMPTY_RESPONSE".equals(failure.code)) noteHollowFetch();
+            if ("APP_SERVICE_BACKOFF".equals(failure.code) || "BUSINESS_REJECTED".equals(failure.code)) throw failure;
+            traceV5("sdk not adopted: " + failure.code);
+            return null;
+        }
     }
     /** Foreground-only rotation quota: at most one fresh registration per 30 seconds
      * (hongguoTV playbackRotationAt). Claimed before registering so concurrent fetches

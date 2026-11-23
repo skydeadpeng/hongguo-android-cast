@@ -203,7 +203,7 @@ try {
   fs.writeFileSync(harnessFile, harness);
   const classes = path.join(output, 'classes');
   fs.mkdirSync(classes, { recursive: true });
-  const sources = ['DanmakuSigner', 'SearchProtocol', 'PassportConstants', 'PassportSigner', 'PassportDevice', 'PassportJson', 'OfficialApiClient', 'OfficialTransport', 'AppTransport', 'NetworkGuard', 'PlayerSigner', 'PlaybackSignerV5', 'AccountSigner', 'TabPlaybackSigner', 'UpstreamDeviceRegister'].map(name => path.join(sourceDir, `${name}.java`));
+  const sources = ['DanmakuSigner', 'SearchProtocol', 'PassportConstants', 'PassportSigner', 'PassportDevice', 'PassportJson', 'OfficialApiClient', 'OfficialTransport', 'AppTransport', 'NetworkGuard', 'PlayerSigner', 'PlaybackSignerV5', 'AccountSigner', 'TabPlaybackSigner', 'UpstreamDeviceRegister', 'SdkWire', 'SdkMaterials', 'SdkSigner', 'SdkRequest', 'SdkAssets', 'SdkDigestBridge', 'SdkPlaybackClient'].map(name => path.join(sourceDir, `${name}.java`));
   const compile = spawnSync(javaCommand('javac'), ['--release', '17', '-encoding', 'UTF-8', '-cp', classpath, '-d', classes, ...sources, sourceFile, harnessFile], { encoding: 'utf8' });
   fs.writeFileSync(path.join(output, 'compile.txt'), `${compile.stdout || ''}${compile.stderr || ''}EXIT_STATUS=${compile.status}\n`);
   if (compile.status !== 0) { process.stderr.write(compile.stderr || String(compile.error)); process.exitCode = compile.status || 1; }

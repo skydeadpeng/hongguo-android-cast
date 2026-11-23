@@ -143,3 +143,12 @@ SOFTWARE.
 - Local decoder/resampler/stretch-pitch Wasm assets come from that exact revision; their SHA256 values are in scripts/software-player-assets.json. No Wasm encoders are included.
 - The complete LGPL text is bundled at software/LIBMEDIA-LGPL-3.0.txt. The upstream project contains the sources and build instructions; JavaScript/Wasm resources remain replaceable local files in the application source/build.
 - ASS dependencies bundled by upstream (assjs and ass-compiler): MIT. libmedia uses FFmpeg under LGPL 2.1 or later and SoundTouch under LGPL 2.1. See upstream licensing notices and pinned sources.
+
+## SDK 播放取源路线移植来源：jackotom/hongguo-drama（Android 0.12.91 / tvNative 0.1.41）
+
+- 项目：https://github.com/jackotom/hongguo-drama （GPL-3.0，本身是 327044572/hongguo-downloader 的修改版本）
+- 固定来源提交：`b20413b`，目录 `scripts/sdk-playback/vendor/phone_account`（上游 8.1 源码冻结版，本人按源码对照移植，未使用其打包产物）。
+- 再上游：该子集由上游归于 `waligoraamodio288-rgb/hongguo-desktop-releases` 的第三方源码归档（v1.0.137；归档 SHA256 `beebd9847e3214ca280cfe71320fb89eb2d5b4db18659803a3404ddac75dd5db`）。
+- 引用范围：令牌交换的封包与解包、播放请求的构造、v5 信封（Gorgon／Ladon／Medusa）与摘要组帧的算法流程。Android 侧以 Java 重写（SdkWire／SdkMaterials／SdkSigner／SdkRequest）并以上述未经修改的 Python 源码为黄金向量逐字节比对，不复制其 Python 运行环境；上游依赖的 Unicorn、Unidbg、PyCryptodome 等均未引入。
+- 摘要核心不是移植代码：应用在运行时从官方安装包的两个字节分段取得 SDK 镜像与配置（双重 SHA-256 固定），由本地适配层（src/main/cpp，自行编写）在 arm64 进程内调用其中一个函数。安装包不内置该镜像。
+- 限制：`phone_account` 子集在上述归档内的许可原文未单独核验，本次未取得；上游以 GPL-3.0 分发该子集，本项目沿用 GPL-3.0。来源接口不是官方开放平台，也不代表获得平台授权；接口或 SDK 变动可能使取源失效。

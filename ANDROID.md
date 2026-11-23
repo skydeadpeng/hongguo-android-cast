@@ -730,7 +730,7 @@ Mac 的旧 API 最后回退、其他内容来源、FFmpeg 转码 / 合并、弹�
 
 ## 构建
 
-依赖 Node >=22.12、npm、JDK 17、Android SDK Platform 35 和 Gradle 8.13（或项目 Gradle Wrapper）。
+依赖 Node >=22.12、npm、JDK 17、Android SDK Platform 35、NDK 28.2.13676358、CMake 3.22.1 和 Gradle 8.13（或项目 Gradle Wrapper）。0.12.91 起构建包含一个 arm64 原生适配库（`android/app/src/main/cpp`，SDK 播放取源路线使用），由 NDK 编译；Android Studio 的 SDK Manager 里勾选对应版本的 NDK 与 CMake 即可。
 
 ```sh
 cd /Users/xiaomingpeng/Desktop/红果

@@ -1,0 +1,844 @@
+{
+ "pid": 4242,
+ "params": {
+  "aid": "8662",
+  "app_name": "novelread",
+  "channel": "xiaomi_8662_64",
+  "version_code": "73932",
+  "version_name": "7.3.9.32",
+  "manifest_version_code": "73932",
+  "update_version_code": "73932",
+  "device_platform": "android",
+  "os": "android",
+  "ssmix": "a",
+  "device_type": "23127PN0CC",
+  "device_brand": "xiaomi",
+  "os_api": "34",
+  "os_version": "14",
+  "resolution": "1200*2670",
+  "dpi": "460",
+  "ac": "wifi",
+  "language": "zh",
+  "openudid": "a1b2c3d4e5f6a7b8",
+  "cdid": "11111111-2222-3333-4444-555555555555",
+  "tt_data": "a",
+  "_rticket": "1795436789123",
+  "ts": "1795436789",
+  "package": "com.phoenix.read",
+  "first_launch_timestamp": "1795436789",
+  "last_deeplink_update_version_code": "0",
+  "cpu_support64": "true",
+  "host_abi": "arm64-v8a",
+  "is_guest_mode": "0",
+  "app_type": "normal",
+  "minor_status": "0",
+  "appTheme": "light",
+  "is_preinstall": "0",
+  "need_personal_recommend": "1",
+  "is_android_pad": "0",
+  "is_android_fold": "0",
+  "md": "0",
+  "cronet_version": "8d40f833_2026-03-03",
+  "ttnet_version": "4.2.243.31-douyin",
+  "use_store_region_cookie": "1",
+  "device_id": "7300000000000001234",
+  "iid": "7400000000000005678"
+ },
+ "cookies": {
+  "odin_tt": "synthetic-odin",
+  "ttreq": "1.synthetic-request",
+  "store-region": "cn",
+  "store-region-src": "did"
+ },
+ "vectors": [
+  {
+   "name": "config_decode",
+   "inputs": {
+    "encoded": "ESIzRE9vD7JtDAmCLTGLFcOAVXesZix2WHzPVEwrIvVMfKfVZU/HaT7GypY6EDGThSFrQ++CZa4w3Oqkiw8vbqk1NWzBkjHO63RxOcSKumZ6FDK13YWihUvnqDn6A7YIP+ZC9ej8f6FL1vByOZH48eXB+sSiDz4GlkdxbMg02vkvXDcANbzRAES/UBQAJIkZe7IxUIla+GgUX/eDhjJFuBNaVzfQS6fXgNoodQoueIeeqcmf0AmJ9RAHqHKVb/ya7clnzwRF+aEgOe8tSciXGcjm6WecjOy5ZrdTwI8twElteomi"
+   },
+   "draws": [],
+   "output": {
+    "signing_key": {
+     "hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+    },
+    "exchange_key": {
+     "hex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
+    }
+   }
+  },
+  {
+   "name": "image_parts",
+   "inputs": {},
+   "draws": [],
+   "output": {
+    "frame": {
+     "hex": "505152535455565758595a5b5c5d5e5f"
+    },
+    "substitutions": {
+     "hex": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc"
+    },
+    "inner": {
+     "hex": "404142434445464748494a4b4c4d4e4f"
+    },
+    "unavailable": "!synth00"
+   }
+  },
+  {
+   "name": "device_proof",
+   "inputs": {
+    "device_id": "7300000000000001234"
+   },
+   "draws": [],
+   "output": {
+    "hex": "080210041a04383636322213373330303030303030303030303030313233342a1941693673764f3350797277444f55536d4f365a6352657378753208216e6f7065726d2138efc06c40efc06c480650efc06c5a08216e6f7473657421620f417369612f5368616e676861692c386a057a685f434e70088501fc3f7f438d010e580e429501b0ea5d409d01b0ea5d40a501ed2c7f43ad01a7b32842b201023136b80152c00148c801f6a7a1bfcd64d001f6a7a1bfcd64d801f6a7a1bfcd64e001faa7a1bfcd64e80101f2010a32353035335254343743fa01055265646d6982020a323530353352543437438a020a323530353352543437439202065869616f6d699a02055265646d69a202055265646d69b0023e"
+   }
+  },
+  {
+   "name": "bound_device_proof",
+   "inputs": {
+    "params": {
+     "aid": "8662",
+     "app_name": "novelread",
+     "channel": "xiaomi_8662_64",
+     "version_code": "73932",
+     "version_name": "7.3.9.32",
+     "manifest_version_code": "73932",
+     "update_version_code": "73932",
+     "device_platform": "android",
+     "os": "android",
+     "ssmix": "a",
+     "device_type": "23127PN0CC",
+     "device_brand": "xiaomi",
+     "os_api": "34",
+     "os_version": "14",
+     "resolution": "1200*2670",
+     "dpi": "460",
+     "ac": "wifi",
+     "language": "zh",
+     "openudid": "a1b2c3d4e5f6a7b8",
+     "cdid": "11111111-2222-3333-4444-555555555555",
+     "tt_data": "a",
+     "_rticket": "1795436789123",
+     "ts": "1795436789",
+     "package": "com.phoenix.read",
+     "first_launch_timestamp": "1795436789",
+     "last_deeplink_update_version_code": "0",
+     "cpu_support64": "true",
+     "host_abi": "arm64-v8a",
+     "is_guest_mode": "0",
+     "app_type": "normal",
+     "minor_status": "0",
+     "appTheme": "light",
+     "is_preinstall": "0",
+     "need_personal_recommend": "1",
+     "is_android_pad": "0",
+     "is_android_fold": "0",
+     "md": "0",
+     "cronet_version": "8d40f833_2026-03-03",
+     "ttnet_version": "4.2.243.31-douyin",
+     "use_store_region_cookie": "1",
+     "device_id": "7300000000000001234",
+     "iid": "7400000000000005678"
+    }
+   },
+   "draws": [],
+   "output": {
+    "hex": "080210041a04383636322213373330303030303030303030303030313233342a2431313131313131312d323232322d333333332d343434342d3535353535353535353535353208216e6f7065726d2138efc06c40efc06c480650efc06c5a08216e6f7473657421620f417369612f5368616e676861692c386a057a685f434e70088501fc3f7f438d010e580e429501b0ea5d409d01b0ea5d40a501ed2c7f43ad01a7b32842b201023134b80152c00148c801f6a7a1bfcd64d001f6a7a1bfcd64d801f6a7a1bfcd64e001faa7a1bfcd64e80101f2010a3233313237504e304343fa01067869616f6d6982020a3233313237504e3043438a020a3233313237504e3043439202067869616f6d699a02067869616f6d69a202067869616f6d69b0023e"
+   }
+  },
+  {
+   "name": "device_payload",
+   "inputs": {
+    "params": {
+     "aid": "8662",
+     "app_name": "novelread",
+     "channel": "xiaomi_8662_64",
+     "version_code": "73932",
+     "version_name": "7.3.9.32",
+     "manifest_version_code": "73932",
+     "update_version_code": "73932",
+     "device_platform": "android",
+     "os": "android",
+     "ssmix": "a",
+     "device_type": "23127PN0CC",
+     "device_brand": "xiaomi",
+     "os_api": "34",
+     "os_version": "14",
+     "resolution": "1200*2670",
+     "dpi": "460",
+     "ac": "wifi",
+     "language": "zh",
+     "openudid": "a1b2c3d4e5f6a7b8",
+     "cdid": "11111111-2222-3333-4444-555555555555",
+     "tt_data": "a",
+     "_rticket": "1795436789123",
+     "ts": "1795436789",
+     "package": "com.phoenix.read",
+     "first_launch_timestamp": "1795436789",
+     "last_deeplink_update_version_code": "0",
+     "cpu_support64": "true",
+     "host_abi": "arm64-v8a",
+     "is_guest_mode": "0",
+     "app_type": "normal",
+     "minor_status": "0",
+     "appTheme": "light",
+     "is_preinstall": "0",
+     "need_personal_recommend": "1",
+     "is_android_pad": "0",
+     "is_android_fold": "0",
+     "md": "0",
+     "cronet_version": "8d40f833_2026-03-03",
+     "ttnet_version": "4.2.243.31-douyin",
+     "use_store_region_cookie": "1",
+     "device_id": "7300000000000001234",
+     "iid": "7400000000000005678"
+    },
+    "token": null
+   },
+   "draws": [],
+   "output": {
+    "hex": "0ada040a082173796e7468303012067869616f6d691a0a3233313237504e3043432a07416e64726f6964320231343a09313230302a323637304098074a082173796e74683030620f417369612f5368616e676861692c3868fd887a9a01082173796e74683030a201082173796e74683030ba01082173796e74683030e201082173796e74683030e801fd887af001fd887afa01082173796e746830308202082173796e74683030a002fd887aa802fd887ab202082173796e74683030ba02082173796e74683030c802fd887ad002fd887ad802fd887a8003448803fd887a9203082173796e746830309803fd887aa003fd887aaa03082173796e74683030c003fd887ac803fd887ad003fd887ad803fd887ae003fd887ae803fd887af003fd887af803fd887a8004fd887a9004fd887a9804fd887aa804fd887ab004fd887ab804fd887ac004fd887ac804fd887ad004fd887ad804fd887ae004fd887ae804fd887af004fd887af804fd887a8005fd887a8805fd887a9005fd887a9805fd887aa005fd887aa805fd887ab005fd887ab805fd887ac005fd887aea05082173796e74683030f205082173796e74683030fa05082173796e746830308206082173796e746830308806fd887a9006fd887a9806fd887aa006fd887aa806fd887ab006fd887ab806fd887ac006fd887ac806fd887ad006fd887aea06082173796e74683030f206082173796e74683030fa06082173796e746830308807fd887a9007fd887a9a07082173796e74683030a007fd887aa807fd887ab007fd887aba08082173796e74683030827d082173796e746830308a7d082173796e746830301a07616e64726f696422147630342e31302e30332d6d6c2d616e64726f696428808cd0403204383636323a08372e332e392e333242133733303030303030303030303030303132333458fd887a8001fd887a8a01082173796e74683030"
+   }
+  },
+  {
+   "name": "device_payload_token",
+   "inputs": {
+    "params": {
+     "aid": "8662",
+     "app_name": "novelread",
+     "channel": "xiaomi_8662_64",
+     "version_code": "73932",
+     "version_name": "7.3.9.32",
+     "manifest_version_code": "73932",
+     "update_version_code": "73932",
+     "device_platform": "android",
+     "os": "android",
+     "ssmix": "a",
+     "device_type": "23127PN0CC",
+     "device_brand": "xiaomi",
+     "os_api": "34",
+     "os_version": "14",
+     "resolution": "1200*2670",
+     "dpi": "460",
+     "ac": "wifi",
+     "language": "zh",
+     "openudid": "a1b2c3d4e5f6a7b8",
+     "cdid": "11111111-2222-3333-4444-555555555555",
+     "tt_data": "a",
+     "_rticket": "1795436789123",
+     "ts": "1795436789",
+     "package": "com.phoenix.read",
+     "first_launch_timestamp": "1795436789",
+     "last_deeplink_update_version_code": "0",
+     "cpu_support64": "true",
+     "host_abi": "arm64-v8a",
+     "is_guest_mode": "0",
+     "app_type": "normal",
+     "minor_status": "0",
+     "appTheme": "light",
+     "is_preinstall": "0",
+     "need_personal_recommend": "1",
+     "is_android_pad": "0",
+     "is_android_fold": "0",
+     "md": "0",
+     "cronet_version": "8d40f833_2026-03-03",
+     "ttnet_version": "4.2.243.31-douyin",
+     "use_store_region_cookie": "1",
+     "device_id": "7300000000000001234",
+     "iid": "7400000000000005678"
+    },
+    "token": "synthetic-session-token-0123456789"
+   },
+   "draws": [],
+   "output": {
+    "hex": "0ada040a082173796e7468303012067869616f6d691a0a3233313237504e3043432a07416e64726f6964320231343a09313230302a323637304098074a082173796e74683030620f417369612f5368616e676861692c3868fd887a9a01082173796e74683030a201082173796e74683030ba01082173796e74683030e201082173796e74683030e801fd887af001fd887afa01082173796e746830308202082173796e74683030a002fd887aa802fd887ab202082173796e74683030ba02082173796e74683030c802fd887ad002fd887ad802fd887a8003448803fd887a9203082173796e746830309803fd887aa003fd887aaa03082173796e74683030c003fd887ac803fd887ad003fd887ad803fd887ae003fd887ae803fd887af003fd887af803fd887a8004fd887a9004fd887a9804fd887aa804fd887ab004fd887ab804fd887ac004fd887ac804fd887ad004fd887ad804fd887ae004fd887ae804fd887af004fd887af804fd887a8005fd887a8805fd887a9005fd887a9805fd887aa005fd887aa805fd887ab005fd887ab805fd887ac005fd887aea05082173796e74683030f205082173796e74683030fa05082173796e746830308206082173796e746830308806fd887a9006fd887a9806fd887aa006fd887aa806fd887ab006fd887ab806fd887ac006fd887ac806fd887ad006fd887aea06082173796e74683030f206082173796e74683030fa06082173796e746830308807fd887a9007fd887a9a07082173796e74683030a007fd887aa807fd887ab007fd887aba08082173796e74683030827d082173796e746830308a7d082173796e74683030122273796e7468657469632d73657373696f6e2d746f6b656e2d303132333435363738391a07616e64726f696422147630342e31302e30332d6d6c2d616e64726f696428808cd0403204383636323a08372e332e392e333242133733303030303030303030303030303132333458fd887a8001fd887a8a01082173796e74683030"
+   }
+  },
+  {
+   "name": "xtea",
+   "inputs": {
+    "data": {
+     "hex": "28292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
+    },
+    "key": {
+     "hex": "404142434445464748494a4b4c4d4e4f"
+    },
+    "nonce": {
+     "hex": "01020304"
+    }
+   },
+   "draws": [],
+   "output": {
+    "sealed": {
+     "hex": "ff92776173e6d104e911ef010e33fc6ea9bca3d9b676b25f"
+    },
+    "opened": {
+     "hex": "28292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
+    }
+   }
+  },
+  {
+   "name": "exchange_seal",
+   "inputs": {
+    "plaintext": {
+     "hex": "0ada040a082173796e7468303012067869616f6d691a0a3233313237504e3043432a07416e64726f6964320231343a09313230302a323637304098074a082173796e74683030620f417369612f5368616e676861692c3868fd887a9a01082173796e74683030a201082173796e74683030ba01082173796e74683030e201082173796e74683030e801fd887af001fd887afa01082173796e746830308202082173796e74683030a002fd887aa802fd887ab202082173796e74683030ba02082173796e74683030c802fd887ad002fd887ad802fd887a8003448803fd887a9203082173796e746830309803fd887aa003fd887aaa03082173796e74683030c003fd887ac803fd887ad003fd887ad803fd887ae003fd887ae803fd887af003fd887af803fd887a8004fd887a9004fd887a9804fd887aa804fd887ab004fd887ab804fd887ac004fd887ac804fd887ad004fd887ad804fd887ae004fd887ae804fd887af004fd887af804fd887a8005fd887a8805fd887a9005fd887a9805fd887aa005fd887aa805fd887ab005fd887ab805fd887ac005fd887aea05082173796e74683030f205082173796e74683030fa05082173796e746830308206082173796e746830308806fd887a9006fd887a9806fd887aa006fd887aa806fd887ab006fd887ab806fd887ac006fd887ac806fd887ad006fd887aea06082173796e74683030f206082173796e74683030fa06082173796e746830308807fd887a9007fd887a9a07082173796e74683030a007fd887aa807fd887ab007fd887aba08082173796e74683030827d082173796e746830308a7d082173796e746830301a07616e64726f696422147630342e31302e30332d6d6c2d616e64726f696428808cd0403204383636323a08372e332e392e333242133733303030303030303030303030303132333458fd887a8001fd887a8a01082173796e74683030"
+    },
+    "nonce": {
+     "hex": "0a0b0c0d"
+    },
+    "entropy": 165
+   },
+   "draws": [],
+   "output": {
+    "sealed": {
+     "hex": "ced15e0d5d201dd1e9e0c5781ecf4a110c5ffb62ae8b0ee68e983c51c248a7c8da67f9068a99e45ce8ac343b2b0cc940d1e28053a7e9fa5de47d41f877a9d5e589260c45befff9df9ee0efe566b06461b51269582fb9486040258a3160cf834ea89b36adc40eb2a8750705f66dc3c3fdf4c17244cfc4349de6b024716949733b20aaa690b405db5413ca52e2f7c19bdf6e02661d4fb601e0848efab6951ad787eee5e4a564cca52cf6f66c120075261e589802fec638d1a739c0449a432e3334d8d65676ab9fe66268749aec00334c9d9ef6de9fb0385729dded8e0b9598c3e5e2fc80e001de7dc5926c1cf501edb5a11dfa62824e4f09c3ca99a0131762ac52888ce565117ad51fac76ec0d9fb77edcba8759fd59689f7d4ac68b4850cb304b10e87368ba5d111dcb2221941e449e7e17cd0cb1d4fd28b0559d9bbdff97dcdb5ac6c883041d6e13aefb8ade6948476cbe823c53a89358692cca2632d49877829dac2a63cef878201807b2e060417663679b07e5d68b7f890b8b7f3dd88cbc371c9ccc3b53e264e0b64ef29822533f5de598781b73a012d44c7676fbade47573479f46606497fddf5d3681dd3c8db3329ec47dc27312002386ac7125c34e79b784276824c9897500aba6c57a905fbbe8a9813a1d77209eafa897763aefa846bb0e6e21ede3cedfba9a9c1c8d577d58e5538970006ec3769ba8d7ffa1e50000a78ff993d2a62f879d19d51bcf3c63da114843c5940630db8a6fbfd1046a4eae43d1b4c3e764e55b31acc75ce57c2ef40c8ab5cc06e6ef7a14dfc9caf25b4fb008c4c85ae4019ec52ff594de7f3d54b083cee777f1a1f106c584bcfd34425e4ce31e2645f9f852026c11870704a2cc8fbc1c1fe1f825cceac8fee38d93b37f6cc7c4ba59705e07d84a0d11badbab58e61675ac67841797a48e0c765c9787e8156a7d2d90281bf28ba4c911f842785de20bb91670f22f2fc9c69be01eeaa2ed8a177bfa11caaa3711e8e96a7d6bc6608330f305798e15ceeca0ee0923b0d1801750"
+    },
+    "opened": {
+     "hex": "0ada040a082173796e7468303012067869616f6d691a0a3233313237504e3043432a07416e64726f6964320231343a09313230302a323637304098074a082173796e74683030620f417369612f5368616e676861692c3868fd887a9a01082173796e74683030a201082173796e74683030ba01082173796e74683030e201082173796e74683030e801fd887af001fd887afa01082173796e746830308202082173796e74683030a002fd887aa802fd887ab202082173796e74683030ba02082173796e74683030c802fd887ad002fd887ad802fd887a8003448803fd887a9203082173796e746830309803fd887aa003fd887aaa03082173796e74683030c003fd887ac803fd887ad003fd887ad803fd887ae003fd887ae803fd887af003fd887af803fd887a8004fd887a9004fd887a9804fd887aa804fd887ab004fd887ab804fd887ac004fd887ac804fd887ad004fd887ad804fd887ae004fd887ae804fd887af004fd887af804fd887a8005fd887a8805fd887a9005fd887a9805fd887aa005fd887aa805fd887ab005fd887ab805fd887ac005fd887aea05082173796e74683030f205082173796e74683030fa05082173796e746830308206082173796e746830308806fd887a9006fd887a9806fd887aa006fd887aa806fd887ab006fd887ab806fd887ac006fd887ac806fd887ad006fd887aea06082173796e74683030f206082173796e74683030fa06082173796e746830308807fd887a9007fd887a9a07082173796e74683030a007fd887aa807fd887ab007fd887aba08082173796e74683030827d082173796e746830308a7d082173796e746830301a07616e64726f696422147630342e31302e30332d6d6c2d616e64726f696428808cd0403204383636323a08372e332e392e333242133733303030303030303030303030303132333458fd887a8001fd887a8a01082173796e74683030"
+    }
+   }
+  },
+  {
+   "name": "exchange_request",
+   "inputs": {
+    "plaintext": {
+     "hex": "0ada040a082173796e7468303012067869616f6d691a0a3233313237504e3043432a07416e64726f6964320231343a09313230302a323637304098074a082173796e74683030620f417369612f5368616e676861692c3868fd887a9a01082173796e74683030a201082173796e74683030ba01082173796e74683030e201082173796e74683030e801fd887af001fd887afa01082173796e746830308202082173796e74683030a002fd887aa802fd887ab202082173796e74683030ba02082173796e74683030c802fd887ad002fd887ad802fd887a8003448803fd887a9203082173796e746830309803fd887aa003fd887aaa03082173796e74683030c003fd887ac803fd887ad003fd887ad803fd887ae003fd887ae803fd887af003fd887af803fd887a8004fd887a9004fd887a9804fd887aa804fd887ab004fd887ab804fd887ac004fd887ac804fd887ad004fd887ad804fd887ae004fd887ae804fd887af004fd887af804fd887a8005fd887a8805fd887a9005fd887a9805fd887aa005fd887aa805fd887ab005fd887ab805fd887ac005fd887aea05082173796e74683030f205082173796e74683030fa05082173796e746830308206082173796e746830308806fd887a9006fd887a9806fd887aa006fd887aa806fd887ab006fd887ab806fd887ac006fd887ac806fd887ad006fd887aea06082173796e74683030f206082173796e74683030fa06082173796e746830308807fd887a9007fd887a9a07082173796e74683030a007fd887aa807fd887ab007fd887aba08082173796e74683030827d082173796e746830308a7d082173796e746830301a07616e64726f696422147630342e31302e30332d6d6c2d616e64726f696428808cd0403204383636323a08372e332e392e333242133733303030303030303030303030303132333458fd887a8001fd887a8a01082173796e74683030"
+    },
+    "milliseconds": 1795436789123,
+    "nonce": {
+     "hex": "0a0b0c0d"
+    },
+    "entropy": 165
+   },
+   "draws": [],
+   "output": {
+    "hex": "08c4908082041002180222e005ced15e0d5d201dd1e9e0c5781ecf4a110c5ffb62ae8b0ee68e983c51c248a7c8da67f9068a99e45ce8ac343b2b0cc940d1e28053a7e9fa5de47d41f877a9d5e589260c45befff9df9ee0efe566b06461b51269582fb9486040258a3160cf834ea89b36adc40eb2a8750705f66dc3c3fdf4c17244cfc4349de6b024716949733b20aaa690b405db5413ca52e2f7c19bdf6e02661d4fb601e0848efab6951ad787eee5e4a564cca52cf6f66c120075261e589802fec638d1a739c0449a432e3334d8d65676ab9fe66268749aec00334c9d9ef6de9fb0385729dded8e0b9598c3e5e2fc80e001de7dc5926c1cf501edb5a11dfa62824e4f09c3ca99a0131762ac52888ce565117ad51fac76ec0d9fb77edcba8759fd59689f7d4ac68b4850cb304b10e87368ba5d111dcb2221941e449e7e17cd0cb1d4fd28b0559d9bbdff97dcdb5ac6c883041d6e13aefb8ade6948476cbe823c53a89358692cca2632d49877829dac2a63cef878201807b2e060417663679b07e5d68b7f890b8b7f3dd88cbc371c9ccc3b53e264e0b64ef29822533f5de598781b73a012d44c7676fbade47573479f46606497fddf5d3681dd3c8db3329ec47dc27312002386ac7125c34e79b784276824c9897500aba6c57a905fbbe8a9813a1d77209eafa897763aefa846bb0e6e21ede3cedfba9a9c1c8d577d58e5538970006ec3769ba8d7ffa1e50000a78ff993d2a62f879d19d51bcf3c63da114843c5940630db8a6fbfd1046a4eae43d1b4c3e764e55b31acc75ce57c2ef40c8ab5cc06e6ef7a14dfc9caf25b4fb008c4c85ae4019ec52ff594de7f3d54b083cee777f1a1f106c584bcfd34425e4ce31e2645f9f852026c11870704a2cc8fbc1c1fe1f825cceac8fee38d93b37f6cc7c4ba59705e07d84a0d11badbab58e61675ac67841797a48e0c765c9787e8156a7d2d90281bf28ba4c911f842785de20bb91670f22f2fc9c69be01eeaa2ed8a177bfa11caaa3711e8e96a7d6bc6608330f305798e15ceeca0ee0923b0d18017502886f6f985c168"
+   }
+  },
+  {
+   "name": "exchange_answer",
+   "inputs": {
+    "packet": {
+     "hex": "08a48c90810410023250243eaa55d43db236c202e3ec062c015faa48806c89884b8380599ea84b6ae7a4851a6835361fa746cab7e032b5e08fd0f9f9484918069c5a84126f2cecf843a41274c9597d7980e782508634f2764bb2"
+    }
+   },
+   "draws": [],
+   "output": {
+    "token": "synthetic-session-token-0123456789",
+    "status": 202
+   }
+  },
+  {
+   "name": "gorgon_0",
+   "inputs": {
+    "query": {
+     "hex": "6169643d38363632266170705f6e616d653d6e6f76656c72656164262676657273696f6e5f636f64653d37343333322f202a7e78"
+    },
+    "body": {
+     "hex": "1f8b080073796e7468657469632d626f6479"
+    },
+    "seconds": 1795436789,
+    "nonce": 4660,
+    "flags": {
+     "hex": "0200"
+    }
+   },
+   "draws": [],
+   "output": "840434120200f85124e949e84e060535c07d3da9a4528ec8756f"
+  },
+  {
+   "name": "gorgon_1",
+   "inputs": {
+    "query": {
+     "hex": "6169643d38363632266170705f6e616d653d6e6f76656c72656164262676657273696f6e5f636f64653d37343333322f202a7e78"
+    },
+    "body": {
+     "hex": "1f8b080073796e7468657469632d626f6479"
+    },
+    "seconds": 1795436789,
+    "nonce": 48879,
+    "flags": {
+     "hex": "0405"
+    }
+   },
+   "draws": [],
+   "output": "8404efbe04052355f86ae2d20492e6c7e29a7b626763ae7dcbac"
+  },
+  {
+   "name": "gorgon_2",
+   "inputs": {
+    "query": {
+     "hex": "6169643d38363632266170705f6e616d653d6e6f76656c72656164262676657273696f6e5f636f64653d37343333322f202a7e78"
+    },
+    "body": {
+     "hex": "1f8b080073796e7468657469632d626f6479"
+    },
+    "seconds": 1795436789,
+    "nonce": 0,
+    "flags": {
+     "hex": "0200"
+    }
+   },
+   "draws": [],
+   "output": "840400000200c0bb234e0b42d4b59e3a3d4d2ff39359b1598999"
+  },
+  {
+   "name": "gorgon_empty_body",
+   "inputs": {
+    "query": {
+     "hex": "6169643d38363632266170705f6e616d653d6e6f76656c72656164262676657273696f6e5f636f64653d37343333322f202a7e78"
+    },
+    "body": {
+     "hex": ""
+    },
+    "seconds": 1795436789,
+    "nonce": 7,
+    "flags": {
+     "hex": "0200"
+    }
+   },
+   "draws": [],
+   "output": "840407000200c15dcb93d5ff42498f299b10c41e189883d392cc"
+  },
+  {
+   "name": "selector_checksum",
+   "inputs": {
+    "query_digest": {
+     "hex": "7cf143ec195efd2818acbe40fa80878750c3ef63b1616709572be5d9e177e460"
+    },
+    "body_digest": {
+     "hex": "2d88c9c5a136c6c945e2e0ddebf0f76c"
+    },
+    "seconds": 1795436789
+   },
+   "draws": [],
+   "output": {
+    "selector": 2341325990,
+    "checksum": 978413910
+   }
+  },
+  {
+   "name": "digest_framing",
+   "inputs": {
+    "query": {
+     "hex": "6169643d38363632266170705f6e616d653d6e6f76656c72656164262676657273696f6e5f636f64653d37343333322f202a7e78"
+    },
+    "body": {
+     "hex": "1f8b080073796e7468657469632d626f6479"
+    },
+    "seconds": 1795436789
+   },
+   "draws": [],
+   "output": {
+    "proof": {
+     "hex": "504963df9ef932d0a9f130057c1a5e1be5094beb"
+    },
+    "core": {
+     "payload": {
+      "hex": "7cf143ec195efd2818acbe40fa80878750c3ef63b1616709572be5d9e177e4602d88c9c5a136c6c945e2e0ddebf0f76cf530046b"
+     },
+     "selector": 6,
+     "seconds": 1795436789
+    }
+   }
+  },
+  {
+   "name": "digest_adapter",
+   "inputs": {
+    "query": {
+     "hex": "6169643d38363632266170705f6e616d653d6e6f76656c72656164262676657273696f6e5f636f64653d37343333322f202a7e78"
+    },
+    "body": {
+     "hex": "1f8b080073796e7468657469632d626f6479"
+    },
+    "seconds": 1795436789
+   },
+   "draws": [],
+   "output": {
+    "hex": "504963df9ef932d0a9f130057c1a5e1be5094beb"
+   }
+  },
+  {
+   "name": "advance_ladon",
+   "inputs": {
+    "previous": 16909060,
+    "allocation": "fedcba9876543210",
+    "seconds": 1795436789
+   },
+   "draws": [],
+   "output": 1719045137
+  },
+  {
+   "name": "envelope",
+   "inputs": {
+    "proto": {
+     "hex": "0a10505152535455565758595a5b5c5d5e5f100a220438363632f201f0010104070a0d101316191c1f2225282b2e3134373a3d404346494c4f5255585b5e6164676a6d707376797c7f8285888b8e9194979a9da0a3a6a9acafb2b5b8bbbec1c4c7cacdd0d3d6d9dcdfe2e5e8ebeef1f4f7fafd000306090c0f1215181b1e2124272a2d303336393c3f4245484b4e5154575a5d606366696c6f7275787b7e8184878a8d909396999c9fa2a5a8abaeb1b4b7babdc0c3c6c9cccfd2d5d8dbdee1e4e7eaedf0f3f6f9fcff0205080b0e1114171a1d202326292c2f3235383b3e4144474a4d505356595c5f6265686b6e7174777a7d808386898c8f9295989b9ea1a4a7aaadb0b3b6b9bcbfc2c5c8cbce"
+    },
+    "query_digest": {
+     "hex": "7cf143ec195efd2818acbe40fa80878750c3ef63b1616709572be5d9e177e460"
+    },
+    "body_proof": {
+     "hex": "504963df9ef932d0a9f130057c1a5e1be5094beb"
+    },
+    "seconds": 1795436789,
+    "key_nonce": 287454020,
+    "frame_nonce": 1432778632
+   },
+   "draws": [],
+   "output": "8DAEa6VhVjihZVI8rWleMKltWjREMwABUcqIf2ZRgRAOWN4L9Bj6oY3wMJlLjL3D0PDQe/APzr/QLhw1kqiYJoeWqHItdiqIUeBVPsiFpWmX80vIlUEUMGcrehWksaCLorpHWN0btpe9zPCXniIyhi1Tqn4zJpnL4gon7mTIm8t19DTdnLxca81ANXw6NF7Duw9qra1JPAdHtY1Um6nqUyMAUjNpfeGt8LZ3ieejpduynK/JoVWQ0lRiVfw2VOFSA14Try6XM6fyXu5EkiEO1BLAvE1Y5jrme5i5ubAhwPy4kmsoWotXyKXQe64Sl1oKMDXHO+5RjA5uH+BsiX297TLSJrqJj4aUtNvCyQJ8pBh7Jyu/rrt6iyCabLx7jjDgqWvWLN0X5vufH4s+ti5qLu/N//7vzfr6IhE="
+  },
+  {
+   "name": "bootstrap",
+   "inputs": {
+    "milliseconds": 1795436789123,
+    "token": null,
+    "previous_ladon": 0
+   },
+   "draws": [
+    {
+     "call": "bytes",
+     "size": 4,
+     "value": "c193e5f6"
+    },
+    {
+     "call": "bits",
+     "size": 8,
+     "value": "a7"
+    },
+    {
+     "call": "bits",
+     "size": 32,
+     "value": "7e6ddce7"
+    },
+    {
+     "call": "bits",
+     "size": 32,
+     "value": "28f00481"
+    },
+    {
+     "call": "bits",
+     "size": 32,
+     "value": "2c63888f"
+    },
+    {
+     "call": "bits",
+     "size": 64,
+     "value": "8f7b7676d015b0dc"
+    },
+    {
+     "call": "below",
+     "size": 65536,
+     "value": "2d78"
+    },
+    {
+     "call": "bytes",
+     "size": 4,
+     "value": "8ada6063"
+    },
+    {
+     "call": "hex",
+     "size": 16,
+     "value": "bc2f07a7fa12196ca745ba1caccd0d48"
+    },
+    {
+     "call": "hex",
+     "size": 8,
+     "value": "5777a9530bf20fc2"
+    }
+   ],
+   "output": {
+    "url": "https://mssdk.zijieapi.com/sdi/get_token?lc_id=646637794&platform=android&device_platform=android&sdk_ver=v04.10.03-ml-android&sdk_ver_code=67764992&app_ver=7.4.3.32&version_code=74332&aid=8662&sdkid=&subaid=&iid=7400000000000005678&did=7300000000000001234&bd_did=&client_type=inhouse&region_type=ml&mode=2&full_update_version_code=74332&os=android&ssmix=a&_rticket=1795436789123&cdid=11111111-2222-3333-4444-555555555555&channel=xiaomi_8662_64&app_name=novelread&version_name=7.4.3.32&manifest_version_code=74332&update_version_code=74332&resolution=1200*2670&dpi=460&device_type=23127PN0CC&device_brand=xiaomi&language=zh&os_api=34&os_version=14&ac=wifi&host_abi=arm64-v8a&dragon_device_type=&pv_player=&compliance_status=&need_personal_recommend=1&player_so_load=&is_android_pad_screen=&rom_version=&device_id=7300000000000001234&klink_egdi=",
+    "headers": {
+     "Content-Type": "application/octet-stream",
+     "Accept": "*/*",
+     "X-TT-Request-Tag": "t=0;n=0",
+     "X-SS-DP": "8662",
+     "X-Khronos": "1795436789",
+     "X-Argus": "9TAEaw==",
+     "X-Ladon": "A2yjEg==",
+     "X-Gorgon": "8404782d0200b4404e0f9435b744a1ea6203cf4d88177e9cc18c",
+     "X-Helios": "itpgY3vIYzuE38ASHO/JswTpLd09UkRtPMktjIbBbMKHebue",
+     "X-Medusa": "8DAEa6VhVjihZVI8rWleMKltWjSBBAABtMqPiHMsgaMOWM3f4e6rlwBBf5Kql70iYk/kRaVWos/lQLCg8rfzva5oMD5sN5Kwupa1oHCv7hOyh07c0JnAjHpZD/BKt6HNj5e+pV4pRIemmmjlrkvAYsHDIpfmVt6LUKo0Ln9+TuXoD8u/encLO7YKEEmi+gqfShLgdp6E5sOTDTs/4nymy9t5QcUZZ/JECwNuyC4LIErYQN11oEBlgbDTA5sqUYG0QbC4rw74EK9tZqHZ/8/Wr0i1Topo9nuIE1Rbj5B15wCsZ/xubGa0S6LKlUzxBp1GTjRLxaFZnxkPNrIozG+Hnhqmd0ZQBRHRPOx/EXc6zuNY02h7qnLajboVuqDPjoZpWTYYjNS9HVQhmUN8MJJwbbqdHUj8gDz1ROF9SJRp3g6kbPaS2OkdGdBwVpN4leY8J0iFCj1GS2KH43C4r+1l4IAV/XIuVOF7evlFq25cWpc/+Ojgbqj3OETjZG2QSt70P+yOmY/u/XjHW+m9POkAhkq6HG9LFE9w46KY027RNP6BWbOVzz61aPC5ohB7d4za24BW+m1myuysiDNGgALsrmZSV0vUpyV1d5n+yZNnpEER5tfrI8hhhPSE+2RQFHyH6ebn4qmjAtCmddskI4ZX+JwSD1mih2JVoW4e/I64EtEZzyLVfVmjn5O71uOI01q592ytJ2bP3YPseQw+xuE5Mcs//+9Ao6vQarNOksYcFEWRl5YVn7rk8RusKkzFq8xKYMD9Ey6mkY5WTC/0qaUtMufXn+hPj3e+vZMI8tB81AY9zYEWyHdVz0w8d5g4UKalb83oaC+R36Wt1vGyYi13XOHwp3WPptq6blo++H8g//h/IP3wKA==",
+     "X-SS-STUB": "CEBDA599518085D7148982FC15BD7E4D",
+     "X-VC-Bdturing-SDK-Version": "4.0.3.cn",
+     "X-TT-Trace-ID": "00-bc2f07a7fa12196ca745ba1caccd0d48-5777a9530bf20fc2-01",
+     "User-Agent": "com.phoenix.read/74332 (Linux; U; Android 14; zh_CN; 23127PN0CC; Cronet/TTNetVersion:8d40f833_2026-03-03)",
+     "Cookie": "install_id=7400000000000005678; odin_tt=synthetic-odin; ttreq=1.synthetic-request; store-region=cn; store-region-src=did"
+    },
+    "body": {
+     "hex": "08c4908082041002180222e0056c041d8129c8143f3713e25c34ff5631785ab9120aca9663efa4dc82dc2551ba49ad4b895c41f2bf4bf3802ff37a0fb9870719eefd46cb70ff5bca60af5e26378ce21682da9c84f588fd37fa06a61c50e53669ff64c060e819f97b533bcbde9fca8ad5cd6f09a74c7751ab28b43273c72fde2c029ce8f423761febf566bc4ad376c1cffb26b6ee6b97aceae3e6cce3691e7dd7125216cb7756156447b397f6ba47205ac5844fd0fdb25128a0d3a67f8fd01b498d1aaa66c5d9e93c1f4e792f3dcfd9531f9135450362d7c54892d5a047df0767fd8b442a2bd07bd01ae2b414f83afd68412efda6e7c0ca2143feb912b875320a4b5b105097a815861a56fb68973ebe6ad43f57c49ec4c6fbae86fa4e9811c5220872fd9b7933047bc255a0ecd45a0f8607c9abb5c26021d60c76c03fce075b033fa119a6e1516ef421132d41c23e709089cac64dd08077102e4418de1537c1930d332bba67f5166cf9fd28e72da08bf1206c657d284483d18b9951e2dcb37f1ca6f1611aadff7f2f81ea4da6fa09deccfa02a27589eb845cc1bb5b5f0a3e674c8b79400c57cd74667d3825e8c4c3153cbf6936aa223dabbf0f72c97cacd44fce19f91bdf9a9ac3d0a660067c3b8da425ee0a94d2be75e19bb21f9b4848cfec2d005d2042667759bac5f4eabdc76cc03015427db6fc0796fa296e4fd508ac8750739c33c3407a2d154c1f04c412fb9238418337ad5405c504e06ef73be840f060c50b3d1746c06b8019fb93ca6d025c2cd0b07a16490cde7c2c47ae29de93e47e44daf3ab9dd281661bd9e16ea02dd7eefd8804916b349249da15055b1abd44c52245e2ed6b9d1eeb36899cc68392b0887c17d0620a5b4ac0974fe34bffa8c1a9f41c6dd7b2b7323e3e472c56e2052f849fb3924031abad50bcc88172594543b57f18ba94aee506344e570c84180542f1dcbc35357a514054de02a900e407f99da672d8745f501783b0a3ad959d1ad11c60013142a83c47e436c9b4cc683504f38ab611018d952d39fb74c785a62886f6f985c168"
+    },
+    "next_ladon": 57451282,
+    "message": {
+     "hex": "0a10505152535455565758595a5b5c5d5e5f100a18cef3eee60f2204383636322a133733303030303030303030303030303132333432093634363633373739343a08372e342e332e333242147630342e31302e30332d6d6c2d616e64726f696448808cd0405208020000000000000060eac3a1b00d6a14a3ff44506d6d66801b75971961dc58ade6cd5ca47206feb7494492487a0e080210bee15418bee15428bee1548801eac3a1b00da201046e6f6e65a801e205ba01e302080232137630342e31302e30332e30342d62756766697838a442420e7869616f6d695f383636325f363462a102080210041a04383636322213373330303030303030303030303030313233342a2431313131313131312d323232322d333333332d343434342d3535353535353535353535353208216e6f7065726d2138efc06c40efc06c480650efc06c5a08216e6f7473657421620f417369612f5368616e676861692c386a057a685f434e70088501fc3f7f438d010e580e429501b0ea5d409d01b0ea5d40a501ed2c7f43ad01a7b32842b201023134b80152c00148c801f6a7a1bfcd64d001f6a7a1bfcd64d801f6a7a1bfcd64e001faa7a1bfcd64e80101f2010a3233313237504e304343fa01067869616f6d6982020a3233313237504e3043438a020a3233313237504e3043439202067869616f6d699a02067869616f6d69a202067869616f6d69b0023e7208372e342e332e3332788421980186f6f985c168c2014a7b22636d72223a31363737373231362c22636d7232223a31363737373231362c2276706e223a302c226b64223a302c2264796e223a22222c22646f223a302c22746b223a66616c73657d"
+    }
+   }
+  },
+  {
+   "name": "bootstrap_token",
+   "inputs": {
+    "milliseconds": 1795436789123,
+    "token": "synthetic-session-token-0123456789",
+    "previous_ladon": 16909060
+   },
+   "draws": [
+    {
+     "call": "bytes",
+     "size": 4,
+     "value": "450c78d2"
+    },
+    {
+     "call": "bits",
+     "size": 8,
+     "value": "dd"
+    },
+    {
+     "call": "bits",
+     "size": 32,
+     "value": "c1cc0aff"
+    },
+    {
+     "call": "bits",
+     "size": 32,
+     "value": "90b401a6"
+    },
+    {
+     "call": "bits",
+     "size": 32,
+     "value": "fb14628e"
+    },
+    {
+     "call": "bits",
+     "size": 64,
+     "value": "3226db943c3ae353"
+    },
+    {
+     "call": "below",
+     "size": 65536,
+     "value": "f454"
+    },
+    {
+     "call": "bytes",
+     "size": 4,
+     "value": "961dbba3"
+    },
+    {
+     "call": "hex",
+     "size": 16,
+     "value": "52cc6867845effe295a6e16b64b90c89"
+    },
+    {
+     "call": "hex",
+     "size": 8,
+     "value": "83d4a384434f4c20"
+    }
+   ],
+   "output": {
+    "url": "https://mssdk.zijieapi.com/sdi/get_token?lc_id=646637794&platform=android&device_platform=android&sdk_ver=v04.10.03-ml-android&sdk_ver_code=67764992&app_ver=7.4.3.32&version_code=74332&aid=8662&sdkid=&subaid=&iid=7400000000000005678&did=7300000000000001234&bd_did=&client_type=inhouse&region_type=ml&mode=2&full_update_version_code=74332&os=android&ssmix=a&_rticket=1795436789123&cdid=11111111-2222-3333-4444-555555555555&channel=xiaomi_8662_64&app_name=novelread&version_name=7.4.3.32&manifest_version_code=74332&update_version_code=74332&resolution=1200*2670&dpi=460&device_type=23127PN0CC&device_brand=xiaomi&language=zh&os_api=34&os_version=14&ac=wifi&host_abi=arm64-v8a&dragon_device_type=&pv_player=&compliance_status=&need_personal_recommend=1&player_so_load=&is_android_pad_screen=&rom_version=&device_id=7300000000000001234&klink_egdi=",
+    "headers": {
+     "Content-Type": "application/octet-stream",
+     "Accept": "*/*",
+     "X-TT-Request-Tag": "t=0;n=0",
+     "X-SS-DP": "8662",
+     "X-Khronos": "1795436789",
+     "X-Argus": "9TAEaw==",
+     "X-Ladon": "wJuYHQ==",
+     "X-Gorgon": "840454f402004dd1cce2269e7cea29a0e9cb0c16d545d5a1d850",
+     "X-Helios": "lh27o8xjC4M3gq9TNzqEwUGAXP6OBzF0p7iQ+wly5UYhGMos",
+     "X-Medusa": "8DAEa6VhVjihZVI8rWleMKltWjSmAQABmoquahT7gYoPGPvJJRlNItaLQMRPLHakKBRdJnObbtl2fX9hlDSyxQq+BYykCZXneq7e6X9PoYzNghQrnzrpAc5qHUdDp1vxpNF4VxFSukhFZzt+CVaE/hOMz5p91nb5bvDeXDS6tMsZQEhF5AMUZ6Cf1iOZhnAXZh4vZlnQd4u9XaAKTH0sOgOw6wnpFotBK7PkPU5L37ZzYlp+jT7gAjR7kC08LUmLkLpenZ+4WEeEvjdBHoqcCWlwLQmUngfw3KkZ4Ao6eGKnl2nnL37ecz0V7WigcsDAOM+ruPDCswOfmcX4A5U0XbQ1FUN+UJmUM6KB12Dh2ETtv26Pjv0M4sCkaYAkM9NeMDAh2hiJrf2oeVZ3ztQq8Rt5YlHsY54+OdaYPv7mQyx77/wyr3AgoVIrTfLT3Z7NOzySRx5CrkgFLZt2GXtlLMaPJuIt8ui4AAZUces5+I+hJJqdLQGNsKSdRJiIo/MuA3Qgdblj9vWKOY2tBaigaE90Y5obFUT5BFecSMMuwldkDbbPoqGhQwx4DdBqoR1DwAmw6gr+gYWpJDni6goQvLzJsiMtMuJ9jKHhhgLS8Oov1b3/8/3QgDlVT/h+pG3rY4k+96dhhvOid4C4FyE84myKXYNTQpuJ7qXSjKiYMA5vaZvKqBMP5K56W0lfswWriUYzsEiY5ECE0VmEjN+9jDCSitR/uyYRSFwcC5VCcsnCIKzqSlsGjJ7iu8hUXNgNT/ZW+yJ+iRbcdMbL2og8pDsBeoOa/dq2kSPYIYsQn7Xima7ziwtfqgjjaAnnhoilxX4rky5PcVyBFS9L7FBFce5j5NrNC2zoKfJK6a6AkL6vPsQ7pkO4ESWTEAjrt0lNWZlM9FBREkodx9weqOdI+l/e//pf3v20kA==",
+     "X-SS-STUB": "F2F2BFCDF1D24B5EBE30EB774275F6AE",
+     "X-VC-Bdturing-SDK-Version": "4.0.3.cn",
+     "X-TT-Trace-ID": "00-52cc6867845effe295a6e16b64b90c89-83d4a384434f4c20-01",
+     "User-Agent": "com.phoenix.read/74332 (Linux; U; Android 14; zh_CN; 23127PN0CC; Cronet/TTNetVersion:8d40f833_2026-03-03)",
+     "Cookie": "install_id=7400000000000005678; odin_tt=synthetic-odin; ttreq=1.synthetic-request; store-region=cn; store-region-src=did"
+    },
+    "body": {
+     "hex": "08c49080820410021802228006609ca79bb7fec84ec4e94940b770650a796153fb6e902b464145ab026426226be5fdea8eb5ac1481bc622cad16f5e09ed33522e69643fb75e42b30a73b74d71389559bb653001f1de3aaf2a49ab23529542654eb243435e587a0cc5478b9046285e1ad4fde06e66272d4a38b9ec36fb05f92ca38beee177c7ce6e2d42ca0cf17eff0b2c30d81375964acce05e4f047ad27081ffae3d4ddd5b438f9866e131f829732a5c0d242172c1ee58772085157fb37dbf985220e80fa46d1f5aa5ac29831d4418b5c08f46c608a7f674c43531027bbf4680c8027c46d4632cf946e6f1e29acf9ff06de54ec811893fe167d3576dacdcae81920d82111fa48e91dec2b4ce23a3365cd3ca6aee3b0a6ba980f8454a9e442e9aa92f5af86fe28ffbe13fcc5979503a1ad57aa40e177176c5b9c8b1ffb56160af0d79331707fb7ee276b44c9bfd455535486d1cb25671a97e104736e2517cfb618637c8822b65e588dba65b5e28cddfd5a68b1d72617490525758f8feb78365a1c8b60d7413b155f2e7843a90b04d6c52ad9d5df2bc3fc74931688f1a70728455cd47f3161898de6b67ef3dfeb07591b6a6a62f80a7a58db4d7f7210e954d30412a67595e562a3039a5383d6205f7577090e25e779ecf2ef4bd292b25a211460937e007c7785596eba225ee6d07f87111ee35220fe681ed57b4de86ba60db8638781c88692c7691c230072696438609a80eb6f128bdfb7756d60f8ab4e0073be211995205e77440c87b11e0f4462cff301b71537adceb7f6e9866b15926619b7bc554e000b602225b8e0cf68084e10a3fbd2f253c94995cb025508efa10c9853f7a4609b44579b38b45ad66e96673bb8ea5869ff95d84910bd5ee425f70e7189499e7ab1e1998a6d97922b099ce6c479c43871ea9020b4aa3ff711dc3dbd2ac7233259d87ef00f19eb2ae39617e945502fe0271946e8a72e8418f81a40c38ab28cd4a7a1d82897419b0398daa3b07cdc03da2a9f6b8a8c2d7e693aedaf8b2a65178183e82381dcce2d7e4de475d25fa37e701536561c37e7cc981acfb401e9af9c43936d47207cf5357c82fb962886f6f985c168"
+    },
+    "next_ladon": 3231422493,
+    "message": {
+     "hex": "0a10505152535455565758595a5b5c5d5e5f100a18feabe09c182204383636322a133733303030303030303030303030303132333432093634363633373739343a08372e342e332e333242147630342e31302e30332d6d6c2d616e64726f696448808cd0405208020000000000000060eac3a1b00d6a144804055a439a9ffe723972b4724a99716d9b823a7206feb7494492487a0e080210bee15418bee15428bee15482012273796e7468657469632d73657373696f6e2d746f6b656e2d303132333435363738398801eac3a1b00da201046e6f6e65a801e205ba01e302080232137630342e31302e30332e30342d62756766697838a442420e7869616f6d695f383636325f363462a102080210041a04383636322213373330303030303030303030303030313233342a2431313131313131312d323232322d333333332d343434342d3535353535353535353535353208216e6f7065726d2138efc06c40efc06c480650efc06c5a08216e6f7473657421620f417369612f5368616e676861692c386a057a685f434e70088501fc3f7f438d010e580e429501b0ea5d409d01b0ea5d40a501ed2c7f43ad01a7b32842b201023134b80152c00148c801f6a7a1bfcd64d001f6a7a1bfcd64d801f6a7a1bfcd64e001faa7a1bfcd64e80101f2010a3233313237504e304343fa01067869616f6d6982020a3233313237504e3043438a020a3233313237504e3043439202067869616f6d699a02067869616f6d69a202067869616f6d69b0023e7208372e342e332e3332788421980186f6f985c168c201497b22636d72223a31363737373231362c22636d7232223a31363737373231362c2276706e223a302c226b64223a302c2264796e223a22222c22646f223a302c22746b223a747275657d"
+    }
+   }
+  },
+  {
+   "name": "playback",
+   "inputs": {
+    "video": "7706406288325872664",
+    "milliseconds": 1795436789123,
+    "token": "synthetic-session-token-0123456789",
+    "previous_ladon": 270544960
+   },
+   "draws": [
+    {
+     "call": "bits",
+     "size": 32,
+     "value": "e3a655f"
+    },
+    {
+     "call": "bits",
+     "size": 32,
+     "value": "547c17d3"
+    },
+    {
+     "call": "bits",
+     "size": 32,
+     "value": "ac9130f4"
+    },
+    {
+     "call": "bits",
+     "size": 64,
+     "value": "7e9bf77c6519a9d5"
+    },
+    {
+     "call": "below",
+     "size": 65536,
+     "value": "71b1"
+    },
+    {
+     "call": "bytes",
+     "size": 4,
+     "value": "4403cc6c"
+    },
+    {
+     "call": "hex",
+     "size": 16,
+     "value": "df77a2ec80c38baa4cbb2f30a1b1e878"
+    },
+    {
+     "call": "hex",
+     "size": 8,
+     "value": "728fb2ada2e52bd2"
+    },
+    {
+     "call": "below",
+     "size": 900000000,
+     "value": "1a0d0319"
+    }
+   ],
+   "output": {
+    "url": "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/player/v1?device_platform=android&os=android&ssmix=a&_rticket=1795436789123&cdid=11111111-2222-3333-4444-555555555555&channel=xiaomi_8662_64&aid=8662&app_name=novelread&version_code=74332&version_name=7.4.3.32&manifest_version_code=74332&update_version_code=74332&resolution=1200*2670&dpi=460&device_type=23127PN0CC&device_brand=xiaomi&language=zh&os_api=34&os_version=14&ac=wifi&host_abi=arm64-v8a&need_personal_recommend=1&device_id=7300000000000001234&iid=7400000000000005678",
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8",
+     "Accept": "application/json",
+     "X-TT-Request-Tag": "t=0;n=0",
+     "X-SS-DP": "8662",
+     "X-Khronos": "1795436789",
+     "X-Argus": "9TAEaw==",
+     "X-Ladon": "Q40DXQ==",
+     "X-Gorgon": "8404b17104053ccce26d08dc45c6172a7193269a596d302782dc",
+     "X-Helios": "RAPMbKD19hzbABt9YNv0Ju/miDzBlaBjc0yjS8/BbuSiOEHB",
+     "X-Medusa": "8DAEa6VhVjihZVI8rWleMKltWjTTFwABzsr0OJGoAYwGWLgsJkq9JdGjIh3ji0pd6B5pyHAIFUfM+d5Xmp2OIX6iIHhIozzxttGiK3P1zUHISrBkM5/1Ud5HYSMyTt7x+xjMr8pgBN9MQ7cUNv/hkpNfS1ZJD/EkDLcoktKOvDuI8IPEIc5kDzC2QIX+u4rrWO5d38YqV5Zn0dgwhshY70MgUjbjoDUZzy/Nv8CYd75BOg/iFge7qcluAk2dSxAFg5P9skeiXVUI/Zv1D1bo5XDaCr/UccD2n/u2rFVJxN3JJmM+E8Ma/0ZhvDjxnZMb1rpnCX+tLoMloMTJHXVIE55/FjbMkY718gCRqvt+Ry3k+RtpLrmVYb3DdrBYki2FtUOOu94UYDAtI4mWPK1tEik6cl9uzS5rcVgperM4w+iPFbNnWGC+I7KBvXS/SAv8d3ZnVzWEC6JDuJUS5MV9Z+ooTmt7V8YfjdLmvf0+mJabgRbzAhKiUCWAxDDrgYJllAwfk1PiEZlCuEynItf0x1/UQ967gWWRdfvt1OTyKvETdr/JJddy2XemlfljondHz1ZAr2ATmu+LiMKw3li9aCSgCLatzlM+GP/mVQn2NjVur+2A0DAtv3FfsOrX5kUa4l+mCk5wauUgkoLkHcR0fZpXHrdb3YrhEGV9lvkhB4W4e1fJ7LAWlnZ/JpSSqXj/6uK66Y2IWTjMtp6QiWrYbzZQxh8N2fFjBoPhdHls4i2IabeMtI6QgNGc0k+bByay94QWVgfssMu2drfnNMTOeXk9dChfusWDfSizhPdEvw4FYtsmvhJetiSfTLeu2PQBwrHJHChzZa58llGOLOXjkj2p5F0Zq+DKwgbxJcnpy1VdwnYLAbYHNxeTjx/CA0KPMn8bx6gnMh+ZBpLsY+Fb/B/U//wf0ft8VA==",
+     "X-SS-STUB": "B1B2E88D92F6509B858B52A060564020",
+     "X-VC-Bdturing-SDK-Version": "4.0.3.cn",
+     "X-TT-Trace-ID": "00-df77a2ec80c38baa4cbb2f30a1b1e878-728fb2ada2e52bd2-01",
+     "User-Agent": "com.phoenix.read/74332 (Linux; U; Android 14; zh_CN; 23127PN0CC; Cronet/TTNetVersion:8d40f833_2026-03-03)",
+     "Cookie": "install_id=7400000000000005678; odin_tt=synthetic-odin; ttreq=1.synthetic-request; store-region=cn; store-region-src=did",
+     "Content-Encoding": "gzip",
+     "X-Reading-Request": "1795436789123-537060377",
+     "X-TT-Store-Region": "cn",
+     "X-TT-Store-Region-Src": "did",
+     "X-SS-REQ-TICKET": "1795436789123"
+    },
+    "body": {
+     "hex": "1f8b08000000000002134d8fdb0a83300c40ff25cf3e74ae53e9af8c11b2354aa056693ad905ff7ddd953de670124eeee013ea8923838339d095135430ca853d2ee27942f138d20cee0e1b632cb83db4ad69ac69eaaedbd6bbaead9bc6c261ade028379c29d1f8943d679250e68171e1a4324570a62a7c911363e08503385b80281d03a3976140cd94c1f514942b885c2228844f88e75ea2e4d7a19cce5f619c6d916488bfbdb3324e8a9f6ffea9722a2de8a3fef0fb7671733fa552be31b55dd707804a18a517010000"
+    },
+    "next_ladon": 1133314909,
+    "message": {
+     "hex": "0a10505152535455565758595a5b5c5d5e5f100a18be95d3e3012204383636322a133733303030303030303030303030303132333432093634363633373739343a08372e342e332e333242147630342e31302e30332d6d6c2d616e64726f696448808cd0405208040500000000000060eac3a1b00d6a14cc332e0146115836da50c20c847ea27067ff977b72065ec736b48c787a0e080210bee15418bee15428bee15482012273796e7468657469632d73657373696f6e2d746f6b656e2d303132333435363738398801eac3a1b00da201046e6f6e65a801e205ba01e302080232137630342e31302e30332e30342d62756766697838a442420e7869616f6d695f383636325f363462a102080210041a04383636322213373330303030303030303030303030313233342a2431313131313131312d323232322d333333332d343434342d3535353535353535353535353208216e6f7065726d2138efc06c40efc06c480650efc06c5a08216e6f7473657421620f417369612f5368616e676861692c386a057a685f434e70088501fc3f7f438d010e580e429501b0ea5d409d01b0ea5d40a501ed2c7f43ad01a7b32842b201023134b80152c00148c801f6a7a1bfcd64d001f6a7a1bfcd64d801f6a7a1bfcd64e001faa7a1bfcd64e80101f2010a3233313237504e304343fa01067869616f6d6982020a3233313237504e3043438a020a3233313237504e3043439202067869616f6d699a02067869616f6d69a202067869616f6d69b0023e7208372e342e332e3332788421980186f6f985c168c201497b22636d72223a31363737373231362c22636d7232223a31363737373231362c2276706e223a302c226b64223a302c2264796e223a22222c22646f223a302c22746b223a747275657d"
+    }
+   }
+  },
+  {
+   "name": "registration",
+   "inputs": {
+    "milliseconds": 1795436789123,
+    "uuid": "12345678-1234-5678-1234-567812345678"
+   },
+   "draws": [
+    {
+     "call": "hex",
+     "size": 8,
+     "value": "f1b90820d042ac1f"
+    },
+    {
+     "call": "bytes",
+     "size": 32,
+     "value": "b2f96d873c5629b7b3a24b40eadf8455672ff08a6f4ea735ad9d0467390be6d4"
+    }
+   ],
+   "output": {
+    "url": "https://log.snssdk.com/service/2/device_register/?_rticket=1795436789123&ac=wifi&aid=8662&appTheme=light&app_name=novelread&app_type=normal&cdid=12345678-1234-5678-1234-567812345678&channel=xiaomi_8662_64&cpu_support64=true&cronet_version=8d40f833_2026-03-03&device_brand=xiaomi&device_platform=android&device_type=23127PN0CC&dpi=460&first_launch_timestamp=1795436789&host_abi=arm64-v8a&is_android_fold=0&is_android_pad=0&is_guest_mode=0&is_preinstall=0&language=zh&last_deeplink_update_version_code=0&manifest_version_code=73932&md=0&minor_status=0&need_personal_recommend=1&openudid=f1b90820d042ac1f&os=android&os_api=34&os_version=14&package=com.phoenix.read&resolution=1200%2A2670&ssmix=a&ts=1795436789&tt_data=a&ttnet_version=4.2.243.31-douyin&update_version_code=73932&use_store_region_cookie=1&version_code=73932&version_name=7.3.9.32",
+    "headers": {
+     "Content-Type": "application/octet-stream;tt-data=a",
+     "Content-Encoding": "gzip",
+     "Accept-Encoding": "gzip",
+     "User-Agent": "com.phoenix.read/73932 (Linux; U; Android 14; zh_CN; Xiaomi 14; Build/UKQ1.230804.001; Cronet/TTNetVersion:8d40f833 QuicVersion:462f352c 2026-08-31)",
+     "Accept": "application/json; charset=utf-8,application/x-protobuf",
+     "X-SS-STUB": "4B92FEBEB1DA8E9C435B1A205DA076C6",
+     "X-SS-DP": "8662",
+     "X-SS-REQ-TICKET": "1795436789123",
+     "X-Khronos": "1795436789",
+     "X-Argus": "9TAEaw==",
+     "X-TT-Request-Tag": "t=0;n=1",
+     "Log-Encode-Type": "gzip",
+     "Passport-SDK-Version": "60755",
+     "Passport-SDK-Settings": "device_transfer_s_0,device_transfer_ab_1",
+     "Sdk-Version": "2",
+     "lc": "102",
+     "X-TT-Store-Region": "cn",
+     "X-TT-Store-Region-Src": "did",
+     "X-VC-Bdturing-SDK-Version": "4.0.3.cn"
+    },
+    "params": {
+     "aid": "8662",
+     "app_name": "novelread",
+     "channel": "xiaomi_8662_64",
+     "version_code": "73932",
+     "version_name": "7.3.9.32",
+     "manifest_version_code": "73932",
+     "update_version_code": "73932",
+     "device_platform": "android",
+     "os": "android",
+     "ssmix": "a",
+     "device_type": "23127PN0CC",
+     "device_brand": "xiaomi",
+     "os_api": "34",
+     "os_version": "14",
+     "resolution": "1200*2670",
+     "dpi": "460",
+     "ac": "wifi",
+     "language": "zh",
+     "openudid": "f1b90820d042ac1f",
+     "cdid": "12345678-1234-5678-1234-567812345678",
+     "tt_data": "a",
+     "_rticket": "1795436789123",
+     "ts": "1795436789",
+     "package": "com.phoenix.read",
+     "first_launch_timestamp": "1795436789",
+     "last_deeplink_update_version_code": "0",
+     "cpu_support64": "true",
+     "host_abi": "arm64-v8a",
+     "is_guest_mode": "0",
+     "app_type": "normal",
+     "minor_status": "0",
+     "appTheme": "light",
+     "is_preinstall": "0",
+     "need_personal_recommend": "1",
+     "is_android_pad": "0",
+     "is_android_fold": "0",
+     "md": "0",
+     "cronet_version": "8d40f833_2026-03-03",
+     "ttnet_version": "4.2.243.31-douyin",
+     "use_store_region_cookie": "1"
+    },
+    "plain": "{\"magic_tag\":\"ss_app_log\",\"header\":{\"access\":\"wifi\",\"aid\":8662,\"app_version\":\"7.3.9.32\",\"app_version_minor\":\"\",\"apk_first_install_time\":1795436789123,\"cdid\":\"12345678-1234-5678-1234-567812345678\",\"channel\":\"xiaomi_8662_64\",\"clientudid\":\"12345678-1234-5678-1234-567812345678\",\"cpu_abi\":\"arm64-v8a\",\"density_dpi\":460,\"device_brand\":\"xiaomi\",\"device_category\":\"phone\",\"device_manufacturer\":\"Xiaomi\",\"device_model\":\"Xiaomi 14\",\"device_platform\":\"android\",\"display_density\":\"xxhdpi\",\"display_name\":\"\u7ea2\u679c\u77ed\u5267\",\"git_hash\":\"fe95b95\",\"guest_mode\":0,\"ipv6_list\":[],\"is_system_app\":0,\"language\":\"zh\",\"manifest_version_code\":73932,\"not_request_sender\":0,\"oaid_may_support\":true,\"openudid\":\"f1b90820d042ac1f\",\"os\":\"Android\",\"os_api\":34,\"os_version\":\"14\",\"package\":\"com.phoenix.read\",\"region\":\"CN\",\"release_build\":\"UKQ1.230804.001_1701234567\",\"req_id\":\"12345678-1234-5678-1234-567812345678\",\"resolution\":\"2670x1200\",\"rom\":\"hyperos\",\"rom_version\":\"OS1.0.32.0.UNCCNXM\",\"sdk_flavor\":\"china\",\"sdk_target_version\":29,\"sdk_version\":\"3.7.3-rc.116-douyin\",\"sig_hash\":\"aea615ab910015038f73c47e45d21466\",\"sim_serial_number\":[],\"timezone\":8,\"tz_name\":\"Asia/Shanghai\",\"tz_offset\":28800,\"update_version_code\":73932,\"version_code\":73932,\"custom\":{\"is_android_fold\":0,\"filter_warn\":0,\"is_android_pad\":0,\"client_ipv4\":\"0.0.0.0\",\"web_ua\":\"Mozilla/5.0 (Linux; Android 14; Xiaomi 14 Build/UKQ1.230804.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.0.0 Mobile Safari/537.36\"}},\"_gen_time\":1795436789123}",
+    "seed": {
+     "hex": "b2f96d873c5629b7b3a24b40eadf8455672ff08a6f4ea735ad9d0467390be6d4"
+    },
+    "openudid": "f1b90820d042ac1f",
+    "cdid": "12345678-1234-5678-1234-567812345678"
+   }
+  }
+ ]
+}

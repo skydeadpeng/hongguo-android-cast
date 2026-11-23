@@ -30,10 +30,14 @@ PY
 "$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -d "$TMP/allowlist" "$TMP/RegisteredRpcAllowlistTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/allowlist" RegisteredRpcAllowlistTest
 "$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR:$SDK_JAR:$OKHTTP_CP" -d "$TMP/classes" \
- "$SRC/DanmakuSigner.java" "$SRC/SearchProtocol.java" "$SRC/PassportConstants.java" "$SRC/PassportSigner.java" "$SRC/PassportDevice.java" "$SRC/PassportJson.java" "$SRC/OfficialApiClient.java" "$SRC/OfficialTransport.java" "$SRC/AppTransport.java" "$SRC/NetworkGuard.java" "$SRC/PlayerSigner.java" "$SRC/PlaybackSignerV5.java" "$SRC/AccountSigner.java" "$SRC/TabPlaybackSigner.java" "$SRC/UpstreamDeviceRegister.java" "$SRC/RegisteredPlaybackModel.java" "$OWN/android/tests/PlayerSignerTest.java" "$OWN/android/tests/PlaybackSignerV5Test.java" "$OWN/android/tests/RegisteredPlaybackModelTest.java"
+ "$SRC/DanmakuSigner.java" "$SRC/SearchProtocol.java" "$SRC/PassportConstants.java" "$SRC/PassportSigner.java" "$SRC/PassportDevice.java" "$SRC/PassportJson.java" "$SRC/OfficialApiClient.java" "$SRC/OfficialTransport.java" "$SRC/AppTransport.java" "$SRC/NetworkGuard.java" "$SRC/PlayerSigner.java" "$SRC/PlaybackSignerV5.java" "$SRC/AccountSigner.java" "$SRC/TabPlaybackSigner.java" "$SRC/UpstreamDeviceRegister.java" "$SRC/SdkWire.java" "$SRC/SdkMaterials.java" "$SRC/SdkSigner.java" "$SRC/SdkRequest.java" "$SRC/SdkAssets.java" "$SRC/SdkDigestBridge.java" "$SRC/SdkPlaybackClient.java" "$SRC/RegisteredPlaybackModel.java" "$OWN/android/tests/PlayerSignerTest.java" "$OWN/android/tests/PlaybackSignerV5Test.java" "$OWN/android/tests/RegisteredPlaybackModelTest.java" "$OWN/android/tests/SdkPlaybackVectorsTest.java" "$OWN/android/tests/SdkAssetsTest.java"
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR:$OKHTTP_CP" io.github.jackotom.hongguo.android.PlayerSignerTest
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR:$OKHTTP_CP" io.github.jackotom.hongguo.android.PlaybackSignerV5Test
 "$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR:$OKHTTP_CP" io.github.jackotom.hongguo.android.RegisteredPlaybackModelTest "$TMP/projected-flags.json"
+# The SDK playback route replays upstream's Python golden vectors (android/tests/sdk-playback-vectors.json, a classpath resource).
+"$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR:$OKHTTP_CP:$OWN/android/tests" io.github.jackotom.hongguo.android.SdkPlaybackVectorsTest
+# The SDK route's material download over a scripted CDN: resume after a cut or a stall, what is kept, what is discarded.
+"$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR:$OKHTTP_CP" io.github.jackotom.hongguo.android.SdkAssetsTest
 node "$OWN/android/tests/registered-model-projection.test.cjs" "$ROOT" "$TMP/projected-flags.json"
 python3 "$OWN/android/tests/registered-model-dispatch-harness.py" "$SRC/NativeBridge.java" "$TMP/RegisteredModelDispatchTest.java"
 "$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/dispatch" "$TMP/RegisteredModelDispatchTest.java"

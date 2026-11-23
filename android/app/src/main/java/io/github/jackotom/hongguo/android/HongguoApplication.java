@@ -13,6 +13,9 @@ public final class HongguoApplication extends Application {
         // The registered playback identity survives process restarts on disk, like the
         // working TV clients' device store; a served identity keeps being served.
         RegisteredPlaybackModel.identityStore(new java.io.File(getFilesDir(), "registered-identity.json"));
+        // The SDK playback route verifies and caches its inputs off the start thread; on any device
+        // that cannot run it this is a no-op and playback keeps the signed-request ladder.
+        SdkPlaybackClient.install(new java.io.File(getFilesDir(), "sdk-playback"));
         // Pre-register (or reload) the identity at process start so the first play tap
         // does not pay the registration round trip; a persisted identity loads locally.
         new Thread(() -> {

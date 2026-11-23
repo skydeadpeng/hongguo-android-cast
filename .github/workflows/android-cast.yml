@@ -41,6 +41,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      # The SDK playback route's arm64 adapter (android/app/src/main/cpp) is built by the NDK.
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'ndk;28.2.13676358 cmake;3.22.1'
       - name: Install source asset build dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Compile all Android production Java against SDK 35
