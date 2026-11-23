@@ -104,25 +104,31 @@ public final class RegisteredPlaybackModelTest {
     try{JSONObject out=op.fetch(VID,name.equals("speculative"));outcome=out.has("video_model")?"MODEL":"MISSING";}
     catch(Exception failure){outcome=failure instanceof RegisteredPlaybackModel.ModelError?((RegisteredPlaybackModel.ModelError)failure).code:failure.getClass().getSimpleName();}
     String expected=name.equals("recover")?"MODEL":name.equals("backoff")?"APP_SERVICE_BACKOFF":name.equals("unknown-encoding")?"APP_INVALID_RESPONSE":name.equals("malformed")?"ZipException":name.equals("truncated")?"EOFException":"APP_EMPTY_RESPONSE";
-    int expectedRequests=name.equals("recover")?1:name.equals("speculative")?2:name.equals("double-empty")||name.equals("tab-backoff")?4:2;
+    int expectedRequests=name.equals("recover")?1:name.equals("speculative")?3:name.equals("double-empty")||name.equals("tab-backoff")?6:2;
     System.out.println("ZERO_GZIP_CASE name="+name+" outcome="+outcome+" requests="+calls.get()+" expected="+expected+" expectedRequests="+expectedRequests);
     if(!outcome.equals(expected)||calls.get()!=expectedRequests)mismatches.add(name);
    }
    check(mismatches.isEmpty(),"zero-byte gzip is an empty response, not decompressor EOF; cases="+mismatches);
   });
-  group("foreground model is served by the exact-episode video_tab GET",()->{
+  group("foreground model is served by the V5-signed bodyless video_tab GET",()->{
    AtomicInteger registrations=new AtomicInteger();List<OfficialApiClient.Request> requests=new ArrayList<>();
    RegisteredPlaybackModel op=operation(r->{registrations.incrementAndGet();return response(200,new JSONObject(new String(registration().body,StandardCharsets.UTF_8)).put("cookies","install_id="+IID+"; ttreq=fixture-register; store-region=cn; store-region-src=did; sessionid=private-account-cookie").toString());},r->{
     requests.add(r);return r.method.equals("POST")?response(200," \n\t "):response(200,tabEnvelope(VID,model()));});
    JSONObject out=op.fetch(VID);
    check(out.getString("vid").equals(VID)&&out.getJSONObject("video_model").getJSONArray("video_list").length()==1,"current episode model recovered");
-   check(registrations.get()==1&&requests.size()==1&&requests.get(0).method.equals("GET"),"one identity and one leading tab GET only; POST fallback unused");
+   check(registrations.get()==1&&requests.size()==1&&requests.get(0).method.equals("GET"),"one identity and one leading V5 tab GET only; POST fallback unused");
    OfficialApiClient.Request tab=requests.get(0);Map<String,String>tq=query(tab.url);
-   check(tq.get("cdid").equals(CDID)&&tq.get("video_id").equals(VID)&&tq.get("device_level").equals("1")&&!tq.containsKey("ts"),"profile identity and selected episode on exact tab query");
+   check(tq.get("cdid").equals(CDID)&&tq.get("device_id").equals(DID)&&tq.get("iid").equals(IID)&&tq.get("video_id").equals(VID)&&tq.get("device_level").equals("1")&&tq.get("video_platform").equals("1024")&&!tq.containsKey("ts"),"profile identity and selected episode on exact tab query");
    check(tab.url.startsWith(RegisteredPlaybackModel.VIDEO_TAB_API+"?")&&tab.body.length==0,"fixed GET target with empty body");
+   check(tq.get("version_code").equals("74332")&&tq.get("version_name").equals("7.4.3.32")&&tq.get("update_version_code").equals("74332")&&tq.get("channel").equals("vivo_8662_64")&&tq.get("device_type").equals("PGT-AN10"),"tab GET shares the v5 player profile");
    for(String name:new String[]{"x-khronos","x-helios","x-medusa"})check(!header(tab,name).isEmpty(),"tab signature header "+name);
-   check(header(tab,"Cookie").contains("install_id="+IID)&&header(tab,"Cookie").contains("ttreq=fixture-register")&&!header(tab,"Cookie").contains("sessionid")&&!header(tab,"Cookie").contains("private-account"),"only registration-cookie allowlist reaches tab");
-   check(header(tab,"X-Tt-Token").isEmpty()&&!out.toString().contains("fixture-register"),"no account token or identity/cookie in result");
+   // The bodyless GET signs MD5(""): jackotom 7.7 and hongguoTV 0.1.37 agree, and the platform drops the legacy Argus GET.
+   check(header(tab,"x-ss-stub").equalsIgnoreCase(DanmakuSigner.hex(DanmakuSigner.md5(new byte[0]))),"bodyless tab GET carries the empty-content body digest");
+   long khronos=Long.parseLong(header(tab,"x-khronos")),ticket=Long.parseLong(tq.get("_rticket"));
+   check(ticket>=khronos*1000&&ticket<khronos*1000+1024&&PlaybackSignerV5.branchClass(new URI(tab.url).getRawQuery(),new byte[0],khronos)==12,"tab ticket search lands the v5 digest on its single branch");
+   for(String retired:new String[]{"X-Ladon","X-Argus","X-SS-Req-Ticket","X-Gorgon","Cookie","X-Tt-Token"})check(!tab.headers.containsKey(retired),"v5 tab GET never sends: "+retired);
+   check(PlaybackSignerV5.PLAYER_V1_UA.equals(header(tab,"User-Agent")),"tab GET uses the v5 player UA exact");
+   check(!out.toString().contains("fixture-register")&&!out.toString().contains(DID),"no identity or cookie in result");
   });
   group("registered identity precedes current v5 player/v1 signed request",()->{
    List<OfficialApiClient.Request> requests=new ArrayList<>();AtomicInteger bootCalls=new AtomicInteger();
@@ -136,6 +142,34 @@ public final class RegisteredPlaybackModelTest {
     long khronos=Long.parseLong(r.headers.get("x-khronos")),ticket=Long.parseLong(q.get("_rticket"));check(ticket>=khronos*1000&&ticket<khronos*1000+1024,"v5 ticket search stays within the signed second");check(r.headers.get("x-ss-stub").equalsIgnoreCase(DanmakuSigner.hex(DanmakuSigner.md5(r.body))),"v5 signature hashes actual gzip body");check(PlaybackSignerV5.PLAYER_V1_UA.equals(r.headers.get("User-Agent")),"v5 player UA exact");check(!r.headers.containsKey("Cookie")&&!r.headers.containsKey("X-Tt-Token"),"anonymous model never copies registration/account cookies");return response(200,envelope(model()));});
    JSONObject result=op.fetch(VID);check(requests.size()==2&&result.length()==2&&result.getString("vid").equals(VID),"one bootstrap plus tab refusal and one v5 model");check(requests.get(0).method.equals("GET")&&requests.get(1).method.equals("POST"),"tab leads and the v5 POST is the fallback");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"real model projected");check(reject(()->op.fetch(VID)) instanceof IOException,"one lookup instance cannot reuse consumed identity");
   });
+  group("v5 POST serves when the leading V5 tab GET answers hollow",()->{
+   List<OfficialApiClient.Request> requests=new ArrayList<>();
+   JSONObject out=operation(r->registration(),r->{requests.add(r);return r.method.equals("GET")?response(200,""):response(200,envelope(model()));}).fetch(VID);
+   check(out.getJSONObject("video_model").getJSONArray("video_list").length()==1,"v5 POST model recovered");
+   check(requests.size()==2&&requests.get(0).method.equals("GET")&&requests.get(1).method.equals("POST"),"hollow leading tab GET falls through to exactly one v5 POST");
+  });
+  group("legacy tab GET serves only after both V5 shapes answer hollow",()->{
+   AtomicInteger registrations=new AtomicInteger();List<OfficialApiClient.Request> requests=new ArrayList<>();
+   RegisteredPlaybackModel op=operation(r->{registrations.incrementAndGet();return response(200,new JSONObject(new String(registration().body,StandardCharsets.UTF_8)).put("cookies","install_id="+IID+"; ttreq=fixture-register; store-region=cn; store-region-src=did; sessionid=private-account-cookie").toString());},r->{
+    requests.add(r);int at=requests.size()-1;check(at<3,"a served legacy tab GET ends the ladder");
+    return at==2?response(200,tabEnvelope(VID,model())):response(200,"");});
+   JSONObject out=op.fetch(VID);
+   check(out.getJSONObject("video_model").getJSONArray("video_list").length()==1,"legacy tab GET recovers the model after two hollow V5 answers");
+   check(registrations.get()==1&&requests.size()==3,"no rotation is spent while a later shape still serves");
+   check(requests.get(0).method.equals("GET")&&requests.get(1).method.equals("POST")&&requests.get(2).method.equals("GET"),"ladder order: V5 tab GET, v5 POST, legacy tab GET");
+   OfficialApiClient.Request legacy=requests.get(2);Map<String,String>lq=query(legacy.url);
+   check(legacy.url.startsWith(RegisteredPlaybackModel.VIDEO_TAB_API+"?")&&lq.get("video_id").equals(VID)&&lq.get("cdid").equals(CDID)&&lq.get("version_code").equals("73932"),"legacy tab GET keeps its own 7.3.9 profile on the same fixed target");
+   check(!header(legacy,"X-Argus").isEmpty()&&!header(legacy,"x-medusa").isEmpty()&&header(legacy,"x-ss-stub").isEmpty()&&header(requests.get(0),"X-Argus").isEmpty(),"first and third GET carry different signature families");
+   check(header(legacy,"Cookie").contains("install_id="+IID)&&header(legacy,"Cookie").contains("ttreq=fixture-register")&&!header(legacy,"Cookie").contains("sessionid")&&!header(legacy,"Cookie").contains("private-account"),"only registration-cookie allowlist reaches the legacy tab");
+   check(header(legacy,"X-Tt-Token").isEmpty()&&!out.toString().contains("fixture-register"),"no account token or identity/cookie in result");
+  });
+  group("three-shape ladder walks V5 tab GET v5 POST and legacy tab GET before one rotation",()->{
+   RegisteredPlaybackModel.resetRotationQuotaForTest();AtomicInteger registrations=new AtomicInteger();List<String> wire=new ArrayList<>();
+   Exception empty=reject(()->operation(r->{registrations.incrementAndGet();return registration();},r->{wire.add(r.method+" "+new URI(r.url).getPath()+(header(r,"X-Argus").isEmpty()?" v5":" argus"));return response(200," ");}).fetch(VID));
+   check(empty instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)empty).code.equals("APP_EMPTY_RESPONSE"),"three hollow shapes surface the rotation signal");
+   check(registrations.get()==2&&wire.size()==6,"one rotation only: two identities walk the same three shapes; requests="+wire.size());
+   check(wire.equals(Arrays.asList("GET /reading/bookapi/video_tab/multi_video_model/v1/ v5","POST /novel/player/multi_video_model/player/v1 v5","GET /reading/bookapi/video_tab/multi_video_model/v1/ argus","GET /reading/bookapi/video_tab/multi_video_model/v1/ v5","POST /novel/player/multi_video_model/player/v1 v5","GET /reading/bookapi/video_tab/multi_video_model/v1/ argus")),"ladder order per identity: V5 tab GET, v5 POST, legacy Argus tab GET; actual="+wire);
+  });
   group("speculative hollowed paths surface without an identity rotation",()->{
    AtomicInteger registrations=new AtomicInteger();List<OfficialApiClient.Request> requests=new ArrayList<>();
    RegisteredPlaybackModel op=operation(r->{requests.add(r);registrations.incrementAndGet();return registration();},r->{
@@ -144,16 +178,16 @@ public final class RegisteredPlaybackModelTest {
    catch (Exception failure) {
      check(failure instanceof RegisteredPlaybackModel.ModelError && "APP_EMPTY_RESPONSE".equals(((RegisteredPlaybackModel.ModelError)failure).code),"hollow error surfaced");
    }
-   check(registrations.get()==1&&requests.size()==3&&requests.get(1).method.equals("GET")&&requests.get(2).method.equals("POST"),"register plus one tab GET and one v5 POST, no rotation");
+   check(registrations.get()==1&&requests.size()==4&&requests.get(1).method.equals("GET")&&requests.get(2).method.equals("POST")&&requests.get(3).method.equals("GET"),"register plus one V5 tab GET, one v5 POST and one legacy tab GET, no rotation");
   });
 group("same identity recovers on the retry (UI-level)",()->{
    AtomicInteger models=new AtomicInteger(),registrations=new AtomicInteger();
    RegisteredPlaybackModel.resetRotationQuotaForTest();
-   // First fetch hollows both paths and spends the rotation; second fetch on the SAME identity succeeds (UI retry)
-   OfficialApiClient.Transport model=r->{int call=models.incrementAndGet();return response(200,call<=4?" ":envelope(model()));};
+   // First fetch hollows all three shapes and spends the rotation; second fetch on the SAME identity succeeds (UI retry)
+   OfficialApiClient.Transport model=r->{int call=models.incrementAndGet();return response(200,call<=6?" ":envelope(model()));};
    try { operation(r->{registrations.incrementAndGet();return registration();},model).fetch(VID); } catch (Exception expected) { }
    JSONObject result=operation(r->{registrations.incrementAndGet();return registration();},model).fetch(VID);
-   check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1&&models.get()==5,"second fetch on same identity succeeds after the hollow pair and one rotated attempt");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"recovered model projected");
+   check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1&&models.get()==7,"second fetch on same identity succeeds after the hollow triple and one rotated attempt");check(result.getJSONObject("video_model").getJSONArray("video_list").length()==1,"recovered model projected");
   });
   group("foreground gzip empties recover but double-empty rotates once",()->{
    RegisteredPlaybackModel.resetRotationQuotaForTest();
@@ -166,7 +200,7 @@ group("same identity recovers on the retry (UI-level)",()->{
    }
    RegisteredPlaybackModel.resetRotationQuotaForTest();
    AtomicInteger calls=new AtomicInteger();Exception empty=reject(()->operation(r->registration(),r->{calls.incrementAndGet();return response(200," ");}).fetch(VID));
-   check(empty instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)empty).code.equals("APP_EMPTY_RESPONSE")&&calls.get()==4,"double-empty rotates once: two tab GET and two v5 POST");
+   check(empty instanceof RegisteredPlaybackModel.ModelError&&((RegisteredPlaybackModel.ModelError)empty).code.equals("APP_EMPTY_RESPONSE")&&calls.get()==6,"three hollow shapes rotate once: two V5 tab GETs, two v5 POSTs and two legacy tab GETs");
   });
   group("Retry-After whitespace plain and gzip answers stay terminal",()->{
    for(boolean packed:new boolean[]{false,true})for(String spelling:new String[]{"Retry-After","rEtRy-AfTeR"}){

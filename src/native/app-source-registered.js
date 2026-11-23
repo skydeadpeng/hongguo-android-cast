@@ -8,7 +8,7 @@
 const crypto = require('node:crypto');
 const sm3 = require('./sm3');
 const { signPlayer } = require('./playback-signature');
-const { buildPlaybackV5Request } = require('./playback-signature-v5');
+const { buildPlaybackV5Request, signPlaybackV5, PLAYER_V1_UA } = require('./playback-signature-v5');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
 const localId = () => String(1000000000000000n + BigInt('0x' + crypto.randomBytes(6).toString('hex')));
 // 已登记设备身份（device_register 之后由桥接层注入）；未登记时保持合成身份。
@@ -184,6 +184,30 @@ function signedPlayerV1Request(payload, vid) {
         ? { iid: registeredIdentity.iid, device_id: registeredIdentity.device_id, cdid: registeredIdentity.cdid || localCdid() }
         : { iid: localId(), device_id: localId(), cdid: localCdid() };
     return buildPlaybackV5Request(String(vid), identity, payload);
+}
+
+/** V5 签名的无正文 video_tab GET（2026-11-23 起服务端唯一应答的模型形态；安卓
+ * RegisteredPlaybackModel.videoTabV5 同构）。与 POST 共用 v5 档案参数；空 Buffer 让各处
+ * 摘要取 MD5("")，与 jackotom 7.7 / hongguoTV 0.1.37 一致。不带任何 Cookie。 */
+function signedVideoTabV5Request(vid) {
+    const identity = registeredIdentity
+        ? { iid: registeredIdentity.iid, device_id: registeredIdentity.device_id, cdid: registeredIdentity.cdid || localCdid() }
+        : { iid: localId(), device_id: localId(), cdid: localCdid() };
+    const values = {
+        aid: '8662', app_name: 'novelread',
+        version_code: '74332', version_name: '7.4.3.32',
+        channel: 'vivo_8662_64', device_platform: 'android',
+        device_type: 'PGT-AN10', os_version: '12', update_version_code: '74332',
+        iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id,
+        video_id: String(vid), video_id_type: '0', device_level: '1',
+        need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
+        video_platform: '1024', source: '0', from_video_id: '',
+    };
+    const signed = signPlaybackV5(VIDEO_TAB_API, values, Buffer.alloc(0));
+    signed.headers['User-Agent'] = PLAYER_V1_UA;
+    signed.headers.Accept = 'application/json';
+    signed.method = 'GET';
+    return signed;
 }
 
 function signedModelRequest(payload, videoId = '') {
@@ -491,6 +515,8 @@ async function fetchAppPlayUrl(vid, options = {}) {
         // a locally classified empty response spends its budget on the legacy ladder.
         // The v5 form signs the exact gzip bytes, so the attempt needs zlib; the WebView
         // bundle has none and always supplies a native registered provider instead.
+        // 2026-11-23: only the V5-signed bodyless video_tab GET is answered, so it is the
+        // next rung after the v5 POST (first one on the wire in the WebView bundle).
         const playerV1Payload = JSON.stringify({
             // device_level=1 negotiates bytevc1 (playable) renditions; level 3 earns
             // bytevc2-only models that every consumer excludes (hongguoTV 0.16.6, issue 61).
@@ -505,20 +531,29 @@ async function fetchAppPlayUrl(vid, options = {}) {
             await settleModel(adoptModel(response));
         } catch (v5Error) {
             // Business refusals, wrong IDs and malformed models stay terminal; only a
-            // classified empty v5 response may try the legacy signed POST.
+            // classified empty v5 response may try the next form.
             if (v5Error?.code !== 'APP_EMPTY_RESPONSE' || v5Error.responseStage !== 'model_post') throw v5Error;
+            // 2026-11-23：服务端当天只应答 V5 签名的无正文 video_tab GET（安卓 RegisteredPlaybackModel
+            // 同构），排在 V5 POST 之后、两条旧形态之前；WebView 包没有 zlib，实际是第一种发出的形态。
             try {
-                const signed = signedModelRequest(payload);
-                const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
+                const tab = signedVideoTabV5Request(vid);
+                const response = await lookupJson(tab.url, { method: 'GET', headers: tab.headers }, 'model_post');
                 await settleModel(adoptModel(response));
-            } catch (error) {
-                // Only a locally classified empty model POST may recover. Valid business
-                // refusals, wrong IDs, HTML and fallback GET errors keep their behavior.
-                if (error?.code !== 'APP_EMPTY_RESPONSE' || error.responseStage !== 'model_post') throw error;
-                // 老 POST 持续空 200 时，把恢复机会用在按集号签名的 video_tab GET 上。
-                const signed = signedModelRequest(payload, vid);
-                const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
-                await settleModel(adoptModel(response));
+            } catch (tabError) {
+                if (tabError?.code !== 'APP_EMPTY_RESPONSE' || tabError.responseStage !== 'model_post') throw tabError;
+                try {
+                    const signed = signedModelRequest(payload);
+                    const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
+                    await settleModel(adoptModel(response));
+                } catch (error) {
+                    // Only a locally classified empty model POST may recover. Valid business
+                    // refusals, wrong IDs, HTML and fallback GET errors keep their behavior.
+                    if (error?.code !== 'APP_EMPTY_RESPONSE' || error.responseStage !== 'model_post') throw error;
+                    // 老 POST 持续空 200 时，把恢复机会用在按集号签名的 video_tab GET 上。
+                    const signed = signedModelRequest(payload, vid);
+                    const response = await lookupJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, 'model_post');
+                    await settleModel(adoptModel(response));
+                }
             }
         }
     }
@@ -580,4 +615,4 @@ async function fetchAppPlayUrl(vid, options = {}) {
         : Object.assign(new Error('本集片源地址或密钥无法解析'), { code: 'INVALID_RESPONSE' });
 }
 
-module.exports = { fetchAppPlayUrl, signedAppRequest, signedModelRequest, signedPlayerV1Request, setDeviceIdentity, __xGorgon: xGorgon, API_HOSTS: [new URL(VIDEO_API).host] };
+module.exports = { fetchAppPlayUrl, signedAppRequest, signedModelRequest, signedPlayerV1Request, signedVideoTabV5Request, setDeviceIdentity, __xGorgon: xGorgon, API_HOSTS: [new URL(VIDEO_API).host] };

@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 // 安卓线的登记身份签名/取流链独立于桌面 app-source（签名头集与 branch 策略有协议差异），勿混用。
-const { fetchAppPlayUrl, signedAppRequest, signedModelRequest, signedPlayerV1Request, setDeviceIdentity } = require('./app-source-registered');
+const { fetchAppPlayUrl, signedAppRequest, signedModelRequest, signedPlayerV1Request, signedVideoTabV5Request, setDeviceIdentity } = require('./app-source-registered');
 const passport = require('./passport-register.cjs');
 const hongguo = require('./hongguo');
 
@@ -322,8 +322,8 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, openExterna
           const vid = String(params && params.vid || '');
           if (!/^\d{1,30}$/.test(vid)) throw new Error('App 分集请求参数无效');
           let identity = await ensureRegisteredDevice();
-          // 已登记身份：只覆盖 device_id/iid；请求形态固定为 v5 player/v1（2026-11-16 起
-          // 服务端只应答 v5 三头签名，551 POST/video_tab 全空 200），且不带任何 Cookie。
+          // 已登记身份：只覆盖 device_id/iid；不带任何 Cookie。每轮先试 V5 签名的无正文 video_tab GET
+          // （2026-11-23 起服务端只应答这一形态，安卓 RegisteredPlaybackModel 同序），空响应再试 v5 player/v1。
           setDeviceIdentity({ device_id: identity.deviceId, iid: identity.installId });
           try {            const payload = JSON.stringify({
               biz_param: { detail_page_version: 0, device_level: 1, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
@@ -337,22 +337,22 @@ function createAndroidBridge({ userDataDir, onPlay, onResolveResult, openExterna
                 // 不再每轮重新注册换身份——多轮换身份快速消耗信誉，反被服务端整段拉黑。
                 await new Promise(resolve => setTimeout(resolve, 1000 + attempt * 2000));
               }
-              const signed = signedPlayerV1Request(payload, vid);
-              const response = await axios.post(signed.url, signed.body, {
-                headers: { ...signed.headers },
-                timeout: 15000, responseType: 'text', validateStatus: () => true,
-                maxContentLength: 8 * 1024 * 1024,
-              });
-              const text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-              if (!text || text.length < 8) { lastError = Object.assign(new Error('App 已登记模型空响应'), { code: 'APP_EMPTY_RESPONSE' }); continue; }
-              let body;
-              try { body = JSON.parse(text); } catch { throw Object.assign(new Error('App 已登记模型响应无效'), { code: 'APP_INVALID_RESPONSE' }); }
-              if (Number(body.Code ?? body.code ?? -1) !== 0) throw Object.assign(new Error('App 已登记模型请求未通过'), { code: 'BUSINESS_REJECTED' });
-              // player/v1 把条目嵌在 data["1004"] 下；兼容旧 data[vid] 形态。
-              const entry = body.data && (body.data['1004'] || body.data)[vid];
-              const model = entry ? (typeof entry.video_model === 'string' ? JSON.parse(entry.video_model) : entry.video_model) : null;
-              if (!model || typeof model !== 'object') { lastError = Object.assign(new Error('App 已登记模型未返回本集'), { code: 'APP_EMPTY_RESPONSE' }); continue; }
-              return { vid, video_model: model };
+              // 空响应才换下一种形态；业务拒绝与格式错误对哪种形态都是终态。
+              for (const signed of [signedVideoTabV5Request(vid), signedPlayerV1Request(payload, vid)]) {
+                const request = { headers: { ...signed.headers }, timeout: 15000, responseType: 'text', validateStatus: () => true,
+                  maxContentLength: 8 * 1024 * 1024 };
+                const response = signed.method === 'GET' ? await axios.get(signed.url, request) : await axios.post(signed.url, signed.body, request);
+                const text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+                if (!text || text.length < 8) { lastError = Object.assign(new Error('App 已登记模型空响应'), { code: 'APP_EMPTY_RESPONSE' }); continue; }
+                let body;
+                try { body = JSON.parse(text); } catch { throw Object.assign(new Error('App 已登记模型响应无效'), { code: 'APP_INVALID_RESPONSE' }); }
+                if (Number(body.Code ?? body.code ?? -1) !== 0) throw Object.assign(new Error('App 已登记模型请求未通过'), { code: 'BUSINESS_REJECTED' });
+                // player/v1 把条目嵌在 data["1004"] 下；video_tab 嵌在 data.video_model_data 下；兼容旧 data[vid] 形态。
+                const entry = body.data && (body.data['1004'] || body.data.video_model_data || body.data)[vid];
+                const model = entry ? (typeof entry.video_model === 'string' ? JSON.parse(entry.video_model) : entry.video_model) : null;
+                if (!model || typeof model !== 'object') { lastError = Object.assign(new Error('App 已登记模型未返回本集'), { code: 'APP_EMPTY_RESPONSE' }); continue; }
+                return { vid, video_model: model };
+              }
             }
             throw lastError || new Error('App 已登记模型未成功');
           } finally { setDeviceIdentity(null); }

@@ -11,26 +11,30 @@ const legacyPost={code:0,data:{[VID]:{video_model:JSON.stringify({fallback_api:'
 const bundle=await build({entryPoints:[path.join(adapter,'entry.mjs')],bundle:true,write:false,platform:'browser',format:'iife',globalName:'RegisteredSource',target:'chrome89',inject:[path.join(adapter,'buffer-runtime.mjs')],alias:{'node:crypto':path.join(adapter,'crypto-shim.mjs'),axios:path.join(adapter,'axios-common.cjs')},define:{'AbortSignal.timeout':'androidAppTimeout'}});
 function fixture(options={}){let now=1793070000000;const calls=[],timers=[],window={AndroidCrypto:{process(raw){const r=JSON.parse(raw);if(r.operation==='digest')return JSON.stringify({data:crypto.createHash(r.algorithm).update(Buffer.from(r.data,'base64')).digest('base64'),error:null});if(r.operation!=='encrypt'&&r.operation!=='decrypt')return JSON.stringify({data:'',error:'unsupported operation'});const cipher=(r.operation==='encrypt'?crypto.createCipheriv:crypto.createDecipheriv)('aes-128-cbc',Buffer.from(r.key,'base64'),Buffer.from(r.iv,'base64'));cipher.setAutoPadding(r.autoPadding!==false);return JSON.stringify({data:Buffer.concat([cipher.update(Buffer.from(r.data,'base64')),cipher.final()]).toString('base64'),error:null})}}};class Clock extends Date{static now(){return now}}
 const context=vm.createContext({window,URL,URLSearchParams,AbortSignal,AbortController,Date:Clock,setTimeout(fn,ms){const timer={fn,ms,cleared:false,fired:false};timers.push(timer);return timer},clearTimeout(t){if(t)t.cleared=true},crypto:{getRandomValues:b=>crypto.webcrypto.getRandomValues(b)}});vm.runInContext(bundle.outputFiles[0].text,context);
-const unregister=context.RegisteredSource.registerAppResolver(async(method,params,timeout,rpcOptions)=>{calls.push({method,params,timeout,signal:rpcOptions?.signal});if(method==='appRegisteredModel'){if(options.registered)return options.registered(params,timeout,rpcOptions);return model(options.rows)}if(method!=='appRequest')return{accepted:true};const isPost=params.method==='POST';const body=options.emptyAt==='fallback_get'?JSON.stringify(isPost?legacyPost:null):options.legacySuccess?JSON.stringify(isPost?legacyPost:legacyGet):options.body??'';return{status:options.status??200,body,headers:{},url:params.url}});
+const unregister=context.RegisteredSource.registerAppResolver(async(method,params,timeout,rpcOptions)=>{calls.push({method,params,timeout,signal:rpcOptions?.signal});if(method==='appRegisteredModel'){if(options.registered)return options.registered(params,timeout,rpcOptions);return model(options.rows)}if(method!=='appRequest')return{accepted:true};const isPost=params.method==='POST';
+  // 2026-11-23：provider 打空后梯子是 V5 video_tab GET → 旧 POST → 旧 GET。夹具里「旧形态可用」时 V5 tab GET 应打空才会往下走；
+  // 它与后备 GET 同为 GET，只能按路径区分。
+  const tab=params.method==='GET'&&new URL(params.url).pathname==='/reading/bookapi/video_tab/multi_video_model/v1/';
+  const body=options.emptyAt==='fallback_get'?JSON.stringify(isPost?legacyPost:null):tab&&options.legacySuccess?'':options.legacySuccess?JSON.stringify(isPost?legacyPost:legacyGet):options.body??'';return{status:options.status??200,body,headers:{},url:params.url}});
 return{source:context.RegisteredSource,window,calls,timers,unregister,setNow:v=>now=v,now:()=>now};}
 // 空响应重试节奏（同身份 1s/3s/8s）挂在假定时器上：泵掉 ms<=8000 的重试定时器直到不再产生。
 async function pump(f){for(let guard=0;guard<64;guard++){await new Promise(r=>setImmediate(r));const due=f.timers.filter(t=>!t.cleared&&!t.fired&&t.ms<=8000).sort((a,b)=>a.ms-b.ms)[0];if(!due)return;due.fired=true;due.fn();}}
 await group('registered provider runs first without legacy HTTP and decodes real protocol',async()=>{const f=fixture();const out=await f.source.fetchAppPlayUrl(VID,{quality:'1080p'});eq(out.vid,VID);eq(out.url,URL_OK);eq(out.contentKey,KEY);eq(out.codec,'hevc');eq(out.width,1080);eq(out.height,1920);eq(out.requestedQuality,'1080p');eq(f.calls.map(c=>c.method),['appDeviceIdentity','appRegisteredModel']);eq(f.calls[1].params.vid,VID);eq(Object.keys(f.calls[1].params),['vid']);eq(f.calls[1].timeout,20000);check(f.calls[1].signal instanceof AbortSignal,'native RPC cancellable');check(f.timers.find(t=>t.ms===28000)?.cleared,'whole deadline cleared on success')});
 await group('shared module without a provider preserves empty HTTP classification',async()=>{const context={Buffer,URL,AbortSignal,module:{exports:{}},require:n=>n==='axios'?async()=>({status:200,data:'',headers:{}}):n.startsWith('./')?require(path.join(native,n)):require(n)};vm.runInNewContext(fs.readFileSync(path.join(native,'app-source-registered.js'),'utf8'),context);await assert.rejects(context.module.exports.fetchAppPlayUrl(VID),e=>e.code==='APP_EMPTY_RESPONSE'&&e.responseStage==='model_post');checks++});
-await group('explicit empty provider retries at the same identity before one legacy HTTP lookup',async()=>{const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture empty'),{code:'APP_EMPTY_RESPONSE'})}});const pending=f.source.fetchAppPlayUrl(VID);pending.catch(()=>{});await pump(f);eq((await pending).url,URL_OK);eq(f.calls.map(c=>c.method),['appDeviceIdentity','appRegisteredModel','appRegisteredModel','appRegisteredModel','appRegisteredModel','appRequest','appRequest']);eq(f.timers.filter(t=>t.fired).map(t=>t.ms),[1000,3000,8000])});
+await group('explicit empty provider retries at the same identity before one legacy HTTP lookup',async()=>{const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture empty'),{code:'APP_EMPTY_RESPONSE'})}});const pending=f.source.fetchAppPlayUrl(VID);pending.catch(()=>{});await pump(f);eq((await pending).url,URL_OK);eq(f.calls.map(c=>c.method),['appDeviceIdentity','appRegisteredModel','appRegisteredModel','appRegisteredModel','appRegisteredModel','appRequest','appRequest','appRequest']);eq(f.timers.filter(t=>t.fired).map(t=>t.ms),[1000,3000,8000])});
 await group('only explicit transient or empty provider errors allow legacy fallback; refusal invalid and cancel are terminal',async()=>{
   for(const code of ['APP_EMPTY_RESPONSE','HTTP_ERROR','ENOTFOUND','EAI_AGAIN','ECONNRESET','ECONNREFUSED','EHOSTUNREACH','ENETUNREACH','EPIPE']){
     const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture failure'),{code})}});
     const pending=f.source.fetchAppPlayUrl(VID);pending.catch(()=>{});await pump(f);eq((await pending).url,URL_OK);
     eq(f.calls.filter(c=>c.method==='appRegisteredModel').length,4,'same-identity retries at 1s/3s/8s');
-    eq(f.calls.filter(c=>c.method==='appRequest').length,2);
+    eq(f.calls.filter(c=>c.method==='appRequest').length,3);
     check(f.calls.filter(c=>c.method==='appRequest').every(c=>c.params.timeoutMs>0&&c.params.timeoutMs<=6000),'bounded shared HTTP budget');
   }
   for(const code of ['ECONNABORTED','ETIMEDOUT']){
     const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture budget'),{code})}});
     eq((await f.source.fetchAppPlayUrl(VID)).url,URL_OK);
     eq(f.calls.filter(c=>c.method==='appRegisteredModel').length,1,'budget exhaustion falls to legacy without retry');
-    eq(f.calls.filter(c=>c.method==='appRequest').length,2);
+    eq(f.calls.filter(c=>c.method==='appRequest').length,3);
   }
   for(const code of ['BUSINESS_REJECTED','APP_SERVICE_BACKOFF','APP_INVALID_RESPONSE','ERR_CANCELED','INVALID_RESPONSE',undefined]){
     const f=fixture({legacySuccess:true,registered:()=>{throw Object.assign(new Error('fixture terminal'),{code})}});
@@ -43,13 +47,13 @@ await group('legacy empty malformed business and forbidden HTTP replies fail aft
     const f=fixture({...options,registered:()=>{throw Object.assign(new Error('fixture empty'),{code:'APP_EMPTY_RESPONSE'})}});
     const pending=f.source.fetchAppPlayUrl(VID);pending.catch(()=>{});await pump(f);await assert.rejects(pending);checks++;
     eq(f.calls.filter(c=>c.method==='appRegisteredModel').length,4);
-    eq(f.calls.filter(c=>c.method==='appRequest').length,options.emptyAt||options.body===''||options.body===' \n\t '||options.body==='null'?2:1);
+    eq(f.calls.filter(c=>c.method==='appRequest').length,options.emptyAt||options.body===''||options.body===' \n\t '||options.body==='null'?3:1);
   }
 });
 await group('slow transient provider receives a fresh shared six-second legacy budget',async()=>{
   let f;f=fixture({legacySuccess:true,registered:()=>{f.setNow(f.now()+21000);throw Object.assign(new Error('fixture timeout'),{code:'ETIMEDOUT'})}});
   const start=f.now();eq((await f.source.fetchAppPlayUrl(VID)).url,URL_OK);
-  const http=f.calls.filter(c=>c.method==='appRequest');eq(http.length,2);
+  const http=f.calls.filter(c=>c.method==='appRequest');eq(http.length,3);
   for(const call of http){eq(call.params.timeoutMs,6000);eq(call.params.deadlineMs,start+27000)}
 });
 await group('inline plaintext requires explicit encryption metadata and never synthesizes a key or leaks provider identity',async()=>{

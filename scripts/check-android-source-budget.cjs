@@ -27,6 +27,10 @@ const legacyPost = () => ({ code: 0, data: { [VID]: { video_model: {
   fallback_api: 'https://vod.snssdk.com/synthetic-budget-fixture',
 } } } });
 const legacyGet = () => ({ code: 0, video_info: { data: plainModel() } });
+// 2026-11-23: the V5 video_tab GET leads the legacy forms. It is a GET like the fallback
+// fetch, so fixtures tell them apart by path and answer it hollow to let the ladder continue.
+const isTab = (method, url) => method === 'GET' && new URL(url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/';
+const hollow = () => ({ status: 200, data: '', headers: {} });
 async function flush() { for (let i = 0; i < 30; i++) await Promise.resolve(); }
 async function rejects(promise, code) {
   let failure;
@@ -116,7 +120,7 @@ async function main() {
       },
       defaultReply(request) {
         if (request.method === 'appRegisteredModel') fixture.reply(request, registeredModel());
-        else if (request.method === 'appRequest') fixture.http(request, request.params.method === 'POST' ? legacyPost() : legacyGet());
+        else if (request.method === 'appRequest') fixture.http(request, isTab(request.params.method, request.params.url) ? '' : request.params.method === 'POST' ? legacyPost() : legacyGet());
         else throw new Error('Unexpected RPC: ' + request.method);
       },
       models: () => calls.filter(c => c.method === 'appRegisteredModel'),
@@ -140,7 +144,7 @@ async function main() {
         if (name === 'axios') return async config => {
           calls.push({ config, at: time.now() });
           if (config.signal.aborted) throw error('ERR_CANCELED');
-          return handle ? handle(config, fixture) : fixture.response(config.method === 'POST' ? legacyPost() : legacyGet());
+          return handle ? handle(config, fixture) : isTab(config.method, config.url) ? hollow() : fixture.response(config.method === 'POST' ? legacyPost() : legacyGet());
         };
         if (name === 'node:crypto') return crypto;
         if (name === './sm3' || name === './download-quality' || name === './playback-signature' || name === './playback-signature-v5') return require(path.join(native, name));
@@ -162,8 +166,8 @@ async function main() {
     for (const step of [1000, 3000, 8000]) { await flush(); f.time.advance(step); await flush(); f.fail(f.models()[f.models().length - 1], 'APP_EMPTY_RESPONSE'); }
     const result = await pending;
     equal(result.url, MEDIA); equal(result.contentKey, null);
-    equal(f.httpCalls().map(c => c.params.timeoutMs), [6000, 6000]);
-    equal(f.httpCalls().map(c => c.at - f.time.start), [19000, 19000]);
+    equal(f.httpCalls().map(c => c.params.timeoutMs), [6000, 6000, 6000]);
+    equal(f.httpCalls().map(c => c.at - f.time.start), [19000, 19000, 19000]);
     equal(f.models().length, 4); equal(f.time.active().length, 0);
   });
 
@@ -172,7 +176,7 @@ async function main() {
     const pending = f.source.fetchAppPlayUrl(VID); await flush(); const native = f.models()[0];
     f.time.advance(20000);
     equal((await pending).url, MEDIA);
-    equal(f.httpCalls().map(c => c.params.timeoutMs), [6000, 6000]);
+    equal(f.httpCalls().map(c => c.params.timeoutMs), [6000, 6000, 6000]);
     equal(f.httpCalls()[0].at - f.time.start, 20000);
     equal(f.calls.filter(c => c.method === 'cancelHttp').map(c => c.params.requestId), [native.id]);
     equal(f.models().length, 1); equal(f.time.active().length, 0);
@@ -187,12 +191,12 @@ async function main() {
     await flush();
     for (const step of [1000, 3000, 8000]) { await flush(); f.time.advance(step); }
     equal((await settled).url, MEDIA);
-    equal(f.httpCalls().map(c => c.params.timeoutMs), [6000, 3700]);
+    equal(f.httpCalls().map(c => c.params.timeoutMs), [6000, 6000, 3700]);
     equal(new Set(f.httpCalls().map(c => c.params.deadlineMs)).size, 1);
     equal(f.models().length, 4);
   });
 
-  await group('exhausted legacy POST does not start a GET or another provider', async () => {
+  await group('exhausted first HTTP rung does not start another request or provider', async () => {
     const f = browser((request, self) => { if (request.method === 'appRegisteredModel') self.fail(request, 'APP_EMPTY_RESPONSE'); });
     const pending = f.source.fetchAppPlayUrl(VID); const result = pending.catch(e => e);
     await flush();
@@ -212,7 +216,7 @@ async function main() {
     for (const step of [1000, 3000, 8000]) { await flush(); f.time.advance(step); }
     const failure = await result;
     equal(failure.code, 'APP_EMPTY_RESPONSE');
-    equal(f.models().length, 4); equal(f.httpCalls().length, 2);
+    equal(f.models().length, 4); equal(f.httpCalls().length, 3);
   });
 
   await group('business refusal HTTP denial cancellation invalid and unknown errors never fall back', async () => {
@@ -322,17 +326,19 @@ async function main() {
 
   await group('no-provider desktop lookup retains its default 12s shared HTTP budget', async () => {
     const f = shared((config, self) => {
+      if (isTab(config.method, config.url)) return hollow();
       if (config.method === 'POST') self.time.advance(3000);
       return self.response(config.method === 'POST' ? legacyPost() : legacyGet());
     });
     equal((await f.source.fetchAppPlayUrl(VID)).url, MEDIA);
-    equal(f.calls.map(c => c.config.timeout), [12000, 9000]); equal(f.signals.length, 1);
+    equal(f.calls.map(c => c.config.timeout), [12000, 12000, 9000]); equal(f.signals.length, 1);
     equal(f.signals[0].at, f.time.start); equal(f.signals[0].ms, 12000);
-    equal(f.calls[0].config.signal, f.calls[1].config.signal);
+    check(f.calls.every(c => c.config.signal === f.calls[0].config.signal), 'one signal across the V5 GET, legacy POST and fallback GET');
   });
 
   await group('shared default signal is created only after provider wait and shares HTTP deadline', async () => {
     const f = shared((config, self) => {
+      if (isTab(config.method, config.url)) return hollow();
       if (config.method === 'POST') self.time.advance(3000);
       return self.response(config.method === 'POST' ? legacyPost() : legacyGet());
     });
@@ -344,8 +350,8 @@ async function main() {
     } });
     equal(result.url, MEDIA); equal(providerCalls, 1); equal(f.signals.length, 1);
     equal(f.signals[0].at - f.time.start, 7000); equal(f.signals[0].ms, 12000);
-    equal(f.calls.map(c => c.config.timeout), [12000, 9000]);
-    equal(f.calls[0].config.signal, f.calls[1].config.signal);
+    equal(f.calls.map(c => c.config.timeout), [12000, 12000, 9000]);
+    check(f.calls.every(c => c.config.signal === f.calls[0].config.signal), 'one signal across the V5 GET, legacy POST and fallback GET');
   });
 
   await group('registered inline shared response needs neither HTTP nor a timeout signal', async () => {
@@ -359,7 +365,7 @@ async function main() {
   await group('shared external signal is reused without creating another timeout signal', async () => {
     const f = shared(), controller = new AbortController();
     equal((await f.source.fetchAppPlayUrl(VID, { signal: controller.signal, lookupTimeoutMs: 6000 })).url, MEDIA);
-    equal(f.calls.map(c => c.config.timeout), [6000, 6000]); equal(f.signals.length, 0);
+    equal(f.calls.map(c => c.config.timeout), [6000, 6000, 6000]); equal(f.signals.length, 0);
     check(f.calls.every(c => c.config.signal === controller.signal), 'same caller signal across HTTP stages');
   });
 
@@ -374,8 +380,8 @@ async function main() {
     for (const [body, code] of [['', 'APP_EMPTY_RESPONSE'], [JSON.stringify({ code: 401 }), 'BUSINESS_REJECTED']]) {
       const f = shared(() => ({ status: 200, data: body, headers: {} }));
       const failure = await rejects(f.source.fetchAppPlayUrl(VID), code);
-      // An empty POST also probes the video_tab GET once before failing; business refusal is terminal.
-      if (code === 'APP_EMPTY_RESPONSE') { equal(failure.responseStage, 'model_post'); equal(f.calls.length, 2); }
+      // Empty answers walk the whole ladder (V5 video_tab GET, legacy POST, legacy video_tab GET); business refusal is terminal.
+      if (code === 'APP_EMPTY_RESPONSE') { equal(failure.responseStage, 'model_post'); equal(f.calls.length, 3); }
       else equal(f.calls.length, 1);
     }
   });

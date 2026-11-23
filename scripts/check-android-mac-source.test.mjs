@@ -74,6 +74,9 @@ function encryptedUrl() {
 function responses({ wrongVid = false, fallback = 'https://vod.snssdk.com/fixture-info', available = true, videoList } = {}) {
   const encrypted = encryptedUrl();
   return (request) => {
+    // 2026-11-23: the V5 video_tab GET leads the legacy forms. It is a GET like the fallback
+    // fetch below, so the fixture tells them apart by path and answers it hollow.
+    if (request.method === 'GET' && new URL(request.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') return { status: 200, body: '', url: request.url };
     if (request.method === 'POST') return { status: 200, body: JSON.stringify({ code: available ? 0 : 1,
       data: { [wrongVid ? '999' : vid]: { video_model: JSON.stringify({ fallback_api: fallback }) } } }), url: request.url };
     if (videoList) return { status: 200, body: JSON.stringify({ video_info: { data: { video_list: videoList } } }), url: request.url };
@@ -252,11 +255,16 @@ test('browser bundle reproduces the shared registered source signed request, dec
   assert.equal(actual.referer, ''); for (const candidate of actual.variants) assert.equal(candidate.referer, '');
   const requests = browser.calls.filter(call => call.method === 'appRequest').map(call => signedRequest(call.params));
   assert.deepEqual(requests, JSON.parse(JSON.stringify(desktop.calls)));
-  assert.equal(requests.length, 2); assert.ok(requests[0].headers['x-argus']); assert.ok(requests[0].headers['x-ladon']);
-  assert.equal(JSON.parse(requests[0].body).mixed_video_id_map['1004'][0], vid);
+  assert.equal(requests.length, 3);
+  // 2026-11-23: the V5 video_tab GET leads; the legacy 551 POST and its fallback GET follow.
+  assert.equal(requests[0].method, 'GET'); assert.match(requests[0].url, /^https:\/\/api5-normal-sinfonlineb\.fqnovel\.com\/reading\/bookapi\/video_tab\/multi_video_model\/v1\/\?/);
+  for (const name of ['x-khronos', 'x-helios', 'x-medusa']) assert.ok(requests[0].headers[name]);
+  assert.equal(requests[0].headers['x-argus'], undefined); assert.equal(requests[0].body, '');
+  assert.ok(requests[1].headers['x-argus']); assert.ok(requests[1].headers['x-ladon']);
+  assert.equal(JSON.parse(requests[1].body).mixed_video_id_map['1004'][0], vid);
 });
 test('32 entropy seeds preserve all shared registered request bytes and models across signature branches offline', async t => {
-  const branches = new Map(), headerLengths = new Set(), signatures = new Set(), urls = new Set();
+  const branches = new Map(), headerLengths = new Set(), signatures = new Set(), urls = new Set(), v5Signatures = new Set();
   for (let seed = 0; seed < 32; seed++) {
     await t.test(`entropy seed ${seed}`, async () => {
       const options = { seed, timestamp: 1_792_074_432_123 };
@@ -267,18 +275,20 @@ test('32 entropy seeds preserve all shared registered request bytes and models a
         assert.equal(actual.url, media); assert.equal(actual.contentKey, keyHex); assert.equal(actual.vid, vid);
         const requests = browser.calls.filter(call => call.method === 'appRequest').map(call => signedRequest(call.params));
         const desktopRequests = JSON.parse(JSON.stringify(desktop.calls));
-        assert.equal(requests.length, 2); assert.equal(desktopRequests.length, 2);
-        assert.equal(requests[0].method, 'POST');
-        assert.equal(requests[0].url, desktopRequests[0].url);
-        assert.deepEqual(requests[0].headers, desktopRequests[0].headers);
-        assert.deepEqual(Buffer.from(requests[0].body, 'utf8'), Buffer.from(desktopRequests[0].body, 'utf8'));
-        // Include the fallback GET, not just the signature-bearing POST.
+        assert.equal(requests.length, 3); assert.equal(desktopRequests.length, 3);
+        assert.equal(requests[0].method, 'GET', 'the V5 video_tab GET leads');
+        assert.equal(requests[1].method, 'POST');
+        assert.equal(requests[1].url, desktopRequests[1].url);
+        assert.deepEqual(requests[1].headers, desktopRequests[1].headers);
+        assert.deepEqual(Buffer.from(requests[1].body, 'utf8'), Buffer.from(desktopRequests[1].body, 'utf8'));
+        // Include the V5 video_tab GET and the fallback GET, not just the signature-bearing POST.
         assert.deepEqual(requests, desktopRequests);
+        v5Signatures.add(requests[0].headers['x-medusa']);
         // This fallback fetch uses the 551 model protocol, not the independent
         // Medusa catalog signer. Preserve its branch coverage on its real entry.
-        assert.ok(requests[0].headers['x-argus']); assert.ok(requests[0].headers['x-ladon']);
+        assert.ok(requests[1].headers['x-argus']); assert.ok(requests[1].headers['x-ladon']);
         const catalog = desktopFixture(options), browserCatalog = browserSigningFixture(options);
-        const api = requests[0].url.split('?')[0], payload = requests[0].body;
+        const api = requests[1].url.split('?')[0], payload = requests[1].body;
         const expectedSigned = catalog.source.signedAppRequest(api, payload);
         const actualSigned = browserCatalog.signedAppRequest(api, payload);
         assert.deepEqual(signedBytes(actualSigned), signedBytes(expectedSigned));
@@ -288,13 +298,14 @@ test('32 entropy seeds preserve all shared registered request bytes and models a
         branches.set(branch, (branches.get(branch) || 0) + 1);
         headerLengths.add(actualSigned.headers['x-medusa'].length);
         signatures.add(actualSigned.headers['x-medusa']);
-        urls.add(requests[0].url);
+        urls.add(requests[1].url);
       } finally { browser.unregister(); }
     });
   }
   assert.equal(urls.size, 32, 'all seeds exercise distinct device/nonces instead of repeating one request');
   assert.ok(branches.get(0) > 0 && branches.get(2) > 0, 'both accepted signature branches execute');
   assert.equal(signatures.size, 32, 'all seeds exercise distinct signed header bytes');
+  assert.equal(v5Signatures.size, 32, 'the leading V5 video_tab GET is signed per seed in the browser bundle too');
   t.diagnostic(`entropyPairs=32 branch0=${branches.get(0)} branch2=${branches.get(2)} signatureLengths=${headerLengths.size} networkRequests=0`);
 });
 test('old WebView without AbortSignal.timeout uses the whole-operation controller and bounded native 6s requests', async () => {
@@ -309,14 +320,14 @@ test('browser wrapper keeps exact episode matching and server rejection behavior
   for (const options of [{ wrongVid: true }, { available: false }]) {
     const browser = browserFixture(options);
     await assert.rejects(browser.source.fetchAppPlayUrl(vid), /未返回所选分集|未提供本集/);
-    assert.equal(browser.calls.filter(call => call.method === 'appRequest').length, 1);
+    assert.equal(browser.calls.filter(call => call.method === 'appRequest').length, 2);
   }
 });
 test('original destination validation rejects foreign fallback before making another request', async () => {
   for (const fallback of ['https://vod.snssdk.com.attacker.test/info', 'http://vod.snssdk.com/info', 'https://127.0.0.1/info']) {
     const browser = browserFixture({ fallback });
     await assert.rejects(browser.source.fetchAppPlayUrl(vid), /不受支持/);
-    assert.equal(browser.calls.filter(call => call.method === 'appRequest').length, 1);
+    assert.equal(browser.calls.filter(call => call.method === 'appRequest').length, 2);
   }
 });
 test('registered native callback returns playInfo or a real error with the original request identity', async () => {
@@ -356,7 +367,7 @@ test('missing, fractional or insufficient dimensions really fail explicit qualit
   for (const dimensions of [{}, { width: 719, height: 1920 }, { width: 1080, height: 0 }, { width: 720.5, height: 1280 }]) {
     const browser = browserFixture({ videoList: { one: { main_url: media, codec_type: 'h264', quality_desc: '1080P', ...dimensions } } });
     await assert.rejects(browser.source.fetchAppPlayUrl(vid, { quality: '720p' }), error => error.code === 'QUALITY_UNAVAILABLE');
-    assert.equal(browser.calls.filter(call => call.method === 'appRequest').length, 2);
+    assert.equal(browser.calls.filter(call => call.method === 'appRequest').length, 3);
   }
 });
 test('quality callback binds the requested value, preserves three-argument auto, and rejects invalid values before network', async () => {

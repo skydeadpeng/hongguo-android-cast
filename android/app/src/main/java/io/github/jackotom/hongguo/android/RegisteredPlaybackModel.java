@@ -148,11 +148,12 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             String cookies = identity.length > 3 && identity[3] != null ? identity[3] : "";
             if (!OfficialApiClient.validID(did) || !OfficialApiClient.validID(iid))
                 throw new ModelError("App片源设备登记未完成", "APP_INVALID_RESPONSE");
-            // hongguoTV 2026-11-20: anonymous POSTs (v1 included) return hollow 200s
-            // while GET video_tab still serves models, so GET leads and the signed POST
-            // is only the fallback. When both paths answer hollow for a foreground
-            // fetch, rotate the identity once (fresh registration, 30s quota) and walk
-            // the same tab→POST order on it. A degraded identity instead answers with
+            // 2026-11-23: the platform answers only the V5-signed bodyless video_tab GET;
+            // the legacy Argus tab GET and the v5 POST both earn hollow 200s, so the V5
+            // GET leads and the v5 POST and the legacy tab GET follow (each was the sole
+            // served shape earlier that week). When every shape answers hollow for a
+            // foreground fetch, rotate the identity once (fresh registration, 30s quota)
+            // and walk the same ladder on it. A degraded identity instead answers with
             // business denials (code!=0): those also rotate once, bounded by a process
             // allowance so a looping failure cannot spend registrations forever. HTTP,
             // format failures, service backoff and trial markers stay terminal;
@@ -263,23 +264,25 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         }
         return null;
     }
-    /** hongguoTV fetch(): GET video_tab leads; the signed POST is only the fallback.
-     * Tab failures (typed errors, malformed gzip) fall through to the POST like
-     * tabVideoModel's null return; cancellation and deadline still win first.
-     * Returns null exclusively when the POST itself answers hollow — the rotation
-     * signal. Any other POST failure propagates unchanged. */
+    /** Playback model ladder: the V5 video_tab GET leads; the v5 POST and the legacy
+     * Argus tab GET follow. Tab failures (typed errors, malformed gzip) fall through
+     * like tabVideoModel's null return; cancellation and deadline still win first.
+     * Returns null when the ladder is still hollow after the v5 POST answered empty —
+     * the rotation signal. Any other v5 POST failure propagates unchanged. */
     private JSONObject resolve(String did, String iid, String cdid, String vid, String cookies) throws Exception {
-        try { return videoTab(did, iid, cdid, vid, cookies); }
+        try { return videoTabV5(did, iid, cdid, vid); }
         catch (ModelError | java.util.zip.ZipException | java.io.EOFException tabFailure) { check(); }
         try { return playerV1(did, iid, cdid, vid); }
         catch (ModelError postFailure) {
-            if ("APP_EMPTY_RESPONSE".equals(postFailure.code)) return null;
-            throw postFailure;
+            check();
+            if (!"APP_EMPTY_RESPONSE".equals(postFailure.code)) throw postFailure;
         }
+        try { return videoTab(did, iid, cdid, vid, cookies); }
+        catch (ModelError | java.util.zip.ZipException | java.io.EOFException tabFailure) { check(); }
+        return null;
     }
-    /** Primary v5 player request: gzip JSON and no account/registration cookies.
-     * The profile cdid is shared with the single foreground compatibility GET. */
-    private JSONObject playerV1(String did, String iid, String cdid, String vid) throws Exception {
+    /** The v5 player profile both V5 shapes share (jackotom 7.7, hongguoTV 0.1.37). */
+    private static Map<String, String> v5Query(String did, String iid, String cdid) {
         Map<String, String> query = new LinkedHashMap<>();
         query.put("aid", "8662"); query.put("app_name", "novelread");
         query.put("version_code", "74332"); query.put("version_name", "7.4.3.32");
@@ -288,6 +291,36 @@ final class RegisteredPlaybackModel implements AutoCloseable {
         query.put("iid", iid);
         query.put("cdid", cdid);
         query.put("device_id", did);
+        return query;
+    }
+    /** Leading shape since 2026-11-23: the V5-signed bodyless video_tab GET. The empty
+     * body makes every digest MD5(""), and no registration or account cookie is sent,
+     * exactly like the v5 POST. The platform drops the legacy Argus GET below with a
+     * hollow 200. */
+    private JSONObject videoTabV5(String did, String iid, String cdid, String vid) throws Exception {
+        check();
+        Map<String, String> query = v5Query(did, iid, cdid);
+        query.put("video_id", vid); query.put("video_id_type", "0"); query.put("device_level", "1");
+        query.put("need_all_video_definition", "1"); query.put("need_mp4_align", "0"); query.put("use_os_player", "0");
+        query.put("video_platform", "1024"); query.put("source", "0"); query.put("from_video_id", "");
+        PlaybackSignerV5.Request signed = PlaybackSignerV5.signPlayback(VIDEO_TAB_API, query, new byte[0], System.currentTimeMillis());
+        Map<String, String> headers = new LinkedHashMap<>(signed.headers);
+        headers.put("User-Agent", PlaybackSignerV5.PLAYER_V1_UA);
+        headers.put("Accept", "application/json");
+        check();
+        OfficialApiClient.Response response;
+        try { response = modelTransport.execute(new OfficialApiClient.Request(signed.url, "GET", headers, signed.body, deadline)); }
+        catch (ConnectException refused) {
+            check(); // Cancellation/deadline wins over the connection classification.
+            throw new ModelError("App片源连接暂未建立，请重试", "ECONNREFUSED");
+        }
+        check();
+        traceV5("video_tab/v5 vid=" + vid + " http=" + response.status + " bytes=" + response.body.length);
+        return adopt(response, vid, deadline);
+    }
+    /** v5 player request, second in the ladder: gzip JSON and no account/registration cookies. */
+    private JSONObject playerV1(String did, String iid, String cdid, String vid) throws Exception {
+        Map<String, String> query = v5Query(did, iid, cdid);
         JSONObject payload = new JSONObject()
             .put("biz_param", new JSONObject().put("detail_page_version", 0).put("device_level", 1).put("disable_digg_stat", false)
                 .put("disable_video_relate_book", false).put("need_all_video_definition", true).put("need_mp4_align", false)
