@@ -117,6 +117,25 @@ static int runtime_handler_installed(void)
     return (current.sa_flags & SA_SIGINFO) && current.sa_sigaction == runtime_handler;
 }
 
+static volatile int probe_code = -999;
+static void probe_handler(int number, siginfo_t *info, void *context) { (void)number; (void)context; probe_code = info->si_code; }
+
+// True where the platform says whether a signal was sent (kill, raise) or raised by an instruction.
+// Linux and Android do; macOS reports the same code for both, so that case cannot be told apart there.
+static int sent_signals_distinguishable(void)
+{
+    struct sigaction action, previous;
+    memset(&action, 0, sizeof action);
+    action.sa_sigaction = probe_handler;
+    action.sa_flags = SA_SIGINFO;
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGSEGV, &action, &previous);
+    probe_code = -999;
+    pthread_kill(pthread_self(), SIGSEGV);
+    sigaction(SIGSEGV, &previous, NULL);
+    return probe_code == SI_USER || probe_code == SI_QUEUE || probe_code == SI_TKILL;
+}
+
 // Runs one call with `thread_main` faulting or being signalled throughout it; `during` receives how
 // often the thread did so. The call opens and closes its own window.
 static int call_with(void *(*thread_main)(void *), int *during)
@@ -180,17 +199,23 @@ int main(int argc, char **argv)
 
     // 2. Signals sent to another thread throughout a call each reach the runtime's handler once.
     int raised_before = atomic_load(&raised_handled);
-    status = call_with(sender, &during);
-    if (status != SDK_E_SHAPE) { fprintf(stderr, "FAIL call status %d with signals sent\n", status); return 1; }
-    checks++;
-    if (during <= 0 || atomic_load(&in_window) <= 0) return fail("no signal was sent during the call");
-    checks++;
-    if (atomic_load(&sent_handled) != atomic_load(&sent_seen) || atomic_load(&sent_handled) == 0) return fail("a sent signal was lost or delivered twice");
-    checks++;
-    if (atomic_load(&raised_handled) != raised_before) return fail("a sent signal was taken for a raised fault");
-    checks++;
-    if (!runtime_handler_installed()) return fail("SIGSEGV disposition not restored after sent signals");
-    checks++;
+    if (sent_signals_distinguishable()) {
+        status = call_with(sender, &during);
+        if (status != SDK_E_SHAPE) { fprintf(stderr, "FAIL call status %d with signals sent\n", status); return 1; }
+        checks++;
+        if (during <= 0 || atomic_load(&in_window) <= 0) return fail("no signal was sent during the call");
+        checks++;
+        if (atomic_load(&sent_handled) != atomic_load(&sent_seen) || atomic_load(&sent_handled) == 0) return fail("a sent signal was lost or delivered twice");
+        checks++;
+        if (atomic_load(&raised_handled) != raised_before) return fail("a sent signal was taken for a raised fault");
+        checks++;
+        if (!runtime_handler_installed()) return fail("SIGSEGV disposition not restored after sent signals");
+        checks++;
+    } else {
+        // Nothing was sent, so this still has to hold exactly as it did.
+        if (atomic_load(&raised_handled) != raised_before) return fail("the runtime's handler ran without a fault");
+        puts("sent-signal case skipped: this platform does not tell a sent signal from a raised fault (run on Android or Linux)");
+    }
 
     // 3. A fault on the digest thread ends that call and leaves the adapter and the runtime's
     //    handler as they were.
