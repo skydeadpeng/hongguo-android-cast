@@ -17,7 +17,7 @@
 
 ## 验证
 
-- 协议移植：以上游未经修改的 Python 源码为黄金向量（素材全部合成），23 组向量 77 项断言逐字节一致；适配层在 arm64 模拟器上与同一预言机的 24 组摘要向量逐字节一致（两种内存载体，最慢 3.8 ms）。向量生成脚本 `android/tests/generate-sdk-playback-vectors.py` 已入库，需上游 `phone_account` 子集与 pycryptodome；本次核对它重新生成的文件与仓库内向量逐字节一致。
+- 协议移植：以上游未经修改的 Python 源码为黄金向量（素材全部合成），23 组向量 77 项断言逐字节一致；适配层在 arm64 模拟器上与同一预言机的 24 组摘要向量逐字节一致（两种内存载体，最慢 3.8 ms）。向量生成脚本 `android/tests/generate-sdk-playback-vectors.py` 已入库，需上游 `phone_account` 子集与 pycryptodome；本次核对它重新生成的文件与仓库内向量逐字节一致。摘要向量与设备端程序同样入库，复现：`bash android/tests/run-sdk-digest-vectors-device.sh <libmetasec_ml.so> [adb 序列号]`（镜像不随仓库，脚本按摘要固定后分别在两种内存载体上重放）。
 - 故障处理（真实信号）：Android 14 arm64 模拟器 `SDK_FAULT_FORWARD_OK checks=14 raised=918979 sent=831`（调用期间其他线程约 92 万次故障逐个被原有处理器吸收、被发送的信号逐个转交一次、摘要线程自身故障被收敛）；无自有处理器的进程按预期死于 SIGSEGV。macOS 宿主机 `checks=9`（该平台不区分信号来源，转交一例明确跳过）。复现：`bash android/tests/run-sdk-fault-forward-test.sh [--android]`。
 - 素材下载：脚本化 CDN 下的离线测试 39 项（断流续传、截止时间、跳转、错误分段、损坏、缓存）全过。测试过程中查出并修正两处缺陷：缓存命中判断用错长度（每次冷启动都会重新下载）、单次请求 20 秒超时封顶（慢网络永远下不完）。
 - 离线回归：`check:android`、`check:android:playback` 通过；登记模型 31 组 / 321 项、分派 35 项、取消所有权检查全过；`npm test` 失败清单与改动前基线逐条相同（4 条存量失败）。

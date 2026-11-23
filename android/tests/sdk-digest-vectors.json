@@ -1,0 +1,174 @@
+{
+ "sdkVersion": "v04.10.03-ml-android",
+ "imageSha256": "c6831ab265a0cb76dacfa3b7041e9ea0f706490106a74e12f39058671cc14fe3",
+ "vectors": [
+  {
+   "payload": "05101b26313c47525d68737e89949faab5c0cbd6e1ecf7020d18232e39444f5a65707b86919ca7b2bdc8d3dee9f4ff0a00f15365",
+   "selector": 0,
+   "seconds": 1700000000,
+   "digest": "18ca13b6e83101be7b2a16580b3aa0677105e6f2",
+   "stable": true
+  },
+  {
+   "payload": "2a35404b56616c77828d98a3aeb9c4cfdae5f0fb06111c27323d48535e69747f8a95a0abb6c1ccd7e2edf8030e19242f3df15365",
+   "selector": 1,
+   "seconds": 1700000061,
+   "digest": "fafd17a3f89b45dd16bf2d819fbbe76263cebdb0",
+   "stable": true
+  },
+  {
+   "payload": "4f5a65707b86919ca7b2bdc8d3dee9f4ff0a15202b36414c57626d78838e99a4afbac5d0dbe6f1fc07121d28333e49547af15365",
+   "selector": 2,
+   "seconds": 1700000122,
+   "digest": "78b3de046a6d15923c83887db4cb4aa93b83362b",
+   "stable": true
+  },
+  {
+   "payload": "747f8a95a0abb6c1ccd7e2edf8030e19242f3a45505b66717c87929da8b3bec9d4dfeaf5000b16212c37424d58636e79b7f15365",
+   "selector": 3,
+   "seconds": 1700000183,
+   "digest": "16b94ef97bc73ce5b26683e2eb529e6be373d3c9",
+   "stable": true
+  },
+  {
+   "payload": "99a4afbac5d0dbe6f1fc07121d28333e49545f6a75808b96a1acb7c2cdd8e3eef9040f1a25303b46515c67727d88939ef4f15365",
+   "selector": 4,
+   "seconds": 1700000244,
+   "digest": "1af174b81f89e7accfad151b08edc5286323bb2f",
+   "stable": true
+  },
+  {
+   "payload": "bec9d4dfeaf5000b16212c37424d58636e79848f9aa5b0bbc6d1dce7f2fd08131e29343f4a55606b76818c97a2adb8c331f25365",
+   "selector": 5,
+   "seconds": 1700000305,
+   "digest": "41e92fab5be17212cdae24402e9efd3a38101b76",
+   "stable": true
+  },
+  {
+   "payload": "e3eef9040f1a25303b46515c67727d88939ea9b4bfcad5e0ebf6010c17222d38434e59646f7a85909ba6b1bcc7d2dde86ef25365",
+   "selector": 6,
+   "seconds": 1700000366,
+   "digest": "60ca40f8a8e34c515cf03b15db8bf2f26a3763bc",
+   "stable": true
+  },
+  {
+   "payload": "08131e29343f4a55606b76818c97a2adb8c3ced9e4effa05101b26313c47525d68737e89949faab5c0cbd6e1ecf7020dabf25365",
+   "selector": 7,
+   "seconds": 1700000427,
+   "digest": "ce507dfd9e613e2a0284b6635e9ae522a8a2f387",
+   "stable": true
+  },
+  {
+   "payload": "2d38434e59646f7a85909ba6b1bcc7d2dde8f3fe09141f2a35404b56616c77828d98a3aeb9c4cfdae5f0fb06111c2732e8f25365",
+   "selector": 8,
+   "seconds": 1700000488,
+   "digest": "1a9cd19ede2d5171a27b9a3318b7eaa22b679b25",
+   "stable": true
+  },
+  {
+   "payload": "525d68737e89949faab5c0cbd6e1ecf7020d18232e39444f5a65707b86919ca7b2bdc8d3dee9f4ff0a15202b36414c5725f35365",
+   "selector": 9,
+   "seconds": 1700000549,
+   "digest": "f110438f28dd971aae11d8cf2e0465fe71e78f74",
+   "stable": true
+  },
+  {
+   "payload": "77828d98a3aeb9c4cfdae5f0fb06111c27323d48535e69747f8a95a0abb6c1ccd7e2edf8030e19242f3a45505b66717c62f35365",
+   "selector": 10,
+   "seconds": 1700000610,
+   "digest": "40129959fa9d0d745bc17d2ff9597ec731f53f82",
+   "stable": true
+  },
+  {
+   "payload": "9ca7b2bdc8d3dee9f4ff0a15202b36414c57626d78838e99a4afbac5d0dbe6f1fc07121d28333e49545f6a75808b96a19ff35365",
+   "selector": 11,
+   "seconds": 1700000671,
+   "digest": "98abac95337ddb9d3d819c97bfad37bcf3481d1c",
+   "stable": true
+  },
+  {
+   "payload": "c1ccd7e2edf8030e19242f3a45505b66717c87929da8b3bec9d4dfeaf5000b16212c37424d58636e79848f9aa5b0bbc6dcf35365",
+   "selector": 12,
+   "seconds": 1700000732,
+   "digest": "2a776eccb2711fe8f477202af04a71aee9396da8",
+   "stable": true
+  },
+  {
+   "payload": "e6f1fc07121d28333e49545f6a75808b96a1acb7c2cdd8e3eef9040f1a25303b46515c67727d88939ea9b4bfcad5e0eb19f45365",
+   "selector": 13,
+   "seconds": 1700000793,
+   "digest": "5c415315b7574c4977192009e872d09c79853e5f",
+   "stable": true
+  },
+  {
+   "payload": "0b16212c37424d58636e79848f9aa5b0bbc6d1dce7f2fd08131e29343f4a55606b76818c97a2adb8c3ced9e4effa051056f45365",
+   "selector": 14,
+   "seconds": 1700000854,
+   "digest": "f33f93268ea5484c0150fdcaa31afee33a20041d",
+   "stable": true
+  },
+  {
+   "payload": "303b46515c67727d88939ea9b4bfcad5e0ebf6010c17222d38434e59646f7a85909ba6b1bcc7d2dde8f3fe09141f2a3593f45365",
+   "selector": 15,
+   "seconds": 1700000915,
+   "digest": "0497704cf949c80221ea3fba5d66d820f21fa9bb",
+   "stable": true
+  },
+  {
+   "payload": "55606b76818c97a2adb8c3ced9e4effa05101b26313c47525d68737e89949faab5c0cbd6e1ecf7020d18232e39444f5ad0f45365",
+   "selector": 0,
+   "seconds": 1700000976,
+   "digest": "02c393b5a02eaf50d2f2ee8afef5f6bd629196b6",
+   "stable": true
+  },
+  {
+   "payload": "7a85909ba6b1bcc7d2dde8f3fe09141f2a35404b56616c77828d98a3aeb9c4cfdae5f0fb06111c27323d48535e69747f0df55365",
+   "selector": 1,
+   "seconds": 1700001037,
+   "digest": "7ef3c57d9cfceb0ef57b940442e0b266b25cb73f",
+   "stable": true
+  },
+  {
+   "payload": "9faab5c0cbd6e1ecf7020d18232e39444f5a65707b86919ca7b2bdc8d3dee9f4ff0a15202b36414c57626d78838e99a44af55365",
+   "selector": 2,
+   "seconds": 1700001098,
+   "digest": "c7cc02a5d44024c76a94bbd189fe3897a8f04297",
+   "stable": true
+  },
+  {
+   "payload": "c4cfdae5f0fb06111c27323d48535e69747f8a95a0abb6c1ccd7e2edf8030e19242f3a45505b66717c87929da8b3bec987f55365",
+   "selector": 3,
+   "seconds": 1700001159,
+   "digest": "2413e7c5124cffd4a37699feb406eecc7ae0306a",
+   "stable": true
+  },
+  {
+   "payload": "e9f4ff0a15202b36414c57626d78838e99a4afbac5d0dbe6f1fc07121d28333e49545f6a75808b96a1acb7c2cdd8e3eec4f55365",
+   "selector": 4,
+   "seconds": 1700001220,
+   "digest": "6d338a77e39119f2e8b68d6ba34fca4da8ec299c",
+   "stable": true
+  },
+  {
+   "payload": "0e19242f3a45505b66717c87929da8b3bec9d4dfeaf5000b16212c37424d58636e79848f9aa5b0bbc6d1dce7f2fd081301f65365",
+   "selector": 5,
+   "seconds": 1700001281,
+   "digest": "c07aed101807a6af4eaf0880d7ca907b7adec27e",
+   "stable": true
+  },
+  {
+   "payload": "333e49545f6a75808b96a1acb7c2cdd8e3eef9040f1a25303b46515c67727d88939ea9b4bfcad5e0ebf6010c17222d383ef65365",
+   "selector": 6,
+   "seconds": 1700001342,
+   "digest": "3a56f0c1bf79d82e5de5e0fa198d988ef804cc44",
+   "stable": true
+  },
+  {
+   "payload": "58636e79848f9aa5b0bbc6d1dce7f2fd08131e29343f4a55606b76818c97a2adb8c3ced9e4effa05101b26313c47525d7bf65365",
+   "selector": 7,
+   "seconds": 1700001403,
+   "digest": "9c9477b1437deca096fb29d85079b630b0fd73ec",
+   "stable": true
+  }
+ ]
+}
