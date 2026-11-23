@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 112,
-  "versionName": "0.12.89",
+  "versionCode": 113,
+  "versionName": "0.12.90",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.89/Hongguo-0.12.89-tv-release-compatible.apk",
-  "size": 1701466,
-  "sha256": "3ec54ea67e396d7e1b110a14a6d6b145f34a1760d891f9e81f8446de3f7c0cde",
-  "notes": "红果 Android 0.12.89\n\n- 全新深色沉浸界面：品牌红渐变顶栏与状态栏融合、卡片阴影层次、骨架屏加载、底部导航选中胶囊。\n- 关于页说明文字精简，新增「重置播放身份」入口。\n- 红果发现、搜索、播放、下载与观看记录链路不变；同包名同证书覆盖升级，数据不迁移不清理。修复已知问题。\n",
-  "publishedAt": "2026-11-22T13:37:18.571Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.90/Hongguo-0.12.90-tv-release-compatible.apk",
+  "size": 1701982,
+  "sha256": "eeda9ddfad3c88c3f316f02ea13688f56c8cb1a71baed591c9ed862bc7676549",
+  "notes": "红果 Android 0.12.90\n\n- 修复在线播放：适配上游取源接口形态调整，恢复播放与连播。\n- 取源失败恢复策略优化：仅当全部取源方式均不可用时才更换取源身份，减少无效重试。\n- 红果发现、搜索、播放、下载与观看记录链路不变；同包名同证书覆盖升级，数据不迁移不清理。修复已知问题。\n",
+  "publishedAt": "2026-11-23T08:33:14.000Z"
 }

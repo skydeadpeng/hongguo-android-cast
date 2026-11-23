@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 40,
-  "versionName": "0.1.39",
+  "versionCode": 41,
+  "versionName": "0.1.40",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.39/HongguoNative-0.1.39-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 47035967,
-  "sha256": "9a8c079efc66b8366e2c55d3da07e4b234b4428816ac0e4958c2b146fdb16a26",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.40/HongguoNative-0.1.40-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 47036118,
+  "sha256": "0c55334f71a8974da2820ca9bd02cc0f9a6bc401f6c917299663782794c5676a",
   "abis": {
     "arm64-v8a": {
-      "url": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.39/HongguoNative-0.1.39-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 47035967,
-      "sha256": "9a8c079efc66b8366e2c55d3da07e4b234b4428816ac0e4958c2b146fdb16a26"
+      "url": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.40/HongguoNative-0.1.40-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 47036118,
+      "sha256": "0c55334f71a8974da2820ca9bd02cc0f9a6bc401f6c917299663782794c5676a"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.39/HongguoNative-0.1.39-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 43308364,
-      "sha256": "9d2a2efb213dd0f907fef63bb55bae2cfa24d40ab8eb54d8d590e4df6fc0cf57"
+      "url": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.40/HongguoNative-0.1.40-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 43308523,
+      "sha256": "32c77431ff592a3999e6f80838128eedff9a6903c7fc5225814884757b31067d"
     }
   },
-  "notes": "红果原生 TV 0.1.39（同 0.12.88 自动恢复）\n\n- 匿名取源身份被临时限流时自动注册全新身份重试。\n- 修复已知问题。同包名同证书覆盖升级，数据不迁移不清理。\n",
-  "publishedAt": "2026-11-22T12:18:58.408Z"
+  "notes": "红果原生 TV 0.1.40（同 0.12.90 播放修复）\n\n- 适配上游取源接口形态调整，恢复播放与连播。\n- 修复已知问题。同包名同证书覆盖升级，数据不迁移不清理。\n",
+  "publishedAt": "2026-11-23T08:33:56.000Z"
 }
