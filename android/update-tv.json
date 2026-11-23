@@ -3,12 +3,12 @@
   "channel": "android-compatible",
   "flavor": "tv",
   "packageName": "io.github.jackotom.hongguo.android.tv",
-  "versionCode": 113,
-  "versionName": "0.12.90",
+  "versionCode": 114,
+  "versionName": "0.12.91",
   "minSdk": 26,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.90/Hongguo-0.12.90-tv-release-compatible.apk",
-  "size": 1701982,
-  "sha256": "eeda9ddfad3c88c3f316f02ea13688f56c8cb1a71baed591c9ed862bc7676549",
-  "notes": "红果 Android 0.12.90\n\n- 修复在线播放：适配上游取源接口形态调整，恢复播放与连播。\n- 取源失败恢复策略优化：仅当全部取源方式均不可用时才更换取源身份，减少无效重试。\n- 红果发现、搜索、播放、下载与观看记录链路不变；同包名同证书覆盖升级，数据不迁移不清理。修复已知问题。\n",
-  "publishedAt": "2026-11-23T08:33:14.000Z"
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.91/Hongguo-0.12.91-tv-release-compatible.apk",
+  "size": 1762363,
+  "sha256": "e55a722e735a9410e866d8bdf0157dbd19841149d707cf9e2eca5c02dc579fa4",
+  "notes": "红果 Android 0.12.91\n\n- 修复在线播放：新增 SDK 取源路线，恢复公开集之外剧集的取源、播放、连播与下载。\n- 64 位（arm64）设备生效；首次播放前需联网下载并校验约 5.4 MB 的 SDK 素材，仅一次并缓存，中断可续传。32 位设备取源方式不变。\n- 红果发现、搜索、播放、下载与观看记录链路不变；同包名同证书覆盖升级，数据不迁移不清理。修复已知问题。\n",
+  "publishedAt": "2026-11-23T19:02:20.880Z"
 }

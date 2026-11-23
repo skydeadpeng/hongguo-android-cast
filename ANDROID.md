@@ -6,15 +6,22 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.86 / code109 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.86 / code109 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.37 / code38 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.91 / code114 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.91 / code114 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.41 / code42 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.90](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.90) · [原生 TV 0.1.40](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.40)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.91](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.91) · [原生 TV 0.1.41](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.41)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+
+## 0.12.91 / 0.1.41 SDK 播放取源路线（2026-11-24）
+
+- 新增 SDK 取源路线并作为 arm64 设备的首选取源：2026-11-23 晚起本机签名的全部请求形态被平台清空响应，公开集之外的剧集无法取源；现在经官方 SDK 镜像的摘要换取会话令牌后取源，恢复取源、播放、连播与下载。
+- 首次播放前需联网下载并校验约 5.4 MB 的 SDK 素材（仅一次，缓存，可续传）；安装包增大约 58–64 KB。32 位设备与 x86 模拟器不含该路线，取源行为不变；路线不可用时自动回落原有签名请求梯子。
+- 同步修正 tvNative 更新清单的架构条目键名：0.1.39、0.1.40 的清单客户端无法解析，应用内检查更新失败。
+- 发行与验证边界见[本轮发行记录](docs/android-release-2026-11-24.md)。
 
 ## 0.12.90 / 0.1.40 播放取源修复（2026-11-23）
 

@@ -31,13 +31,13 @@
 
 2026-11-17：三线同步修复播放签名、预取取消和首播恢复，详见[本轮发行与验证记录](docs/android-release-2026-11-17.md)。
 
-当前发行（2026-11-23）：手机 / TV WebView **0.12.90**，原生 TV **0.1.40**。按设备下载一个 APK 安装即可；手机／TV WebView 要求 Android 8.0+，原生 TV 支持 Android 6.0+。修复在线播放（适配上游取源接口形态调整）；安装包约 1.7MB；播放持续失败时自动注册新取源身份恢复，关于页亦有手动重置入口。
+当前发行（2026-11-24）：手机 / TV WebView **0.12.91**，原生 TV **0.1.41**。按设备下载一个 APK 安装即可；手机／TV WebView 要求 Android 8.0+，原生 TV 支持 Android 6.0+。修复公开集之外剧集的在线播放（新增 SDK 取源路线，64 位设备生效；首次播放前需联网下载约 5.4 MB 素材，仅一次）；安装包约 1.7MB；播放持续失败时自动注册新取源身份恢复，关于页亦有手动重置入口。
 
 | 客户端 | 版本 | 下载 | 说明 |
 |---|---|---|---|
-| Android 手机 / 平板 | 0.12.90 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.90/Hongguo-0.12.90-phone-release-compatible.apk) | 触屏操作、本机播放、DLNA 投屏、扫码登录云同步 |
-| Android TV / 盒子（WebView） | 0.12.90 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.90/Hongguo-0.12.90-tv-release-compatible.apk) | 遥控器友好的 WebView 界面，原生解码播放 |
-| Android 原生 TV | 0.1.40 | [下载 APK（arm64）](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.40/HongguoNative-0.1.40-tvNative-release-compatible-arm64-v8a.apk) · [32 位](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.40/HongguoNative-0.1.40-tvNative-release-compatible-armeabi-v7a.apk) | 不依赖系统 WebView 的全原生电视界面，支持 Android 6.0+，解码方式可设（含内置软解） |
+| Android 手机 / 平板 | 0.12.91 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.91/Hongguo-0.12.91-phone-release-compatible.apk) | 触屏操作、本机播放、DLNA 投屏、扫码登录云同步 |
+| Android TV / 盒子（WebView） | 0.12.91 | [下载 APK](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.12.91/Hongguo-0.12.91-tv-release-compatible.apk) | 遥控器友好的 WebView 界面，原生解码播放 |
+| Android 原生 TV | 0.1.41 | [下载 APK（arm64）](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.41/HongguoNative-0.1.41-tvNative-release-compatible-arm64-v8a.apk) · [32 位](https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.41/HongguoNative-0.1.41-tvNative-release-compatible-armeabi-v7a.apk) | 不依赖系统 WebView 的全原生电视界面，支持 Android 6.0+，解码方式可设（含内置软解） |
 
 [查看全部版本](https://github.com/skydeadpeng/hongguo-android-cast/releases) · [版本记录与验证情况](ANDROID.md)
 

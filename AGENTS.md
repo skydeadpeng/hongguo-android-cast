@@ -12,6 +12,14 @@
 - 来源只剩红果后，Android 整套多源子系统（SourceService/SourceModuleRuntime/SourcePlaybackSessions/SourcePlaybackActivity/TvSourceActivity/SourceRuntimeSupport、Rhino/jsoup/Media3 依赖、vendor/source-modules、影视来源 WebView 页面与 tvNative「影视来源」菜单）整体拆除；红果自身播放/下载不依赖 Media3，不受影响。
 - NativeBridge getInfo 的 sourceService 恒为 false；手机包预期回到 0.12.80 时代量级（Media3/Rhino 三件套是 0.12.82 涨到 5.9M 的主因）。
 
+## SDK 播放取源路线（2026-11-24）
+
+- 2026-11-23 晚起本机签名的全部请求形态被平台清空响应。arm64 端新增 SDK 取源路线（`SdkPlaybackClient`，经官方 SDK 镜像的摘要换取会话令牌后取源）并作为首选，不可用时回落原签名请求梯子，梯子本身不改。手机 / TV WebView 0.12.91、原生 TV 0.1.41 已发。
+- SDK 镜像不随包分发：运行时从官方安装包的字节分段取得并双重 SHA-256 固定，首次约 5.4 MB、缓存、可续传。32 位与 x86 不含该路线，取源行为不变。
+- 适配库只编 arm64，由 `CMakeLists.txt` 按 ABI 决定；不得改用 `ndk.abiFilters`，那会连 32 位 tvNative 包的 libVLC 一起剥掉。
+- 原生测试素材按 2026-10-29 的规则执行：在红果短剧内随机选取、真实下载、全程静音，不使用彩条。
+- 发行、验证与限制见 `docs/android-release-2026-11-24.md`。
+
 ## 黄果漫剧来源（2026-11-08 接入，已于 2026-11-21 删除）
 
 - 用户已解除原「来源边界」禁令（该节已删除）；黄果漫剧接入为内置来源，设置 → 内置来源可开关，默认开启。
