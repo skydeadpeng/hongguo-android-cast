@@ -6,15 +6,21 @@
 
 | 版本 | 当前发行 | 应用 ID | 界面 |
 | --- | --- | --- | --- |
-| 手机 | 0.12.91 / code114 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
-| TV WebView | 0.12.91 / code114 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
-| 原生 TV 独立版 | 0.1.41 / code42 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
+| 手机 | 0.12.92 / code115 | `io.github.jackotom.hongguo.android` | WebView + 原生播放器，含手机投屏控制 |
+| TV WebView | 0.12.92 / code115 | `io.github.jackotom.hongguo.android.tv` | WebView 横屏界面 + 原生播放器 |
+| 原生 TV 独立版 | 0.1.42 / code43 | `io.github.jackotom.hongguo.android.tvnative` | 原生 Java 横屏界面、Java 取源、共享原生播放器 |
 
 手机 / TV WebView 版支持 Android 8.0（API26）及以上；原生 TV 0.1.22 起最低支持 Android 6.0（API23）。三包可以共存；原生 TV 不依赖系统 WebView。各包私有记录与下载独立，不进行跨包自动迁移。`release-compatible` 是非 debuggable 的 release 构建，沿用既有安装证书，在同包内覆盖更新保留本机记录。原生 TV 0.1.22 起内置软解（libVLC，仅 tvNative flavor），按设备架构分发 arm64 / 32 位安装包，应用内更新按设备支持的 ABI 自动选择对应包。
 
 原生 TV 提供海报分类、搜索、收藏、观看历史与续播、分季选集、官方账号入口、下载 / 离线播放 / 删除、遥控焦点及完整滚动设置。自动检查默认开启：成功检查间隔24小时，失败15分钟后重试；下载与系统安装分别确认，播放期间不弹窗。原生版本使用自己的 `update-tvnative.json`，不混用手机 / TV WebView 渠道。
 
-下载：[手机 / TV WebView 0.12.91](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.91) · [原生 TV 0.1.41](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.41)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+下载：[手机 / TV WebView 0.12.92](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.12.92) · [原生 TV 0.1.42](https://github.com/skydeadpeng/hongguo-android-cast/releases/tag/v0.1.42)。完整选择、数据隔离与构建说明见 [README 下载与安装](README.md#下载与安装)。以下旧版段落保留为历史记录。
+
+## 0.12.92 / 0.1.42 官网分集改版适配（2026-11-27）
+
+- 修复进入剧集后分集不全或无法选集：2026-11-27 起官网剧集页只公开前几集，分集编号改为混淆令牌，三端都无法再从该页读到完整分集；现在从官方接口读取完整分集，选集、连播、下载与观看记录照常使用。
+- 读取完整分集需要联网；官网公开的前几集仍优先使用网页片源。
+- 发行与验证边界见[本轮发行记录](docs/android-release-2026-11-27.md)。
 
 ## 0.12.91 / 0.1.41 SDK 播放取源路线（2026-11-24）
 

@@ -3,24 +3,24 @@
   "channel": "android-compatible",
   "flavor": "tvnative",
   "packageName": "io.github.jackotom.hongguo.android.tvnative",
-  "versionCode": 42,
-  "versionName": "0.1.41",
+  "versionCode": 43,
+  "versionName": "0.1.42",
   "minSdk": 23,
-  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.41/HongguoNative-0.1.41-tvNative-release-compatible-arm64-v8a.apk",
-  "size": 47101876,
-  "sha256": "d017dbbc5ad1c09526a162bd378051d9987b5072738fb97a48fec69cf32406f8",
+  "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.42/HongguoNative-0.1.42-tvNative-release-compatible-arm64-v8a.apk",
+  "size": 47102408,
+  "sha256": "a66164fd27c4770bd83682a9ba973ec23f86b291394c29392895588001bac0ec",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.41/HongguoNative-0.1.41-tvNative-release-compatible-arm64-v8a.apk",
-      "size": 47101876,
-      "sha256": "d017dbbc5ad1c09526a162bd378051d9987b5072738fb97a48fec69cf32406f8"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.42/HongguoNative-0.1.42-tvNative-release-compatible-arm64-v8a.apk",
+      "size": 47102408,
+      "sha256": "a66164fd27c4770bd83682a9ba973ec23f86b291394c29392895588001bac0ec"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.41/HongguoNative-0.1.41-tvNative-release-compatible-armeabi-v7a.apk",
-      "size": 43341326,
-      "sha256": "fc116258404d4e00806bf98c26acd462ef7aab9aaa99b320769ca8abba7404ec"
+      "apkUrl": "https://github.com/skydeadpeng/hongguo-android-cast/releases/download/v0.1.42/HongguoNative-0.1.42-tvNative-release-compatible-armeabi-v7a.apk",
+      "size": 43341877,
+      "sha256": "dee8d0163c715c4dd6b474739a86fff2d275375f333f9cd13e4a8d7cd236bc6e"
     }
   },
-  "notes": "红果原生 TV 0.1.41\n\n- 同步 0.12.91 播放修复：新增 SDK 取源路线，恢复公开集之外剧集的取源、播放与连播。\n- 64 位安装包生效；首次播放前需联网下载并校验约 5.4 MB 的 SDK 素材，仅一次并缓存，中断可续传。32 位安装包取源方式不变。\n- 支持 Android 6.0+；同包名同证书覆盖升级，数据不迁移不清理。修复已知问题。\n",
-  "publishedAt": "2026-11-23T19:02:21.499Z"
+  "notes": "红果原生电视版 0.1.42\n\n- 修复进入剧集后分集不全或无法选集：官网自 11 月 27 日起只在网页里公开前几集的分集编号，现在从官方接口读取完整分集，选集、连播、下载与观看记录照常使用。\n- 读取完整分集需要联网；官网公开的前几集仍优先使用网页片源。\n- 同包名同证书覆盖升级，数据不迁移不清理。修复已知问题。\n",
+  "publishedAt": "2026-11-27T02:47:58.638Z"
 }
