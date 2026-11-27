@@ -34,7 +34,7 @@ final class NativeBridge {
     private final ThreadPoolExecutor searchWorker = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
     // Login/cloud control never occupies source or media request workers.
     private final ThreadPoolExecutor accountWorker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new SynchronousQueue<>());
-    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appDeviceIdentity", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "removeHistory", "clearHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "resetPlaybackIdentity", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo"));
+    private static final Set<String> METHODS = new HashSet<>(Arrays.asList("getInfo", "httpGet", "cancelHttp", "appRequest", "appDeviceIdentity", "appEpisodeList", "appRegisteredModel", "appResolveResult", "getLibrary", "getSeriesHistory", "removeHistory", "clearHistory", "toggleFavorite", "play", "download", "getDownloads", "deleteDownload", "playDownload", "getPlaybackCache", "clearPlaybackCache", "getPlaybackOptions", "setPlaybackOptions", "getSearchHistory", "addSearchHistory", "removeSearchHistory", "clearSearchHistory", "searchQuery", "openExternal", "resetPlaybackIdentity", "getAccount", "officialSendCode", "officialLoginSMS", "officialVerifyMFA", "officialCancelLogin", "officialLogout", "officialSync", "officialImportGuest", "officialWebQrcode", "officialWebPoll", "officialWebLogout", "officialWebCancel", "getAnnouncements", "searchNewReleases", "homeFeed", "mergeDownloads", "getMergedVideos", "deleteMergedVideo", "playMergedVideo"));
     NativeBridge(MainActivity activity) { this.activity = activity; store = new LibraryStore(activity); downloads = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE); }
     @JavascriptInterface public void postMessage(String message) {
         if (message == null || message.length() > 256 * 1024 || message.getBytes(StandardCharsets.UTF_8).length > 256 * 1024) return;
@@ -83,7 +83,7 @@ final class NativeBridge {
                     AccountSync.get().requireCurrent(favoriteSelection);
                 } catch (Exception error) { respond(id, null, "账号正在切换，请稍后重试收藏"); return; }
             } else { favoriteSelection = null; favoriteStore = null; }
-            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") || method.equals("homeFeed") ? searchWorker : method.equals("download") ? downloadWorker : worker;
+            ThreadPoolExecutor executor = method.startsWith("official") ? accountWorker : method.equals("searchQuery") || method.equals("searchNewReleases") || method.equals("homeFeed") || method.equals("appEpisodeList") ? searchWorker : method.equals("download") ? downloadWorker : worker;
             try { executor.execute(() -> { try (AutoCloseable updateLease = (method.equals("download") || method.equals("playDownload")) ? UpdateInstallCheckpoint.operation() : null) { handle(id, method, params, favoriteStore, favoriteSelection); } catch (Exception error) { respond(id, null, error.getMessage() == null ? "操作未成功，请重试" : error.getMessage()); } }); }
             catch (RejectedExecutionException error) { respond(id, null, "请求较多，请稍后重试"); }
         });
@@ -114,6 +114,21 @@ final class NativeBridge {
                 }
             });
         } catch (RejectedExecutionException busy) { respond(id, null, "设备登记繁忙，请稍后重试"); }
+    }
+    /** The complete numeric episode list for a page that only previews its accessible episodes.
+     *  params: {seriesId, webIds?} — the official ids of those episodes stay bound to their order. */
+    private JSONObject episodeList(JSONObject params) throws Exception {
+        Object rawId = params.opt("seriesId");
+        JSONArray ids = params.optJSONArray("webIds");
+        if (!(rawId instanceof String) || !((String) rawId).matches("[0-9]{1,30}") || params.length() > 2
+            || (params.has("webIds") && ids == null) || (ids != null && ids.length() > 2000)) throw new java.io.IOException("剧集请求信息无效");
+        List<String> webIds = new ArrayList<>();
+        for (int i = 0; ids != null && i < ids.length(); i++) {
+            Object value = ids.opt(i);
+            if (!(value instanceof String) || !((String) value).matches(SiteCatalog.WEB_ID)) throw new java.io.IOException("分集请求信息无效");
+            webIds.add((String) value);
+        }
+        return SiteCatalog.completeFromWebIds((String) rawId, webIds, System.nanoTime() + 20_000_000_000L);
     }
     private void startRegisteredModel(Object id, JSONObject params) {
         final String key = String.valueOf(id), vid;
@@ -395,6 +410,7 @@ final class NativeBridge {
             }
             case "appRequest": respond(id, AppTransport.request(params), null); break;
             case "appDeviceIdentity": startDeviceIdentity(id); break;
+            case "appEpisodeList": respond(id, episodeList(params), null); break;
             case "appResolveResult": PlaybackSources.result(params); respond(id, new JSONObject().put("accepted", true), null); break;
             // Library reads remain on-device; the retired sync account is not selected.
             case "getLibrary": respond(id, currentLibrary(), null); break;

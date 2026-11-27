@@ -227,20 +227,29 @@ final class PlaybackSources {
         if (requestedQuality.equals("480p")||requestedQuality.equals("360p"))return resolvePlayback(sid,vid,requestedQuality,defaultPlaybackCeiling(requestedQuality),false,false,lookup);
         if (!requestedQuality.equals("auto")) return register(bindSeries(resolveApp(sid,vid,requestedQuality,true,0,lookup),sid),vid,true);
         if (webFailureActive(sid,vid)) {
+            EpisodeResolver.trace("DIAG webPenaltyActive sid="+sid+" vid="+vid+" quality="+requestedQuality);
             try { return register(bindSeries(resolveApp(sid,vid,requestedQuality,true,0,lookup),sid),vid,true); }
             catch (Exception appError) {
                 if (cancelled(appError)) throw appError;
                 // Like the desktop, the penalty changes priority, not permanent availability.
                 try { return resolveWeb(sid,vid); }
                 catch (Exception webError) {
+                    EpisodeResolver.trace("DIAG webAfterAppFailed sid="+sid+" vid="+vid+" "+webError.getClass().getName()+": "+webError.getMessage());
                     if(cancelled(webError)||terminalGuestFailure(webError,allowUnavailablePublicFallback))throw webError;
                     appError.addSuppressed(webError);throw appError;
                 }
             }
         }
         try {
-            return resolveWeb(sid,vid);
-        } catch (Exception webError) {
+            long diagStarted=System.nanoTime();Plan diagPlan=resolveWeb(sid,vid);
+            EpisodeResolver.trace("DIAG webOk sid="+sid+" vid="+vid+" ms="+(System.nanoTime()-diagStarted)/1000000+" source="+diagPlan.source+" guest="+diagPlan.guestPlayback);
+            return diagPlan;
+        }
+        catch (Exception webError) {
+            EpisodeResolver.trace("DIAG webFailed sid="+sid+" vid="+vid+" "+webError.getClass().getName()+": "+webError.getMessage()
+                +(webError.getCause()!=null?" cause="+webError.getCause().getClass().getName()+": "+webError.getCause().getMessage():""));
+            for (Throwable suppressed=webError;suppressed!=null;suppressed=suppressed.getCause())
+                for (Throwable extra:suppressed.getSuppressed())EpisodeResolver.trace("DIAG webSuppressed "+extra.getClass().getName()+": "+extra.getMessage());
             if (cancelled(webError) || terminalGuestFailure(webError,allowUnavailablePublicFallback)) throw webError;
             try { return register(bindSeries(resolveApp(sid,vid,requestedQuality,true,0,lookup),sid),vid,true); }
             catch (Exception appError) {
@@ -506,6 +515,7 @@ final class PlaybackSources {
                 if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("播放准备已取消");
                 return;
             } catch(Exception failure) {
+                EpisodeResolver.trace("DIAG guestFileFailed vid="+plan.vid+" bytes="+(destination.exists()?destination.length():-1)+" "+failure.getClass().getName()+": "+failure.getMessage());
                 if(destination.exists()&&!destination.delete())throw new EpisodeResolver.GuestFailure("未完成的官网视频清理失败");
                 if(cancelled(failure))throw failure;
                 // Surface the concrete gate that rejected the file: dimension/timeline/

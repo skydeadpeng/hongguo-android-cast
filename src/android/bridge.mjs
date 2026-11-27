@@ -6,7 +6,7 @@ const METHODS = new Set([
   'getMergedVideos', 'deleteMergedVideo', 'playMergedVideo',
   'download', 'getDownloads', 'playDownload', 'deleteDownload', 'openExternal',
   'getPlaybackCache', 'clearPlaybackCache',
-  'appRequest', 'appDeviceIdentity', 'appRegisteredModel', 'appResolveResult', 'getPlaybackOptions', 'setPlaybackOptions',
+  'appRequest', 'appDeviceIdentity', 'appEpisodeList', 'appRegisteredModel', 'appResolveResult', 'getPlaybackOptions', 'setPlaybackOptions',
   'getSearchHistory', 'addSearchHistory', 'removeSearchHistory', 'clearSearchHistory', 'searchQuery',
   'resetPlaybackIdentity',
 ]);

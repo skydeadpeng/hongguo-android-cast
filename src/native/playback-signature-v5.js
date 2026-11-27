@@ -178,7 +178,7 @@ function heliosV5(khronos) {
     return Buffer.concat([le32(random), ...output]).toString('base64');
 }
 
-function medusaV5(url, body, khronos, who) {
+function medusaV5(url, body, khronos, who, field21 = 377) {
     const query = url.split('?')[1];
     const bodyMd5 = body ? md5of(body) : Buffer.alloc(16);
     const querySm3 = sm3(query);
@@ -188,7 +188,7 @@ function medusaV5(url, body, khronos, who) {
     const env = proto([[6, 'v04.10.03.04-bugfix'], [8, who.channel], [12, deviceInfo, 'message'], [14, who.version_name]]);
     // Field 9 is the SDK version: v5 carries 04.10.03.00. The v3-era 67503104 (04.06.04.00)
     // was refused silently with an empty 200 (2026-11-23); the Java twin always sent 0x040a0300.
-    const message = proto([[1, V5_MAGIC, 'bytes'], [2, 5, 'sint'], [3, Math.floor(Math.random() * 0x100000000), 'sint'], [4, '8662'], [5, who.device_id], [6, V5_LICENSE], [7, who.version_name], [8, 'v04.10.03-ml-android'], [9, 0x040a0300, 'sint'], [10, flags, 'bytes'], [12, khronos, 'sint'], [13, f13, 'bytes'], [14, querySm3.subarray(0, 6), 'bytes'], [15, proto([[1, 1, 'sint'], [2, 1, 'sint'], [3, 1, 'sint'], [5, 1, 'sint']]), 'message'], [17, khronos, 'sint'], [20, 'none'], [21, 377, 'sint'], [23, env, 'message'], [24, '{"cmr":16777216,"cmr2":16777216,"un_h":11,"vpn":0,"kd":0,"dyn":"","do":1,"tk":true}']]);
+    const message = proto([[1, V5_MAGIC, 'bytes'], [2, 5, 'sint'], [3, Math.floor(Math.random() * 0x100000000), 'sint'], [4, '8662'], [5, who.device_id], [6, V5_LICENSE], [7, who.version_name], [8, 'v04.10.03-ml-android'], [9, 0x040a0300, 'sint'], [10, flags, 'bytes'], [12, khronos, 'sint'], [13, f13, 'bytes'], [14, querySm3.subarray(0, 6), 'bytes'], [15, proto([[1, 1, 'sint'], [2, 1, 'sint'], [3, 1, 'sint'], [5, 1, 'sint']]), 'message'], [17, khronos, 'sint'], [20, 'none'], [21, field21, 'sint'], [23, env, 'message'], [24, '{"cmr":16777216,"cmr2":16777216,"un_h":11,"vpn":0,"kd":0,"dyn":"","do":1,"tk":true}']]);
     const nonce = Math.floor(Math.random() * 0x100000000);
     const [hash, seed] = keyHash(V5_SIGN_KEY, nonce);
     let transformed = Buffer.concat([flags, xmxor(message, hash)]).reverse();
@@ -215,8 +215,9 @@ function encodeQuery(values) {
  * v5 playback signing. Adjusts only _rticket (≤1024 tries) until the digest lands
  * on class 12; signs the final query bytes and the exact body bytes (gzip'd).
  * Emits only x-khronos / x-helios / x-medusa (+Content-Type/x-ss-stub for bodies).
+ * field21 is Medusa field 21: 377 for the player profile, 312 for the 7.4.5.32 video_detail/v1 profile.
  */
-function signPlaybackV5(base, values, body, now = Date.now()) {
+function signPlaybackV5(base, values, body, now = Date.now(), field21 = 377) {
     const ts = Math.floor(now / 1000);
     let query = '', url = '';
     for (let offset = 0; offset < 1024; offset += 1) {
@@ -228,7 +229,7 @@ function signPlaybackV5(base, values, body, now = Date.now()) {
     const headers = {
         'x-khronos': String(ts),
         'x-helios': heliosV5(ts),
-        'x-medusa': medusaV5(url, body, ts, values),
+        'x-medusa': medusaV5(url, body, ts, values, field21),
     };
     if (body) {
         headers['Content-Type'] = 'application/json; charset=utf-8';

@@ -589,4 +589,65 @@ function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata
         });
 }
 
-module.exports = { fetchAppPlayUrl, signedSearchRequest, signedMetadataRequest, signedAccountRequest, parseSearchInteger, preserveLargeJsonIntegers, requestJson, SEARCH_API, SEARCH_UA };
+const VIDEO_DETAIL_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_detail/v1/';
+/** Signed series detail on the playback identity; the 7.4.5.32 profile signs Medusa field 21 with 312 (upstream 8.5, issue #217). */
+function videoDetailRequest(identity, seriesId) {
+    const payload = JSON.stringify({
+        series_id: String(seriesId),
+        biz_param: { caller_scene: 'single_col', detail_page_version: 0, from_video_id: '', need_all_video_definition: false, need_mp4_align: false, source: 4, video_id_type: 1 },
+    });
+    const body = gzipSync(Buffer.from(payload));
+    const signed = require('./playback-signature-v5').signPlaybackV5(VIDEO_DETAIL_API, {
+        aid: '8662', app_name: 'novelread', version_code: '74532', version_name: '7.4.5.32',
+        update_version_code: '74532', manifest_version_code: '74532', os: 'android', ssmix: 'a',
+        channel: 'update_64', device_platform: 'android', device_type: '25053RT47C', device_brand: 'Redmi',
+        os_version: '16', os_api: '36', ac: 'wifi', language: 'zh', host_abi: 'arm64-v8a',
+        iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id,
+    }, body, Date.now(), 312);
+    return { url: signed.url, body, method: 'POST', headers: { ...signed.headers, 'User-Agent': 'okhttp/4.12.0', Accept: 'application/json',
+        'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip' } };
+}
+function safeDetailCover(value) { const url = str(value).trim(); return /^https?:\/\//i.test(url) ? url : ''; }
+function detailContentType(value, fallback = '1004') { const normalized = String(value ?? ''); return ['1001', '1004'].includes(normalized) ? normalized : fallback; }
+/** The complete numeric episode list of a series. Since 2026-11-27 the official page lists only the
+ *  leading episodes by obfuscated token, so this is where numeric episode ids come from. */
+async function fetchAppEpisodeList(seriesId, options = {}) {
+    throwIfAborted(options.signal);
+    const sid = String(seriesId || '');
+    if (!/^\d{1,30}$/.test(sid)) throw Object.assign(new Error('红果剧集编号无效'), { code: 'INVALID_OPTIONS' });
+    const deadline = Number(options.deadline) || (Date.now() + 9000);
+    if (deadline <= Date.now()) throw Object.assign(new Error('App 详情请求超时'), { code: 'ETIMEDOUT' });
+    const identity = await registerPlaybackDevice(requestJson, { signal: options.signal });
+    throwIfAborted(options.signal);
+    const req = videoDetailRequest(identity, sid);
+    const response = await requestJson(req.url, { method: 'POST', headers: req.headers, data: req.body,
+        preserveLargeIntegerFields: ['series_id', 'vid'] }, deadline, options.signal);
+    throwIfAborted(options.signal);
+    if (!response || Number(response.code) !== 0) throw Object.assign(new Error('App 详情接口拒绝请求'), { code: 'BUSINESS_REJECTED' });
+    const vd = response.data?.video_data;
+    if (!vd || String(vd.series_id || '') !== sid) throw Object.assign(new Error('App 详情返回的剧集与请求不一致'), { code: 'INVALID_RESPONSE' });
+    const rows = Array.isArray(vd.video_list) ? vd.video_list : [];
+    if (!rows.length) throw Object.assign(new Error('App 详情分集列表为空'), { code: 'INVALID_RESPONSE' });
+    const requestedType = detailContentType(options.content_type || options.contentType, '');
+    const seriesType = detailContentType(vd.content_type, '');
+    const seriesTitle = typeof vd.series_title === 'string' && vd.series_title ? vd.series_title : '未命名短剧';
+    const seriesCover = safeDetailCover(vd.series_cover || vd.cover_url);
+    const episodes = rows.map((item, index) => {
+        const vid = String(item?.vid || '');
+        if (!/^\d{1,30}$/.test(vid) || (item?.series_id != null && String(item.series_id) !== sid)) {
+            throw Object.assign(new Error('App 详情分集数据异常'), { code: 'INVALID_RESPONSE' });
+        }
+        const contentType = requestedType || detailContentType(item?.content_type, seriesType || '1004');
+        return { vid, vid_index: Number(item.vid_index) > 0 ? Number(item.vid_index) : index + 1, title: typeof item.title === 'string' ? item.title : '',
+            series_id: sid, series_title: seriesTitle, cover: safeDetailCover(item.cover_url || item.series_cover) || seriesCover,
+            content_type: contentType, web_available: null, locked: item.disable_play === true };
+    }).sort((a, b) => a.vid_index - b.vid_index);
+    if (new Set(episodes.map(item => item.vid)).size !== episodes.length || Number(vd.episode_cnt) > episodes.length) {
+        throw Object.assign(new Error('App 详情分集列表不完整'), { code: 'INVALID_RESPONSE' });
+    }
+    return { series_id: sid, series_title: seriesTitle, cover: seriesCover || (episodes[0] && episodes[0].cover) || '',
+        description: typeof vd.series_intro === 'string' ? vd.series_intro : '', content_type: requestedType || seriesType || episodes[0]?.content_type || '1004',
+        total: episodes.length, web_accessible_episodes: null, episodes, source: 'app' };
+}
+
+module.exports = { fetchAppPlayUrl, fetchAppEpisodeList, signedSearchRequest, signedMetadataRequest, signedAccountRequest, parseSearchInteger, preserveLargeJsonIntegers, requestJson, SEARCH_API, SEARCH_UA };

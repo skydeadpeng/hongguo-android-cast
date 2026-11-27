@@ -10,10 +10,13 @@ if [ ! -f "$JSON_JAR" ]; then
   JSON_JAR="$(find "$HOME/.gradle/caches" "$HOME/.m2/repository/org/json/json" -name 'json-*.jar' ! -name '*sources*' ! -name '*javadoc*' -print 2>/dev/null | head -1)"
 fi
 [ -f "$JSON_JAR" ] || { echo 'TEST_DEPENDENCY_MISSING set JSON_JAR'; exit 2; }
+# NetworkGuard references android.os.Build; the resolver's trace references android.util.Log.
+SDK_JAR="${SDK_JAR:-${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}/platforms/android-35/android.jar}"
+[ -f "$SDK_JAR" ] || { echo 'TEST_DEPENDENCY_MISSING set SDK_JAR'; exit 2; }
 TMP="$(mktemp -d -t hongguo-site-catalog.XXXXXX)"; trap 'rm -rf "$TMP"' EXIT
 SRC="$SOURCE_ROOT/android/app/src/main/java/io/github/jackotom/hongguo/android"
-"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR" -d "$TMP/classes" \
-  "$SRC/NetworkGuard.java" "$SRC/EpisodeResolver.java" "$SRC/SiteCatalog.java" "$SRC/AppSearchPage.java" \
+"$JAVA_HOME/bin/javac" --release 17 -encoding UTF-8 -cp "$JSON_JAR:$SDK_JAR" -d "$TMP/classes" \
+  "$SRC/NetworkGuard.java" "$SRC/LegacyText.java" "$SRC/EpisodeResolver.java" "$SRC/SiteCatalog.java" "$SRC/AppSearchPage.java" \
   "$ROOT/android/tests/SiteCatalogTest.java" "$ROOT/android/tests/AppSearchPageTest.java"
-"$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.SiteCatalogTest
-"$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR" io.github.jackotom.hongguo.android.AppSearchPageTest
+"$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.SiteCatalogTest
+"$JAVA_HOME/bin/java" -cp "$TMP/classes:$JSON_JAR:$SDK_JAR" io.github.jackotom.hongguo.android.AppSearchPageTest

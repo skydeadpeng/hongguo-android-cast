@@ -564,10 +564,12 @@ final class RegisteredPlaybackModel implements AutoCloseable {
             URI uri = new URI(request.url);
             boolean post = "/novel/player/multi_video_model/v1/".equals(uri.getRawPath()) && request.method.equals("POST");
             boolean tab = "/reading/bookapi/video_tab/multi_video_model/v1/".equals(uri.getRawPath()) && request.method.equals("GET") && request.body.length == 0;
+            // The signed series detail (complete episode list, 2026-11-27) shares the model host and client.
+            boolean detail = "/novel/player/video_detail/v1/".equals(uri.getRawPath()) && request.method.equals("POST");
             // The v5 player/v1 form lives on the sinfonlinea host; everything else stays on sinfonlineb.
             boolean player = "/novel/player/multi_video_model/player/v1".equals(uri.getRawPath()) && request.method.equals("POST")
                 && "api5-normal-sinfonlinea.fqnovel.com".equals(uri.getHost());
-            if (!"https".equals(uri.getScheme()) || !player && !"api5-normal-sinfonlineb.fqnovel.com".equals(uri.getHost()) || !post && !tab && !player || uri.getPort() != -1 || uri.getUserInfo() != null || uri.getFragment() != null || request.body.length > 128 * 1024)
+            if (!"https".equals(uri.getScheme()) || !player && !"api5-normal-sinfonlineb.fqnovel.com".equals(uri.getHost()) || !post && !tab && !player && !detail || uri.getPort() != -1 || uri.getUserInfo() != null || uri.getFragment() != null || request.body.length > 128 * 1024)
                 throw new ModelError("App片源服务地址无效", "INVALID_INPUT");
             return uri;
         }

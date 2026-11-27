@@ -17,7 +17,9 @@ import { pickSpatialCandidate, pickInitialControl } from './tv-navigation.mjs';
 
 const source = createSource(requestHtml, { fallback: fetchAppPlayUrl,
   searchPage: params => nativeCall('searchQuery', params, 60000),
-  newReleases: params => nativeCall('searchNewReleases', params, 30000) });
+  newReleases: params => nativeCall('searchNewReleases', params, 30000),
+  // The official page previews only its accessible episodes; native code signs the App detail for the full list.
+  appDetail: params => nativeCall('appEpisodeList', params, 30000) });
 const seasonLookup = createOfficialSeasonLookup(requestOfficialSeries, createSeasonLookup((keyword, page) => source.search(keyword, page)));
 const EMPTY_LIBRARY = { favorites: [], history: [] };
 const NAV = [

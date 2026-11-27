@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const sourceRoot = resolve(process.env.ANDROID_SOURCE_ROOT || fileURLToPath(new URL('..', import.meta.url)));
-const { CATEGORIES, SITE_ORIGIN, extractRouterData, parseCatalog, parseSearch, parseDetail, parsePlayback, createSource } =
+const { CATEGORIES, SITE_ORIGIN, extractRouterData, parseCatalog, parseSearch, parseDetail, parsePlayback, createSource, completeDetail } =
   await import(pathToFileURL(resolve(sourceRoot, 'src/android/source.mjs')).href);
 
 const sid = '1234567890123456789', vid = '2345678901234567890';
@@ -263,4 +263,63 @@ test('cache is bounded to 64 successful pages', async () => {
   let calls = 0; const source = createSource(async () => { calls++; return catalog(); });
   for (let page = 1; page <= 65; page++) await source.catalog('real-drama', page);
   await source.catalog(); assert.equal(calls, 66);
+});
+
+// 2026-11-27: the official page lists only its accessible episodes, by obfuscated token (upstream #217).
+const tokens = ['v1_5DC8VBWf14_jqPcnhiSPfJ6fiGI', 'v1_2VMvyadqPpt6G-ZZqkmCa18eFHw', 'v1_q8HExAwWPUBqpvQw_DdZQ9vFYP0'];
+const tokenPage = (overrides = {}, data = {}, key = 'player_(series_id)/page') =>
+  detail({ vid_list: tokens, accessible_episode_cnt: 3, episode_cnt: 71, ...overrides }, data, key);
+const appRows = count => ({ seriesId: sid, title: ' App 标题 ', coverUrl: 'https://cdn.example.net/app.jpg', description: 'App 简介', episodeLabel: '全71集', source: 'app',
+  episodes: Array.from({ length: count }, (_, i) => ({ vid: `90000000000000000${String(i + 1).padStart(2, '0')}`, index: i + 1, webAvailable: true, availability: 'available' })) });
+test('token page is an incomplete preview: no numeric episode, its accessible tokens in order', () => {
+  const page = parseDetail(tokenPage(), sid);
+  assert.equal(page.complete, false); assert.equal(page.episodes.length, 0); assert.equal(page.episodeCount, 71);
+  assert.deepEqual(page.webIds, tokens); assert.equal(page.title, '测试短剧'); assert.equal(page.accessibleEpisodeCount, 0);
+  assert.deepEqual(parseDetail(tokenPage({}, { isSuccess: true }, 'detail_page'), sid).webIds, tokens, 'detail route serves the same preview');
+  assert.deepEqual(parseDetail(tokenPage({ vid_list: [...tokens, tokens[0], 'v1_x'] }), sid).webIds, tokens, 'duplicates and malformed tokens are dropped');
+  assert.deepEqual(parseDetail(tokenPage({ vid_list: tokens, accessible_episode_cnt: 2 }), sid).webIds, tokens.slice(0, 2), 'only accessible tokens are web episodes');
+  throwsCode(() => parseDetail(tokenPage({ series_id: '333333' }), sid), 'IDENTITY_MISMATCH');
+  // A page that lists only the accessible prefix of a longer series, numerically, is a preview too.
+  const numeric = parseDetail(detail({ vid_list: ['1001', '1002', '1003'], accessible_episode_cnt: 3, episode_cnt: 71 }), sid);
+  assert.equal(numeric.complete, false); assert.deepEqual(numeric.webIds, ['1001', '1002', '1003']); assert.equal(numeric.episodes.length, 3);
+  for (const full of [detail(), detail({ vid_list: ['1001', '1002', '1003', '1004', '1005'], accessible_episode_cnt: 3 })].map(page => parseDetail(page, sid))) {
+    assert.equal('complete' in full, false); assert.equal('webIds' in full, false); assert.equal(full.episodeCount, 80);
+  }
+});
+test('a preview is completed by the App list; its web ids bind to the leading episodes', async () => {
+  const calls = [];
+  const source = createSource(async url => { calls.push(`page ${url}`); return tokenPage(); }, { appDetail: async params => { calls.push(params); return appRows(71); } });
+  const item = await source.detail(sid);
+  assert.equal(item.episodes.length, 71); assert.equal(item.episodeCount, 71); assert.equal(item.accessibleEpisodeCount, 3);
+  assert.deepEqual(item.episodes.slice(0, 4).map(episode => episode.webAvailable), [true, true, true, false]);
+  assert.equal(item.episodes[70].index, 71); assert.equal(item.episodes[70].availability, 'unknown');
+  assert.equal(item.title, '测试短剧'); assert.equal(item.coverUrl, 'https://cdn.example.net/cover.jpg'); assert.deepEqual(item.tags, ['都市', '逆袭']);
+  assert.equal('complete' in item, false); assert.equal('webIds' in item, false); assert.equal('source' in item, false);
+  const appCalls = calls.filter(call => typeof call === 'object');
+  assert.deepEqual(appCalls, [{ seriesId: sid, webIds: tokens }]);
+  assert.equal(calls.filter(call => typeof call === 'string').length, 2, 'both page routes race once');
+  assert.strictEqual(await source.detail(sid), item); assert.equal(calls.length, 3, 'the completed detail is cached');
+});
+test('without an App list a token page fails clearly, a numeric preview stays usable', async () => {
+  const bare = createSource(async () => tokenPage());
+  await assert.rejects(bare.detail(sid), error => error.code === 'DETAIL_UNAVAILABLE' && /分集/.test(error.message));
+  let asked = 0;
+  const failing = createSource(async () => tokenPage(), { appDetail: async () => { asked++; throw Object.assign(new Error('分集接口未返回数据，请稍后重试'), { code: 'EMPTY_RESPONSE' }); } });
+  await assert.rejects(failing.detail(sid), /分集接口未返回数据/); assert.equal(asked, 1);
+  const numeric = createSource(async () => detail({ vid_list: ['1001', '1002', '1003'], accessible_episode_cnt: 3, episode_cnt: 71 }),
+    { appDetail: async () => { throw new Error('分集接口未返回数据'); } });
+  const kept = await numeric.detail(sid);
+  assert.equal(kept.episodes.length, 3); assert.equal(kept.episodes[0].vid, '1001'); assert.equal(kept.episodeCount, 71); assert.equal('complete' in kept, false);
+});
+test('App list must match the series and hold unique numeric episodes', async () => {
+  throwsCode(() => createSource(async () => tokenPage(), { appDetail: 'fetch' }), 'INVALID_INPUT');
+  for (const app of [null, { ...appRows(3), seriesId: '333333' }, { ...appRows(3), episodes: [] }, { ...appRows(3), episodes: [{ vid: tokens[0] }] },
+    { ...appRows(2), episodes: [{ vid: '1001' }, { vid: '1001' }] }, appRows(2001), { ...appRows(2), episodes: null }]) {
+    const source = createSource(async () => tokenPage(), { appDetail: async () => app });
+    await assert.rejects(source.detail(sid), error => error.code === 'DETAIL_UNAVAILABLE');
+  }
+  const page = parseDetail(tokenPage(), sid);
+  const merged = completeDetail(page, { seriesId: sid, title: 'App 标题', coverUrl: 'https://cdn.example.net/app.jpg', episodes: appRows(2).episodes }, sid);
+  assert.equal(merged.title, '测试短剧'); assert.equal(merged.coverUrl, 'https://cdn.example.net/cover.jpg'); assert.equal(merged.episodes.length, 2);
+  assert.equal(completeDetail({ ...page, title: '', coverUrl: '' }, { seriesId: sid, title: 'App 标题', coverUrl: 'http://127.0.0.1/x', episodes: appRows(1).episodes }, sid).title, 'App 标题');
 });

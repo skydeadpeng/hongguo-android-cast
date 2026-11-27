@@ -46,6 +46,8 @@ final class PlaybackSignerV5 {
         "1335ae0e178f3409a7803db83892dde5b9b7f0c750e24aef077badd678a09b850b84ec1597e4963cb5e675df1c0d6fb618496ecd76c35c798325590c2fb27a5e");
     private static final int[] HASH_TABLE = {0xebb64faf,0x7aadcc2,0xcf3187bf,0xe01138ff,0x6d0bfcff,0x5a30a3be,0xb41ad638,0x34180eb8,0xf233eb6f,0xb1a584cc,0xccc30dc7,0x47d1db51,0xd55653de,0x70a84fa1,0x57473c12,0xf76f0288,0x2c077f0a,0xda0dcad0,0xfbb86f6c,0xfdc4cf00,0x688a020d,0xe676c6a6,0x8cd6338b,0x1a3c8d0e,0xcce8b06b,0x6ad0ed0b,0xa0522717,0xdc71ac83,0x2285db71,0xd5b4dda6,0x736f8650,0x6560306c,0x617ce2a6,0xe423417e,0xa40e143,0x544e4032,0x88dffb2a,0x716c1ae0,0x4c467a88,0x5b23bb3,0xe1d0b866,0xbaa3dcb8,0xae3374d3,0xc3381a50,0x1702f75b,0xfe6da368,0xf0b4cf48,0x4e0ffbb8,0x72aad10d,0x26c53a3d,0xf2bce0f6,0xb4557581,0x4a257fdd,0x8c3182a2,0xab0b3b86,0x3d5dfb14,0x4f103634,0xd37b52d7,0x444eff16,0xeb0a33d1,0x6ca86f6e,0x284ba7,0x8387cfa,0x5fb37586};
     static final String PLAYER_V1_API = "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/multi_video_model/player/v1";
+    /** Signed series detail: the complete numeric episode list (upstream 8.5, field 21 = 312). */
+    static final String VIDEO_DETAIL_API = "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_detail/v1/";
     static final String PLAYER_V1_UA = "com.phoenix.read/73932 (Linux; U; Android 12; zh_CN_#Hans; PGT-AN10; Build/V417IR;tt-ok/3.12.13.20)";
     private static final SecureRandom RANDOM = new SecureRandom();
     /** The official medusa plaintext embeds a per-process nonce and start time; one pair per cold start. */
@@ -372,8 +374,13 @@ final class PlaybackSignerV5 {
         return base64(output.toByteArray());
     }
 
+    /** Medusa field 21 of the v5 player profile; the 7.4.5.32 profile (video_detail/v1, upstream 8.5) signs 312. */
+    static final int DEFAULT_FIELD21 = 377, DETAIL_FIELD21 = 312;
     /** who carries the same registered identity the query string carries; the server cross-checks both. */
     static String medusa(String url, byte[] body, long ts, Map<String, String> who) {
+        return medusa(url, body, ts, who, DEFAULT_FIELD21);
+    }
+    static String medusa(String url, byte[] body, long ts, Map<String, String> who, int field21) {
         String query = url.substring(url.indexOf('?') + 1);
         byte[] bodyMd5 = body != null ? md5(body) : new byte[16];
         byte[] querySm3 = DanmakuSigner.sm3(query.getBytes(StandardCharsets.UTF_8));
@@ -389,7 +396,7 @@ final class PlaybackSignerV5 {
             str(6, LICENSE), str(7, who.get("version_name")), str(8, "v04.10.03-ml-android"), sint(9, 0x040a0300),
             field(10, flags), sint(12, ts), field(13, f13), field(14, copyOf(querySm3, 6)),
             field(15, concat(sint(1, 1), sint(2, 1), sint(3, 1), sint(5, 1))),
-            sint(17, ts), str(20, "none"), sint(21, 377), field(23, env),
+            sint(17, ts), str(20, "none"), sint(21, field21), field(23, env),
             str(24, "{\"cmr\":16777216,\"cmr2\":16777216,\"un_h\":11,\"vpn\":0,\"kd\":0,\"dyn\":\"\",\"do\":1,\"tk\":true}"));
         int nonce = rand();
         byte[] hash = DanmakuSigner.sm3(concat(SIGN_KEY, le32(unsigned(nonce)), SIGN_KEY));
@@ -436,6 +443,9 @@ final class PlaybackSignerV5 {
      * on class 12; emits only x-khronos/x-helios/x-medusa (+Content-Type/x-ss-stub for bodies).
      */
     static Request signPlayback(String base, Map<String, String> values, byte[] body, long now) {
+        return signPlayback(base, values, body, now, DEFAULT_FIELD21);
+    }
+    static Request signPlayback(String base, Map<String, String> values, byte[] body, long now, int field21) {
         long ts = now / 1000;
         Map<String, String> query = new LinkedHashMap<>(values);
         for (int offset = 0; offset < 1024; offset++) {
@@ -446,7 +456,7 @@ final class PlaybackSignerV5 {
                 Map<String, String> headers = new LinkedHashMap<>();
                 headers.put("x-khronos", Long.toString(ts));
                 headers.put("x-helios", helios(ts));
-                headers.put("x-medusa", medusa(url, body, ts, values));
+                headers.put("x-medusa", medusa(url, body, ts, values, field21));
                 if (body != null) {
                     headers.put("Content-Type", "application/json; charset=utf-8");
                     headers.put("x-ss-stub", hexText(md5(body)).toUpperCase());

@@ -32,11 +32,18 @@ package io.github.jackotom.hongguo.android;
 final class NetworkGuard {
     static final class Reply { final String body, url; final int status; Reply(String body, int status, String url) { this.body = body; this.status = status; this.url = url; } }
     // A queue entry is a Reply or a thrown exception (a synthetic transport timeout).
-    static Reply guestPlaybackPost(String id,long deadline) { throw new AssertionError("unexpected guest POST"); }
+    // One scripted guest POST answer; the item id it was asked for is recorded.
+    static Object guestReply; static String guestItem;
+    static Reply guestPlaybackPost(String id,long deadline) {
+        if (guestReply == null) throw new AssertionError("unexpected guest POST " + id);
+        guestItem = id;
+        if (guestReply instanceof RuntimeException) throw (RuntimeException) guestReply;
+        return (Reply) guestReply;
+    }
     static Object[] replies; static int totalRequests;
     static final java.util.concurrent.atomic.AtomicInteger requests = new java.util.concurrent.atomic.AtomicInteger();
     static final java.util.List<String> requested = new java.util.concurrent.CopyOnWriteArrayList<>();
-    static void reset(Object... next) { replies = next; requests.set(0); requested.clear(); }
+    static void reset(Object... next) { replies = next; requests.set(0); requested.clear(); guestReply = null; guestItem = null; }
     static int requests() { return requests.get(); }
     static Reply get(String url) throws Exception { return get(url, 0, 0L); }
     static Reply get(String url, int timeoutMs, long deadlineMs) throws Exception {

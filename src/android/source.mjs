@@ -8,10 +8,14 @@ export const CATEGORIES = Object.freeze([
   Object.freeze({ id: 'ai-drama', label: 'AI剧' }),
 ]);
 const ID = /^\d{1,30}$/;
+// Since 2026-11-27 the official page names its accessible episodes by an obfuscated token and
+// lists only those (upstream issue #217); the numeric episodes come from the App detail.
+const WEB_TOKEN = /^v\d+_[A-Za-z0-9_-]{8,128}$/, MAX_EPISODES = 2000;
 const CACHE_MS = 30_000;
 const MAX_HTML = 8 * 1024 * 1024;
 const error = (message, code = 'SOURCE_INVALID') => Object.assign(new Error(message), { code });
 const isId = value => typeof value === 'string' && ID.test(value);
+const isWebToken = value => typeof value === 'string' && WEB_TOKEN.test(value);
 const text = value => typeof value === 'string' ? value.trim() : '';
 const count = value => Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? Number(value) : 0;
 function requireId(value, label) {
@@ -148,7 +152,43 @@ export function parseDetail(html, seriesId) {
       seen.add(episode.vid);
       return true;
     });
-  return { ...item, episodes, accessibleEpisodeCount: episodes.filter(episode => episode.webAvailable).length };
+  return withWebIds({ ...item, episodes, accessibleEpisodeCount: episodes.filter(episode => episode.webAvailable).length }, accessible, detail);
+}
+/** A page that only previews the accessible episodes of a longer series is marked incomplete;
+ *  its web ids stay bound to the leading episodes they name. */
+function withWebIds(result, accessible, detail) {
+  const episodeCount = count(detail.series_episode_info?.episode_cnt) || result.episodeCount;
+  const entries = Array.isArray(detail.vid_list) ? detail.vid_list : [];
+  const listed = entries.filter(isWebToken);
+  const webIds = [];
+  if (listed.length && !result.episodes.length) {
+    // Token page: no numeric episode at all, only the leading ones by position.
+    for (const token of listed.slice(0, accessible > 0 ? accessible : listed.length)) if (!webIds.includes(token)) webIds.push(token);
+  } else if (result.episodes.length && episodeCount > result.episodes.length && result.accessibleEpisodeCount === result.episodes.length) {
+    for (const episode of result.episodes) if (episode.webAvailable) webIds.push(episode.vid);
+  }
+  return webIds.length ? { ...result, episodeCount, webIds, complete: false } : result;
+}
+/** The detail as the page presents it, without the completion bookkeeping. */
+function pageDetail(detail) {
+  const { webIds, complete, ...page } = detail;
+  return page;
+}
+/** The native App list supplies the numeric episodes; the page's web ids bind to the leading ones. */
+export function completeDetail(web, app, seriesId) {
+  const invalid = () => error('完整分集与请求剧集不一致', 'DETAIL_UNAVAILABLE');
+  if (!app || app.seriesId !== seriesId || !Array.isArray(app.episodes) || !app.episodes.length || app.episodes.length > MAX_EPISODES) throw invalid();
+  const webIds = Array.isArray(web.webIds) ? web.webIds : [];
+  const seen = new Set();
+  const episodes = app.episodes.map((row, i) => {
+    if (!isId(row?.vid) || seen.has(row.vid)) throw invalid();
+    seen.add(row.vid);
+    const webAvailable = i < webIds.length;
+    return { vid: row.vid, index: i + 1, webAvailable, availability: webAvailable ? 'available' : 'unknown' };
+  });
+  return { seriesId, title: web.title || app.title || '未命名短剧', coverUrl: web.coverUrl || publicHttpsUrl(app.coverUrl) || '',
+    description: web.description || '', episodeLabel: web.episodeLabel || '', tags: web.tags, episodeCount: episodes.length, episodes,
+    accessibleEpisodeCount: Math.min(episodes.length, webIds.length) };
 }
 function matchesPlayer(value, seriesId, vid, allowCanonical = false) {
   try {
@@ -202,10 +242,11 @@ export function parsePlayback(html, seriesId, vid) {
 }
 
 /** Inject Android's native HTML request; never requires a Mac/local server. */
-export function createSource(request, { fallback, webFallback = !!fallback, searchPage, newReleases } = {}) {
+export function createSource(request, { fallback, webFallback = !!fallback, searchPage, newReleases, appDetail } = {}) {
   if (typeof request !== 'function') throw error('需要提供页面请求函数', 'INVALID_INPUT');
   if (fallback !== undefined && typeof fallback !== 'function') throw error('片源回退必须是请求函数', 'INVALID_INPUT');
   if (newReleases !== undefined && typeof newReleases !== 'function') throw error('上新补搜必须是请求函数', 'INVALID_INPUT');
+  if (appDetail !== undefined && typeof appDetail !== 'function') throw error('完整分集来源必须是请求函数', 'INVALID_INPUT');
   const pagedSearch = searchPage === undefined ? null : createFallbackSearch(searchPage, request, { newReleases });
   const cache = new Map(), pending = new Map();
   const cachedLoad = (key, execute, { refresh = false } = {}) => {
@@ -245,7 +286,24 @@ export function createSource(request, { fallback, webFallback = !!fallback, sear
     },
     detail(seriesId) {
       requireId(seriesId, '剧集编号');
-      return cachedLoad(`${SITE_ORIGIN}/detail:${seriesId}`, () => loadDetail(request, seriesId, html => parseDetail(html, seriesId)));
+      return cachedLoad(`${SITE_ORIGIN}/detail:${seriesId}`, async () => {
+        const web = await loadDetail(request, seriesId, html => parseDetail(html, seriesId));
+        // A full page stands on its own; a preview needs the App list for the numeric episodes.
+        if (web.complete !== false) return web;
+        const incomplete = () => pageDetail(web);
+        if (typeof appDetail !== 'function') {
+          if (web.episodes.length) return incomplete();
+          throw error('来源仅返回部分分集，请稍后重试', 'DETAIL_UNAVAILABLE');
+        }
+        let app;
+        try { app = await appDetail({ seriesId, webIds: web.webIds }); }
+        catch (cause) {
+          // A page that still lists numeric episodes remains usable on its own.
+          if (web.episodes.length) return incomplete();
+          throw cause;
+        }
+        return completeDetail(web, app, seriesId);
+      });
     },
     playback(seriesId, vid, { quality = 'auto' } = {}) {
       requireId(seriesId, '剧集编号'); requireId(vid, '分集编号');

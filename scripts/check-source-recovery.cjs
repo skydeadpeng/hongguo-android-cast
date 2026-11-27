@@ -12,8 +12,15 @@ const webPage = (vid = '11', sid = '1', extra = {}) => `<script>window._ROUTER_D
 } })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'VideoObject', url: `https://hongguoduanju.com/player/${sid}/${vid}`, contentUrl: media('web') })}</script>`;
 function load(file, dependencies) {
   dependencies = { './playback-device': { registerPlaybackDevice: async () => playbackDevice }, ...dependencies };
+  if (file === 'hongguo.js' && !Object.hasOwn(dependencies, './app-source')) {
+    // 2026-11-27: the list chain asks the App detail first; without a caller stub it stays offline.
+    dependencies['./app-source'] = { ...require(path.join(nativeDir, 'app-source.js')),
+      fetchAppEpisodeList: async () => { throw Object.assign(new Error('app detail unavailable'), { code: 'EMPTY_RESPONSE' }); } };
+  }
   const context = { Buffer, URL, URLSearchParams, AbortSignal, AbortController, process: { env: {} }, module: { exports: {} },
-    console: { warn() {} }, setTimeout: (fn, ms) => ms === 600 ? setTimeout(fn, 0) : fn(),
+    console: { warn() {} },
+    setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms === 600 ? 0 : ms); return { _timer: timer, unref() { timer.unref?.(); } }; },
+    clearTimeout: (timer) => clearTimeout(timer?._timer ?? timer),
     require: name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name.startsWith('.') ? path.join(nativeDir, name) : name) };
   vm.runInNewContext(fs.readFileSync(path.join(nativeDir, file), 'utf8'), context);
   return context.module.exports;
@@ -259,6 +266,128 @@ const checks = [
       return true;
     });
     assert.equal(apiCalls, 1, 'empty 200 responses must stop without retrying');
+  }],
+  // 2026-11-27: the official page lists only the leading episodes, by obfuscated token (upstream #217).
+  ['Episode list takes the App detail first, rejects an incomplete web preview and bounds its own timeout', async () => {
+    const sid = '918273647';
+    let appCalls = 0, webCalls = 0, apiCalls = 0;
+    const appFirst = load('hongguo.js', {
+      './app-source': { fetchAppEpisodeList: async (id, opts) => {
+        appCalls++;
+        assert.equal(id, sid);
+        assert.ok(opts?.signal instanceof AbortSignal, 'the App list must receive a bounded abort signal');
+        return { series_id: sid, series_title: '完整剧', total: 6, episodes: Array.from({ length: 6 }, (_, i) => ({ vid: String(100 + i), vid_index: i + 1 })), source: 'app' };
+      } },
+      axios: {
+        get: async () => { webCalls++; return { data: '' }; },
+        post: async () => { apiCalls++; return { status: 200, headers: {}, data: Buffer.alloc(0) }; },
+      },
+    });
+    const full = await appFirst.fetchEpisodeList(sid);
+    assert.equal(full.source, 'app'); assert.equal(full.total, 6);
+    assert.equal(appCalls, 1); assert.equal(webCalls, 0); assert.equal(apiCalls, 0, 'a served App list reads no web page and no preload API');
+
+    // A page that lists only the accessible prefix of a longer series is a preview, never the list.
+    const previewHtml = `<script>window._ROUTER_DATA=${JSON.stringify({ loaderData: {
+      'player_(series_id)/page': { isSuccess: true, series_id: sid, seriesDetail: {
+        series_id: sid, series_name: '预览剧', episode_cnt: 71, accessible_episode_cnt: 3, vid_list: ['101', '102', '103'],
+      } },
+    } })}</script>`;
+    let detailCalls = 0;
+    const previewFallback = load('hongguo.js', {
+      axios: {
+        get: async () => ({ data: previewHtml }),
+        post: async () => {
+          detailCalls++;
+          return { status: 200, headers: {}, data: Buffer.from(JSON.stringify({ code: 0, data: {
+            [sid]: { video_data: { series_title: '完整回退', video_list: Array.from({ length: 71 }, (_, i) => ({ vid: String(200 + i), vid_index: i + 1 })) } },
+          } })) };
+        },
+      },
+    });
+    const parsedPreview = await previewFallback.fetchEpisodeListFromWeb(sid);
+    assert.equal(parsedPreview.episode_count, 71); assert.equal(parsedPreview.complete, false);
+    const recovered = await previewFallback.fetchEpisodeList(sid);
+    assert.equal(recovered.total, 71);
+    assert.equal(detailCalls, 1, 'an incomplete web preview must not be accepted as a full series');
+
+    // Token pages (the current site format) stay a typed web failure behind the App failure.
+    let tokenApiCalls = 0;
+    const tokens = load('hongguo.js', { axios: {
+      get: async () => ({ data: previewHtml.replace('"vid_list":["101","102","103"]', '"vid_list":["v1_5DC8VBWf14_jqPcnhiSPfJ6fiGI","v1_2VMvyadqPpt6G-ZZqkmCa18eFHw"]') }),
+      post: async () => { tokenApiCalls++; return { status: 200, headers: {}, data: Buffer.alloc(0) }; },
+    } });
+    await assert.rejects(tokens.fetchEpisodeList(sid), error => {
+      assert.match(error.message, /App详情（接口返回空响应）/); assert.match(error.message, /官网分集数据异常/); assert.match(error.message, /0 字节/);
+      assert.doesNotMatch(error.message, /aborted|secret|signed\.invalid/);
+      return true;
+    });
+    assert.equal(tokenApiCalls, 1);
+
+    // A stalled App list is abandoned inside its budget; the web page keeps the remaining deadline.
+    let timedOutSignal = false, webBudgetOk = false;
+    const deadline = Date.now() + 300;
+    const bounded = load('hongguo.js', {
+      './app-source': { fetchAppEpisodeList: async (_id, opts) => new Promise((_resolve, reject) => {
+        opts.signal.addEventListener('abort', () => { timedOutSignal = true; reject(new Error('aborted')); }, { once: true });
+      }) },
+      axios: {
+        get: async () => {
+          webBudgetOk = deadline - Date.now() > 0;
+          return { data: `<script>window._ROUTER_DATA=${JSON.stringify({ loaderData: {
+            'player_(series_id)/page': { isSuccess: true, series_id: sid, seriesDetail: {
+              series_id: sid, series_name: '完整网页剧', episode_cnt: 2, vid_list: ['301', '302'],
+            } },
+          } })}</script>` };
+        },
+        post: async () => ({ status: 200, headers: {}, data: Buffer.alloc(0) }),
+      },
+    });
+    const keepAlive = setInterval(() => {}, 50);
+    try {
+      const fromWeb = await bounded.fetchEpisodeList(sid, { deadline, force: true });
+      assert.equal(timedOutSignal, true, 'a stalled App list must abort before the outer deadline');
+      assert.equal(webBudgetOk, true, 'the web fallback must keep a positive remaining deadline');
+      assert.equal(fromWeb.total, 2);
+    } finally { clearInterval(keepAlive); }
+  }],
+  ['Episode list reads the signed App video_detail/v1 with 64-bit series ids and full numeric vids', async () => {
+    const sid = '7706908220253555737';
+    let detailCalled = 0, webCalled = 0;
+    const app = load('app-source.js', {
+      axios: async config => {
+        detailCalled++;
+        const url = new URL(config.url);
+        assert.equal(url.pathname, '/novel/player/video_detail/v1/');
+        assert.equal(config.method, 'POST');
+        assert.equal(url.searchParams.get('version_code'), '74532');
+        assert.equal(url.searchParams.get('iid'), playbackDevice.iid);
+        assert.equal(url.searchParams.get('device_id'), playbackDevice.device_id);
+        assert.equal(url.searchParams.get('cdid'), playbackDevice.cdid);
+        assert.equal(config.headers['User-Agent'], 'okhttp/4.12.0');
+        assert.equal(config.headers['Content-Encoding'], 'gzip');
+        assert.ok(config.headers['x-medusa'] && config.headers['x-helios'] && config.headers['x-khronos'] && config.headers['x-ss-stub']);
+        const raw = `{"code":0,"data":{"video_data":{"series_id":${sid},"series_title":"完整真剧","series_cover":"https://img.example/c.jpg","series_intro":"简介","episode_cnt":3,"content_type":1001,"video_list":[{"vid":7706910230088518718,"vid_index":1,"title":"第1集"},{"vid":7706910230088518719,"vid_index":2,"title":"第2集"},{"vid":7706910230088518720,"vid_index":3,"title":"第3集","disable_play":true}]}}}`;
+        return { status: 200, headers: {}, data: raw };
+      },
+    });
+    const f = load('hongguo.js', {
+      './app-source': app,
+      axios: { get: async () => { webCalled++; return { data: '' }; }, post: async () => ({ status: 200, headers: {}, data: Buffer.alloc(0) }) },
+    });
+    const result = await f.fetchEpisodeList(sid);
+    assert.equal(detailCalled, 1); assert.equal(webCalled, 0);
+    assert.equal(result.source, 'app'); assert.equal(result.series_id, sid); assert.equal(result.content_type, '1001'); assert.equal(result.total, 3);
+    assert.deepEqual(Array.from(result.episodes, e => e.vid), ['7706910230088518718', '7706910230088518719', '7706910230088518720']);
+    assert.deepEqual(Array.from(result.episodes, e => e.locked), [false, false, true]);
+    assert.equal(result.episodes[0].series_title, '完整真剧');
+    // A refusal or a short list is typed, and a canceled caller is never answered from the App.
+    const refused = load('app-source.js', { axios: async () => ({ status: 200, headers: {}, data: `{"code":0,"data":{"video_data":{"series_id":${sid},"series_title":"短","video_list":[{"vid":1,"vid_index":1},{"vid":1,"vid_index":2}],"episode_cnt":3}}}` }) });
+    await assert.rejects(refused.fetchAppEpisodeList(sid), error => error.code === 'INVALID_RESPONSE');
+    await assert.rejects(refused.fetchAppEpisodeList('12', { signal: AbortSignal.abort() }), error => error.code === 'ERR_CANCELED');
+    await assert.rejects(refused.fetchAppEpisodeList('../1'), error => error.code === 'INVALID_OPTIONS');
+    const other = load('app-source.js', { axios: async () => ({ status: 200, headers: {}, data: `{"code":0,"data":{"video_data":{"series_id":100001,"video_list":[{"vid":1,"vid_index":1}]}}}` }) });
+    await assert.rejects(other.fetchAppEpisodeList(sid), error => error.code === 'INVALID_RESPONSE');
   }],
   ['Protected website SEO preview never replaces the complete App episode', async () => {
     const calls = [];

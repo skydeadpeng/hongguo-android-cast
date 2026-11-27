@@ -328,10 +328,11 @@ final class NetworkGuard {
     }
     static Reply get(String value) throws Exception { return request(value, true, false); }
     static Reply get(String value, long deadline) throws Exception { return request(value, true, false, deadline); }
-    /** The normal official guest-player request: fixed destination, one validated
-     * public episode ID, no cookies/credentials, and never a redirected POST. */
+    /** The normal official guest-player request: fixed destination, one validated public episode
+     * id (a numeric vid or, since 2026-11-27, the site's obfuscated "v1_" token), no
+     * cookies/credentials, and never a redirected POST. */
     static Reply guestPlaybackPost(String itemId, long deadline) throws Exception {
-        if (itemId == null || !itemId.matches("[0-9]{1,30}")) throw new IOException("分集编号无效");
+        if (itemId == null || !(itemId.matches("[0-9]{1,30}") || itemId.matches("v[0-9]+_[A-Za-z0-9_-]{8,128}"))) throw new IOException("分集编号无效");
         return request("https://hongguoduanju.com/api/video/protected/fallback-play-info", false, false,
             deadline, "{\"item_id\":\"" + itemId + "\"}", true);
     }

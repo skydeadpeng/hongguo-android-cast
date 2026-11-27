@@ -32,6 +32,38 @@ final class EpisodeResolver {
     private static void requireId(String value, String label) throws ResolverException {
         if (value == null || !value.matches("[0-9]{1,30}")) throw error("INVALID_INPUT", label + "必须是 1 至 30 位数字字符串");
     }
+    /** An official page's own episode id: the numeric vid, or the obfuscated token the site
+     *  addresses its accessible episodes by since 2026-11-27. */
+    private static final Pattern WEB_TOKEN = Pattern.compile("v[0-9]+_[A-Za-z0-9_-]{8,128}");
+    private static boolean webId(String value) {
+        return value != null && (value.matches("[0-9]{1,30}") || WEB_TOKEN.matcher(value).matches());
+    }
+    /** Accessible web ids by episode position, remembered when a series' list is loaded. The
+     *  page's tokens cannot be derived from a numeric vid; playback after a process restart
+     *  without a loaded list simply has no web route, like an episode the page never listed. */
+    private static final int MAX_WEB_ID_SERIES = 24;
+    private static final long WEB_ID_TTL_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(30);
+    private static final java.util.LinkedHashMap<String, Object[]> WEB_IDS = new java.util.LinkedHashMap<>(16, 0.75f, true);
+    static void rememberWebIds(String seriesId, List<String> vids, List<String> webIds) {
+        if (seriesId == null || vids == null || webIds == null || webIds.isEmpty() || vids.size() > 2000 || webIds.size() > vids.size()) return;
+        String[] ids = webIds.toArray(new String[0]);
+        for (String id : ids) if (!webId(id)) return;
+        synchronized (WEB_IDS) {
+            WEB_IDS.put(seriesId, new Object[]{ System.nanoTime() + WEB_ID_TTL_NANOS, vids.toArray(new String[0]), ids });
+            while (WEB_IDS.size() > MAX_WEB_ID_SERIES) WEB_IDS.remove(WEB_IDS.keySet().iterator().next());
+        }
+    }
+    /** The official page id of this episode when its series list was loaded, else null. */
+    private static String webId(String seriesId, String vid) {
+        synchronized (WEB_IDS) {
+            Object[] entry = WEB_IDS.get(seriesId);
+            if (entry == null) return null;
+            if (System.nanoTime() >= (Long) entry[0]) { WEB_IDS.remove(seriesId); return null; }
+            String[] vids = (String[]) entry[1], ids = (String[]) entry[2];
+            for (int i = 0; i < vids.length; i++) if (vids[i].equals(vid)) return i < ids.length ? ids[i] : null;
+            return null;
+        }
+    }
     /** Short first budget: a hung CDN edge must not consume the whole wait alone. */
     private static final int FIRST_BUDGET_MS = 2000, HEDGE_BUDGET_MS = 6000;
     /** Returns a lexically checked URL; the player's transport must run NetworkGuard.media before use. */
@@ -50,9 +82,9 @@ final class EpisodeResolver {
         GuestPublicUnavailable() { super("官网未提供本集公开片源"); }
     }
     private static final class GuestPage {
-        final String sid, vid; final double duration; final int width, height;
-        GuestPage(String sid, String vid, double duration, int width, int height) {
-            this.sid=sid;this.vid=vid;this.duration=duration;this.width=width;this.height=height;
+        final String sid, vid, pageId; final double duration; final int width, height;
+        GuestPage(String sid, String vid, String pageId, double duration, int width, int height) {
+            this.sid=sid;this.vid=vid;this.pageId=pageId;this.duration=duration;this.width=width;this.height=height;
         }
     }
     private static final class Candidate {
@@ -84,18 +116,41 @@ final class EpisodeResolver {
         // HTTP status, identity) stay final and keep their sequential error.
         String canonical = ORIGIN + "/player/" + seriesId + "/" + vid, underscore = ORIGIN + "/player/_/" + vid;
         Exception[] failures = new Exception[2];
+        long diagAt=System.nanoTime();
+        // 2026-11-27: the official page addresses an episode by an obfuscated token and answers the
+        // numeric route with 404. A token known from a loaded list is the canonical route; short of
+        // its own guest verdict, its failure is not more final than the numeric routes below.
+        String token = webId(seriesId, vid);
+        if (token != null && !token.equals(vid)) {
+            String route = ORIGIN + "/player/" + seriesId + "/" + token;
+            try { return attempt(route, seriesId, vid, token, boundedBudget(deadline, FIRST_BUDGET_MS), true); }
+            catch (java.net.SocketTimeoutException timedOut) { failures[0] = timedOut; }
+            catch (java.io.InterruptedIOException cancelled) { throw cancelled; }
+            catch (GuestFailure verdict) { throw verdict; }
+            catch (Exception error) { failures[0] = error; }
+            // A slow page gets the same single longer retry the numeric routes get below.
+            if (transportTimeout(failures[0])) {
+                try { return attempt(route, seriesId, vid, token, boundedBudget(deadline, HEDGE_BUDGET_MS), true); }
+                catch (java.io.InterruptedIOException | GuestFailure verdict) { throw verdict; }
+                catch (Exception retry) { failures[0] = retry; }
+            }
+            diagAt=System.nanoTime();
+        }
         // SocketTimeoutException extends InterruptedIOException, so the timeout must be
         // caught BEFORE cancellation or a hung first route aborts the whole resolution.
-        try { return attempt(canonical, seriesId, vid, boundedBudget(deadline, FIRST_BUDGET_MS), true); }
+        try { return attempt(canonical, seriesId, vid, vid, boundedBudget(deadline, FIRST_BUDGET_MS), true); }
         catch (java.net.SocketTimeoutException timedOut) { failures[0] = timedOut; }
         catch (java.io.InterruptedIOException cancelled) { throw cancelled; }
         catch (GuestFailure denied) { throw denied; }
         catch (Exception error) { failures[0] = error; }
-        try { return attempt(underscore, seriesId, vid, boundedBudget(deadline, FIRST_BUDGET_MS), false); }
+        trace("DIAG canonicalFailed sid="+seriesId+" vid="+vid+" ms="+(System.nanoTime()-diagAt)/1000000+" "+failures[0].getClass().getName()+": "+failures[0].getMessage());
+        diagAt=System.nanoTime();
+        try { return attempt(underscore, seriesId, vid, vid, boundedBudget(deadline, FIRST_BUDGET_MS), false); }
         catch (java.net.SocketTimeoutException timedOut) { failures[1] = timedOut; }
         catch (java.io.InterruptedIOException cancelled) { throw cancelled; }
         catch (GuestFailure denied) { throw denied; }
         catch (Exception error) { failures[1] = error; }
+        trace("DIAG underscoreFailed sid="+seriesId+" vid="+vid+" ms="+(System.nanoTime()-diagAt)/1000000+" "+failures[1].getClass().getName()+": "+failures[1].getMessage());
         if (!transportTimeout(failures[0]) || !transportTimeout(failures[1])) throw failures[1] != null ? failures[1] : failures[0];
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2, runnable -> {
             Thread thread = new Thread(runnable, "hongguo-episode-resolve");
@@ -109,7 +164,7 @@ final class EpisodeResolver {
                 final int which = index;
                 final String url = index == 0 ? canonical : underscore;
                 service.submit(() -> {
-                    try { return attempt(url, seriesId, vid, boundedBudget(deadline, HEDGE_BUDGET_MS), false); }
+                    try { return attempt(url, seriesId, vid, vid, boundedBudget(deadline, HEDGE_BUDGET_MS), false); }
                     catch (Exception failure) { hedge[which] = failure; throw failure; }
                 });
             }
@@ -126,7 +181,12 @@ final class EpisodeResolver {
     private static boolean transportTimeout(Exception error) {
         return error instanceof java.net.SocketTimeoutException || error instanceof java.net.ConnectException || error instanceof java.net.SocketException;
     }
-    private static Candidate attempt(String url, String seriesId, String vid, int budgetMs, boolean canonical) throws Exception {
+    /** One diagnostic line per failed route; inert off-device (no android.util.Log). */
+    static void trace(String message) {
+        try { android.util.Log.i("HongguoWeb", message); } catch (Throwable ignored) { }
+    }
+    /** pageId is the official page's own id of this episode: the numeric vid, or its web token. */
+    private static Candidate attempt(String url, String seriesId, String vid, String pageId, int budgetMs, boolean canonical) throws Exception {
         if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("已切换分集");
         NetworkGuard.Reply response = NetworkGuard.get(url, budgetMs, System.currentTimeMillis() + budgetMs);
         if (response.status == 404) throw error("EPISODE_UNAVAILABLE", "该分集未向官网提供公开播放页面，请在官方 App 查看");
@@ -134,12 +194,12 @@ final class EpisodeResolver {
         // Only a direct canonical page can report absent public metadata to the
         // caller. Alternate/hedged responses cannot supersede another page's denial.
         boolean allowMissingSeo = canonical && response.status == 200 && url.equals(response.url);
-        GuestPage guest=guestPage(response.body,seriesId,vid,allowMissingSeo);
-        return guest==null?new Candidate(parse(response.body,seriesId,vid),null):new Candidate(null,guest);
+        GuestPage guest=guestPage(response.body,seriesId,vid,pageId,allowMissingSeo);
+        return guest==null?new Candidate(parsePage(response.body,seriesId,pageId),null):new Candidate(null,guest);
     }
     /** Only the current official page can establish this explicit guest route.
      * Its SEO contentUrl is never used as a substitute for the server response. */
-    private static GuestPage guestPage(String html,String sid,String vid,boolean allowMissingSeo) throws Exception {
+    private static GuestPage guestPage(String html,String sid,String vid,String pageId,boolean allowMissingSeo) throws Exception {
         JSONObject loaders=extractRouterData(html).optJSONObject("loaderData");
         JSONObject data=loaders==null?null:loaders.optJSONObject("player_(series_id)/(vid)/page");
         if(data==null&&loaders!=null)data=loaders.optJSONObject("player_(series_id)/page");
@@ -148,7 +208,7 @@ final class EpisodeResolver {
         if(req!=null&&(Boolean.TRUE.equals(req.opt("pcLoginRequired"))||Boolean.TRUE.equals(req.opt("pcAuthenticatedPlayback"))))
             throw new GuestFailure("本集需要官网支持的登录播放流程，请在官方应用查看");
         if(!Boolean.TRUE.equals(data.opt("protectedPlayback")))return null;
-        if(!Boolean.TRUE.equals(data.opt("isSuccess"))||!exact(data,"series_id",sid)||!exact(data,"vid",vid)||
+        if(!Boolean.TRUE.equals(data.opt("isSuccess"))||!exact(data,"series_id",sid)||!exact(data,"vid",pageId)||
             !exact(detail,"series_id",sid))
             throw new GuestFailure("官网播放信息与所选分集不一致");
         // Official browser routing is isEncryptSupported && encryptedBrowserAllowed.
@@ -159,13 +219,13 @@ final class EpisodeResolver {
         if(req==null||!Boolean.FALSE.equals(req.opt("pcLoginRequired"))||!Boolean.FALSE.equals(req.opt("pcAuthenticatedPlayback"))||!(req.opt("encryptedBrowserAllowed") instanceof Boolean))
             throw new GuestFailure("官网未明确允许本集使用公开游客播放流程");
         JSONArray vids=detail.optJSONArray("vid_list");boolean present=false;
-        for(int i=0;vids!=null&&i<vids.length();i++)if(vid.equals(vids.opt(i)))present=true;
+        for(int i=0;vids!=null&&i<vids.length();i++)if(pageId.equals(vids.opt(i)))present=true;
         if(!present)throw new GuestFailure("官网分集不属于当前剧集");
         if(allowMissingSeo&&!data.has("publicVideoSeo")) {
             if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("已切换分集");
             throw new GuestPublicUnavailable();
         }
-        if(!exact(seo,"seriesId",sid)||!exact(seo,"itemId",vid))
+        if(!exact(seo,"seriesId",sid)||!exact(seo,"itemId",pageId))
             throw new GuestFailure("官网播放信息与所选分集不一致");
         if(!Boolean.TRUE.equals(seo.opt("available")))throw new GuestFailure("官网暂未允许本集公开播放");
         Object raw=seo.opt("durationSeconds"),w=seo.opt("width"),h=seo.opt("height");
@@ -174,7 +234,7 @@ final class EpisodeResolver {
         double width=((Number)w).doubleValue(),height=((Number)h).doubleValue();
         if(!Double.isFinite(width)||!Double.isFinite(height)||width!=Math.rint(width)||height!=Math.rint(height)||width<1||height<1||width>16384||height>16384)
             throw new GuestFailure("官网分集尺寸无效");
-        return new GuestPage(sid,vid,((Number)raw).doubleValue(),(int)width,(int)height);
+        return new GuestPage(sid,vid,pageId,((Number)raw).doubleValue(),(int)width,(int)height);
     }
     private static void guestBudget(long deadline) throws Exception {
         try { boundedBudget(deadline,25000); }
@@ -185,7 +245,7 @@ final class EpisodeResolver {
     private static JSONObject guestInfo(GuestPage page,long deadline) throws Exception {
         guestBudget(deadline);
         NetworkGuard.Reply reply;
-        try { reply=NetworkGuard.guestPlaybackPost(page.vid,deadline); }
+        try { reply=NetworkGuard.guestPlaybackPost(page.pageId,deadline); }
         catch(Exception failure) {
             if(Thread.currentThread().isInterrupted() || failure instanceof java.io.InterruptedIOException && !(failure instanceof java.net.SocketTimeoutException))throw failure;
             GuestFailure terminal=new GuestFailure("官网游客播放请求未完成，请稍后重试");terminal.initCause(failure);throw terminal;
@@ -197,7 +257,7 @@ final class EpisodeResolver {
         catch(Exception invalid){throw new GuestFailure("官网游客播放信息格式无效");}
         JSONObject base=value.optJSONObject("base_resp");Object code=base==null?null:base.opt("StatusCode");
         if(!(code instanceof Number)||((Number)code).doubleValue()!=0)throw new GuestFailure("官网暂未允许本集游客播放");
-        for(String id:new String[]{"item_id","vid"})if(value.has(id)&&!page.vid.equals(value.opt(id)))throw new GuestFailure("官网返回的分集身份不匹配");
+        for(String id:new String[]{"item_id","vid"})if(value.has(id)&&!page.pageId.equals(value.opt(id)))throw new GuestFailure("官网返回的分集身份不匹配");
         for(String id:new String[]{"series_id","seriesId"})if(value.has(id)&&!page.sid.equals(value.opt(id)))throw new GuestFailure("官网返回的剧集身份不匹配");
         for(String name:new String[]{"code","Code","error_code"})if(value.has(name)&&(!(value.opt(name) instanceof Number)||((Number)value.opt(name)).doubleValue()!=0))
             throw new GuestFailure("官网暂未允许本集游客播放");
@@ -222,6 +282,12 @@ final class EpisodeResolver {
     static String parse(String html, String seriesId, String vid) throws Exception {
         requireId(seriesId, "剧集编号");
         requireId(vid, "分集编号");
+        return parsePage(html, seriesId, vid);
+    }
+    /** The same parser for the official page's own episode id: a numeric vid or its web token. */
+    private static String parsePage(String html, String seriesId, String pageId) throws Exception {
+        requireId(seriesId, "剧集编号");
+        if (!webId(pageId)) throw error("INVALID_INPUT", "分集编号必须是 1 至 30 位数字字符串");
         JSONObject loaders = extractRouterData(html).optJSONObject("loaderData");
         Object raw = loaders == null ? null : loaders.opt("player_(series_id)/(vid)/page");
         if (raw == null || raw == JSONObject.NULL) raw = loaders == null ? null : loaders.opt("player_(series_id)/page");
@@ -229,8 +295,8 @@ final class EpisodeResolver {
         JSONObject detail = data == null ? null : data.optJSONObject("seriesDetail");
         JSONObject seo = data == null ? null : data.optJSONObject("publicVideoSeo");
         if (data == null || Boolean.FALSE.equals(data.opt("isSuccess")) || !exact(data, "series_id", seriesId) ||
-                !exact(data, "vid", vid) || !exact(detail, "series_id", seriesId) ||
-                !exact(seo, "seriesId", seriesId) || !exact(seo, "itemId", vid)) {
+                !exact(data, "vid", pageId) || !exact(detail, "series_id", seriesId) ||
+                !exact(seo, "seriesId", seriesId) || !exact(seo, "itemId", pageId)) {
             throw error("IDENTITY_MISMATCH", "播放页面与请求剧集或分集不一致");
         }
         if (!Boolean.TRUE.equals(seo.opt("available"))) throw error("EPISODE_UNAVAILABLE", "该分集未向官网公开播放，请在官方 App 查看");
@@ -238,7 +304,7 @@ final class EpisodeResolver {
         // resolveInfo handles the separate, server-approved guest POST when explicitly eligible.
         if (Boolean.TRUE.equals(data.opt("protectedPlayback"))) throw error("PREVIEW_ONLY", "官网需要受支持的授权播放流程");
         JSONArray vids = detail.optJSONArray("vid_list");
-        boolean canonicalFirst = vids != null && vid.equals(vids.opt(0));
+        boolean canonicalFirst = vids != null && pageId.equals(vids.opt(0));
         boolean invalidUrl = false;
         Matcher scripts = SCRIPT.matcher(html);
         while (scripts.find()) {
@@ -254,13 +320,13 @@ final class EpisodeResolver {
                 // Later canonical pages omit VID; only their checked, same-origin media path binds it.
                 boolean officialMedia = media != null && "hongguoduanju.com".equals(media.getHost()) &&
                         media.getRawPath().startsWith("/video/public/");
-                boolean boundMedia = officialMedia && media.getRawPath().startsWith("/video/public/" + vid + "/");
+                boolean boundMedia = officialMedia && media.getRawPath().startsWith("/video/public/" + pageId + "/");
                 // Contradictory media identity must not borrow the legacy first-episode CDN exception.
                 if (officialMedia && !boundMedia) continue;
                 boolean allowCanonical = canonicalFirst || boundMedia;
-                if (!matchesPlayer(video.opt("url"), seriesId, vid, allowCanonical)) continue;
+                if (!matchesPlayer(video.opt("url"), seriesId, pageId, allowCanonical)) continue;
                 Object id = video.opt("@id");
-                if (truthy(id) && !matchesPlayer(id, seriesId, vid, allowCanonical)) continue;
+                if (truthy(id) && !matchesPlayer(id, seriesId, pageId, allowCanonical)) continue;
                 if (!url.isEmpty()) return url;
                 invalidUrl = true;
             }
@@ -309,14 +375,14 @@ final class EpisodeResolver {
             videoObjects(object.opt("@graph"), out, depth + 1);
         }
     }
-    private static boolean matchesPlayer(Object value, String seriesId, String vid, boolean allowCanonical) {
+    private static boolean matchesPlayer(Object value, String seriesId, String pageId, boolean allowCanonical) {
         if (!(value instanceof String)) return false;
         try {
             URI uri = new URI((String) value);
             if (!"https".equalsIgnoreCase(uri.getScheme()) || !"hongguoduanju.com".equalsIgnoreCase(uri.getHost()) ||
                     uri.getRawUserInfo() != null || uri.getPort() != -1 && uri.getPort() != 443) return false;
             String path = normalizedPath(uri.getRawPath());
-            return ("/player/" + seriesId + "/" + vid).equals(path) || allowCanonical &&
+            return ("/player/" + seriesId + "/" + pageId).equals(path) || allowCanonical &&
                     (uri.getRawQuery() == null || uri.getRawQuery().isEmpty()) && ("/player/" + seriesId).equals(path);
         } catch (Exception ignored) { return false; }
     }

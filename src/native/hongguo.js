@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { URL } = require('node:url');
 const { normalizeDownloadQuality } = require('./download-quality');
 const { isPublicMediaUrl, webMediaRequestOptions } = require('./web-media-guard');
+const { abortError, boundedSignal } = require('./request-signal');
 
 const API = "https://api5-normal-sinfonlineb.fqnovel.com";
 const UA = "com.phoenix.read/71532 (Linux; U; Android 9; SM-N9860; Build/PQ3A.190705.10241111;tt-ok/3.12.13.20)";
@@ -244,6 +245,7 @@ function parseEpisodeListHtml(html, seriesId) {
   const accessible = detail.accessible_episode_cnt;
   const webAccessibleEpisodes = accessible != null && /^\d+$/.test(String(accessible))
     ? Math.min(Number(accessible), vids.length) : null;
+  const episodeCount = Number(detail.episode_cnt) || Number(detail.series_episode_info?.episode_cnt) || null;
 
   const episodes = vids.map((vid, i) => ({
     vid,
@@ -260,6 +262,9 @@ function parseEpisodeListHtml(html, seriesId) {
     series_title: seriesTitle,
     cover: cover || (episodes[0] && episodes[0].cover) || '',
     total: episodes.length,
+    // A CDN edge may still list only the accessible prefix of a longer series: that is a preview.
+    episode_count: episodeCount,
+    complete: episodeCount == null || episodes.length >= episodeCount,
     web_accessible_episodes: webAccessibleEpisodes,
     episodes,
     source: 'web', // 标记来源，便于排查
@@ -486,10 +491,63 @@ async function fetchEpisodeListFromWeb(seriesId, deadline = 0) {
   }
 }
 
+const APP_DETAIL_LIST_TIMEOUT_MS = 9000;
+
+/** One safe reason per list source; never a raw upstream message, URL or identity. */
+function describeListSourceError(error) {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '');
+  if (code === 'ETIMEDOUT' || code === 'ECONNABORTED' || code === 'TIMEOUT' || error?.name === 'TimeoutError'
+      || /超时|timeout/i.test(message)) {
+    return '请求超时';
+  }
+  if (code === 'ERR_CANCELED' || /aborted|canceled/i.test(message)) {
+    return '加载超时或连接中断';
+  }
+  if (code === 'ANONYMOUS_LIMITED') return '匿名设备暂时受限';
+  if (code === 'DEVICE_REJECTED') return '匿名设备被拒';
+  if (code === 'DEVICE_REGISTRATION_FAILED') return '匿名设备注册失败';
+  if (code === 'RATE_LIMITED') return '请求过于频繁';
+  if (code === 'BUSINESS_REJECTED') return '接口暂时拒绝请求';
+  if (code === 'EMPTY_RESPONSE') return '接口返回空响应';
+  if (code === 'SECURITY_BLOCKED') return '请求被安全校验阻止';
+  if (code === 'INVALID_OPTIONS') return '剧集编号无效';
+  if (code === 'INVALID_RESPONSE') return '分集列表不完整或数据异常';
+  if (code === 'CONTENT_UNAVAILABLE') return '剧集暂不可用';
+  if (['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ERR_NETWORK', 'TRANSPORT'].includes(code)) {
+    return '网络连接失败';
+  }
+  return '暂不可用';
+}
+
 async function fetchEpisodeListFresh(seriesId, { deadline = 0 } = {}) {
+  let appError = null;
+  const appSource = require('./app-source');
+  // 2026-11-27: the official page lists only the leading episodes, by obfuscated token (upstream #217).
+  // The complete numeric list comes from the signed App detail; the page only serves when it is whole.
+  if (typeof appSource?.fetchAppEpisodeList === 'function') {
+    const remaining = deadline ? deadline - Date.now() : APP_DETAIL_LIST_TIMEOUT_MS;
+    if (deadline && remaining <= 0) {
+      appError = Object.assign(new Error('请求超时'), { code: 'ETIMEDOUT' });
+    } else {
+      // Under a caller's deadline the App list spends at most 60% of it, like upstream: the page
+      // and the preload API behind it keep the rest.
+      const appTimeout = deadline ? Math.min(APP_DETAIL_LIST_TIMEOUT_MS, Math.max(1, Math.floor(remaining * 0.6))) : APP_DETAIL_LIST_TIMEOUT_MS;
+      const appBudget = boundedSignal(undefined, appTimeout);
+      try {
+        return await appSource.fetchAppEpisodeList(seriesId, { deadline: Date.now() + appTimeout, signal: appBudget.signal });
+      } catch (error) {
+        appError = appBudget.signal.aborted ? abortError(appBudget.signal) : error;
+      } finally {
+        appBudget.dispose();
+      }
+    }
+  }
   let webError;
   try {
-    return await fetchEpisodeListFromWeb(seriesId, deadline);
+    const web = await fetchEpisodeListFromWeb(seriesId, deadline);
+    if (web.complete !== false) return web;
+    webError = new Error(`官网仅返回 ${web.episodes.length}/${web.episode_count} 集预览`);
   } catch (error) {
     webError = error;
   }
@@ -502,7 +560,8 @@ async function fetchEpisodeListFresh(seriesId, { deadline = 0 } = {}) {
   try {
     j = await apiCall("/novel/player/multi_video_detail/preload/v1", body, 3, 25000, deadline);
   } catch (e) {
-    throw new Error(`获取分集失败：官网数据源（${webError.message}），备用接口（${e.message}）`);
+    const appPart = appError ? `App详情（${describeListSourceError(appError)}），` : '';
+    throw new Error(`获取分集失败：${appPart}官网数据源（${webError.message}），备用接口（${e.message}）`);
   }
   if (!j || j.code !== 0) {
     throw new Error("detail API 失败: " + JSON.stringify(j || {}).slice(0, 200));

@@ -33,7 +33,8 @@ export async function loadDetail(request, seriesId, parse, { timeoutMs = 8000, s
       }).then(html => {
         if (settled) return;
         const detail = parse(html);
-        if (!detail || !Array.isArray(detail.episodes) || !detail.episodes.length) throw fail('来源未返回有效分集', 'DETAIL_UNAVAILABLE');
+        // An incomplete preview (token-only page) still counts as an answer; its episodes come from the App list.
+        if (!detail || !Array.isArray(detail.episodes) || !detail.episodes.length && detail.complete !== false) throw fail('来源未返回有效分集', 'DETAIL_UNAVAILABLE');
         finish(detail, null, index);
       }).catch(() => {
         if (settled) return;
